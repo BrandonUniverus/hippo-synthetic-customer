@@ -1,0 +1,22 @@
+# Generated artifacts
+artifacts/
+out/
+dist/
+temp/
+
+# Local configuration
+.env
+.env.*
+*.user
+
+# Tooling caches
+.vs/
+.vscode/
+bin/
+obj/
+node_modules/
+__pycache__/
+.pytest_cache/
+
+# Logs
+*.log

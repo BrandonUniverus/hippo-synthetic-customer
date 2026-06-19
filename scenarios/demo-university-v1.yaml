@@ -1,0 +1,129 @@
+manifestVersion: 1
+customer:
+  id: demo_university_v1
+  displayName: Northlake University
+  seed: 104729
+  timeZone: America/Los_Angeles
+  region: Sacramento, California
+
+weather:
+  primaryStation: KSAC
+  secondaryStation: KSMF
+
+dateRange:
+  start: 2024-01-01
+  end: 2025-12-31
+
+sites:
+  - id: northlake_main_campus
+    displayName: Northlake Main Campus
+    type: campus
+    buildings:
+      - id: admin_hall
+        displayName: Admin Hall
+        useType: office_classroom
+        grossFloorAreaSqft: 85000
+        address:
+          line1: 100 Synthetic Campus Drive
+          city: Sacramento
+          state: CA
+          postalCode: "95822"
+      - id: science_center
+        displayName: Science Center
+        useType: lab_classroom
+        grossFloorAreaSqft: 120000
+        address:
+          line1: 120 Synthetic Campus Drive
+          city: Sacramento
+          state: CA
+          postalCode: "95822"
+      - id: library
+        displayName: Library
+        useType: library
+        grossFloorAreaSqft: 70000
+        address:
+          line1: 140 Synthetic Campus Drive
+          city: Sacramento
+          state: CA
+          postalCode: "95822"
+      - id: student_center
+        displayName: Student Center
+        useType: food_service_event
+        grossFloorAreaSqft: 95000
+        address:
+          line1: 160 Synthetic Campus Drive
+          city: Sacramento
+          state: CA
+          postalCode: "95822"
+  - id: cedar_row_apartments
+    displayName: Cedar Row Apartments
+    type: multifamily
+    buildings:
+      - id: cedar_row_a
+        displayName: Cedar Row A
+        useType: multifamily_housing
+        units: 60
+        address:
+          line1: 400 Synthetic Grove Avenue
+          city: Sacramento
+          state: CA
+          postalCode: "95822"
+      - id: cedar_row_b
+        displayName: Cedar Row B
+        useType: multifamily_housing
+        units: 64
+        address:
+          line1: 420 Synthetic Grove Avenue
+          city: Sacramento
+          state: CA
+          postalCode: "95822"
+
+providers:
+  - id: valley_electric_district
+    displayName: Valley Electric District
+    category: electric
+  - id: sierra_gas_utility
+    displayName: Sierra Gas Utility
+    category: natural_gas
+  - id: river_city_water
+    displayName: River City Water
+    category: water
+  - id: capital_sewer_district
+    displayName: Capital Sewer District
+    category: sewer
+  - id: northlake_thermal_plant
+    displayName: Northlake Thermal Plant
+    category: chilled_water
+
+scenarios:
+  positive:
+    - baseline_monthly_bills
+    - electric_interval_15min
+    - chilled_water_hourly
+    - meter_replacement
+    - estimated_bill_correction
+    - missing_interval_backfill
+    - duplicate_file_import
+    - account_number_change
+    - provider_rate_change
+  negative:
+    - negative_bad_units
+
+artifactTargets:
+  - source_database_seed
+  - mdef
+  - bif
+  - backfill_inputs
+  - provider_billing_files
+  - provider_interval_files
+  - integration_payloads
+
+assertionTargets:
+  - bill_totals_by_account
+  - bill_totals_by_building
+  - interval_counts_by_channel
+  - interval_usage_by_channel
+  - peak_demand_by_building
+  - report_rollups_by_site
+  - import_idempotency
+  - integration_export_shape
