@@ -1,0 +1,118 @@
+# River City Utilities — EVERYDAY municipal multi-service utility.
+# The "does multiple things" everyday provider: one account number and one
+# monthly statement carry three services — potable water, sanitary sewer, and
+# stormwater. Replaces the earlier separate "River City Water" and
+# "Capital Sewer District".
+id: river_city_utilities
+displayName: River City Utilities
+shortName: RCU
+identityClass: everyday
+providerKind: municipal_multi_service
+ownership: public_municipal
+billingModel: bundled_municipal
+currency: USD
+billingCadence: monthly
+description: >
+  Everyday municipal utility that bundles potable water, sanitary sewer, and
+  stormwater on a single account and statement. Only water is metered; sewer
+  volume is derived from metered water and stormwater is a flat area-based fee.
+
+supplies:
+  - commodity: water
+    role: consumption
+    usageUnit: kgal            # thousand gallons
+    dataTypes: [monthly_bill]
+    notes: Metered potable water. Drives both the water and the sewer charge.
+  - commodity: sewer
+    role: consumption
+    usageUnit: kgal
+    derivedFrom: water
+    dataTypes: [monthly_bill]
+    notes: Volumetric sewer billed on metered water; apartments capped at a winter average.
+  - commodity: stormwater
+    role: service_fee
+    usageUnit: eru            # equivalent runoff units (impervious area)
+    dataTypes: [monthly_bill]
+    notes: Flat area-based fee. No metered usage quantity.
+
+accountModel:
+  numberFormat: "SYN-RCU-A-#######"
+  example: "SYN-RCU-A-0030007"
+  grouping: one_account_per_building_with_multiple_services
+  renewalScenario: account_number_change
+  meta: [service_address, water_meter_size_in, eru_count]
+
+meterModel:
+  numberFormat: "SYN-RCU-M-#######"
+  example: "SYN-RCU-M-0060142"
+  meterTypes: [water_positive_displacement, water_compound]
+  note: Only water is metered. Sewer and stormwater are calculated, not metered.
+
+channels:
+  - id: water_kgal
+    commodity: water
+    unit: kgal
+    direction: delivered
+    intervalMinutes: null
+
+rateSchedules:
+  - id: RCU-W-TIER
+    name: Non-Residential Water (tiered)
+    type: tiered_volumetric
+    effective: "2024-01-01..2025-12-31"
+    components:
+      meterCharge:                    # by water meter size
+        "1in": { unit: $/month, rate: 42.00 }
+        "2in": { unit: $/month, rate: 96.00 }
+        "4in": { unit: $/month, rate: 260.00 }
+      tiers:
+        - { upToKgal: 50, unit: $/kgal, rate: 4.85 }
+        - { upToKgal: 200, unit: $/kgal, rate: 6.40 }
+        - { upToKgal: null, unit: $/kgal, rate: 8.15 }
+  - id: RCU-S-VOL
+    name: Sanitary Sewer (volumetric on water)
+    type: volumetric_on_water
+    effective: "2024-01-01..2025-12-31"
+    components:
+      baseCharge: { unit: $/month, rate: 28.50 }
+      volume: { unit: $/kgal, rate: 7.95, basis: metered_water_kgal }
+  - id: RCU-SW-ERU
+    name: Stormwater (impervious area)
+    type: flat_per_eru
+    effective: "2024-01-01..2025-12-31"
+    components:
+      eruCharge: { unit: $/eru/month, rate: 11.20 }
+
+billCharges:
+  - { code: water_meter_charge, type: fixed, unit: $/month }
+  - { code: water_tier1, type: usage_tier, unit: $/kgal }
+  - { code: water_tier2, type: usage_tier, unit: $/kgal }
+  - { code: water_tier3, type: usage_tier, unit: $/kgal }
+  - { code: sewer_base, type: fixed, unit: $/month }
+  - { code: sewer_volume, type: usage, unit: $/kgal }
+  - { code: stormwater_eru, type: fixed, unit: $/eru }
+
+fileFormats:
+  billing:
+    name: RCU combined municipal billing extract
+    format: csv
+    grain: one_row_per_account_per_service_per_billing_period
+    artifactType: bif
+    keyColumns: [synthetic_account_number, service_code, billing_start, billing_end, usage_quantity, usage_unit, total_cost]
+    note: One account carries multiple service rows (WATER, SEWER, STORM) on the same statement.
+
+environmental:
+  scope: 3
+  metrics:
+    - { name: embedded_water_energy, unit: kWh/kgal, value: 3.2, note: synthetic conveyance + treatment energy }
+
+scenarioHooks:
+  - { scenario: baseline_monthly_bills, role: primary }
+  - { scenario: account_number_change, role: primary, targets: [cedar_row_a], note: "Account number changes at renewal; site and building continuity preserved across all three services" }
+  - { scenario: duplicate_file_import, role: primary, note: "Re-import the combined billing file; must not double-count any of the three services" }
+
+dataQuirks:
+  - One account, multiple service line items on a single statement.
+  - Sewer volume is derived from metered water, not independently metered.
+  - Stormwater is a flat ERU fee with a zero usage quantity.
+  - Apartment occupancy scales water usage, and therefore sewer, month to month.

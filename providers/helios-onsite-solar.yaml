@@ -1,0 +1,115 @@
+# Helios Onsite Solar — UNIQUE provider identity #2: behind-the-meter generation.
+# A third-party developer that owns rooftop and carport PV (plus a small battery)
+# on campus and sells the output under a Power Purchase Agreement (PPA): priced
+# per kWh GENERATED, not per kWh consumed, with no demand charge. It inverts the
+# usual sign convention and supplies environmental attributes (RECs, avoided
+# CO2e) that no everyday meter produces.
+id: helios_onsite_solar
+displayName: Helios Onsite Solar
+shortName: HOS
+identityClass: unique
+providerKind: onsite_generation_ppa
+ownership: third_party_owned
+billingModel: ppa_generation
+currency: USD
+billingCadence: monthly
+uniqueIdentity: >
+  Generation, not consumption. Channels are positive-generation / negative-load:
+  self-consumed kWh offset Valley Electric usage and surplus is exported with a
+  net-metering credit. The PPA prices energy per kWh produced (escalating yearly)
+  rather than against a tariff, and the provider issues a monthly REC and
+  avoided-emissions statement for market-based Scope 2 reporting.
+
+supplies:
+  - commodity: solar_generation
+    role: generation
+    usageUnit: kWh
+    demandUnit: kW
+    dataTypes: [interval_15min, monthly_ppa_invoice, rec_statement]
+    intervalMinutes: 15
+    direction: generated
+    servedBuildings: [science_center, student_center, cedar_row_a]
+    notes: Self-consumed kWh offset Valley Electric load; surplus is exported for a credit.
+
+accountModel:
+  numberFormat: "SYN-HOS-P-#######"     # P = PPA agreement id, not a utility account
+  example: "SYN-HOS-P-0000002"
+  grouping: one_ppa_per_array_site
+  meta: [array_site_id, system_size_kwdc, ppa_start, ppa_term_years, escalator_pct]
+
+meterModel:
+  numberFormat: "SYN-HOS-M-#######"
+  example: "SYN-HOS-M-0080011"
+  meterTypes: [production_meter_pv, bidirectional_export]
+
+channels:
+  - id: solar_gen_kwh
+    commodity: solar_generation
+    unit: kWh
+    direction: generated
+    intervalMinutes: 15
+  - id: solar_export_kwh
+    commodity: solar_generation
+    unit: kWh
+    direction: exported
+    intervalMinutes: 15
+  - id: solar_gen_kw
+    commodity: solar_generation
+    unit: kW
+    direction: generated
+    intervalMinutes: 15
+
+rateSchedules:
+  - id: HOS-PPA-2024
+    name: Solar Power Purchase Agreement
+    type: ppa_energy
+    effective: "2024-01-01..2025-12-31"
+    components:
+      ppaEnergy: { unit: $/kWh, rate: 0.119, basis: metered_generation }
+      annualEscalator: { unit: pct/year, rate: 2.0 }
+      netMeteringCredit: { unit: $/kWh, rate: 0.092, basis: exported_kwh }
+    recOwnership: customer_retains    # customer keeps RECs for market-based Scope 2 claims
+
+billCharges:
+  - { code: ppa_energy, type: generation, unit: $/kWh }
+  - { code: net_metering_credit, type: credit, unit: $/kWh }
+  - { code: rec_transfer, type: informational, unit: rec }
+
+fileFormats:
+  billing:
+    name: HOS monthly PPA invoice extract
+    format: csv
+    grain: one_row_per_ppa_per_billing_period
+    artifactType: bif
+    keyColumns: [ppa_id, array_site_id, billing_start, billing_end, generated_kwh, exported_kwh, ppa_amount, credit_amount]
+  interval:
+    name: HOS 15-minute generation extract
+    format: csv
+    grain: one_row_per_channel_per_interval
+    artifactType: mdef
+    keyColumns: [synthetic_meter_number, channel_id, reading_start, reading_end, kwh, kw, direction, quality_code]
+  environmentalStatement:
+    name: HOS monthly REC and avoided-emissions statement
+    format: csv
+    grain: one_row_per_array_site_per_month
+    artifactType: integration_payload
+    keyColumns: [array_site_id, period_start, period_end, generated_mwh, recs_issued, avoided_co2e_kg]
+
+environmental:
+  scope: "2_reduction"
+  attributes:
+    - { name: renewable_energy_certificates, unit: rec_per_mwh, value: 1.0 }
+    - { name: avoided_co2e, unit: kgCO2e/kWh, value: 0.231, basis: displaced_grid_factor }
+
+scenarioHooks:
+  - { scenario: electric_interval_15min, role: paired, note: "Generation nets against Valley Electric consumption at Science/Student Center" }
+  - { scenario: solar_generation_interval, role: primary, note: "MV90/MV9 generation and export channels prove positive-generation handling" }
+  - { scenario: baseline_monthly_bills, role: primary, note: "PPA invoice plus net-metering credit" }
+  - { scenario: missing_interval_backfill, role: candidate, note: "An inverter outage leaves a generation gap that is later backfilled" }
+
+dataQuirks:
+  - Generation sign convention — channels are positive-generation, reducing net load.
+  - Priced per kWh generated (PPA), not per kWh consumed; there is no demand charge.
+  - Supplies environmental attributes (RECs, avoided CO2e) no everyday meter has.
+  - Output follows the daily solar shape and weather, peaking midday; near zero overnight.
+  - A small battery can shift an evening discharge (reserved for V2).

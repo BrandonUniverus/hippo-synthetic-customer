@@ -33,6 +33,9 @@ docs/
   integration-coverage.md      Coverage matrix for gateways, reports, and integrations.
 schemas/
   synthetic-source-model.md    Source database model and invariants.
+providers/
+  README.md                    Provider set overview (3 everyday + 2 unique).
+  *.yaml                       Full configuration for each utility provider.
 scenarios/
   demo-university-v1.yaml      Machine-readable scenario manifest.
 generators/

@@ -1,0 +1,118 @@
+# Northlake Thermal Plant — UNIQUE provider identity #1: campus district energy.
+# Not an external utility. A campus-owned central plant that PRODUCES chilled
+# water (cooling) and steam (heating) and ALLOCATES its operating cost to the
+# buildings it serves. No external account number, no tariff — internal cost
+# recovery based on sub-metered consumption.
+id: northlake_thermal_plant
+displayName: Northlake Thermal Plant
+shortName: NTP
+identityClass: unique
+providerKind: district_energy_plant
+ownership: internal_campus_owned
+billingModel: internal_allocation
+currency: USD
+billingCadence: monthly
+uniqueIdentity: >
+  This provider exists to stress data shapes an external utility never produces:
+  internal cost allocation instead of a tariff bill, hourly (not 15-minute)
+  interval, and a non-electric energy commodity. The plant is itself a Valley
+  Electric customer (chiller power) and a Sierra Gas customer (boiler fuel), so
+  it ties Scope 1 and Scope 2 emissions to delivered thermal energy.
+
+supplies:
+  - commodity: chilled_water
+    role: production_and_allocation
+    usageUnit: ton_hours        # ton-hours of cooling energy
+    demandUnit: tons            # instantaneous cooling
+    dataTypes: [interval_hourly, monthly_allocation]
+    intervalMinutes: 60
+    servedBuildings: [science_center]
+    notes: Hourly ton-hour sub-meter at Science Center plus monthly cost allocation.
+  - commodity: steam
+    role: production_and_allocation
+    usageUnit: klb              # thousand pounds of steam
+    energyEquivalentUnit: mmbtu
+    dataTypes: [monthly_allocation]
+    intervalMinutes: null
+    servedBuildings: [science_center, admin_hall, library, student_center]
+    notes: Campus heating loop, allocated monthly. No interval channel in V1.
+
+accountModel:
+  numberFormat: "SYN-NTP-C-#######"     # C = internal cost center, not a utility account
+  example: "SYN-NTP-C-0000004"
+  grouping: one_cost_center_per_served_building
+  meta: [served_building_id, allocation_basis, plant_id]
+
+meterModel:
+  numberFormat: "SYN-NTP-M-#######"
+  example: "SYN-NTP-M-0070003"
+  meterTypes: [btu_meter_chilled, condensate_meter_steam]
+  note: Sub-meters measure delivered thermal energy at each served building.
+
+channels:
+  - id: chw_ton_hours
+    commodity: chilled_water
+    unit: ton_hours
+    direction: delivered
+    intervalMinutes: 60
+    appliesTo: [science_center]
+  - id: chw_tons
+    commodity: chilled_water
+    unit: tons
+    direction: delivered
+    intervalMinutes: 60
+    appliesTo: [science_center]
+
+rateSchedules:
+  - id: NTP-ALLOC-CHW
+    name: Chilled Water Cost Allocation
+    type: internal_cost_recovery
+    effective: "2024-01-01..2025-12-31"
+    components:
+      consumption: { unit: $/ton_hour, rate: 0.168, basis: annual_plant_oandm }
+      demand: { unit: $/ton/month, rate: 9.50, basis: peak_tons }
+  - id: NTP-ALLOC-STEAM
+    name: Steam Cost Allocation
+    type: internal_cost_recovery
+    effective: "2024-01-01..2025-12-31"
+    components:
+      consumption: { unit: $/klb, rate: 14.20, basis: annual_plant_oandm }
+
+billCharges:
+  - { code: chilled_water_consumption, type: usage, unit: $/ton_hour }
+  - { code: chilled_water_demand, type: demand, unit: $/ton }
+  - { code: steam_consumption, type: usage, unit: $/klb }
+  - { code: fixed_oandm_allocation, type: allocation, unit: $ }
+
+fileFormats:
+  allocation:
+    name: NTP monthly internal allocation extract
+    format: csv
+    grain: one_row_per_cost_center_per_commodity_per_month
+    artifactType: bif
+    keyColumns: [cost_center, served_building_id, commodity, period_start, period_end, usage_quantity, usage_unit, allocated_cost]
+  interval:
+    name: NTP hourly chilled-water interval extract
+    format: csv
+    grain: one_row_per_channel_per_hour
+    artifactType: mdef
+    keyColumns: [synthetic_meter_number, channel_id, reading_start, reading_end, ton_hours, tons, quality_code]
+
+environmental:
+  scope: mixed
+  note: >
+    Plant emissions are upstream Scope 1 (gas boilers) and Scope 2 (electric
+    chillers), allocated to delivered thermal energy.
+  metrics:
+    - { name: plant_electric_input, unit: kWh/ton_hour, value: 0.62 }
+    - { name: plant_gas_input, unit: therms/klb, value: 1.18 }
+
+scenarioHooks:
+  - { scenario: chilled_water_hourly, role: primary, targets: [science_center] }
+  - { scenario: baseline_monthly_bills, role: secondary, note: "Monthly allocation behaves like a bill for rollups" }
+
+dataQuirks:
+  - Internal allocation, not a utility bill — there is no external account number.
+  - Chilled-water (cooling) demand is seasonal and peaks on summer afternoons.
+  - The plant is itself a Valley Electric and Sierra Gas customer (nested consumption).
+  - Hourly interval (not 15-minute) to exercise a non-electric interval shape.

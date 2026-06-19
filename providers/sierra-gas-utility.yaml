@@ -1,0 +1,87 @@
+# Sierra Gas Utility — EVERYDAY natural-gas distribution utility.
+# The simplest everyday provider: a single commodity, monthly bills only,
+# no interval data. Gas heats every campus building and fuels the Student
+# Center kitchen.
+id: sierra_gas_utility
+displayName: Sierra Gas Utility
+shortName: SGU
+identityClass: everyday
+providerKind: distribution_utility
+ownership: investor_owned_synthetic
+billingModel: tariff_metered
+currency: USD
+billingCadence: monthly
+description: >
+  Everyday natural-gas distribution utility. Billed on therms derived from
+  metered ccf and a heating-value factor. Strong winter heating seasonality and
+  a near-flat summer baseload.
+
+supplies:
+  - commodity: natural_gas
+    role: consumption
+    usageUnit: therms
+    deliveredVolumeUnit: ccf
+    thermFactor: 1.027        # therms per ccf (synthetic heating value)
+    dataTypes: [monthly_bill]
+    intervalMinutes: null
+    notes: No interval data. Usage is monthly therms only.
+
+accountModel:
+  numberFormat: "SYN-SGU-A-#######"
+  example: "SYN-SGU-A-0020031"
+  grouping: one_account_per_building
+  meta: [service_address, rate_schedule_id, meter_set_size]
+
+meterModel:
+  numberFormat: "SYN-SGU-M-#######"
+  example: "SYN-SGU-M-0050118"
+  meterTypes: [monthly_diaphragm, monthly_rotary]
+
+channels:
+  - id: gas_therms
+    commodity: natural_gas
+    unit: therms
+    direction: delivered
+    intervalMinutes: null
+
+rateSchedules:
+  - id: SGU-GN-1
+    name: General Non-Residential Firm Service
+    type: tiered_seasonal
+    effective: "2024-01-01..2025-12-31"
+    components:
+      customerCharge: { unit: $/month, rate: 38.00 }
+      commodity:
+        winter: { unit: $/therm, rate: 1.142, months: [11, 12, 1, 2, 3] }
+        summer: { unit: $/therm, rate: 0.876, months: [4, 5, 6, 7, 8, 9, 10] }
+      transport: { unit: $/therm, rate: 0.214 }
+
+billCharges:
+  - { code: customer_charge, type: fixed, unit: $/month }
+  - { code: gas_commodity, type: usage_seasonal, unit: $/therm }
+  - { code: gas_transport, type: usage, unit: $/therm }
+  - { code: public_purpose_surcharge, type: rider, unit: $ }
+  - { code: utility_users_tax, type: tax, unit: $ }
+
+fileFormats:
+  billing:
+    name: SGU monthly billing extract
+    format: csv
+    grain: one_row_per_account_per_billing_period
+    artifactType: bif
+    keyColumns: [synthetic_account_number, billing_start, billing_end, total_therms, total_cost, bill_status]
+
+environmental:
+  scope: 1
+  emissionFactorSource: EPA stationary combustion (synthetic value)
+  co2eFactor: { unit: kgCO2e/therm, value: 5.31 }
+
+scenarioHooks:
+  - { scenario: baseline_monthly_bills, role: primary }
+  - { scenario: estimated_bill_correction, role: primary, note: "One estimated read, then a corrected actual bill supersedes it" }
+  - { scenario: negative_bad_units, role: host, note: "Negative-test file declares usage in BTU/hr (unsupported) to force a validation failure" }
+
+dataQuirks:
+  - Strong winter heating peak; near-flat summer baseload.
+  - One billing period is issued as an estimate, then superseded by an actual read.
+  - The negative-test file intentionally uses an unsupported usage unit.

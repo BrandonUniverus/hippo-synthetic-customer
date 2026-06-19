@@ -78,28 +78,1446 @@ sites:
           state: CA
           postalCode: "95822"
 
+# ENERGY STAR Portfolio Manager property mapping.
+# Each site/building maps to a PM Property with a primaryFunction (an exact
+# PrimaryFunctionType enum value) plus one or more Property Uses carrying use
+# details. Field names, enum values, and units are grounded in the EEMSuite
+# EnergyStar integration model and the ENERGY STAR "U.S. Property Types,
+# Definitions, and Use Details" reference (Oct 2024). See
+# docs/energystar-integration.md for the full mapping and integration notes.
+# Two PM grouping models are represented: a campus (College/University parent
+# with child building properties) and a multifamily property (one benchmarked
+# property containing physical buildings).
+energyStarProperties:
+  # --- Northlake Main Campus: campus parent + per-building child properties ---
+  - ref: { siteId: northlake_main_campus }
+    role: campus_parent
+    primaryFunction: College/University
+    yearBuilt: 1965
+    occupancyPercentage: 90
+    isInstitutionalProperty: true
+    grossFloorArea: { value: 370000, units: Square Feet }
+    propertyUses:
+      - function: College/University
+        grossFloorAreaSqft: 370000
+        useDetails:
+          weeklyOperatingHours: 100
+          enrollment: 9500
+          numberOfFTEWorkers: 1200
+          numberOfComputers: 4200
+          grantDollars: 18500000
+    notes: Campus benchmarking parent; the child building properties roll up to it.
+
+  - ref: { buildingId: admin_hall }
+    role: child_property
+    parentSiteId: northlake_main_campus
+    primaryFunction: Office
+    yearBuilt: 1998
+    occupancyPercentage: 95
+    isInstitutionalProperty: true
+    grossFloorArea: { value: 85000, units: Square Feet }
+    propertyUses:
+      - function: Office
+        grossFloorAreaSqft: 60000
+        useDetails:
+          weeklyOperatingHours: 60
+          numberOfWorkersOnMainShift: 180
+          numberOfComputers: 200
+          percentThatCanBeCooled: 100
+          percentThatCanBeHeated: 100
+      - function: Other - Education
+        grossFloorAreaSqft: 25000
+        useDetails:
+          weeklyOperatingHours: 50
+          numberOfWorkersOnMainShift: 20
+          numberOfComputers: 60
+
+  - ref: { buildingId: science_center }
+    role: child_property
+    parentSiteId: northlake_main_campus
+    primaryFunction: Laboratory
+    yearBuilt: 2008
+    occupancyPercentage: 90
+    isInstitutionalProperty: true
+    grossFloorArea: { value: 120000, units: Square Feet }
+    propertyUses:
+      - function: Laboratory
+        grossFloorAreaSqft: 80000
+        useDetails:
+          weeklyOperatingHours: 90
+          numberOfWorkersOnMainShift: 60
+          numberOfComputers: 150
+      - function: Other - Education
+        grossFloorAreaSqft: 40000
+        useDetails:
+          weeklyOperatingHours: 50
+          numberOfWorkersOnMainShift: 15
+          numberOfComputers: 80
+
+  - ref: { buildingId: library }
+    role: child_property
+    parentSiteId: northlake_main_campus
+    primaryFunction: Library
+    yearBuilt: 1992
+    occupancyPercentage: 90
+    isInstitutionalProperty: true
+    grossFloorArea: { value: 70000, units: Square Feet }
+    propertyUses:
+      - function: Library
+        grossFloorAreaSqft: 70000
+        useDetails:
+          weeklyOperatingHours: 100
+          numberOfWorkersOnMainShift: 25
+          numberOfComputers: 120
+          percentThatCanBeHeated: 100
+          percentThatCanBeCooled: 100
+
+  - ref: { buildingId: student_center }
+    role: child_property
+    parentSiteId: northlake_main_campus
+    primaryFunction: Food Service
+    yearBuilt: 2003
+    occupancyPercentage: 85
+    isInstitutionalProperty: true
+    grossFloorArea: { value: 95000, units: Square Feet }
+    propertyUses:
+      - function: Food Service
+        grossFloorAreaSqft: 45000
+        useDetails:
+          weeklyOperatingHours: 98
+          numberOfWorkersOnMainShift: 40
+          numberOfComputers: 30
+      - function: Other - Entertainment/Public Assembly
+        grossFloorAreaSqft: 50000
+        useDetails:
+          weeklyOperatingHours: 70
+          numberOfWorkersOnMainShift: 20
+          numberOfComputers: 25
+
+  # --- Cedar Row Apartments: one multifamily property with two physical buildings ---
+  - ref: { siteId: cedar_row_apartments }
+    role: multifamily_property
+    primaryFunction: Multifamily Housing
+    yearBuilt: 2012
+    occupancyPercentage: 95
+    isInstitutionalProperty: true
+    grossFloorArea: { value: 120000, units: Square Feet }
+    propertyUses:
+      - function: Multifamily Housing
+        grossFloorAreaSqft: 120000
+        useDetails:
+          totalNumberOfResidentialLivingUnits: 124
+          residentialLivingUnitsLowRise: 124
+          residentialLivingUnitsMidRise: 0
+          residentialLivingUnitsHighRise: 0
+          numberOfBedrooms: 200
+          residentPopulationType: Dedicated Student
+          governmentSubsidizedHousing: "No"
+          numberOfLaundryHookupsInAllUnits: 0
+          numberOfLaundryHookupsInCommonAreas: 8
+          percentThatCanBeHeated: 100
+          percentThatCanBeCooled: 100
+    notes: PM-benchmarked multifamily property; cedar_row_a and cedar_row_b are its physical buildings.
+
+  - ref: { buildingId: cedar_row_a }
+    role: building_within_property
+    parentSiteId: cedar_row_apartments
+    primaryFunction: Multifamily Housing
+    yearBuilt: 2012
+    occupancyPercentage: 95
+    grossFloorArea: { value: 58000, units: Square Feet }
+    propertyUses:
+      - function: Multifamily Housing
+        grossFloorAreaSqft: 58000
+        useDetails:
+          totalNumberOfResidentialLivingUnits: 60
+          residentialLivingUnitsLowRise: 60
+          numberOfBedrooms: 96
+          residentPopulationType: Dedicated Student
+
+  - ref: { buildingId: cedar_row_b }
+    role: building_within_property
+    parentSiteId: cedar_row_apartments
+    primaryFunction: Multifamily Housing
+    yearBuilt: 2014
+    occupancyPercentage: 95
+    grossFloorArea: { value: 62000, units: Square Feet }
+    propertyUses:
+      - function: Multifamily Housing
+        grossFloorAreaSqft: 62000
+        useDetails:
+          totalNumberOfResidentialLivingUnits: 64
+          residentialLivingUnitsLowRise: 64
+          numberOfBedrooms: 104
+          residentPopulationType: Dedicated Student
+
+# Five fully-configured providers, split 3 everyday + 2 unique identities.
+# Full definitions (services, units, channels, rate schedules, charges, file
+# formats, environmental attributes, scenario hooks) live in providers/<id>.yaml.
 providers:
+  # --- 3 everyday utilities ---
   - id: valley_electric_district
     displayName: Valley Electric District
-    category: electric
+    identityClass: everyday
+    providerKind: distribution_utility
+    billingModel: tariff_metered
+    categories: [electric]
+    supplies: [monthly_bill, interval_15min, billing_demand]
+    configRef: providers/valley-electric-district.yaml
   - id: sierra_gas_utility
     displayName: Sierra Gas Utility
-    category: natural_gas
-  - id: river_city_water
-    displayName: River City Water
-    category: water
-  - id: capital_sewer_district
-    displayName: Capital Sewer District
-    category: sewer
+    identityClass: everyday
+    providerKind: distribution_utility
+    billingModel: tariff_metered
+    categories: [natural_gas]
+    supplies: [monthly_bill]
+    configRef: providers/sierra-gas-utility.yaml
+  - id: river_city_utilities
+    displayName: River City Utilities
+    identityClass: everyday
+    providerKind: municipal_multi_service
+    billingModel: bundled_municipal
+    categories: [water, sewer, stormwater]
+    supplies: [monthly_bill]
+    configRef: providers/river-city-utilities.yaml
+    replaces: [river_city_water, capital_sewer_district]
+  # --- 2 unique provider identities (not everyday utilities) ---
   - id: northlake_thermal_plant
     displayName: Northlake Thermal Plant
-    category: chilled_water
+    identityClass: unique
+    providerKind: district_energy_plant
+    billingModel: internal_allocation
+    categories: [chilled_water, steam]
+    supplies: [interval_hourly, monthly_allocation]
+    configRef: providers/northlake-thermal-plant.yaml
+  - id: helios_onsite_solar
+    displayName: Helios Onsite Solar
+    identityClass: unique
+    providerKind: onsite_generation_ppa
+    billingModel: ppa_generation
+    categories: [solar_generation]
+    supplies: [interval_15min, monthly_ppa_invoice, rec_statement]
+    configRef: providers/helios-onsite-solar.yaml
+
+referenceChannels:
+  - id: ch_weather_ksac_temp_f_hourly
+    sourceKind: weather_station
+    sourceId: KSAC
+    commodity: weather
+    role: observation
+    unit: degF
+    intervalMinutes: 60
+    pointType: temp_f
+  - id: ch_weather_ksac_rh_hourly
+    sourceKind: weather_station
+    sourceId: KSAC
+    commodity: weather
+    role: observation
+    unit: pct
+    intervalMinutes: 60
+    pointType: relative_humidity
+  - id: ch_weather_ksac_wind_mph_hourly
+    sourceKind: weather_station
+    sourceId: KSAC
+    commodity: weather
+    role: observation
+    unit: mph
+    intervalMinutes: 60
+    pointType: wind_mph
+  - id: ch_weather_ksmf_temp_f_hourly
+    sourceKind: weather_station
+    sourceId: KSMF
+    commodity: weather
+    role: observation
+    unit: degF
+    intervalMinutes: 60
+    pointType: tempF
+  - id: ch_weather_ksmf_forecast_temp_f_hourly
+    sourceKind: weather_station
+    sourceId: KSMF
+    commodity: weather
+    role: forecast
+    unit: degF
+    intervalMinutes: 60
+    pointType: tempF
+  - id: ch_spinwave_science_lab_temp_f_15m
+    sourceKind: building_sensor
+    sourceId: science_center
+    commodity: indoor_air
+    role: sensor_observation
+    unit: degF
+    intervalMinutes: 15
+    pointType: temp_f
+  - id: ch_spinwave_science_lab_rh_15m
+    sourceKind: building_sensor
+    sourceId: science_center
+    commodity: indoor_air
+    role: sensor_observation
+    unit: pct
+    intervalMinutes: 15
+    pointType: relative_humidity
+  - id: ch_modbus_ntp_chiller_kw_5m
+    sourceKind: plant_controller
+    sourceId: northlake_thermal_plant
+    commodity: electric
+    role: equipment_demand
+    unit: kW
+    intervalMinutes: 5
+    pointType: kW
+  - id: ch_odbc_library_electric_kwh_15m
+    sourceKind: sql_historian
+    sourceId: library
+    commodity: electric
+    role: interval_usage
+    unit: kWh
+    intervalMinutes: 15
+    pointType: kWh
+  - id: ch_fig_cedar_row_a_water_kgal_60m
+    sourceKind: provider_file_alias
+    sourceId: cedar_row_a
+    commodity: water
+    role: interval_usage
+    unit: kgal
+    intervalMinutes: 60
+    pointType: kgal
+  - id: ch_fake_gateway_smoke_kwh_15m
+    sourceKind: synthetic_gateway
+    sourceId: fake_gateway_smoke
+    commodity: electric
+    role: generated_smoke_test
+    unit: kWh
+    intervalMinutes: 15
+    pointType: kWh
+
+accounts:
+  - id: ved_admin_hall
+    providerId: valley_electric_district
+    siteId: northlake_main_campus
+    buildingId: admin_hall
+    syntheticAccountNumber: SYN-VED-A-0010001
+    rateScheduleId: VED-TOU-GS
+    effectiveStart: 2024-01-01
+    meters:
+      - id: ved_admin_hall_main
+        syntheticMeterNumber: SYN-VED-M-0040001
+        meterType: monthly_kwh
+        channels:
+          - id: ch_ved_admin_hall_kwh_monthly
+            commodity: electric
+            role: billing_usage
+            unit: kWh
+            direction: delivered
+            intervalMinutes: null
+            pointType: kWh
+          - id: ch_ved_admin_hall_kw_monthly
+            commodity: electric
+            role: billing_demand
+            unit: kW
+            direction: delivered
+            intervalMinutes: null
+            pointType: kW
+  - id: ved_science_center
+    providerId: valley_electric_district
+    siteId: northlake_main_campus
+    buildingId: science_center
+    syntheticAccountNumber: SYN-VED-A-0010002
+    rateScheduleId: VED-TOU-GS
+    effectiveStart: 2024-01-01
+    meters:
+      - id: ved_science_center_interval
+        syntheticMeterNumber: SYN-VED-M-0040002
+        meterType: interval_demand
+        gatewayProfiles: [gw_mv90_valley_mdef]
+        channels:
+          - id: ch_ved_science_center_kwh_15m
+            commodity: electric
+            role: interval_usage
+            unit: kWh
+            direction: delivered
+            intervalMinutes: 15
+            pointType: kWh
+          - id: ch_ved_science_center_kw_15m
+            commodity: electric
+            role: interval_demand
+            unit: kW
+            direction: delivered
+            intervalMinutes: 15
+            pointType: kW
+  - id: ved_library
+    providerId: valley_electric_district
+    siteId: northlake_main_campus
+    buildingId: library
+    syntheticAccountNumber: SYN-VED-A-0010003
+    rateScheduleId: VED-TOU-GS
+    effectiveStart: 2024-01-01
+    scenarios: [meter_replacement]
+    meters:
+      - id: ved_library_main_before_replacement
+        syntheticMeterNumber: SYN-VED-M-0040003
+        meterType: monthly_kwh
+        effectiveStart: 2024-01-01
+        effectiveEnd: 2024-08-14
+        lifecycleStatus: replaced
+        channels:
+          - id: ch_ved_library_kwh_monthly_old
+            commodity: electric
+            role: billing_usage
+            unit: kWh
+            direction: delivered
+            intervalMinutes: null
+            pointType: kWh
+      - id: ved_library_main_after_replacement
+        syntheticMeterNumber: SYN-VED-M-0040103
+        meterType: monthly_kwh
+        effectiveStart: 2024-08-15
+        effectiveEnd: null
+        replacesMeterId: ved_library_main_before_replacement
+        channels:
+          - id: ch_ved_library_kwh_monthly_new
+            commodity: electric
+            role: billing_usage
+            unit: kWh
+            direction: delivered
+            intervalMinutes: null
+            pointType: kWh
+  - id: ved_student_center
+    providerId: valley_electric_district
+    siteId: northlake_main_campus
+    buildingId: student_center
+    syntheticAccountNumber: SYN-VED-A-0010004
+    rateScheduleId: VED-TOU-GS
+    effectiveStart: 2024-01-01
+    meters:
+      - id: ved_student_center_interval
+        syntheticMeterNumber: SYN-VED-M-0040004
+        meterType: interval_demand
+        gatewayProfiles: [gw_acquisuite_student_electric]
+        channels:
+          - id: ch_ved_student_center_kwh_15m
+            commodity: electric
+            role: interval_usage
+            unit: kWh
+            direction: delivered
+            intervalMinutes: 15
+            pointType: kWh
+          - id: ch_ved_student_center_kw_15m
+            commodity: electric
+            role: interval_demand
+            unit: kW
+            direction: delivered
+            intervalMinutes: 15
+            pointType: kW
+  - id: ved_cedar_row_a
+    providerId: valley_electric_district
+    siteId: cedar_row_apartments
+    buildingId: cedar_row_a
+    syntheticAccountNumber: SYN-VED-A-0010005
+    rateScheduleId: VED-TOU-GS
+    effectiveStart: 2024-01-01
+    meters:
+      - id: ved_cedar_row_a_common
+        syntheticMeterNumber: SYN-VED-M-0040005
+        meterType: monthly_kwh
+        channels:
+          - id: ch_ved_cedar_row_a_kwh_monthly
+            commodity: electric
+            role: billing_usage
+            unit: kWh
+            direction: delivered
+            intervalMinutes: null
+            pointType: kWh
+  - id: ved_cedar_row_b
+    providerId: valley_electric_district
+    siteId: cedar_row_apartments
+    buildingId: cedar_row_b
+    syntheticAccountNumber: SYN-VED-A-0010006
+    rateScheduleId: VED-TOU-GS
+    effectiveStart: 2024-01-01
+    meters:
+      - id: ved_cedar_row_b_common
+        syntheticMeterNumber: SYN-VED-M-0040006
+        meterType: monthly_kwh
+        channels:
+          - id: ch_ved_cedar_row_b_kwh_monthly
+            commodity: electric
+            role: billing_usage
+            unit: kWh
+            direction: delivered
+            intervalMinutes: null
+            pointType: kWh
+
+  - id: sgu_admin_hall
+    providerId: sierra_gas_utility
+    siteId: northlake_main_campus
+    buildingId: admin_hall
+    syntheticAccountNumber: SYN-SGU-A-0020001
+    rateScheduleId: SGU-GN-1
+    effectiveStart: 2024-01-01
+    meters:
+      - id: sgu_admin_hall_gas
+        syntheticMeterNumber: SYN-SGU-M-0050001
+        meterType: monthly_diaphragm
+        channels:
+          - id: ch_sgu_admin_hall_therms_monthly
+            commodity: natural_gas
+            role: billing_usage
+            unit: therms
+            deliveredVolumeUnit: ccf
+            intervalMinutes: null
+            pointType: therms
+  - id: sgu_science_center
+    providerId: sierra_gas_utility
+    siteId: northlake_main_campus
+    buildingId: science_center
+    syntheticAccountNumber: SYN-SGU-A-0020002
+    rateScheduleId: SGU-GN-1
+    effectiveStart: 2024-01-01
+    meters:
+      - id: sgu_science_center_gas
+        syntheticMeterNumber: SYN-SGU-M-0050002
+        meterType: monthly_rotary
+        channels:
+          - id: ch_sgu_science_center_therms_monthly
+            commodity: natural_gas
+            role: billing_usage
+            unit: therms
+            deliveredVolumeUnit: ccf
+            intervalMinutes: null
+            pointType: therms
+  - id: sgu_library
+    providerId: sierra_gas_utility
+    siteId: northlake_main_campus
+    buildingId: library
+    syntheticAccountNumber: SYN-SGU-A-0020003
+    rateScheduleId: SGU-GN-1
+    effectiveStart: 2024-01-01
+    meters:
+      - id: sgu_library_gas
+        syntheticMeterNumber: SYN-SGU-M-0050003
+        meterType: monthly_diaphragm
+        channels:
+          - id: ch_sgu_library_therms_monthly
+            commodity: natural_gas
+            role: billing_usage
+            unit: therms
+            deliveredVolumeUnit: ccf
+            intervalMinutes: null
+            pointType: therms
+  - id: sgu_student_center
+    providerId: sierra_gas_utility
+    siteId: northlake_main_campus
+    buildingId: student_center
+    syntheticAccountNumber: SYN-SGU-A-0020004
+    rateScheduleId: SGU-GN-1
+    effectiveStart: 2024-01-01
+    scenarios: [estimated_bill_correction, negative_bad_units]
+    meters:
+      - id: sgu_student_center_gas
+        syntheticMeterNumber: SYN-SGU-M-0050004
+        meterType: monthly_rotary
+        channels:
+          - id: ch_sgu_student_center_therms_monthly
+            commodity: natural_gas
+            role: billing_usage
+            unit: therms
+            deliveredVolumeUnit: ccf
+            intervalMinutes: null
+            pointType: therms
+
+  - id: rcu_admin_hall
+    providerId: river_city_utilities
+    siteId: northlake_main_campus
+    buildingId: admin_hall
+    syntheticAccountNumber: SYN-RCU-A-0030001
+    rateScheduleIds: [RCU-W-TIER, RCU-S-VOL, RCU-SW-ERU]
+    effectiveStart: 2024-01-01
+    meters:
+      - id: rcu_admin_hall_water
+        syntheticMeterNumber: SYN-RCU-M-0060001
+        meterType: water_compound
+        meterSize: 2in
+        eruCount: 18
+        channels:
+          - id: ch_rcu_admin_hall_water_kgal_monthly
+            commodity: water
+            role: billing_usage
+            unit: kgal
+            intervalMinutes: null
+            pointType: kgal
+          - id: ch_rcu_admin_hall_sewer_kgal_monthly
+            commodity: sewer
+            role: derived_billing_usage
+            unit: kgal
+            derivedFromChannelId: ch_rcu_admin_hall_water_kgal_monthly
+            intervalMinutes: null
+            pointType: kgal
+          - id: ch_rcu_admin_hall_stormwater_eru_monthly
+            commodity: stormwater
+            role: flat_service_fee
+            unit: eru
+            intervalMinutes: null
+            pointType: eru
+  - id: rcu_student_center
+    providerId: river_city_utilities
+    siteId: northlake_main_campus
+    buildingId: student_center
+    syntheticAccountNumber: SYN-RCU-A-0030002
+    rateScheduleIds: [RCU-W-TIER, RCU-S-VOL, RCU-SW-ERU]
+    effectiveStart: 2024-01-01
+    meters:
+      - id: rcu_student_center_water
+        syntheticMeterNumber: SYN-RCU-M-0060002
+        meterType: water_compound
+        meterSize: 4in
+        eruCount: 22
+        channels:
+          - id: ch_rcu_student_center_water_kgal_monthly
+            commodity: water
+            role: billing_usage
+            unit: kgal
+            intervalMinutes: null
+            pointType: kgal
+          - id: ch_rcu_student_center_sewer_kgal_monthly
+            commodity: sewer
+            role: derived_billing_usage
+            unit: kgal
+            derivedFromChannelId: ch_rcu_student_center_water_kgal_monthly
+            intervalMinutes: null
+            pointType: kgal
+          - id: ch_rcu_student_center_stormwater_eru_monthly
+            commodity: stormwater
+            role: flat_service_fee
+            unit: eru
+            intervalMinutes: null
+            pointType: eru
+  - id: rcu_cedar_row_a
+    providerId: river_city_utilities
+    siteId: cedar_row_apartments
+    buildingId: cedar_row_a
+    syntheticAccountNumber: SYN-RCU-A-0030003
+    rateScheduleIds: [RCU-W-TIER, RCU-S-VOL]
+    effectiveStart: 2024-01-01
+    scenarios: [account_number_change]
+    meters:
+      - id: rcu_cedar_row_a_water
+        syntheticMeterNumber: SYN-RCU-M-0060003
+        meterType: water_compound
+        meterSize: 2in
+        channels:
+          - id: ch_rcu_cedar_row_a_water_kgal_monthly
+            commodity: water
+            role: billing_usage
+            unit: kgal
+            intervalMinutes: null
+            pointType: kgal
+          - id: ch_rcu_cedar_row_a_sewer_kgal_monthly
+            commodity: sewer
+            role: derived_billing_usage
+            unit: kgal
+            derivedFromChannelId: ch_rcu_cedar_row_a_water_kgal_monthly
+            intervalMinutes: null
+            pointType: kgal
+  - id: rcu_cedar_row_b
+    providerId: river_city_utilities
+    siteId: cedar_row_apartments
+    buildingId: cedar_row_b
+    syntheticAccountNumber: SYN-RCU-A-0030004
+    rateScheduleIds: [RCU-W-TIER, RCU-S-VOL]
+    effectiveStart: 2024-01-01
+    meters:
+      - id: rcu_cedar_row_b_water
+        syntheticMeterNumber: SYN-RCU-M-0060004
+        meterType: water_compound
+        meterSize: 2in
+        channels:
+          - id: ch_rcu_cedar_row_b_water_kgal_monthly
+            commodity: water
+            role: billing_usage
+            unit: kgal
+            intervalMinutes: null
+            pointType: kgal
+          - id: ch_rcu_cedar_row_b_sewer_kgal_monthly
+            commodity: sewer
+            role: derived_billing_usage
+            unit: kgal
+            derivedFromChannelId: ch_rcu_cedar_row_b_water_kgal_monthly
+            intervalMinutes: null
+            pointType: kgal
+
+  - id: ntp_science_center
+    providerId: northlake_thermal_plant
+    siteId: northlake_main_campus
+    buildingId: science_center
+    syntheticAccountNumber: SYN-NTP-C-0000001
+    rateScheduleIds: [NTP-ALLOC-CHW, NTP-ALLOC-STEAM]
+    effectiveStart: 2024-01-01
+    meters:
+      - id: ntp_science_center_chilled_water
+        syntheticMeterNumber: SYN-NTP-M-0070001
+        meterType: btu_meter_chilled
+        gatewayProfiles: [gw_bacnet_thermal_plant]
+        channels:
+          - id: ch_ntp_science_center_chw_ton_hours_hourly
+            commodity: chilled_water
+            role: interval_usage
+            unit: ton_hours
+            direction: delivered
+            intervalMinutes: 60
+            pointType: ton_hours
+          - id: ch_ntp_science_center_chw_tons_hourly
+            commodity: chilled_water
+            role: interval_demand
+            unit: tons
+            direction: delivered
+            intervalMinutes: 60
+            pointType: tons
+      - id: ntp_science_center_steam
+        syntheticMeterNumber: SYN-NTP-M-0070101
+        meterType: condensate_meter_steam
+        channels:
+          - id: ch_ntp_science_center_steam_klb_monthly
+            commodity: steam
+            role: monthly_allocation
+            unit: klb
+            direction: delivered
+            intervalMinutes: null
+            pointType: klb
+  - id: ntp_admin_hall
+    providerId: northlake_thermal_plant
+    siteId: northlake_main_campus
+    buildingId: admin_hall
+    syntheticAccountNumber: SYN-NTP-C-0000002
+    rateScheduleIds: [NTP-ALLOC-STEAM]
+    effectiveStart: 2024-01-01
+    meters:
+      - id: ntp_admin_hall_steam
+        syntheticMeterNumber: SYN-NTP-M-0070002
+        meterType: condensate_meter_steam
+        channels:
+          - id: ch_ntp_admin_hall_steam_klb_monthly
+            commodity: steam
+            role: monthly_allocation
+            unit: klb
+            direction: delivered
+            intervalMinutes: null
+            pointType: klb
+  - id: ntp_library
+    providerId: northlake_thermal_plant
+    siteId: northlake_main_campus
+    buildingId: library
+    syntheticAccountNumber: SYN-NTP-C-0000003
+    rateScheduleIds: [NTP-ALLOC-STEAM]
+    effectiveStart: 2024-01-01
+    meters:
+      - id: ntp_library_steam
+        syntheticMeterNumber: SYN-NTP-M-0070003
+        meterType: condensate_meter_steam
+        channels:
+          - id: ch_ntp_library_steam_klb_monthly
+            commodity: steam
+            role: monthly_allocation
+            unit: klb
+            direction: delivered
+            intervalMinutes: null
+            pointType: klb
+  - id: ntp_student_center
+    providerId: northlake_thermal_plant
+    siteId: northlake_main_campus
+    buildingId: student_center
+    syntheticAccountNumber: SYN-NTP-C-0000004
+    rateScheduleIds: [NTP-ALLOC-STEAM]
+    effectiveStart: 2024-01-01
+    meters:
+      - id: ntp_student_center_steam
+        syntheticMeterNumber: SYN-NTP-M-0070004
+        meterType: condensate_meter_steam
+        channels:
+          - id: ch_ntp_student_center_steam_klb_monthly
+            commodity: steam
+            role: monthly_allocation
+            unit: klb
+            direction: delivered
+            intervalMinutes: null
+            pointType: klb
+
+  - id: hos_science_center
+    providerId: helios_onsite_solar
+    siteId: northlake_main_campus
+    buildingId: science_center
+    syntheticAccountNumber: SYN-HOS-P-0000001
+    rateScheduleId: HOS-PPA-2024
+    effectiveStart: 2024-01-01
+    meters:
+      - id: hos_science_center_array
+        syntheticMeterNumber: SYN-HOS-M-0080001
+        meterType: production_meter_pv
+        systemSizeKwDc: 420
+        gatewayProfiles: [gw_mv90_helios_mv9]
+        channels:
+          - id: ch_hos_science_center_gen_kwh_15m
+            commodity: solar_generation
+            role: interval_generation
+            unit: kWh
+            direction: generated
+            intervalMinutes: 15
+            pointType: kWh
+          - id: ch_hos_science_center_export_kwh_15m
+            commodity: solar_generation
+            role: interval_export
+            unit: kWh
+            direction: exported
+            intervalMinutes: 15
+            pointType: kWh
+          - id: ch_hos_science_center_gen_kw_15m
+            commodity: solar_generation
+            role: interval_generation_demand
+            unit: kW
+            direction: generated
+            intervalMinutes: 15
+            pointType: kW
+  - id: hos_student_center
+    providerId: helios_onsite_solar
+    siteId: northlake_main_campus
+    buildingId: student_center
+    syntheticAccountNumber: SYN-HOS-P-0000002
+    rateScheduleId: HOS-PPA-2024
+    effectiveStart: 2024-01-01
+    meters:
+      - id: hos_student_center_array
+        syntheticMeterNumber: SYN-HOS-M-0080002
+        meterType: production_meter_pv
+        systemSizeKwDc: 360
+        gatewayProfiles: [gw_mv90_helios_mv9]
+        channels:
+          - id: ch_hos_student_center_gen_kwh_15m
+            commodity: solar_generation
+            role: interval_generation
+            unit: kWh
+            direction: generated
+            intervalMinutes: 15
+            pointType: kWh
+          - id: ch_hos_student_center_export_kwh_15m
+            commodity: solar_generation
+            role: interval_export
+            unit: kWh
+            direction: exported
+            intervalMinutes: 15
+            pointType: kWh
+          - id: ch_hos_student_center_gen_kw_15m
+            commodity: solar_generation
+            role: interval_generation_demand
+            unit: kW
+            direction: generated
+            intervalMinutes: 15
+            pointType: kW
+  - id: hos_cedar_row_a
+    providerId: helios_onsite_solar
+    siteId: cedar_row_apartments
+    buildingId: cedar_row_a
+    syntheticAccountNumber: SYN-HOS-P-0000003
+    rateScheduleId: HOS-PPA-2024
+    effectiveStart: 2024-01-01
+    meters:
+      - id: hos_cedar_row_a_carport
+        syntheticMeterNumber: SYN-HOS-M-0080003
+        meterType: production_meter_pv
+        systemSizeKwDc: 240
+        gatewayProfiles: [gw_mv90_helios_mv9]
+        channels:
+          - id: ch_hos_cedar_row_a_gen_kwh_15m
+            commodity: solar_generation
+            role: interval_generation
+            unit: kWh
+            direction: generated
+            intervalMinutes: 15
+            pointType: kWh
+          - id: ch_hos_cedar_row_a_export_kwh_15m
+            commodity: solar_generation
+            role: interval_export
+            unit: kWh
+            direction: exported
+            intervalMinutes: 15
+            pointType: kWh
+
+gatewayBindings:
+  timeZone:
+    sourceName: America/Los_Angeles
+    gatewayTimeZoneId: 13
+    note: Replace this with the target dev database TimeZoneID during source seeding if it differs.
+  profiles:
+    - id: gw_acquisuite_student_electric
+      componentId: AcquiSuiteGateway
+      executorKey: gateway.acquisuite
+      gatewayType: ACQUISUITE
+      proves: [acquisuite_log_file, electric_interval_15min, missing_interval_backfill]
+      providerIds: [valley_electric_district]
+      generatedArtifacts:
+        - path: artifacts/demo-university-v1/acquisuite/ASQVED01_STUDENT.log
+          format: acquisuite_log
+          namingRule: "{Serial Number}_{DeviceID}.log"
+      runtime:
+        gatewayId: 5101
+        gatewayName: Northlake Student Center AcquiSuite
+        gatewayGuid: SYN-GW-ACQUISUITE-5101
+        nodes:
+          - gwNodeId: 510101
+            name: ASQ-VED-STUDENT
+            isEnabled: true
+            values:
+              "Serial Number": ASQVED01
+            points:
+              - ptId: 1510101
+                channelId: ch_ved_student_center_kwh_15m
+                ptType: 1
+                timeZoneId: 13
+                interval: 15
+                description: Student Center electric interval kWh
+                values:
+                  DeviceID: STUDENT
+                  "Row Number": 1
+                  PointType: kWh
+              - ptId: 1510102
+                channelId: ch_ved_student_center_kw_15m
+                ptType: 1
+                timeZoneId: 13
+                interval: 15
+                description: Student Center electric interval kW
+                values:
+                  DeviceID: STUDENT
+                  "Row Number": 2
+                  PointType: kW
+
+    - id: gw_mv90_valley_mdef
+      componentId: MV90Gateway
+      executorKey: gateway.mv90
+      gatewayType: MDEF
+      proves: [mdef_binary_file, mv90_gateway_mdef_format, electric_interval_15min]
+      providerIds: [valley_electric_district]
+      generatedArtifacts:
+        - path: artifacts/demo-university-v1/mv90/SCIENCE_VED_202401.mde
+          format: mdef
+          filePattern: "*.mde"
+      runtime:
+        gatewayId: 5201
+        gatewayName: Northlake VED MDEF Interval Import
+        gatewayGuid: SYN-GW-MDEF-5201
+        nodes:
+          - gwNodeId: 520101
+            name: MV90-MDEF-VED-SCIENCE
+            isEnabled: true
+            timeStampType: local
+            points:
+              - ptId: 1520101
+                channelId: ch_ved_science_center_kwh_15m
+                ptType: 1
+                timeZoneId: 13
+                interval: 15
+                description: Science Center MDEF delivered kWh
+                values:
+                  RecorderID: VEDSCIENCE01
+                  Channel: 1
+                  PointType: kWh
+              - ptId: 1520102
+                channelId: ch_ved_science_center_kw_15m
+                ptType: 1
+                timeZoneId: 13
+                interval: 15
+                description: Science Center MDEF billing kW
+                values:
+                  RecorderID: VEDSCIENCE01
+                  Channel: 2
+                  PointType: kW
+
+    - id: gw_mv90_helios_mv9
+      componentId: MV90Gateway
+      executorKey: gateway.mv90
+      gatewayType: MV9
+      proves: [mv90_mv9_file, solar_generation_interval, generation_sign_convention]
+      providerIds: [helios_onsite_solar]
+      generatedArtifacts:
+        - path: artifacts/demo-university-v1/mv90/HELIOS_202401.mv9
+          format: mv9
+          filePattern: "*.mv9"
+      runtime:
+        gatewayId: 5202
+        gatewayName: Northlake Helios MV90 Generation Import
+        gatewayGuid: SYN-GW-MV9-5202
+        nodes:
+          - gwNodeId: 520201
+            name: MV90-MV9-HELIOS
+            isEnabled: true
+            timeStampType: local
+            points:
+              - ptId: 1520201
+                channelId: ch_hos_science_center_gen_kwh_15m
+                ptType: 1
+                timeZoneId: 13
+                interval: 15
+                description: Science Center PV generated kWh
+                values:
+                  RecorderID: HOSSCIENCE01
+                  Channel: 1
+                  PointType: kWh
+              - ptId: 1520202
+                channelId: ch_hos_science_center_export_kwh_15m
+                ptType: 1
+                timeZoneId: 13
+                interval: 15
+                description: Science Center PV exported kWh
+                values:
+                  RecorderID: HOSSCIENCE01
+                  Channel: 2
+                  PointType: kWh
+              - ptId: 1520203
+                channelId: ch_hos_student_center_gen_kwh_15m
+                ptType: 1
+                timeZoneId: 13
+                interval: 15
+                description: Student Center PV generated kWh
+                values:
+                  RecorderID: HOSSTUDENT01
+                  Channel: 1
+                  PointType: kWh
+              - ptId: 1520204
+                channelId: ch_hos_cedar_row_a_gen_kwh_15m
+                ptType: 1
+                timeZoneId: 13
+                interval: 15
+                description: Cedar Row A PV generated kWh
+                values:
+                  RecorderID: HOSCEDARA01
+                  Channel: 1
+                  PointType: kWh
+
+    - id: gw_bacnet_thermal_plant
+      componentId: BACnetGateway
+      executorKey: gateway.bacnet
+      gatewayType: BACNET
+      proves: [bacnet_present_value, chilled_water_hourly, control_command_shape]
+      providerIds: [northlake_thermal_plant]
+      runtime:
+        gatewayId: 5301
+        gatewayName: Northlake Thermal Plant BACnet
+        gatewayGuid: SYN-GW-BACNET-5301
+        nodes:
+          - gwNodeId: 530101
+            name: NTP-BACNET-SCIENCE-CHW
+            isEnabled: true
+            values:
+              "BBMD Address": 10.53.0.10
+              "BBMD UDP Port": 47808
+            points:
+              - ptId: 1530101
+                channelId: ch_ntp_science_center_chw_ton_hours_hourly
+                ptType: 1
+                timeZoneId: 13
+                interval: 60
+                description: Science Center chilled water ton-hours
+                values:
+                  DeviceID: 5301001
+                  ObjectID: 1001
+                  "Object Type": 2
+                  "Array Index": 0
+                  PointType: ton_hours
+              - ptId: 1530102
+                channelId: ch_ntp_science_center_chw_tons_hourly
+                ptType: 1
+                timeZoneId: 13
+                interval: 60
+                description: Science Center chilled water tons
+                values:
+                  DeviceID: 5301001
+                  ObjectID: 1002
+                  "Object Type": 2
+                  "Array Index": 0
+                  PointType: tons
+
+    - id: gw_noaa_ksac_observations
+      componentId: NOAAGateway
+      executorKey: gateway.noaa
+      gatewayType: NOAA
+      proves: [noaa_weather_xml, weather_station_mapping]
+      referenceSourceIds: [KSAC]
+      parameters:
+        BaseUrl: https://w1.weather.gov/xml/current_obs
+      runtime:
+        gatewayId: 5401
+        gatewayName: Northlake NOAA Current Observations
+        gatewayGuid: SYN-GW-NOAA-5401
+        nodes:
+          - gwNodeId: 540101
+            name: NOAA-KSAC
+            isEnabled: true
+            values:
+              WeatherType: history
+              StationID: KSAC
+            points:
+              - ptId: 1540101
+                channelId: ch_weather_ksac_temp_f_hourly
+                ptType: 1
+                timeZoneId: 13
+                interval: 60
+                description: KSAC NOAA outside air temperature
+                values:
+                  WeatherTypeName: tempi
+                  PointType: temp_f
+              - ptId: 1540102
+                channelId: ch_weather_ksac_rh_hourly
+                ptType: 1
+                timeZoneId: 13
+                interval: 60
+                description: KSAC NOAA relative humidity
+                values:
+                  WeatherTypeName: hum
+                  PointType: relative_humidity
+              - ptId: 1540103
+                channelId: ch_weather_ksac_wind_mph_hourly
+                ptType: 1
+                timeZoneId: 13
+                interval: 60
+                description: KSAC NOAA wind speed
+                values:
+                  WeatherTypeName: wspdi
+                  PointType: wind_mph
+
+    - id: gw_aeris_ksmf_weather
+      componentId: AerisWeatherGateway
+      executorKey: gateway.aerisweather
+      gatewayType: AERISWEATHER
+      proves: [aeris_observations, aeris_forecasts, weather_state_file]
+      referenceSourceIds: [KSMF]
+      parameters:
+        BaseUrl: https://api.aerisapi.com
+        ClientId: SYN-AERIS-CLIENT
+        ClientSecret: SYN-AERIS-SECRET
+        ForecastHours: 1
+        HistoryDaysBack: 1
+      runtime:
+        gatewayId: 5402
+        gatewayName: Northlake Aeris Weather
+        gatewayGuid: SYN-GW-AERIS-5402
+        nodes:
+          - gwNodeId: 540201
+            name: AERIS-KSMF-OBS
+            isEnabled: true
+            backFillDays: 1
+            values:
+              WeatherType: observation
+              StationID: KSMF
+            points:
+              - ptId: 1540201
+                channelId: ch_weather_ksmf_temp_f_hourly
+                ptType: 1
+                timeZoneId: 13
+                interval: 60
+                description: KSMF Aeris observed temperature
+                values:
+                  WeatherTypeName: tempF
+                  PointType: tempF
+          - gwNodeId: 540202
+            name: AERIS-KSMF-FORECAST
+            isEnabled: true
+            values:
+              WeatherType: forecast
+              StationID: KSMF
+            points:
+              - ptId: 1540202
+                channelId: ch_weather_ksmf_forecast_temp_f_hourly
+                ptType: 1
+                timeZoneId: 13
+                interval: 60
+                description: KSMF Aeris forecast temperature
+                values:
+                  WeatherTypeName: tempF
+                  PointType: tempF
+
+    - id: gw_spinwave_science_lab
+      componentId: SpinwaveGateway
+      executorKey: gateway.spinwave
+      gatewayType: SPINWAVE
+      proves: [spinwave_csv, wireless_sensor_channel_mapping]
+      generatedArtifacts:
+        - path: artifacts/demo-university-v1/spinwave/SCIENCE/science-lab-env.csv
+          format: spinwave_csv
+          filePattern: "*.csv"
+      runtime:
+        gatewayId: 5501
+        gatewayName: Northlake Science Center Spinwave
+        gatewayGuid: SYN-GW-SPINWAVE-5501
+        nodes:
+          - gwNodeId: 550101
+            name: SPINWAVE-SCIENCE-LAB
+            isEnabled: true
+            values:
+              "Folder Name": SCIENCE
+            points:
+              - ptId: 1550101
+                channelId: ch_spinwave_science_lab_temp_f_15m
+                ptType: 1
+                timeZoneId: 13
+                interval: 15
+                description: Science lab Spinwave temperature
+                values:
+                  "Device Address": SW-SCI-LAB-01
+                  "Channel Number": 1
+                  PointType: temp_f
+              - ptId: 1550102
+                channelId: ch_spinwave_science_lab_rh_15m
+                ptType: 1
+                timeZoneId: 13
+                interval: 15
+                description: Science lab Spinwave humidity
+                values:
+                  "Device Address": SW-SCI-LAB-01
+                  "Channel Number": 2
+                  PointType: relative_humidity
+
+    - id: gw_fig_multi_format
+      componentId: FIGGateway
+      executorKey: gateway.fig
+      gatewayType: FIG
+      proves: [fig_gateway, fig_format_catalog, provider_file_alias_mapping]
+      formatVariants: [FIG, SIEMANSREPORT, MEDIATOR, EATON, XML, FIXEDNETWORKS, CMEP]
+      generatedArtifacts:
+        - path: artifacts/demo-university-v1/fig/cedar-row-water.fig.csv
+          format: FIG
+        - path: artifacts/demo-university-v1/fig/cedar-row-water.siemens.csv
+          format: SIEMANSREPORT
+        - path: artifacts/demo-university-v1/fig/cedar-row-water.mediator.csv
+          format: MEDIATOR
+        - path: artifacts/demo-university-v1/fig/cedar-row-water.eaton.csv
+          format: EATON
+        - path: artifacts/demo-university-v1/fig/cedar-row-water.xml
+          format: XML
+        - path: artifacts/demo-university-v1/fig/cedar-row-water.fixednetworks.xml
+          format: FIXEDNETWORKS
+        - path: artifacts/demo-university-v1/fig/cedar-row-water.cmep.csv
+          format: CMEP
+      runtime:
+        gatewayId: 5601
+        gatewayName: Northlake FIG File Imports
+        gatewayGuid: SYN-GW-FIG-5601
+        nodes:
+          - gwNodeId: 560101
+            name: FIG-CEDAR-ROW
+            isEnabled: true
+            points:
+              - ptId: 1560101
+                channelId: ch_fig_cedar_row_a_water_kgal_60m
+                ptType: 1
+                timeZoneId: 13
+                interval: 60
+                description: Cedar Row A FIG water interval
+                values:
+                  "Point Alias": FIG_CEDAR_ROW_A_WATER
+                  Channel: "01"
+                  UOM: kgal
+                  Multiplier: 1
+                  OffsetTimeMinutes: 0
+                  PointType: kgal
+
+    - id: gw_modbus_thermal_plant
+      componentId: ModbusGateway
+      executorKey: gateway.modbus
+      gatewayType: MODBUS
+      proves: [modbus_tcp_registers, register_type_decoding]
+      runtime:
+        gatewayId: 5701
+        gatewayName: Northlake Thermal Plant Modbus
+        gatewayGuid: SYN-GW-MODBUS-5701
+        nodes:
+          - gwNodeId: 570101
+            name: NTP-MODBUS-CHILLER
+            isEnabled: true
+            values:
+              "IP Address": 10.57.0.20
+              Port: 502
+              "Modbus Address": 1
+            points:
+              - ptId: 1570101
+                channelId: ch_modbus_ntp_chiller_kw_5m
+                ptType: 1
+                timeZoneId: 13
+                interval: 5
+                description: Thermal plant chiller electric demand
+                values:
+                  "Register Type": "Floating Point MSR First"
+                  "Register Address": 40001
+                  Multiplier: 1
+                  Offset: 0
+                  PointType: kW
+
+    - id: gw_odbc_library_historian
+      componentId: ODBCGateway
+      executorKey: gateway.odbc
+      gatewayType: ODBC
+      proves: [odbc_source_query, query_token_substitution, state_file_backfill]
+      parameters:
+        StateFilePath: artifacts/demo-university-v1/odbc/library-state.json
+        QueryKey: SyntheticGatewayQueries:LibraryElectricInterval
+        QueryTemplate: >
+          select TimeStamp, Value from SyntheticIntervalReadings
+          where PtID = |PtID| and TimeStamp > '|LastTimeStamp|'
+          order by TimeStamp
+      runtime:
+        gatewayId: 5801
+        gatewayName: Northlake ODBC Historian
+        gatewayGuid: SYN-GW-ODBC-5801
+        nodes:
+          - gwNodeId: 580101
+            name: ODBC-LIBRARY-HISTORIAN
+            isEnabled: true
+            profileName: SyntheticCustomerHistorian
+            queryKey: SyntheticGatewayQueries:LibraryElectricInterval
+            timeStampType: local
+            lastTimeStampName: TimeStamp
+            daysBack: 7
+            points:
+              - ptId: 1580101
+                channelId: ch_odbc_library_electric_kwh_15m
+                ptType: 1
+                timeZoneId: 13
+                interval: 15
+                description: Library electric interval from SQL historian
+                values:
+                  SourceTable: SyntheticIntervalReadings
+                  PointType: kWh
+
+    - id: gw_fake_smoke
+      componentId: FakeGateway
+      executorKey: gateway.fake
+      gatewayType: FAKE
+      proves: [fake_gateway_generation, anomaly_profile, replay_shape]
+      parameters:
+        AllowSyntheticData: true
+        GenerationMode: sinusoidal
+        StartTimestamp: 2024-01-01T00:00:00Z
+        EndTimestamp: 2024-01-02T00:00:00Z
+        StateFilePath: artifacts/demo-university-v1/fake/fake-state.json
+      runtime:
+        gatewayId: 5901
+        gatewayName: Northlake Fake Gateway Smoke
+        gatewayGuid: SYN-GW-FAKE-5901
+        nodes:
+          - gwNodeId: 590101
+            name: FAKE-SMOKE
+            isEnabled: true
+            points:
+              - ptId: 1590101
+                channelId: ch_fake_gateway_smoke_kwh_15m
+                ptType: 1
+                timeZoneId: 13
+                interval: 15
+                description: Fake gateway deterministic smoke channel
+                values:
+                  GenerationMode: sinusoidal
+                  MinValue: 12
+                  MaxValue: 36
+                  PeriodMinutes: 1440
+                  Seed: 104729
+                  PointType: kWh
+
+    - id: gw_neptune_river_city_water
+      componentId: NeptuneGateway
+      executorKey: gateway.neptune
+      gatewayType: NEPTUNE
+      proves: [neptune_handheld_upload, hmr_usage_and_register_reading]
+      providerIds: [river_city_utilities]
+      generatedArtifacts:
+        - path: artifacts/demo-university-v1/neptune/cedar-row-b-upload.txt
+          format: neptune_upload
+          filePattern: "*.*"
+      runtime:
+        gatewayId: 6001
+        gatewayName: Northlake Neptune Water Upload
+        gatewayGuid: SYN-GW-NEPTUNE-6001
+        nodes:
+          - gwNodeId: 600101
+            name: NEPTUNE-RCU-CEDAR-B
+            isEnabled: true
+            points:
+              - ptId: 1600101
+                channelId: ch_rcu_cedar_row_b_water_kgal_monthly
+                ptType: 1
+                timeZoneId: 13
+                interval: 43200
+                description: Cedar Row B Neptune water route
+                values:
+                  MetaWorldID: 660004
+                  TextPrompt: KGAL
+                  PtID_Usage: 1600101
+                  PtID_Reading: 1600102
+                  MeterConstant: 1
+                  LastReadingValue: 1200
+                  PointType: kgal
+
+    - id: gw_mvrs_sierra_gas
+      componentId: MVRSGateway
+      executorKey: gateway.mvrs
+      gatewayType: MVRS
+      proves: [mvrs_handheld_upload, hmr_event_file, read_code_audit_code]
+      providerIds: [sierra_gas_utility]
+      generatedArtifacts:
+        - path: artifacts/demo-university-v1/mvrs/student-center-gas-upload.txt
+          format: mvrs_upload
+          filePattern: "*.*"
+        - path: artifacts/demo-university-v1/hmr-events/student-center-gas-events.jsonl
+          format: hmr_events_jsonl
+      runtime:
+        gatewayId: 6002
+        gatewayName: Northlake MVRS Gas Upload
+        gatewayGuid: SYN-GW-MVRS-6002
+        nodes:
+          - gwNodeId: 600201
+            name: MVRS-SGU-STUDENT-CENTER
+            isEnabled: true
+            points:
+              - ptId: 1600201
+                channelId: ch_sgu_student_center_therms_monthly
+                ptType: 1
+                timeZoneId: 13
+                interval: 43200
+                description: Student Center MVRS gas route
+                values:
+                  MetaWorldID: 650004
+                  TextPrompt: THRM
+                  UN_Units: CurRead
+                  PtID_Usage: 1600201
+                  PtID_Reading: 1600202
+                  MeterConstant: 1
+                  LastReadingValue: 800
+                  PointType: therms
+
+    - id: hmr_events_publish
+      componentId: HmrEventsPublish
+      executorKey: hmr.events.publish
+      gatewayType: HMR_EVENTS
+      proves: [hmr_event_broker_payload, idempotent_event_delivery]
+      sourceProfiles: [gw_mvrs_sierra_gas, gw_neptune_river_city_water]
+      parameters:
+        InputFilePath: artifacts/demo-university-v1/hmr-events/student-center-gas-events.jsonl
+        GatewayId: 6002
+        GatewayName: Northlake MVRS Gas Upload
+        GatewayGuid: SYN-GW-MVRS-6002
+        GatewayType: MVRS
+        QueueNameTemplate: hmr.events.synthetic
+        IdempotencyScope: demo-university-v1
 
 scenarios:
   positive:
     - baseline_monthly_bills
     - electric_interval_15min
+    - solar_generation_interval
     - chilled_water_hourly
+    - weather_gateway_noaa
+    - weather_gateway_aeris
+    - spinwave_gateway
+    - fig_gateway_formats
+    - modbus_gateway
+    - odbc_gateway
+    - fake_gateway
+    - handheld_gateway_uploads
+    - hmr_events_publish
     - meter_replacement
     - estimated_bill_correction
     - missing_interval_backfill
@@ -116,6 +1534,9 @@ artifactTargets:
   - backfill_inputs
   - provider_billing_files
   - provider_interval_files
+  - gateway_runtime_json
+  - gateway_file_inputs
+  - hmr_event_payloads
   - integration_payloads
 
 assertionTargets:
@@ -126,4 +1547,7 @@ assertionTargets:
   - peak_demand_by_building
   - report_rollups_by_site
   - import_idempotency
+  - gateway_record_counts_by_profile
+  - gateway_point_bindings_by_profile
+  - gateway_file_disposition_by_profile
   - integration_export_shape

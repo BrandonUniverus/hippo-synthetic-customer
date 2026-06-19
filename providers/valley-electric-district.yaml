@@ -1,0 +1,123 @@
+# Valley Electric District — EVERYDAY electric distribution utility.
+# Single commodity (electric) but the most data-rich everyday provider:
+# every account produces a monthly tariff bill, and the two interval-metered
+# campus buildings also produce 15-minute kWh and kW channels.
+id: valley_electric_district
+displayName: Valley Electric District
+shortName: VED
+identityClass: everyday
+providerKind: distribution_utility
+ownership: public_municipal_district
+billingModel: tariff_metered
+currency: USD
+billingCadence: monthly
+description: >
+  Municipal electric distribution district serving the Northlake campus and the
+  Cedar Row apartment common areas. Demand is billed on the highest 15-minute
+  average kW in the period, and power factor is tracked so reactive-power
+  adjustments can appear on lab-heavy buildings.
+
+supplies:
+  - commodity: electric
+    role: consumption
+    usageUnit: kWh
+    demandUnit: kW
+    dataTypes: [monthly_bill, interval_15min, billing_demand]
+    intervalMinutes: 15
+    notes: Demand billed on max 15-minute kW; power factor below 0.95 triggers an adjustment.
+
+accountModel:
+  numberFormat: "SYN-VED-A-#######"
+  example: "SYN-VED-A-0010014"
+  grouping: one_account_per_metered_building
+  meta: [service_address, rate_schedule_id, voltage_level, service_territory_synthetic]
+
+meterModel:
+  numberFormat: "SYN-VED-M-#######"
+  example: "SYN-VED-M-0040207"
+  meterTypes: [interval_demand, monthly_kwh]
+  intervalBuildings: [science_center, student_center]
+  monthlyOnlyBuildings: [admin_hall, library, cedar_row_a, cedar_row_b]
+
+channels:
+  - id: electric_kwh
+    commodity: electric
+    unit: kWh
+    direction: delivered
+    intervalMinutes: 15
+    appliesTo: intervalBuildings
+  - id: electric_kw
+    commodity: electric
+    unit: kW
+    direction: delivered
+    intervalMinutes: 15
+    appliesTo: intervalBuildings
+
+rateSchedules:
+  - id: VED-TOU-GS
+    name: Time-of-Use General Service
+    type: time_of_use_demand
+    effective: "2024-01-01..2024-12-31"
+    seasons:
+      summer: { months: [6, 7, 8, 9], periods: [peak, part_peak, off_peak] }
+      winter: { months: [1, 2, 3, 4, 5, 10, 11, 12], periods: [part_peak, off_peak] }
+    components:
+      energy:
+        peak: { unit: $/kWh, rate: 0.241 }
+        part_peak: { unit: $/kWh, rate: 0.168 }
+        off_peak: { unit: $/kWh, rate: 0.112 }
+      demand: { unit: $/kW, rate: 18.40, basis: max_15min_kw }
+      facilityCharge: { unit: $/month, rate: 64.00 }
+  - id: VED-TOU-GS-FY25
+    name: Time-of-Use General Service (FY2025 rate change)
+    type: time_of_use_demand
+    effective: "2025-01-01..2025-12-31"
+    rateChangeScenario: provider_rate_change
+    components:
+      energy:
+        peak: { unit: $/kWh, rate: 0.258 }
+        part_peak: { unit: $/kWh, rate: 0.179 }
+        off_peak: { unit: $/kWh, rate: 0.118 }
+      demand: { unit: $/kW, rate: 19.75, basis: max_15min_kw }
+      facilityCharge: { unit: $/month, rate: 67.50 }
+
+billCharges:
+  - { code: energy_peak, type: usage_tou, unit: $/kWh }
+  - { code: energy_part_peak, type: usage_tou, unit: $/kWh }
+  - { code: energy_off_peak, type: usage_tou, unit: $/kWh }
+  - { code: demand_charge, type: demand, unit: $/kW }
+  - { code: facility_charge, type: fixed, unit: $/month }
+  - { code: power_factor_adjustment, type: adjustment, unit: $ }
+  - { code: public_purpose_program, type: rider, unit: $ }
+  - { code: utility_users_tax, type: tax, unit: $ }
+
+fileFormats:
+  billing:
+    name: VED monthly billing extract
+    format: csv
+    grain: one_row_per_account_per_billing_period
+    artifactType: bif
+    keyColumns: [synthetic_account_number, billing_start, billing_end, total_kwh, billing_demand_kw, total_cost, bill_status]
+  interval:
+    name: VED 15-minute interval extract
+    format: csv
+    grain: one_row_per_channel_per_interval
+    artifactType: mdef
+    keyColumns: [synthetic_meter_number, channel_id, reading_start, reading_end, kwh, kw, quality_code]
+
+environmental:
+  scope: 2
+  emissionFactorSource: eGRID CAMX region (synthetic value)
+  co2eFactor: { unit: kgCO2e/kWh, value: 0.231 }
+
+scenarioHooks:
+  - { scenario: baseline_monthly_bills, role: primary }
+  - { scenario: electric_interval_15min, role: primary, targets: [science_center, student_center] }
+  - { scenario: meter_replacement, role: primary, targets: [library] }
+  - { scenario: missing_interval_backfill, role: primary, targets: [student_center] }
+  - { scenario: provider_rate_change, role: primary, note: "FY2025 TOU rate step" }
+
+dataQuirks:
+  - Summer cooling load raises Science Center peak demand and shifts energy into peak hours.
+  - Power factor below 0.95 on lab loads adds a reactive-power adjustment line.
+  - One meter swap keeps the same account but issues a new synthetic meter number.
