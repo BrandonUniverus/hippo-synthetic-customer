@@ -1,0 +1,15 @@
+NORTHLAKE UNIVERSITY ENERGY PORTAL
+Energy portal notification
+
+{{Subject}}
+
+{{Body}}
+
+Open the portal: {{LogoRedirectUrl}}
+
+--
+(c) {{CurrentYear}} Northlake University Energy Portal — powered by EEM Suite
+(Energy Hippo, a Univerus company). This is an automated message; replies are
+not monitored.
+Questions? energy.support@northlake.example.edu
+Sent by {{MachineName}}

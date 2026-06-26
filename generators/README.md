@@ -2,6 +2,12 @@
 
 Generator code will live here once the source model is finalized.
 
+> The generation core + file/DB/API **intake emulators** are Layer 1–2 of the
+> **Synthetic Meter System** — see
+> [`docs/synthetic-meter-system-plan.md`](../docs/synthetic-meter-system-plan.md)
+> for the full plan (fake meters emitting into every gateway's real intake path,
+> plus a web control plane to turn meters on/off and drive scenarios).
+
 The generators should transform checked-in manifests and synthetic source database rows into ingestion-ready artifacts. They should not contain hidden random data or hand-maintained customer facts.
 
 ## Expected Command Shape

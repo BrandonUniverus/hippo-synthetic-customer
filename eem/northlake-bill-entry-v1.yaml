@@ -1,0 +1,76 @@
+manifestVersion: 1
+id: northlake_bill_entry_v1
+customerScenarioId: demo_university_v1
+stage: 2
+roadmapPhase: 1            # docs/dream-customer/bill-charge-line-spec.md + phase1-substrate-extras.md
+displayName: Northlake Bill & Cost-Core Entry Plan
+purpose: >
+  How the Phase 1 cost-core data gets INTO EEM through the UI / data paths: monthly
+  bills with itemized charge lines, bill status history, digital points, and notes/
+  images. End-state + entry method, not a DB seed.
+
+entryUI:
+  manualBills:
+    app: Web SPA
+    screen: "#/BillEntry -> Add Bill -> #/BillEntry/Editor/Details"
+    fields: [period start/end/days, fiscal year/period, received/issue/due dates, "invoice #", bill type, amounts, "Bill Items grid (meter, commodity, unit, qty, cost, readings, expense account)"]
+    note: edit gated AccessLevel>=3; exported bills become read-only
+  importedBills:
+    convert: "WPF BillImporter app -> BIF (file converter only)"
+    load: "Web SPA #/BillImporter (files -> mappings -> workspace -> import)"
+    classification: DATA-PATH
+  digitalPoints:
+    screen: "WPF DBAdmin -> Nodes -> Point definition (point_type Digital)"
+    data: "via gateway/import (DATA-PATH), e.g. Modbus chiller status / BMS occupancy"
+  notes: { screen: "Web NoteHistory (api/NoteHistory/AddOrUpdate)", classification: UI-DIRECT }
+  images: { screen: "bill image upload", source: "output/pdf/<provider>/*.pdf (existing synthetic bills)" }
+
+sourceReferences:
+  chargeLineRules: docs/dream-customer/bill-charge-line-spec.md
+  substrateExtras: docs/dream-customer/phase1-substrate-extras.md
+  providerValues: providers/
+  calendar: eem/northlake-company-calendar-v1.yaml
+
+bills:
+  span: 2024-01..2025-12
+  grain: one bill per account per month (RCU = 3 service lines on one statement)
+  chargeLines: "decompose per docs/dream-customer/bill-charge-line-spec.md (energy/demand/fixed/tier/tax...); lines reconcile to total"
+  preferredEntry:
+    - { providers: [valley_electric_district, river_city_utilities], method: import (DATA-PATH), user: nora.chen }
+    - { providers: [sierra_gas_utility, helios_onsite_solar], method: manual (Bill Entry), user: iris.morales }
+    - { providers: [northlake_thermal_plant], method: manual allocation, user: keiko.tan }
+    - { scope: cedar_row, method: manual, user: marcus.reed }
+
+statusHistory:
+  rule: "every bill gets a Status_Code 1 (Bill Entry) row; ~1/3 advanced to 2 (QC Approval) by an AccessLevel-3 user"
+  entryLagDays: { valley_electric_district: 3, river_city_utilities: 4, sierra_gas_utility: 5, northlake_thermal_plant: 6, helios_onsite_solar: 7, cedar_row: 5 }
+
+digitalPoints:
+  - { id: ch_modbus_ntp_chiller_enable_status, stateSet: "chiller_run {0 off,1 on}", interval: 15 }
+  - { id: ch_student_center_occupancy_status, stateSet: "occupancy {0 unoccupied,1 occupied}", interval: 15 }
+  - { id: ch_science_center_lab_exhaust_status, stateSet: "exhaust_mode {0 normal,1 high}", interval: 15 }
+
+notesAndImages:
+  notes:
+    - { target: library electric meter, tableCode: METR, text: "Meter replaced 2024-08-14; new serial, same account; reads continuous." }
+    - { target: SGU Student Center estimated bill, tableCode: BL, text: "Estimated read; corrected actual next cycle." }
+    - { target: RCU Cedar Row A account, tableCode: BA, text: "Account number changed at 2025 renewal; continuity preserved across 3 services." }
+  images:
+    - { target: each provider sample bill, tableCode: BL, kind: bill_image, fileRef: "output/pdf/<provider>/*.pdf" }
+
+fixtures:
+  - { id: late_bill, account: SGU Library, behavior: "stop series 1 period early -> appears in rp_LateBills (>5 day overdue)" }
+  - { id: estimated_bill_correction, account: SGU Student Center, behavior: "estimated bill then corrected actual supersedes" }
+  - { id: meter_replacement, account: VED Library, behavior: "meter swap 2024-08-14/15; no double-count" }
+  - { id: duplicate_file_import, account: RCU Cedar Row A, behavior: "re-import combined file; no service double-counted" }
+  - { id: account_number_change, account: RCU Cedar Row A, behavior: "new account # at 2025 renewal" }
+  - { id: provider_rate_change, scope: VED, behavior: "bills >=2025-01 use FY2025 rates" }
+  - { id: fiscal_period_not_found, behavior: "import a bill dated 2026-01 -> rejected (no calendar period)" }
+
+expectedAssertions:
+  ref: docs/dream-customer/phase-0-1-assertions.md
+  keyChecks:
+    - charge lines sum to bill total (+-$0.01); usage lines reconcile to bill usage
+    - ">=24 monthly bills per active account minus fixtures; >=2 distinct entry users"
+    - rollups: site = sum(buildings); customer = sum(sites); provider totals
+    - rp_LateBills shows the SGU Library late fixture; rp_DigitalSummary shows on-hours

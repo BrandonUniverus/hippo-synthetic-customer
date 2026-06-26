@@ -38,13 +38,20 @@ providers/
   *.yaml                       Full configuration for each utility provider.
 scenarios/
   demo-university-v1.yaml      Machine-readable scenario manifest.
+security/
+  northlake-eem-security-v1.yaml Stage 1 EEM company/context/group/user setup.
+eem/
+  northlake-eem-stage1-setup-v1.yaml DBAdmin-facing Stage 1 setup fields.
 generators/
   README.md                    Generator expectations and future command shape.
 ```
 
 ## Current Status
 
-This repo currently contains the starting contract for the synthetic customer. The next step is to choose the first generator implementation and create the synthetic source database schema from `schemas/synthetic-source-model.md`.
+This repo currently contains the starting contract for the synthetic customer,
+including provider/gateway coverage, the Stage 1 EEM security manifest, and the
+DBAdmin-facing Stage 1 setup manifest. The next step is to drive those manifests
+through the apps and capture generated ids for validation.
 
 ## Operating Rules
 

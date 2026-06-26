@@ -1,0 +1,96 @@
+manifestVersion: 1
+id: northlake_company_calendar_v1
+customerScenarioId: demo_university_v1
+stage: 1
+roadmapPhase: 0            # docs/dream-customer/roadmap.md Phase 0 (foundation)
+displayName: Northlake EEM Company Calendar
+purpose: >
+  Fiscal calendar periods (EEMSuite CompanyCalendar) for every Northlake EEM
+  company, covering the V1 data span. The calendar gates bill posting/processing
+  and bill-import validation: a bill whose fiscal year/period has no calendar row
+  is rejected ("Fiscal Year/Period NOT found!" in BillImportPro_FileData_Validate)
+  and is also required for the monthly-bill reporting engine (wh_GetReportData,
+  DailyProcessingSummary, FiscalPeriodBills) to return rows. Must exist before any
+  bills load.
+
+sourceReferences:
+  sourceScenarioManifest: scenarios/demo-university-v1.yaml
+  stage1SetupManifest: eem/northlake-eem-stage1-setup-v1.yaml
+  gapAnalysis: docs/dream-customer/subsystem-gap-analysis.md
+
+targetTable:
+  name: CompanyCalendar
+  grain: one row per (CompanyID, CalendarTypeID, PeriodYear, PeriodMonth)
+  columns: [CompanyID, CalendarTypeID, PeriodMonth, PeriodYear, StartDate, EndDate, PeriodDescription, Quarter]
+  note: >
+    CompanyIDs are assigned by EEM at setup, so companies are referenced here by
+    source id (consistent with the Stage 1 manifests: do not preassign positive
+    CompanyIDs).
+
+calendarType:
+  calendarTypeId: 1
+  description: >
+    Standard calendar-year monthly periods (fiscal year = calendar year). This
+    matches the FY2024/FY2025 rate-change boundary at 2025-01-01 used by Valley
+    Electric in the source manifest.
+
+# Every Northlake EEM company receives this calendar.
+companies:
+  - northlake_university
+  - cedar_row_apartments
+  - northlake_thermal_plant
+
+# Deterministic period rule applied to every company above.
+periodRule:
+  cadence: monthly
+  firstPeriod: { year: 2024, month: 1 }
+  lastPeriod: { year: 2025, month: 12 }
+  totalPeriodsPerCompany: 24
+  derivations:
+    startDate: first calendar day of (PeriodYear, PeriodMonth)
+    endDate: last calendar day of (PeriodYear, PeriodMonth)
+    quarter: ceil(PeriodMonth / 3)
+    periodDescription: "MMM-YY"   # e.g. Jan-24, Dec-25
+
+# Boundary periods stated explicitly as sanity anchors for loaders/tests.
+anchorPeriods:
+  - { year: 2024, month: 1, startDate: 2024-01-01, endDate: 2024-01-31, quarter: 1, description: Jan-24 }
+  - { year: 2024, month: 12, startDate: 2024-12-01, endDate: 2024-12-31, quarter: 4, description: Dec-24 }
+  - { year: 2025, month: 1, startDate: 2025-01-01, endDate: 2025-01-31, quarter: 1, description: Jan-25 }   # FY2025 rate-change boundary
+  - { year: 2025, month: 12, startDate: 2025-12-01, endDate: 2025-12-31, quarter: 4, description: Dec-25 }
+
+# Negative-test fixture: a period intentionally NOT created, to prove import rejection.
+negativeFixtures:
+  - id: fiscal_period_not_found
+    fixtureRole: import_rejection_gap
+    omittedPeriod: { year: 2026, month: 1 }
+    appliesToCompany: northlake_university
+    description: >
+      The calendar ends at 2025-12. A bill-import file dated fiscal period 2026-01
+      (next year, before the new calendar is set up) must be rejected with
+      "Fiscal Year/Period NOT found!". No normal V1 bill targets this period, so
+      baseline data is unaffected. This is the deterministic, non-destructive way
+      to exercise the interior fiscal-gap rejection path.
+    expectedBehavior: import_rejected
+    relatedReport: bill_importer
+
+futureExtensions:
+  - note: >
+      To exercise a non-calendar fiscal year (period offset, FY labels spanning a
+      year boundary), a later customer/company (e.g. a July-June fiscal year) can
+      be given CalendarTypeID 1 with shifted periods. Kept out of V1 to avoid
+      data-span edges before 2024-01 and after 2025-12.
+
+expectedAssertions:
+  - id: calendar_period_count_per_company
+    assertionType: row_count
+    target: CompanyCalendar per company (CalendarTypeID=1)
+    expectedValue: 24
+  - id: calendar_companies_present
+    assertionType: set
+    target: distinct companies with a 2024-2025 calendar
+    expectedValue: [northlake_university, cedar_row_apartments, northlake_thermal_plant]
+  - id: fiscal_gap_2026_01_absent
+    assertionType: absence
+    target: CompanyCalendar (PeriodYear=2026, PeriodMonth=1)
+    expectedValue: no row

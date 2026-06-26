@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Northlake University — Login entrance · EEM Suite</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Spectral:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* ---- Fallback theme tokens (overridden by northlake-theme-vars.css below) ---- */
+  :root{
+    --color-primary:#14263F; --color-primary-2:#1F3A5F; --color-accent:#C9A227;
+    --color-tertiary:#2E6E7E; --font-size-sm:0.875rem;
+    --nl-spark:var(--color-accent); --nl-ripple-1:var(--color-accent);
+    --nl-ripple-2:var(--color-tertiary); --nl-panel-from:var(--color-primary-2);
+    --nl-panel-to:var(--color-primary); --nl-ambient:rgba(201,162,39,.16);
+    /* page-only neutrals (NOT part of the per-customer override) */
+    --warm-50:#FAF8F2; --warm-100:#F4F0E6; --paper:#FFFFFF;
+    --cool-100:#EDF1F5; --cool-200:#DCE3EB; --cool-300:#C3CDD8; --cool-600:#475563; --cool-700:#2E3942; --cool-900:#11171C;
+    --ease-out:cubic-bezier(0,0,.2,1); --ease-standard:cubic-bezier(.4,0,.2,1);
+    --radius-md:8px; --radius-lg:12px;
+    --shadow-sm:0 1px 2px rgba(17,23,28,.06),0 1px 3px rgba(17,23,28,.08);
+    --shadow-md:0 6px 24px rgba(17,23,28,.10),0 2px 6px rgba(17,23,28,.06);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    font-family:'IBM Plex Sans',system-ui,sans-serif;
+    background:var(--warm-50); color:var(--cool-700);
+    -webkit-font-smoothing:antialiased; line-height:1.5;
+    padding:32px 24px 64px;
+  }
+  .wrap{max-width:1080px;margin:0 auto}
+  .mono{font-family:'IBM Plex Mono',ui-monospace,monospace}
+
+  /* ---------------- Page header ---------------- */
+  .page-head{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;flex-wrap:wrap;margin-bottom:22px}
+  .page-head h1{font-family:'Spectral',Georgia,serif;font-weight:600;font-size:1.5rem;color:var(--color-primary);margin:0 0 4px;letter-spacing:-.01em}
+  .page-head .sub{font-size:var(--font-size-sm);color:var(--cool-600);margin:0}
+  .eyebrow{font-size:.6875rem;letter-spacing:.18em;text-transform:uppercase;color:var(--color-tertiary);font-weight:600;margin:0 0 8px}
+  .chips{display:flex;gap:8px;flex-wrap:wrap}
+  .chip{display:inline-flex;align-items:center;gap:6px;font-size:.75rem;font-weight:500;color:var(--cool-700);background:var(--paper);border:1px solid var(--cool-200);border-radius:999px;padding:5px 11px}
+  .chip .dot{width:7px;height:7px;border-radius:50%;background:var(--color-accent)}
+  .chip.lic .dot{background:#2E7D52}
+
+  /* ---------------- Login stage ---------------- */
+  .stage{background:var(--paper);border:1px solid var(--cool-200);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);overflow:hidden}
+  .login-card{display:grid;grid-template-columns:minmax(0,420px) minmax(0,1fr);min-height:468px}
+  @media (max-width:780px){.login-card{grid-template-columns:1fr}}
+
+  /* Branding panel — soft navy gradient, the animation target */
+  .auth-branding{
+    position:relative;overflow:hidden;
+    background:
+      radial-gradient(120% 90% at 50% 8%, rgba(255,255,255,.06), rgba(255,255,255,0) 55%),
+      linear-gradient(158deg, var(--nl-panel-from) 0%, var(--nl-panel-to) 100%);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:48px 36px;color:#fff;
+  }
+  /* faint engraved horizon line, institutional */
+  .auth-branding::after{content:"";position:absolute;left:0;right:0;bottom:0;height:1px;background:linear-gradient(90deg,transparent,rgba(201,162,39,.32),transparent)}
+  .auth-branding__figure{position:relative;margin:0;display:flex;flex-direction:column;align-items:center;gap:18px}
+  /* soft gold lake-glow behind the mark */
+  .auth-branding__figure::before{content:"";position:absolute;left:50%;top:48px;width:220px;height:220px;transform:translate(-50%,-50%);
+    background:radial-gradient(circle, rgba(201,162,39,.16), rgba(201,162,39,0) 62%);pointer-events:none}
+
+  .auth-branding__mark{position:relative;width:96px;height:96px;display:flex;align-items:center;justify-content:center}
+  .auth-branding__mark svg{display:block;width:96px;height:96px}
+  .nl-ambient{position:absolute;inset:0;margin:auto;width:92px;height:92px;border-radius:50%;border:1.5px solid var(--color-accent);opacity:0;pointer-events:none}
+
+  .auth-branding__caption{position:relative;display:flex;flex-direction:column;align-items:center;gap:7px;text-align:center}
+  .nl-wordmark{font-family:'Spectral',Georgia,serif;font-weight:600;font-size:1.95rem;line-height:1;color:#fff;letter-spacing:-.01em}
+  .nl-eyebrow{font-family:'IBM Plex Sans',sans-serif;font-weight:600;font-size:.72rem;letter-spacing:.36em;text-transform:uppercase;color:var(--color-accent)}
+  .nl-underline{width:104px;height:2px;border-radius:2px;background:var(--color-accent);transform-origin:left center}
+  .auth-branding__tag{position:absolute;bottom:26px;left:0;right:0;text-align:center;font-size:.72rem;letter-spacing:.04em;color:rgba(255,255,255,.55)}
+
+  /* css-engine mark: transient rings + settling spark/bars */
+  .nl-svg .nl-ring{transform-box:fill-box;transform-origin:center;opacity:0}
+  .nl-svg .nl-spark,.nl-svg .nl-bar{transform-box:fill-box;transform-origin:center}
+
+  /* ---- entrance (additive; content is fully composed by default) ---- */
+  .is-playing .nl-svg .nl-ring-1{animation:nl-ripple 1.05s cubic-bezier(.16,1,.3,1) .12s both}
+  .is-playing .nl-svg .nl-ring-2{animation:nl-ripple2 1.3s cubic-bezier(.16,1,.3,1) .3s both}
+  .is-playing .nl-svg .nl-spark{animation:nl-spark-in .55s var(--ease-out) .5s both}
+  .is-playing .nl-svg .nl-bar-1{animation:nl-bar-in .5s var(--ease-out) .82s both}
+  .is-playing .nl-svg .nl-bar-2{animation:nl-bar-in .5s var(--ease-out) .96s both}
+  .is-playing .nl-wordmark{animation:nl-rise .6s var(--ease-out) 1s both}
+  .is-playing .nl-eyebrow{animation:nl-fade .55s ease 1.26s both}
+  .is-playing .nl-underline{animation:nl-draw .55s var(--ease-out) 1.46s both}
+  .is-playing .nl-ambient{animation:nl-ambient 5s cubic-bezier(.16,1,.3,1) 2.4s infinite}
+
+  @keyframes nl-ripple{0%{transform:scale(.3);opacity:0}20%{opacity:.72}100%{transform:scale(1.5);opacity:0}}
+  @keyframes nl-ripple2{0%{transform:scale(.3);opacity:0}22%{opacity:.5}100%{transform:scale(1.85);opacity:0}}
+  @keyframes nl-spark-in{0%{transform:scale(.4);opacity:0}100%{transform:scale(1);opacity:1}}
+  @keyframes nl-bar-in{0%{transform:scaleX(0);opacity:0}100%{transform:scaleX(1);opacity:1}}
+  @keyframes nl-rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+  @keyframes nl-fade{from{opacity:0}to{opacity:1}}
+  @keyframes nl-draw{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+  @keyframes nl-ambient{0%{transform:scale(.5);opacity:0}24%{opacity:.42}100%{transform:scale(1.8);opacity:0}}
+
+  /* Demo harness: motion is driven by the .rm class so you can preview BOTH
+     states regardless of your OS setting. The shipped CSS uses the real
+     @media (prefers-reduced-motion: reduce) query — see integration snippet 3. */
+  .rm .auth-branding__figure *{animation:none !important}
+
+  /* ---------------- Sign-in form (product chrome, fully interactive) ---------------- */
+  .auth-form{padding:52px 56px;display:flex;flex-direction:column;justify-content:center;background:var(--paper)}
+  @media (max-width:780px){.auth-form{padding:40px 32px}}
+  .auth-form h2{font-family:'IBM Plex Sans',sans-serif;font-weight:600;font-size:1.5rem;color:var(--cool-900);margin:0 0 6px}
+  .auth-form .lead{font-size:var(--font-size-sm);color:var(--cool-600);margin:0 0 28px}
+  .field{display:flex;flex-direction:column;gap:7px;margin-bottom:18px}
+  .field .row{display:flex;justify-content:space-between;align-items:baseline}
+  .field label{font-size:var(--font-size-sm);font-weight:500;color:var(--cool-700)}
+  .field a.small{font-size:.8125rem;color:var(--color-tertiary);text-decoration:none;font-weight:500}
+  .field a.small:hover{text-decoration:underline}
+  .field input{font:inherit;font-size:.9375rem;padding:11px 13px;border:1px solid var(--cool-300);border-radius:var(--radius-md);background:#fff;color:var(--cool-900);transition:border-color .12s,box-shadow .12s}
+  .field input::placeholder{color:#9aa6b2}
+  .field input:focus{outline:none;border-color:var(--color-tertiary);box-shadow:0 0 0 3px rgba(46,110,126,.18)}
+  .btn{font:inherit;font-weight:600;font-size:.9375rem;border-radius:var(--radius-md);padding:12px 16px;cursor:pointer;border:1px solid transparent;transition:background .12s,transform .08s,box-shadow .12s}
+  .btn:active{transform:translateY(1px)}
+  .btn-primary{background:var(--color-primary-2);color:#fff;width:100%;margin-top:4px}
+  .btn-primary:hover{background:#16304f}
+  .btn-primary:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(46,110,126,.35)}
+  .divider{display:flex;align-items:center;gap:14px;color:var(--cool-600);font-size:.8125rem;margin:22px 0}
+  .divider::before,.divider::after{content:"";flex:1;height:1px;background:var(--cool-200)}
+  .btn-ghost{background:#fff;border-color:var(--cool-300);color:var(--cool-700);width:100%;display:flex;align-items:center;justify-content:center;gap:9px}
+  .btn-ghost:hover{background:var(--warm-50)}
+  .btn-ghost .g{width:16px;height:16px;color:var(--color-accent)}
+  .form-foot{margin-top:26px;font-size:.8125rem;color:var(--cool-600)}
+  .form-foot a{color:var(--color-tertiary);text-decoration:none;font-weight:500}
+
+  /* ---------------- Controls ---------------- */
+  .controls{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:20px 2px 0;padding:14px 16px;background:var(--paper);border:1px solid var(--cool-200);border-radius:var(--radius-md);box-shadow:var(--shadow-sm)}
+  .controls .grp{display:flex;align-items:center;gap:9px}
+  .controls .lbl{font-size:.75rem;letter-spacing:.04em;text-transform:uppercase;color:var(--cool-600);font-weight:600}
+  .seg{display:inline-flex;background:var(--cool-100);border-radius:8px;padding:3px}
+  .seg button{font:inherit;font-size:.8125rem;font-weight:600;border:none;background:transparent;color:var(--cool-600);padding:6px 14px;border-radius:6px;cursor:pointer;transition:.12s}
+  .seg button[aria-pressed="true"]{background:#fff;color:var(--color-primary);box-shadow:var(--shadow-sm)}
+  .cbtn{font:inherit;font-size:.8125rem;font-weight:600;border:1px solid var(--cool-300);background:#fff;color:var(--cool-700);padding:8px 14px;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:.12s}
+  .cbtn:hover{background:var(--warm-50)}
+  .cbtn.replay{background:var(--color-primary);color:#fff;border-color:transparent}
+  .cbtn.replay:hover{background:#0e1c30}
+  .cbtn[aria-pressed="true"]{background:var(--color-tertiary);color:#fff;border-color:transparent}
+  .controls .spacer{flex:1}
+  .controls .state{font-size:.75rem;color:var(--cool-600)}
+  .controls .state b{color:var(--color-primary);font-weight:600}
+  .controls .hint{font-size:.75rem;color:var(--cool-600)}
+  .auth-branding .panel-replay{position:absolute;top:14px;right:14px;font:inherit;font-size:.72rem;font-weight:600;letter-spacing:.02em;color:rgba(255,255,255,.72);background:rgba(255,255,255,.08);border:1px solid rgba(201,162,39,.42);border-radius:999px;padding:5px 12px;cursor:pointer;transition:background .12s,color .12s,border-color .12s}
+  .auth-branding .panel-replay:hover{color:#fff;background:rgba(201,162,39,.22);border-color:var(--color-accent)}
+  .auth-branding .panel-replay:active{transform:translateY(1px)}
+
+  /* ---------------- Integration ---------------- */
+  .integration{margin-top:34px}
+  .integration h3{font-family:'Spectral',serif;font-weight:600;font-size:1.15rem;color:var(--color-primary);margin:0 0 4px}
+  .integration .note{font-size:var(--font-size-sm);color:var(--cool-600);margin:0 0 18px;max-width:64ch}
+  details.code{background:var(--paper);border:1px solid var(--cool-200);border-radius:var(--radius-md);margin-bottom:12px;overflow:hidden}
+  details.code>summary{cursor:pointer;list-style:none;padding:13px 16px;font-weight:600;font-size:.9rem;color:var(--cool-900);display:flex;align-items:center;gap:9px}
+  details.code>summary::-webkit-details-marker{display:none}
+  details.code>summary .tw{transition:transform .15s;color:var(--cool-600)}
+  details.code[open]>summary .tw{transform:rotate(90deg)}
+  details.code>summary .tag{margin-left:auto;font-size:.7rem;font-weight:600;letter-spacing:.04em;color:var(--cool-600);background:var(--cool-100);padding:3px 8px;border-radius:5px}
+  pre{margin:0;border-top:1px solid var(--cool-200);background:#0f1d30;color:#d7e2f0;padding:18px 20px;overflow:auto;font-family:'IBM Plex Mono',monospace;font-size:.8125rem;line-height:1.65}
+  pre .c{color:#7a93b0}
+  pre .k{color:#C9A227}
+  pre .s{color:#8fcaa0}
+  .callout{display:flex;gap:12px;align-items:flex-start;background:var(--warm-100);border:1px solid #e7ddc4;border-left:3px solid var(--color-accent);border-radius:var(--radius-md);padding:14px 16px;margin-top:6px;font-size:var(--font-size-sm);color:var(--cool-700)}
+  .callout b{color:var(--color-primary)}
+</style>
+<link rel="stylesheet" href="northlake-theme-vars.css">
+<script src="https://unpkg.com/lottie-web@5.12.2/build/player/lottie.min.js"></script>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="page-head">
+    <div>
+      <p class="eyebrow">EEM Suite · Branding</p>
+      <h1>Login entrance — Northlake University</h1>
+      <p class="sub">The entrance for <span class="mono">.auth-branding__figure</span> — lake ripples expand, a gold spark settles, the wordmark rises and a gold underline draws (~2.2&nbsp;s). It plays automatically when the login screen loads; press <b>Replay</b> to watch it again.</p>
+    </div>
+    <div class="chips">
+      <span class="chip lic"><span class="dot"></span>lottie-web · MIT</span>
+      <span class="chip"><span class="dot"></span>CSS/SVG · zero-dep</span>
+      <span class="chip"><span class="dot"></span>prefers-reduced-motion</span>
+    </div>
+  </header>
+
+  <!-- ================= CONTROLS ================= -->
+  <div class="controls">
+    <button class="cbtn replay" id="replay" type="button">↻ Replay entrance</button>
+    <div class="grp">
+      <span class="lbl">Engine</span>
+      <div class="seg" id="engine" role="group" aria-label="Animation engine">
+        <button data-engine="lottie" aria-pressed="true">Lottie</button>
+        <button data-engine="css" aria-pressed="false">CSS / SVG</button>
+      </div>
+    </div>
+    <button class="cbtn" id="rm" type="button" aria-pressed="false">Preview reduced motion</button>
+    <span class="hint">Plays on load — press Replay to watch again.</span>
+    <div class="spacer"></div>
+    <div class="state">engine <b id="stEngine">lottie</b> · <span id="stRM">motion on</span></div>
+  </div>
+
+  <!-- ================= STAGE ================= -->
+  <div class="stage">
+    <div class="login-card">
+
+      <!-- LEFT: branding panel (animation target) -->
+      <div class="auth-branding">
+        <figure class="auth-branding__figure" id="figure">
+          <div class="auth-branding__mark" id="mark" aria-hidden="true">
+            <span class="nl-ambient"></span>
+          </div>
+          <figcaption class="auth-branding__caption">
+            <span class="nl-wordmark">Northlake</span>
+            <span class="nl-eyebrow">University</span>
+            <span class="nl-underline" aria-hidden="true"></span>
+          </figcaption>
+        </figure>
+        <div class="auth-branding__tag">Energy &amp; Environmental Management</div>
+        <button class="panel-replay" id="panelReplay" type="button">↻ Replay</button>
+      </div>
+
+      <!-- RIGHT: sign-in form (fully interactive; never covered) -->
+      <div class="auth-form">
+        <h2>Sign in</h2>
+        <p class="lead">Access your Northlake University energy &amp; environmental dashboards.</p>
+        <form id="signin" autocomplete="off">
+          <div class="field">
+            <label for="email">University email</label>
+            <input id="email" type="email" placeholder="you@northlake.edu" required>
+          </div>
+          <div class="field">
+            <div class="row">
+              <label for="pw">Password</label>
+              <a class="small" href="#" onclick="return false">Forgot password?</a>
+            </div>
+            <input id="pw" type="password" placeholder="••••••••••" required>
+          </div>
+          <button class="btn btn-primary" type="submit">Sign in</button>
+          <div class="divider">or</div>
+          <button class="btn btn-ghost" type="button">
+            <svg class="g" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 6v6c0 5 3.5 8 8 8s8-3 8-8V6z"></path><path d="m9 12 2 2 4-4"></path></svg>
+            Continue with University SSO
+          </button>
+        </form>
+        <p class="form-foot">Need access? Contact the <a href="#" onclick="return false">IT Service Desk</a>.</p>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ================= INTEGRATION ================= -->
+  <section class="integration">
+    <h3>Integration</h3>
+    <p class="note">Drop-in for <span class="mono">login/_auth-branding.less</span>. The Lottie path ships the runtime once and swaps a <span class="mono">.json</span> per customer; the CSS/SVG path is zero-dependency. Both drive the same caption + underline and degrade to a fully composed static state.</p>
+
+    <details class="code" open>
+      <summary><span class="tw">▸</span>1 · Markup <span class="tag">.auth-branding__figure</span></summary>
+<pre><span class="c">&lt;!-- replaces the static &lt;img&gt; inside .auth-branding__figure --&gt;</span>
+&lt;figure class=<span class="s">"auth-branding__figure"</span> data-nl-entrance&gt;
+  &lt;div class=<span class="s">"auth-branding__mark"</span> aria-hidden=<span class="s">"true"</span>&gt;<span class="c">&lt;!-- Lottie / inline SVG mounts here --&gt;</span>&lt;/div&gt;
+  &lt;figcaption class=<span class="s">"auth-branding__caption"</span>&gt;
+    &lt;span class=<span class="s">"nl-wordmark"</span>&gt;Northlake&lt;/span&gt;
+    &lt;span class=<span class="s">"nl-eyebrow"</span>&gt;University&lt;/span&gt;
+    &lt;span class=<span class="s">"nl-underline"</span> aria-hidden=<span class="s">"true"</span>&gt;&lt;/span&gt;
+  &lt;/figcaption&gt;
+&lt;/figure&gt;</pre>
+    </details>
+
+    <details class="code">
+      <summary><span class="tw">▸</span>2 · Lottie init <span class="tag">recommended</span></summary>
+<pre><span class="c">// lottie-web is MIT. Ship once, then swap northlake-login.json per customer.</span>
+<span class="k">import</span> lottie <span class="k">from</span> <span class="s">'lottie-web'</span>;
+
+<span class="k">const</span> fig  = document.querySelector(<span class="s">'[data-nl-entrance]'</span>);
+<span class="k">const</span> host = fig.querySelector(<span class="s">'.auth-branding__mark'</span>);
+<span class="k">const</span> reduce = matchMedia(<span class="s">'(prefers-reduced-motion: reduce)'</span>).matches;
+
+fetch(<span class="s">'/branding/northlake-login.json'</span>)
+  .then(r =&gt; r.json())
+  .then(data =&gt; {
+    <span class="k">const</span> anim = lottie.loadAnimation({
+      container: host, renderer: <span class="s">'svg'</span>,
+      loop: <span class="k">false</span>, autoplay: <span class="k">false</span>, animationData: data
+    });
+    anim.addEventListener(<span class="s">'DOMLoaded'</span>, () =&gt; {
+      fig.classList.add(<span class="s">'is-playing'</span>);            <span class="c">// drives caption + underline</span>
+      reduce ? anim.goToAndStop(anim.totalFrames - 1, <span class="k">true</span>)
+             : anim.play();
+    });
+  });</pre>
+    </details>
+
+    <details class="code">
+      <summary><span class="tw">▸</span>3 · Caption CSS + reduced motion <span class="tag">.less / .css</span></summary>
+<pre><span class="c">/* The Lottie covers the MARK. The caption + underline are CSS so they
+   restyle with theme vars and stay accessible. Animation is additive:
+   the composed state is the DEFAULT, so no-JS / reduced-motion = final. */</span>
+.nl-wordmark { font-family:<span class="s">'Spectral'</span>,serif; font-size:1.95rem; color:#fff; }
+.nl-eyebrow  { font-size:<span class="k">var</span>(--font-size-sm); letter-spacing:.36em;
+               text-transform:uppercase; color:<span class="k">var</span>(--color-accent); }
+.nl-underline{ width:104px; height:2px; background:<span class="k">var</span>(--color-accent);
+               transform-origin:left; border-radius:2px; }
+
+.is-playing .nl-wordmark { animation:nl-rise .6s <span class="k">var</span>(--ease-out) 1s both; }
+.is-playing .nl-eyebrow  { animation:nl-fade .55s ease 1.26s both; }
+.is-playing .nl-underline{ animation:nl-draw .55s <span class="k">var</span>(--ease-out) 1.46s both; }
+@keyframes nl-rise { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:none} }
+@keyframes nl-draw { from{transform:scaleX(0)} to{transform:scaleX(1)} }
+
+@media (prefers-reduced-motion: reduce){
+  .auth-branding__figure * { animation:none !important; }  <span class="c">/* show composed state */</span>
+}</pre>
+    </details>
+
+    <div class="callout">
+      <span>★</span>
+      <div><b>Per-customer reskin.</b> Lottie → swap <span class="mono">northlake-login.json</span> + set the five theme vars. CSS/SVG → change <span class="mono">--color-*</span> in <span class="mono">northlake-theme-vars.css</span> and swap the mark. No animation code changes.</div>
+    </div>
+  </section>
+</div>
+
+<!-- inline SVG used by the CSS/SVG engine (kept in a template so it's visible in source) -->
+<template id="nl-css-mark">
+  <svg class="nl-svg" viewBox="0 0 64 64" aria-hidden="true">
+    <circle class="nl-ring nl-ring-1" cx="32" cy="32" r="20" fill="none" stroke="var(--nl-ripple-1,var(--color-accent))" stroke-width="2.4"></circle>
+    <circle class="nl-ring nl-ring-2" cx="32" cy="32" r="20" fill="none" stroke="var(--nl-ripple-2,var(--color-tertiary))" stroke-width="2"></circle>
+    <path class="nl-spark" d="M32 11 L35.5 20.5 L45 24 L35.5 27.5 L32 37 L28.5 27.5 L19 24 L28.5 20.5 Z" fill="var(--nl-spark,var(--color-accent))"></path>
+    <rect class="nl-bar nl-bar-1" x="14" y="41.5" width="36" height="2.6" rx="1.3" fill="var(--color-accent)"></rect>
+    <rect class="nl-bar nl-bar-2" x="19" y="46.5" width="26" height="2.2" rx="1.1" fill="var(--color-accent)" opacity=".82"></rect>
+  </svg>
+</template>
+
+<script>
+  const figure  = document.getElementById('figure');
+  const markHost= document.getElementById('mark');
+  const ambient = markHost.querySelector('.nl-ambient');
+  const cssTpl  = document.getElementById('nl-css-mark');
+  const stEngine= document.getElementById('stEngine');
+  const stRM    = document.getElementById('stRM');
+  let engine = 'lottie';
+  let lottieAnim = null;
+
+  // Demo plays motion by default (so you can see it) regardless of OS setting;
+  // "Preview reduced motion" forces the static fallback on demand. Production
+  // respects @media (prefers-reduced-motion: reduce) — see integration snippet 3.
+  const reduced = () => document.documentElement.classList.contains('rm');
+
+  function clearMark(){
+    if (lottieAnim){ lottieAnim.destroy(); lottieAnim = null; }
+    markHost.querySelectorAll('svg').forEach(n => n.remove());
+  }
+
+  function buildLottie(){
+    clearMark();
+    fetch('northlake-login.json').then(r => r.json()).then(data => {
+      lottieAnim = lottie.loadAnimation({ container: markHost, renderer:'svg', loop:false, autoplay:false, animationData:data });
+      lottieAnim.addEventListener('DOMLoaded', () => play());
+    });
+  }
+  function buildCSS(){
+    clearMark();
+    markHost.appendChild(cssTpl.content.cloneNode(true));
+    play();
+  }
+
+  function play(){
+    const r = reduced();
+    figure.classList.remove('is-playing');
+    void figure.offsetWidth;                 // reflow → restart CSS animations
+    if (!r) figure.classList.add('is-playing');
+    if (engine === 'lottie' && lottieAnim){
+      if (r){ lottieAnim.goToAndStop(lottieAnim.totalFrames - 1, true); return; }
+      lottieAnim.goToAndPlay(0, true);
+      // Safety net: if the animation clock is throttled (e.g. a backgrounded
+      // preview) and never advances, snap to the settled mark so it is never blank.
+      clearTimeout(play._guard);
+      play._guard = setTimeout(() => {
+        if (lottieAnim && lottieAnim.currentFrame < 1) lottieAnim.goToAndStop(lottieAnim.totalFrames - 1, true);
+      }, 500);
+    }
+  }
+
+  function setEngine(e){
+    engine = e;
+    document.querySelectorAll('#engine button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.engine === e)));
+    stEngine.textContent = e === 'lottie' ? 'lottie' : 'css / svg';
+    e === 'lottie' ? buildLottie() : buildCSS();
+  }
+
+  document.getElementById('engine').addEventListener('click', e => {
+    const b = e.target.closest('button[data-engine]'); if (b) setEngine(b.dataset.engine);
+  });
+  document.getElementById('replay').addEventListener('click', play);
+  document.getElementById('panelReplay').addEventListener('click', play);
+  document.getElementById('rm').addEventListener('click', e => {
+    const on = document.documentElement.classList.toggle('rm');
+    e.currentTarget.setAttribute('aria-pressed', String(on));
+    stRM.textContent = on ? 'reduced motion' : 'motion on';
+    play();
+  });
+  document.getElementById('signin').addEventListener('submit', e => e.preventDefault());
+
+  // boot
+  setEngine('lottie');
+</script>
+</body>
+</html>

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 268 64" width="268" height="64" role="img" aria-label="Northlake University">
+  
+  <g>
+    <path d="M32 9 L35 18 L43.5 21 L35 24 L32 33 L29 24 L20.5 21 L29 18 Z" fill="#C9A227"></path>
+    <path d="M15 43 Q32 35.8 49 43 Q32 50.8 15 43 Z" fill="#FFFFFF"></path>
+    <path d="M20.5 43 H43.5" stroke="#1F3A5F" stroke-width="1.5" stroke-linecap="round" fill="none"></path>
+  </g>
+  <text x="81" y="36" font-family="&#39;Open Sans&#39;, &#39;Segoe UI&#39;, Arial, sans-serif" font-weight="700" font-size="30" letter-spacing="-0.15" fill="#FFFFFF">Northlake</text>
+  <text x="82.5" y="55" font-family="&#39;Open Sans&#39;, &#39;Segoe UI&#39;, Arial, sans-serif" font-weight="600" font-size="12" letter-spacing="4.2" fill="#C9A227">UNIVERSITY</text>
+</svg>

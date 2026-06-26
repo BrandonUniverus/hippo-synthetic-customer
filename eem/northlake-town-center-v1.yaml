@@ -1,0 +1,85 @@
+manifestVersion: 1
+id: northlake_town_center_v1
+customerScenarioId: demo_university_v1
+stage: 4
+roadmapPhase: 4            # docs/dream-customer/phase4-tenant-rebilling-spec.md
+displayName: Northlake Town Center + Tenant Rebilling Entry Plan
+purpose: >
+  How the Phase 4 multi-tenant data gets into EEM through the UI: a new mixed-use
+  company/site/buildings/tenant-spaces/master+sub meters (commercial) plus Cedar
+  Row sub-metering (residential), then allocation configs for every method, WUI
+  point families, bill-generation config, and reconciliation. Owner decision: BOTH
+  Town Center and sub-metered Cedar Row.
+
+entryUI:
+  companyHierarchy: { app: WPF DBAdmin, screen: "Companies (new company) + Nodes (site/buildings/spaces/meters)" }
+  rates: { ref: eem/northlake-rates-v1.yaml, note: "assign NL-STEP-Demand etc. via TenantRebill view" }
+  billAllocationConfig: { app: Web SPA, screen: "#/reporting/BillAllocationConfiguration (interactive editor: New/Save, Add-Meter, %/amount/overhead grid)" }
+  wuiPointFamily: { app: Web SPA, screen: "Master Point Configuration modal (viewMasterPointConfiguration)" }
+  billGenConfig: { app: WPF DBAdmin, screen: "TenantRebill view -> Bill Generation tab (Status = gen type 1 Off/2 Manual/3 Auto/4 Auto-Regen; Schedule; %Available; Offset; Bill recon checkbox)" }
+  runMeterAlloc: { app: Web SPA, screen: "#/reporting/ProcessMeterAllocations (on-demand)" }
+  runBillGen: { classification: UI-THEN-RUN, note: "full tenant-bill generation runs via scheduled SQL Agent job Job_BillAllocation; no on-demand button" }
+
+sourceReferences:
+  designSpec: docs/dream-customer/phase4-tenant-rebilling-spec.md
+  productBacklog: docs/dream-customer/product-gap-backlog.md
+
+# ---- New commercial structure (enter in WPF Companies + Nodes) ----
+townCenter:
+  company: { id: northlake_town_center, type: commercial_multi_tenant }
+  site: { id: northlake_town_center, displayName: Northlake Town Center }
+  buildings:
+    - { id: tc_market_hall, use: retail, master: tc_market_main (electric), tenants: [Anchor Store, In-line Shop 1-4, Food Court, Common Area] }
+    - { id: tc_tower, use: office, master: tc_tower_main (electric), tenants: [Floor 1-4 (sub-metered), Landlord/house meter] }
+    - { id: tc_campus_annex, use: mixed, master: tc_annex_main (demand-metered), tenants: [Bldg A, B, C] }
+    - { id: tc_substation, use: infrastructure, master: tc_substation_master, tenants: [Substation 1, Substation 2] }
+    - { id: tc_property_total, use: cost_center, role: aggregation_target }
+
+cedarRowSubMetering:
+  add: "unit-level electric + water sub-meters (Cedar Row A 60 units, B 64 units)"
+  allocate: "common-area master -> units via method 2 (electric) + method 4 (winter-capped water), with common-area overhead"
+
+# ---- Allocation configs (one per method; web BillAllocationConfiguration) ----
+# Methods 2-5,7 are method-1 detail rows with precomputed % (engine branches only on 1 & 6).
+allocationConfigs:
+  - { method: 1, name: "Fixed Amount & %", master: tc_market_main, detail: "Anchor fixed $2000; Food Court 15%; in-line shops remaining %; overhead combined + separate modes" }
+  - { method: 2, name: "Fully Submetered", master: tc_tower_main, detail: "4 floors by submeter consumption share" }
+  - { method: 3, name: "Partially Submetered", master: tc_tower_main (variant), detail: "3 submetered floors + landlord/house residual" }
+  - { method: 4, name: "Building Areas", master: tc_market_main, detail: "in-line shops by floor_area" }
+  - { method: 5, name: "Partially Submetered w/ Coincident Demand", master: tc_annex_main, detail: "Bldg A/B/C by usage + coincident peak" }
+  - { method: 6, name: "Bill Aggregation", target: tc_property_total, detail: "sum child tenant bills up (children->parent)" }
+  - { method: 7, name: "Metered Substations", master: tc_substation_master, detail: "Substation 1/2 by % of usage" }
+
+wuiPointFamilies:        # web Master Point Configuration; PtAllocationMethod 1 WUI / 2 Measured (3 Percentage = unimplemented)
+  entries:
+    - { id: wui_market_electric, method: 1, members: "master + 3 child points each with index (kWh/sqft-day) + area + gen rate" }
+    - { id: wui_tower_electric, method: 2, members: "master + measured child (subtracted) + WUI child (residual)" }
+  failReasonFixtures:
+    - { reason: 2 NoUseIndex, fixture: "method-1 child with no index" }
+    - { reason: 3 NoFloorArea, fixture: "child with index but no premise area" }
+    - { reason: 1 InsufficientIntervalData, fixture: "master/child with partial interval" }
+    - { reason: 4 UseNotAllocatedToMaster, fixture: "3-level chain where mid master fails" }
+    - { reason: 5 MissingRateSetup, fixture: "valid child with no UtilityMeterRatesBillGen" }
+    - { reason: "n/a", fixture: "method-3 (Percentage Based) child -> silently ignored (document gap)" }
+
+billGeneration:
+  config: "assign a multi-component rate (UtilityCommodityMap to >=2 charge commodities) under Actual (-1) + a non-actual scenario"
+  genTypes: "replicate config with Status 1 Off / 2 Manual / 3 Auto / 4 Auto-Regen; schedule code CC"
+  run: "seed >=3 periods interval -> Job_BillAllocation generates UtilityBillGenLog + child bills"
+
+reconciliation:
+  enable: "TenantRebill 'Bill' checkbox (EnableBillReconciliation)"
+  scenario: "Bill Meter Reconciliation (ScenarioTypeId 20); recon source 1 Interval on some meters, 2 Bill on others"
+  fixture: "deliberate rate/usage mismatch on one meter -> rp_BillReconciliation shows nonzero variance"
+
+trackBDeferred:
+  - { backlogItem: 4, what: "tenant accruals (open + trued-up pair)", reason: "no accrual UI/API" }
+  - { backlogItem: 5, what: "per-meter rate-class/option binding", reason: "assignment has no option field" }
+
+expectedAssertions:
+  ref: docs/dream-customer/phase4-tenant-rebilling-spec.md#expectedassertions
+  keyChecks:
+    - one config per method 1-7 produces tenant bills; children sum to parent (penny true-up) incl overhead
+    - tc_property_total = sum of consumed child bills (aggregation)
+    - WUI child allocated use = master residual ~ index x area x days; each fail reason 1-5 produced; method-3 child ignored
+    - gen types behave per type; rp_BillReconciliation shows the deliberate variance

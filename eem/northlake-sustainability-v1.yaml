@@ -1,0 +1,67 @@
+manifestVersion: 1
+id: northlake_sustainability_v1
+customerScenarioId: demo_university_v1
+stage: 5
+roadmapPhase: 5            # docs/dream-customer/phase5-sustainability-analytics-spec.md
+displayName: Northlake Sustainability & Analytics Entry Plan
+purpose: >
+  How the Phase 5 data gets into EEM: GHG emission config (web screens), ENERGY
+  STAR property setup + rating requests (local UI), weather regression (UI-then-run),
+  and benchmarks. ENERGY STAR SCORES and benchmark definitions are flagged Track B
+  (external/needs-feature).
+
+entryUI:
+  ghg:
+    sources: "Web #/EmissionFactorSources (title, commodities, emission types, meterLinkType + members)"
+    factors: "Web #/EmissionFactors -> Emission Factor History sub-grid (factor value + effectiveDate)"
+    meterAssign: "Web #/MeterEmissionFactorAssignment (hierarchy -> meters -> source/member/category -> Assign)"
+    companyConfig: "Web #/GHGCompanyConfiguration (reporting year range + default category + source->company)"
+  energyStar:
+    property: "Web #/ESPropertySetup (saves locally; PMPropertyID 0 until linked)"
+    request: "Web #/ESNewRatingRequest (local queue; needs CustomerServer constant to submit)"
+  regression: { classification: UI-THEN-RUN, screen: "Web Custom: WeatherNormalization_SetPeriod -> _Run (runs FF_wn*) -> _MeterDetails" }
+
+sourceReferences:
+  designSpec: docs/dream-customer/phase5-sustainability-analytics-spec.md
+  esPropertyMapping: docs/energystar-integration.md
+  productBacklog: docs/dream-customer/product-gap-backlog.md
+
+ghg:
+  # EmissionFactorSource ids (verified): 4 eGRID, 3 Non-electric commodities, 10 Steam Plant
+  sourceMapping:
+    - { commodity: electric, source: "4 eGRID (CAMX)", category: 1 Indirect (Scope 2), factor: "0.231 kgCO2e/kWh (+CH4,N2O)" }
+    - { commodity: natural_gas, source: "3 Non-electric commodities", category: 2 Stationary (Scope 1), factor: "5.31 kgCO2e/therm" }
+    - { commodity: "chilled_water, steam", source: "10 Steam Plant", category: 2 Stationary (Scope 1, plant) }
+    - { commodity: "water, sewer", source: "3 Non-electric", category: 1 Indirect (Scope 3), factor: "3.2 kWh/kgal embedded x grid" }
+    - { commodity: solar_generation, note: "Scope 2 reduction; avoided 0.231 kgCO2e/kWh; RECs retained (market-based)" }
+  factorHistory: "enter a 2024 value and a different 2025 value per factor (drives GHGVariance)"
+  companyConfig: "reporting years 2024-2025; assign sources to each company"
+  contentGap: "GHGCompanyConfiguration has no Scope 1/2/3 toggles / baseline year / targets (note for stakeholders)"
+
+energyStar:
+  properties: "8 mapped properties already in docs/energystar-integration.md (campus + buildings + Cedar Row)"
+  requests: "quarterly rating requests 2024-2025 for eligible types"
+  scores:
+    classification: EXTERNAL (Track B item 1)
+    how: "connect sandbox/real Portfolio Manager account; set CustomerServer + credentials; run EEMSuite.Tasks.EnergyStar sync (RatingSyncService) -> ESResponseFacility"
+    note: "scores CANNOT be hand-entered; eligible types (office/library/food-service/residence) get 1-100; labs get metrics, no score"
+
+weatherRegression:
+  run: "configure period + run FF_wn* via Custom views (results computed, not entered)"
+  targets:
+    - { point: Science Center electric kWh, inputs: HDD+CDD, expect: "cooling-driven, R^2>=0.8" }
+    - { point: Admin Hall gas therms, inputs: HDD, expect: "heating-driven, R^2>=0.85" }
+    - { point: NTP chilled-water ton-hours, inputs: CDD, expect: "strong cooling fit" }
+  effect: "fills the 3 baseline shells with computed values; enables weather-normalized ScatterPlot/UsageVariance"
+
+trackBDeferred:
+  - { backlogItem: 7, what: "benchmark / EUI target definitions", reason: "benchmark UI is read-only; no create screen" }
+  - { backlogItem: 1, what: "ENERGY STAR scores", reason: "external PM-only; connect sandbox PM to populate" }
+
+expectedAssertions:
+  ref: docs/dream-customer/phase5-sustainability-analytics-spec.md#expectedassertions
+  keyChecks:
+    - GHG History = sum(usage x factor x GWP) per scope; 2025 factor differs from 2024 (GHGVariance != 0)
+    - regression results have plausible R^2/CV-RMSE; baselines now computed
+    - "(after PM connect) eligible properties show quarterly 1-100 scores; labs show metrics, no score"
+    - "(after Track B) benchmark ranking by EUI with labs highest"

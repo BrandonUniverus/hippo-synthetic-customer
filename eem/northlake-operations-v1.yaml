@@ -1,0 +1,85 @@
+manifestVersion: 1
+id: northlake_operations_v1
+customerScenarioId: demo_university_v1
+stage: 6
+roadmapPhase: 6            # docs/dream-customer/phase6-operations-engagement-spec.md
+displayName: Northlake Operations & Engagement Entry Plan
+purpose: >
+  How the Phase 6 data gets into EEM: projects, alarm thresholds, tasks/workflows,
+  MFR saved reports + delivery (100+ users via groups), handheld config, and
+  importers. Audit/status/notes/logs are produced by USING the app. EnergyAI and
+  GreenButton are flagged Track B (external / needs-feature).
+
+entryUI:
+  projects: { app: Web SPA, screen: "#/reporting/ProjectTrackingConfiguration -> ProjectTracking editor (AddOrUpdateProject)" }
+  alarmThresholds: { app: WPF DBAdmin, screen: "Point Alarm Definition (per point: hi/lo alarm+warning, deadband, priority, recipient)" }
+  alarmEvents: { classification: UI-THEN-RUN, note: "raised by the alarm evaluation/notification task from point data + thresholds (needs Tasks EngineWorker running)" }
+  auditStatusNotes: { classification: SYSTEM-GENERATED, note: "perform actions (bill entry/approval, edits, report runs, logins incl. disabled-user fail + cross-company auditor) -> rows appear" }
+  taskSchedules: { app: Web SPA, screen: "#/tasks/manager (CreateTaskItem; OneShot/Interval>=300s/Cron; RunTaskNow)" }
+  workflows: { app: WPF ConfigurationTool, screen: "Workflow Designer (author + version); web schedules existing workflows only" }
+  taskLogs: { classification: UI-THEN-RUN, note: "run tasks -> WorkflowRun/TaskQuickRun surface at #/tasks/dashboard" }
+  mfr: { app: Web SPA, screen: "Save-as-Favorite drawer; #/MyFavoriteReports/Index (dashboards); MFRDelivery modal (Reports/Recipients/Groups/Schedule)" }
+  handheld: { app: Web SPA, screen: "HandheldMeterReadingConfiguration (per-meter route/read-type) + #/HandheldMeterReadingExport" }
+  importers: { app: Web SPA, screen: "#/MyUploads (docs), #/MyImports (templates: download XLSX -> fill -> upload)" }
+
+sourceReferences:
+  designSpec: docs/dream-customer/phase6-operations-engagement-spec.md
+  productBacklog: docs/dream-customer/product-gap-backlog.md
+
+projects:                  # ProjectTracking editor
+  entries:
+    - { name: Library LED Retrofit, category: Lighting, capital: "$120k", incentive: "$25k", mAndV: "baseline -> post lighting kWh" }
+    - { name: Science Center Chiller Upgrade, category: HVAC, capital: "$640k", incentive: "$80k", mAndV: "CHW ton-hour baseline" }
+    - { name: Cedar Row Solar Expansion, category: Renewable, capital: "$410k", incentive: ITC }
+    - { name: Admin Hall Recommissioning, category: Controls, capital: "$55k", incentive: "$10k" }
+  activities: "Design -> Procurement -> Install -> Commissioning -> M&V (+ financial events per commodity)"
+  note: "project types/categories/activities are reference data (selectable, no create UI); M&V<->meter linkage is Track B (none today)"
+
+alarms:                    # WPF Point Alarm Definition; PriorityLevels 1-5
+  entries:
+    - { point: Student Center demand kW, type: high-demand, priority: 4 Critical }
+    - { point: Chiller enable (digital), type: chiller-fault, priority: 3 Important }
+    - { point: Science Center interval, type: data-gap, priority: 2 Warning }
+    - { point: Cedar Row water kgal, type: high-usage, priority: 2 Warning }
+  events: "configure thresholds + load point data + run alarm task -> raised/ack/resolved rows -> rp_AlarmDataMap"
+
+tasksAndWorkflows:
+  schedules: "for the 13 gateway profiles + bill import + report/MFR delivery (interval + cron)"
+  workflows:
+    - "download -> bill-import -> validate -> notify finance"
+    - "gateway read -> interval publish -> weather regression -> alert"
+  history: "run tasks (EngineWorker) -> TaskLog/GatewayStatus populate"
+
+mfrDelivery:
+  savedReports: [Monthly Building Energy, Weekly Cost Rollup, Executive Sustainability Summary, Daily Operations]
+  dashboards: [Facility Operations, Executive Overview]
+  deliveries:
+    - { name: Monthly Building Energy, schedule: "cron 0 7 1 * *", recipients: "building-rep GROUPS (~120 users)", format: PDF }
+    - { name: Weekly Cost Rollup, schedule: cron weekly, recipients: "finance group", format: PDF+Excel }
+    - { name: Daily Operations, schedule: interval, recipients: "ops individuals" }
+  hundredPlusUsers: "reach 100+ via GROUP recipients (~12 building-rep groups x ~10 users); generation rule, not enumerated"
+  trackBNote: "external-email recipients need backlog item 8; use groups meanwhile"
+
+handheld:                  # ties to existing Neptune (water) + MVRS (gas) routes
+  config: "per-meter route/cycle/sequence + read type (dials/decimals/direction/demand)"
+  export: "#/HandheldMeterReadingExport -> .txt route file"
+  readsBack: "HMR events JSONL -> broker gateway.hmr.events (DATA-PATH)"
+
+importers:
+  myUpload: "upload synthetic docs (bill PDFs) by upload-type"
+  myImport: "run myimport_intervaldata / myimport_MeterReadings templates (download XLSX, fill, upload)"
+
+trackBDeferred:
+  - { backlogItem: 9, what: "EnergyAI insights", reason: "external service only; even enrollment is DB-only" }
+  - { backlogItem: 10, what: "GreenButton (ESPI XML) import", reason: "read-only API; legacy, no import UI" }
+  - { backlogItem: 8, what: "MFR external-email recipients", reason: "picker offers only users/groups (use groups for 100+)" }
+
+expectedAssertions:
+  ref: docs/dream-customer/phase6-operations-engagement-spec.md#expectedassertions
+  keyChecks:
+    - Project Detail/Summary/Finance render with capital/incentive/savings
+    - rp_AlarmDataMap shows raised->ack->resolved; data-gap alarm aligns with backfill window
+    - rp_Audit/rp_ActivityTracker show edits + disabled-user fail + cross-company auditor
+    - rp_TaskLog/rp_GatewayStatus show scheduled runs; workflows complete
+    - Monthly MFR delivery fans out to >=100 recipients (via groups), PDF
+    - every one of the 115 reports has >=1 scenario rendering it non-empty (with Track B done)

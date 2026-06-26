@@ -1,0 +1,220 @@
+manifestVersion: 1
+id: northlake_rates_v1
+customerScenarioId: demo_university_v1
+stage: 2
+roadmapPhase: 2            # docs/dream-customer/phase2-rate-engine-spec.md
+displayName: Northlake EEM Rate Library (Rate Modeler entry plan)
+purpose: >
+  The rate library to build BY HAND in the WPF Rate Modeler (DBAdmin) so Northlake
+  exercises all 9 determinant kinds (UtilityDeterminantType 100-800). This is an
+  end-state + entry plan: WHAT each rate must contain and WHERE to enter it — not a
+  DB seed. Numeric tariff values for the five base providers are the single source
+  of truth in providers/<id>.yaml; this file enumerates the determinant STRUCTURE,
+  the entry steps, and meter assignment. New dream-only schedules (ratchet, RTP,
+  stepped, contract, options, multi-currency) carry explicit values here.
+
+entryUI:
+  app: WPF DatabaseAdministrator
+  screen: Rate Modeler
+  navigation: >
+    Rate Modeler tree -> Add Utility Provider -> Add Rate (name, currency,
+    measure type, T/D/C flags) -> Add Rate Class -> Add Determinant (pick type,
+    schedule, unit, isDemand, interval rule, load factor, scripts) -> Add Effective
+    Date -> Blocks grid. Bulk alternative: Rate Import (file).
+  assignment: >
+    WPF TenantRebill view (hosted under Node definitions), scoped to a Bill
+    Scenario: assign Rate + Start/End dates to a meter node.
+
+sourceReferences:
+  providerRateValues: providers/      # VED, SGU, RCU, NTP, HOS numeric tariffs (authoritative)
+  designSpec: docs/dream-customer/phase2-rate-engine-spec.md
+  entryGaps: docs/dream-customer/entry-path-and-gaps.md
+  productBacklog: docs/dream-customer/product-gap-backlog.md
+
+# Track B dependencies (build first if you want full fidelity; see product-gap-backlog.md):
+trackBDependencies:
+  - backlogItem: 5   # per-meter rate-class/option binding — NL-OPTIONS-Phase can DEFINE options but not BIND per meter via UI today
+  - backlogItem: 6   # non-Unique "All" class — used below for tax/min-bill scoping; Rate Modeler hardcodes Unique today
+
+# ---------- Shared building blocks (create FIRST; determinants reference them) ----------
+
+holidaySetsToCreate:
+  - id: NL-HOLIDAYS
+    screen: Rate Modeler -> Schedule -> Holidays
+    dates: [New Year's Day, Memorial Day, Independence Day, Labor Day, Thanksgiving, Christmas Day]
+
+schedulesToCreate:   # Rate Modeler "Schedule" = season + TOU + holiday bundle
+  - { id: SCHED-ALLHOURS, season: annual, tou: "all hours (significance 1 All Hour)", holiday: none }
+  - { id: SCHED-SUMMER,   season: "summer Jun1-Sep30", tou: "all hours", holiday: none }
+  - { id: SCHED-WINTER,   season: "winter Oct1-May31", tou: "all hours", holiday: none }
+  - { id: SCHED-SUM-ONPEAK,  season: "summer Jun1-Sep30", tou: "weekday 12:00-18:00 (sig 4 On Peak)", holiday: NL-HOLIDAYS }
+  - { id: SCHED-SUM-OFFPEAK, season: "summer Jun1-Sep30", tou: "all other hours (sig 3 Off Peak)", holiday: NL-HOLIDAYS }
+  - { id: SCHED-WIN-ONPEAK,  season: "winter Oct1-May31", tou: "weekday 17:00-21:00 (sig 4 On Peak)", holiday: NL-HOLIDAYS }
+  - { id: SCHED-WIN-OFFPEAK, season: "winter Oct1-May31", tou: "all other hours (sig 3 Off Peak)", holiday: NL-HOLIDAYS }
+
+scriptsToCreate:
+  - { id: SCRIPT-BASE-EXCESS, type: pre,  purpose: "split contract demand into base vs excess" }
+  - { id: SCRIPT-PF-ADJUST,   type: post, purpose: "power-factor adjustment (synthetic stand-in; engine has no PF math)" }
+  - { id: SCRIPT-ROUND-2DP,   type: post, purpose: "round bill item to 2 decimals" }
+
+# Synthetic price-signal POINT for RTP (point created in Node/Point editor; hourly
+# $/kWh values arrive via DATA-PATH, not the rate UI):
+priceSignalPoints:
+  - { id: pt_ved_rtp_price_hourly, unit: $/kWh, interval: 60, source: synthetic hourly price file (ODBC/import) }
+
+# ---------- Rate schedules (build each in Rate Modeler) ----------
+# determinant.type = UtilityDeterminantType id. value_ref points to providers/*.yaml.
+
+rateSchedules:
+
+  - id: NL-GS-TOU-Seasonal            # flagship; enriches VED-TOU-GS to determinant level
+    extends: VED-TOU-GS
+    measureType: Electricity
+    currency: USD
+    rateClasses: [All]                # needs Track B #6 for a true non-Unique "All" class
+    determinants:
+      - { name: Facility Charge,        type: 400, unit: $/month, schedule: SCHED-ALLHOURS, value_ref: "VED facilityCharge" }
+      - { name: Energy On-Peak,         type: 200, unit: $/kWh, intervalRule: 2, schedule: SCHED-SUM-ONPEAK,  value_ref: "VED energy.peak" }
+      - { name: Energy Part-Peak,       type: 200, unit: $/kWh, intervalRule: 2, schedule: SCHED-SUM-OFFPEAK, value_ref: "VED energy.part_peak" }
+      - { name: Energy Off-Peak,        type: 200, unit: $/kWh, intervalRule: 2, schedule: SCHED-WIN-OFFPEAK, value_ref: "VED energy.off_peak" }
+      - { name: Summer Demand,          type: 200, isDemand: true, intervalRule: 4, unit: $/kW, schedule: SCHED-SUMMER, value_ref: "VED demand" }
+      - { name: Winter Demand,          type: 200, isDemand: true, intervalRule: 4, unit: $/kW, schedule: SCHED-WINTER, value: 14.10 }
+      - { name: Public Purpose Rider,   type: 700, unit: "%", value: 2.85, members: [Energy On-Peak, Energy Part-Peak, Energy Off-Peak] }
+      - { name: Renewable Energy Rider, type: 200, unit: $/kWh, value: 0.00461, schedule: SCHED-ALLHOURS }
+      - { name: Utility Users Tax,      type: 800, unit: "%", value: 5.0, members: [all preceding] }
+    effectiveDates:
+      - { start: 2024-01-01, values_ref: "VED-TOU-GS" }
+      - { start: 2025-01-01, values_ref: "VED-TOU-GS-FY25", note: provider_rate_change step }
+    meterAssignment: { meters: [admin_hall electric, library electric], billScenario: Actual, note: "monthly-only meters carry TOU register reads" }
+
+  - id: NL-RES-Tiered                 # Cedar Row residential electric
+    measureType: Electricity
+    currency: USD
+    rateClasses: [All]
+    determinants:
+      - { name: Customer Charge,   type: 400, unit: $/month, value: 12.50, schedule: SCHED-ALLHOURS }
+      - { name: Energy Tier 1,     type: 200, unit: $/kWh, intervalRule: 2, schedule: SCHED-ALLHOURS, blocks: [{upTo: 500, value: 0.128}] }
+      - { name: Energy Tier 2,     type: 200, unit: $/kWh, blocks: [{from: 500, upTo: 1500, value: 0.156}] }
+      - { name: Energy Tier 3,     type: 200, unit: $/kWh, blocks: [{from: 1500, upTo: null, value: 0.189}] }
+      - { name: Minimum Bill,      type: 500, unit: $, value: 18.00, members: [Customer Charge, Energy Tier 1, Energy Tier 2, Energy Tier 3] }
+      - { name: State Tax,         type: 800, unit: "%", value: 2.5, members: [all preceding] }
+      - { name: Municipal Tax,     type: 800, unit: "%", value: 1.75, members: [all preceding incl State Tax] }   # tax-on-tax ordering
+    meterAssignment: { meters: [cedar_row_a electric, cedar_row_b electric], billScenario: Actual }
+
+  - id: NL-LG-Ratchet                 # Science Center large demand
+    measureType: Electricity
+    currency: USD
+    rateClasses: [All]
+    determinants:
+      - { name: Facility Charge,   type: 400, unit: $/month, value: 320.00, schedule: SCHED-ALLHOURS }
+      - { name: Energy (LF-sized), type: 200, unit: $/kWh, useLoadFactor: true, schedule: SCHED-ALLHOURS, blocks: [{lfSize: true, value: 0.131}] }
+      - { name: Demand (ratchet),  type: 200, isDemand: true, intervalRule: 4, unit: $/kW, value: 21.40, schedule: SCHED-ALLHOURS,
+          ratchet: { currentPct: 100, previousPct: 80, ratchetMonths: 11 } }
+      - { name: Utility Users Tax, type: 800, unit: "%", value: 5.0, members: [all preceding] }
+    meterAssignment: { meters: [science_center electric], billScenario: Actual, note: "needs >=12 mo interval w/ strong summer peak so winter ratchet floor binds" }
+
+  - id: NL-CONTRACT-2Part             # campus central plant electric
+    measureType: Electricity
+    currency: USD
+    rateClasses: [All]
+    determinants:
+      - { name: Base Contract Demand, type: 200, isDemand: true, intervalRule: 4, unit: $/kW, value: 16.20, schedule: SCHED-ALLHOURS, preScript: SCRIPT-BASE-EXCESS }
+      - { name: Excess Demand,        type: 200, isDemand: true, intervalRule: 4, unit: $/kW, value: 24.30, schedule: SCHED-ALLHOURS, postScript: SCRIPT-BASE-EXCESS }
+      - { name: Base Energy,          type: 200, unit: $/kWh, value: 0.118, schedule: SCHED-ALLHOURS }
+      - { name: Facility Charge,      type: 400, unit: $/month, value: 500.00 }
+      - { name: Utility Users Tax,    type: 800, unit: "%", value: 5.0, members: [all preceding] }
+    meterAssignment: { meters: [northlake_central_plant electric], billScenario: Actual }
+
+  - id: NL-RTP-Index                  # Student Center real-time pricing (fires type 100)
+    measureType: Electricity
+    currency: USD
+    rateClasses: [All]
+    determinants:
+      - { name: RTP Energy,        type: 100, unit: $/kWh, rtpPoint: pt_ved_rtp_price_hourly, schedule: SCHED-ALLHOURS }
+      - { name: RTP Energy Capped, type: 100, unit: $/kWh, rtpPoint: pt_ved_rtp_price_hourly, usePriceRanges: true, highRange: 0.95, lowRange: 0.02 }
+      - { name: Delivery Charge,   type: 400, unit: $/month, value: 145.00 }
+    meterAssignment: { meters: [student_center electric], billScenario: "Scenario (what-if)", note: "RTP is a what-if/shadow rate; Student Center actual stays on its tariff" }
+    requires: "price-signal point pt_ved_rtp_price_hourly with hourly values loaded via DATA-PATH"
+
+  - id: NL-STEP-Demand                # Town Center anchor (fires type 210 + 600)
+    measureType: Electricity
+    currency: USD
+    rateClasses: [All]
+    determinants:
+      - { name: Stepped Demand, type: 210, isDemand: true, intervalRule: 4, unit: $/kW, schedule: SCHED-ALLHOURS,
+          blocks: [{upTo: 100, value: 1500.00}, {from: 100, upTo: 250, value: 3200.00}, {from: 250, upTo: null, value: 6800.00}] }
+      - { name: Energy,         type: 200, unit: $/kWh, value: 0.142, schedule: SCHED-ALLHOURS }
+      - { name: Maximum Bill,   type: 600, unit: $, value: 25000.00, members: [Stepped Demand, Energy] }
+    meterAssignment: { meters: [tc_market_main electric], billScenario: Actual, note: "Phase 4 Town Center anchor" }
+
+  - id: NL-GAS-FuelAdj                # enriches SGU-GN-1
+    extends: SGU-GN-1
+    measureType: Natural Gas
+    currency: USD
+    rateClasses: [All]
+    determinants:
+      - { name: Customer Charge,        type: 300, unit: $/day, value_ref: "SGU customerCharge (per-day proration)" }
+      - { name: Commodity (seasonal),   type: 200, unit: $/therm, schedule: SCHED-WINTER, value_ref: "SGU commodity.winter" }
+      - { name: Commodity (summer),     type: 200, unit: $/therm, schedule: SCHED-SUMMER, value_ref: "SGU commodity.summer" }
+      - { name: Transport,              type: 200, unit: $/therm, value_ref: "SGU transport", unitConversion: "ccf->therm 1.027" }
+      - { name: Fuel Cost Adjustment,   type: 200, unit: $/therm, schedule: SCHED-ALLHOURS,
+          effectiveDates: "one row per month (2024-01..2025-12), each a new BlockValue (monthly PCA)" }
+      - { name: Public Purpose Surcharge, type: 700, unit: "%", value: 1.9, members: [Commodity (seasonal), Commodity (summer)] }
+      - { name: Utility Users Tax,      type: 800, unit: "%", value: 5.0, members: [all preceding] }
+    meterAssignment: { meters: [all Sierra Gas meters], billScenario: Actual }
+
+  - id: NL-MULTI-Commodity            # RCU water/sewer/storm + NTP chilled water/steam
+    note: "Build as separate rates per measure type (engine bills per MeasureType); group via UtilityCommodityMap"
+    rates:
+      - { measureType: Potable Water, basis: RCU-W-TIER, determinants: [
+          {name: Meter Charge, type: 400, unit: $/month, value_ref: "RCU meterCharge by size"},
+          {name: Water Tier 1, type: 200, unit: $/kgal, blocks: [{upTo: 50, value_ref: "RCU tiers[0]"}]},
+          {name: Water Tier 2, type: 200, unit: $/kgal, blocks: [{from: 50, upTo: 200, value_ref: "RCU tiers[1]"}]},
+          {name: Water Tier 3, type: 200, unit: $/kgal, blocks: [{from: 200, upTo: null, value_ref: "RCU tiers[2]"}]} ] }
+      - { measureType: Sewer Water, basis: RCU-S-VOL, determinants: [
+          {name: Sewer Base, type: 400, unit: $/month, value_ref: "RCU baseCharge"},
+          {name: Sewer Volume, type: 200, unit: $/kgal, value_ref: "RCU volume (on metered water)"} ] }
+      - { measureType: Stormwater, basis: RCU-SW-ERU, determinants: [
+          {name: Stormwater ERU, type: 400, unit: $/eru, value_ref: "RCU eruCharge"} ] }
+      - { measureType: Chilled Water, basis: NTP-ALLOC-CHW, determinants: [
+          {name: CHW Consumption, type: 200, unit: $/ton_hour, value_ref: "NTP consumption"},
+          {name: CHW Demand, type: 200, isDemand: true, intervalRule: 4, unit: $/ton, value_ref: "NTP demand"} ] }
+      - { measureType: Steam, basis: NTP-ALLOC-STEAM, determinants: [
+          {name: Steam Consumption, type: 200, unit: $/klb, value_ref: "NTP-ALLOC-STEAM consumption"} ] }
+    meterAssignment: { meters: [RCU water meters, NTP chilled-water + steam meters], billScenario: Actual }
+
+  - id: NL-OPTIONS-Phase              # rate-class options demo (Admin Hall)
+    measureType: Electricity
+    currency: USD
+    rateClasses:
+      - { name: All, type: always_applied }
+      - { name: Primary Voltage, type: option, group: voltage }
+      - { name: Secondary Voltage, type: option, group: voltage, default: true }
+      - { name: Three-Phase, type: option, group: phase }
+      - { name: Tax-Exempt, type: option, group: tax }
+      - { name: Farm Discount, type: option, group: discount }
+    determinants:
+      - { name: Energy, type: 200, unit: $/kWh, value: 0.151, schedule: SCHED-ALLHOURS, class: All }
+      - { name: Voltage Discount, type: 700, unit: "%", value: -3.0, class: Primary Voltage }
+      - { name: Utility Users Tax, type: 800, unit: "%", value: 5.0, class: All, excludedFor: [Tax-Exempt] }
+    meterAssignment: { meters: [admin_hall electric (variant)], billScenario: Actual, classOption: "Primary Voltage + Tax-Exempt" }
+    trackBNote: "Defining options here works; BINDING a meter to a specific option needs backlog item 5."
+
+  - id: NL-MULTI-Currency             # optional completeness
+    measureType: Electricity
+    currency: CAD
+    rateClasses: [All]
+    determinants:
+      - { name: Energy (C$), type: 200, unit: C$/kWh, value: 0.148, schedule: SCHED-ALLHOURS }
+      - { name: GST, type: 800, unit: "%", value: 5.0, members: [Energy (C$)] }
+    meterAssignment: { meters: [a synthetic cross-border meter or shadow assignment], billScenario: "Scenario (what-if)" }
+    note: "Exercises currency conversion vs a US$ reporting unit profile; flag as synthetic."
+
+expectedAssertions:
+  ref: docs/dream-customer/phase2-rate-engine-spec.md#expectedassertions
+  keyChecks:
+    - every UtilityRates_Run_100..800 proc fires at least once across this library
+    - NL-RTP-Index bill = sum(interval kWh x hourly price); capped variant respects high/low
+    - NL-STEP-Demand picks one step; Maximum Bill caps the subtotal
+    - NL-LG-Ratchet winter billed demand = 80% of prior summer peak when current is lower
+    - NL-RES-Tiered tops up to the 500 minimum on a low-usage month; the two 800 taxes compound in order

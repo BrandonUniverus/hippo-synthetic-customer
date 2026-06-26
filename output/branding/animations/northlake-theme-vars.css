@@ -1,0 +1,36 @@
+/* ============================================================
+   Northlake University — EEM Suite portal theme override
+   ------------------------------------------------------------
+   Per-customer reskin layer. Set these CSS custom properties at
+   :root (or under a [data-brand="northlake"] scope) and the EEM
+   shell, the login entrance, and the loading ripple all retheme.
+
+   To onboard a different customer, change ONLY these values and
+   swap the mark + Lottie sources (northlake-mark.svg /
+   northlake-login.json / northlake-loading.json). No animation
+   code changes are required.
+   ============================================================ */
+
+:root {
+  /* --- The five theme hooks the EEM app already exposes --- */
+  --color-primary:   #14263F;  /* deepest collegiate navy — gradient base, ink   */
+  --color-primary-2: #1F3A5F;  /* navy — branding panel + mark roundel           */
+  --color-accent:    #C9A227;  /* heritage gold — spark, ripples, underline      */
+  --color-tertiary:  #2E6E7E;  /* lake teal — secondary ripple / support         */
+  --font-size-sm:    0.875rem; /* 14px — figcaption + .k-loading-text             */
+}
+
+/* --- Optional animation helper tokens ---------------------------------
+   The animations read these with fallbacks, e.g.
+       stroke: var(--nl-ripple-2, var(--color-tertiary));
+   so the motion palette can be fine-tuned without touching the brand
+   vars above. Leave them out entirely and the five hooks drive
+   everything. ------------------------------------------------------- */
+:root {
+  --nl-spark:       var(--color-accent);    /* leaf / energy spark fill        */
+  --nl-ripple-1:    var(--color-accent);    /* primary lake ripple stroke      */
+  --nl-ripple-2:    var(--color-tertiary);  /* secondary lake ripple stroke    */
+  --nl-panel-from:  var(--color-primary-2); /* branding panel gradient (top)   */
+  --nl-panel-to:    var(--color-primary);   /* branding panel gradient (base)  */
+  --nl-ambient:     rgba(201, 162, 39, 0.16); /* idle ambient ripple (gold@16%) */
+}

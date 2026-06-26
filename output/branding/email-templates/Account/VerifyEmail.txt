@@ -1,0 +1,21 @@
+NORTHLAKE UNIVERSITY ENERGY PORTAL
+Verify your email
+
+CONFIRM YOUR EMAIL ADDRESS
+
+Welcome to the Northlake University Energy Portal.
+
+Confirm this email address to finish setting up your account and keep it
+secure. Open the link below:
+
+{{VerifyUrl}}
+
+This link expires in {{ExpiresIn}}. If you didn't create a Northlake Energy
+Portal account, you can safely ignore this email.
+
+--
+(c) {{CurrentYear}} Northlake University Energy Portal — powered by EEM Suite
+(Energy Hippo, a Univerus company). This is an automated message; replies are
+not monitored.
+Questions? energy.support@northlake.example.edu
+Sent by {{MachineName}}

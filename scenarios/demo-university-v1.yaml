@@ -18,6 +18,14 @@ sites:
   - id: northlake_main_campus
     displayName: Northlake Main Campus
     type: campus
+    address:
+      line1: 4100 North Shore Drive
+      city: Sacramento
+      state: CA
+      postalCode: "95822"
+      latitude: 38.53520
+      longitude: -121.49390
+      coordinateSource: synthetic_plausible_sacramento
     buildings:
       - id: admin_hall
         displayName: Admin Hall
@@ -28,6 +36,9 @@ sites:
           city: Sacramento
           state: CA
           postalCode: "95822"
+          latitude: 38.53590
+          longitude: -121.49450
+          coordinateSource: synthetic_plausible_sacramento
       - id: science_center
         displayName: Science Center
         useType: lab_classroom
@@ -37,6 +48,9 @@ sites:
           city: Sacramento
           state: CA
           postalCode: "95822"
+          latitude: 38.53655
+          longitude: -121.49280
+          coordinateSource: synthetic_plausible_sacramento
       - id: library
         displayName: Library
         useType: library
@@ -46,6 +60,9 @@ sites:
           city: Sacramento
           state: CA
           postalCode: "95822"
+          latitude: 38.53480
+          longitude: -121.49310
+          coordinateSource: synthetic_plausible_sacramento
       - id: student_center
         displayName: Student Center
         useType: food_service_event
@@ -55,9 +72,20 @@ sites:
           city: Sacramento
           state: CA
           postalCode: "95822"
+          latitude: 38.53420
+          longitude: -121.49530
+          coordinateSource: synthetic_plausible_sacramento
   - id: cedar_row_apartments
     displayName: Cedar Row Apartments
     type: multifamily
+    address:
+      line1: 1280 Cedar Row Lane
+      city: Sacramento
+      state: CA
+      postalCode: "95822"
+      latitude: 38.54720
+      longitude: -121.47060
+      coordinateSource: synthetic_plausible_sacramento
     buildings:
       - id: cedar_row_a
         displayName: Cedar Row A
@@ -68,6 +96,9 @@ sites:
           city: Sacramento
           state: CA
           postalCode: "95822"
+          latitude: 38.54765
+          longitude: -121.47020
+          coordinateSource: synthetic_plausible_sacramento
       - id: cedar_row_b
         displayName: Cedar Row B
         useType: multifamily_housing
@@ -77,6 +108,9 @@ sites:
           city: Sacramento
           state: CA
           postalCode: "95822"
+          latitude: 38.54685
+          longitude: -121.46955
+          coordinateSource: synthetic_plausible_sacramento
 
 # ENERGY STAR Portfolio Manager property mapping.
 # Each site/building maps to a PM Property with a primaryFunction (an exact

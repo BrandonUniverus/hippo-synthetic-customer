@@ -1,0 +1,710 @@
+manifestVersion: 1
+id: northlake_eem_metaworld_stage1b_v1
+customerScenarioId: demo_university_v1
+stage: 1b
+displayName: Northlake EEM MetaWorld Stage 1B Setup
+purpose: >
+  App-facing target model for finishing the blank Northlake EEM system after the
+  company shell exists. This stage creates the hierarchy completion, utility
+  setup, billing account shells, meter shells, point definitions, weather
+  station mappings, aggregate definitions, and baseline point shells needed
+  before Stage 2 gateway/task configuration and Stage 3 fake consumption.
+
+sourceReferences:
+  stage1CompanySetup: eem/northlake-eem-stage1-setup-v1.yaml
+  sourceScenarioManifest: scenarios/demo-university-v1.yaml
+  securityManifest: security/northlake-eem-security-v1.yaml
+  addressCoordinates: docs/northlake-address-coordinates.md
+  customerOverview: customer-provided/northlake-university/northlake-facilities-and-utility-overview.md
+
+eemResearchBasis:
+  hierarchyNodeTypes:
+    source: C:/Hippo/Git/univerus/energyhippo/EEMSuite/src/Domain/EEMSuite.Domain/Organizations/Hierarchy/Models/HierarchyNodes/HierarchyNodeTypes.cs
+    supported:
+      - {name: Company, internalLevelNbr: -1, use: Existing company/security boundary.}
+      - {name: UserDefined, internalLevelNbr: 0, use: Portfolio, service area, and custom rollup levels.}
+      - {name: Site, internalLevelNbr: 1, use: Campus, property, plant, and weather-reference groupings.}
+      - {name: Location, internalLevelNbr: 2, use: Buildings, served buildings, and physical locations.}
+      - {name: Meter, internalLevelNbr: 4, use: Physical meters, logical provider meters, weather stations, and sensor/controller groupings.}
+      - {name: Point, internalLevelNbr: 5, use: Measured channels, derived channels, aggregates, weather indices, and baselines.}
+  meterStorage:
+    sourceTables: [MetaWorld_TBL, Meter]
+    saveProc: Meter_Save
+    keyFields:
+      - ProviderID
+      - RateScheduleOID
+      - BA_BillingAccountID
+      - SM_Code
+      - SM_SerialNumber
+      - SM_Multiplier
+      - BillCycle
+  pointStorage:
+    sourceTables: [MetaWorld_TBL, PointDef_TBL, PtRelatedData_TBL]
+    saveProc: Point_Save
+    supportedPointTypes:
+      - {name: Analog, expectedPtType: 1, use: Most interval, bill, weather, and calculated values.}
+      - {name: Digital, expectedPtType: 2, use: Status/state points using company digital colors.}
+      - {name: Accumulator, expectedPtType: 3, use: Register readings that produce usage deltas.}
+      - {name: AccumulatorDelta, expectedPtType: 4, use: Usage delta related to an accumulator.}
+      - {name: AccumulatorROC, expectedPtType: 5, use: Rate-of-change related point where enabled.}
+    note: Confirm exact PointTypes rows in the restored target database before app setup.
+  weatherAndIndex:
+    sourceObjects:
+      - C:/Hippo/Git/univerus/energyhippo/Database/EEMSuite/Procs/IndexPoints_Save.sql
+      - C:/Hippo/Git/univerus/energyhippo/Database/EEMSuite/Views/wh_WeatherRelatedPoints.sql
+      - C:/Hippo/Git/univerus/energyhippo/Database/EEMSuite/Tables/WeatherStationMap_TBL.sql
+    behavior:
+      - Weather stations are meter nodes with Weather measure type, not a separate hierarchy type.
+      - Temperature points use degF or degC units.
+      - IndexType 0 on a temperature point creates related HDD and CDD points.
+      - HDD/CDD are linked through PtRelatedData_TBL reason types H and C.
+      - WeatherStationMap_tbl maps a weather station meter to company location nodes.
+  aggregates:
+    sourceObjects:
+      - C:/Hippo/Git/univerus/energyhippo/Database/EEMSuite/Tables/PointAggregates_TBL.sql
+      - C:/Hippo/Git/univerus/energyhippo/Database/EEMSuite/Tables/PointAggregatePoints.sql
+      - C:/Hippo/Git/univerus/energyhippo/Database/EEMSuite/Procs/PointAggregation_Save.sql
+    behavior:
+      - An aggregate is still a point node.
+      - The aggregate point is registered in PointAggregates_TBL.
+      - Members in PointAggregatePoints must match interval and unit.
+      - Multipliers and Required flags are available per member.
+  baselines:
+    sourceObjects:
+      - C:/Hippo/Git/univerus/energyhippo/Database/EEMSuite/Tables/PointBaseLine.sql
+      - C:/Hippo/Git/univerus/energyhippo/Database/EEMSuite/Procs/PtRelatedData_Save.sql
+      - C:/Hippo/Git/univerus/energyhippo/Database/EEMSuite/Procs/BaselinePoints_Lookup.sql
+    behavior:
+      - Baseline points are real point nodes.
+      - PointBaseline assigns the baseline calculation.
+      - PtRelatedData_TBL reason type B links the measured point to its baseline point.
+  gatewayComponentsCovered:
+    sourceProject: C:/Hippo/Git/univerus/energyhippo/EEMSuite/src/Tasks/EEMSuite.Tasks.Gateways/EEMSuite.Tasks.Gateways.csproj
+    components:
+      - {componentId: AcquiSuiteGateway, executorKey: gateway.acquisuite, gatewayType: ACQUISUITE}
+      - {componentId: MV90Gateway, executorKey: gateway.mv90, gatewayType: MDEF}
+      - {componentId: MV90Gateway, executorKey: gateway.mv90, gatewayType: MV9}
+      - {componentId: BACnetGateway, executorKey: gateway.bacnet, gatewayType: BACNET}
+      - {componentId: NOAAGateway, executorKey: gateway.noaa, gatewayType: NOAA}
+      - {componentId: AerisWeatherGateway, executorKey: gateway.aerisweather, gatewayType: AERISWEATHER}
+      - {componentId: SpinwaveGateway, executorKey: gateway.spinwave, gatewayType: SPINWAVE}
+      - {componentId: FIGGateway, executorKey: gateway.fig, gatewayType: FIG}
+      - {componentId: FIGGateway, executorKey: gateway.fig, gatewayType: SIEMANSREPORT}
+      - {componentId: FIGGateway, executorKey: gateway.fig, gatewayType: MEDIATOR}
+      - {componentId: FIGGateway, executorKey: gateway.fig, gatewayType: EATON}
+      - {componentId: FIGGateway, executorKey: gateway.fig, gatewayType: XML}
+      - {componentId: FIGGateway, executorKey: gateway.fig, gatewayType: FIXEDNETWORKS}
+      - {componentId: FIGGateway, executorKey: gateway.fig, gatewayType: CMEP}
+      - {componentId: ModbusGateway, executorKey: gateway.modbus, gatewayType: MODBUS}
+      - {componentId: ODBCGateway, executorKey: gateway.odbc, gatewayType: ODBC}
+      - {componentId: FakeGateway, executorKey: gateway.fake, gatewayType: FAKE}
+      - {componentId: NeptuneGateway, executorKey: gateway.neptune, gatewayType: NEPTUNE}
+      - {componentId: MVRSGateway, executorKey: gateway.mvrs, gatewayType: MVRS}
+      - {componentId: HmrEventsPublish, executorKey: hmr.events.publish, gatewayType: HMR_EVENTS}
+
+stageBoundaries:
+  stage1aCompanyShell:
+    alreadyModeledIn: eem/northlake-eem-stage1-setup-v1.yaml
+    includes: [companies, definitions, levels, users, groups]
+  stage1bMetaWorldSetup:
+    includes:
+      - Complete site/location hierarchy.
+      - Utility provider and rate schedule shells.
+      - Billing account, cost center, and agreement shells with no bills loaded.
+      - Meter nodes and point nodes with archive interval settings but no archive rows.
+      - Weather station meter nodes, HDD/CDD related points, and weather station assignments.
+      - Aggregate point definitions and member selections.
+      - Baseline point shells and measured-to-baseline relationships.
+    excludes:
+      - Bill records and bill images attached to records.
+      - AnalogArchive_TBL and DigitalArchive_TBL scenario data.
+      - Gateway runtime object registry rows, workflow definitions, and task schedules.
+      - Enabled gateway execution.
+  stage2GatewayPrep:
+    includes:
+      - Gateway objects, gateway nodes, and gateway point bindings.
+      - Workflows and schedules created disabled.
+      - Local service configuration for fake providers and local SMTP.
+  stage3Consumption:
+    includes:
+      - Generated bills, bill images, interval archives, weather observations, gateway artifacts, task runs, and validation assertions.
+
+ownershipRules:
+  - Northlake University owns only main-campus utility, solar, weather-reference, sensor, historian, and campus aggregate points.
+  - Cedar Row Apartments owns only Cedar Row property meters, points, bills, and solar data.
+  - Northlake Thermal Plant owns internal chilled-water, steam, plant-controller, and thermal allocation points.
+  - Cedar Row meters and points are not duplicated under Northlake University.
+  - Thermal allocation meters are not duplicated under Northlake University; campus buildings can reference them in documentation and reports.
+  - Weather station reference meters are created once and mapped to locations through WeatherStationMap_tbl.
+
+canonicalLocationNames:
+  northlake_university:
+    - {sourceBuildingId: admin_hall, eemName: Admin Hall, aliases: []}
+    - {sourceBuildingId: science_center, eemName: Applied Science Center, aliases: [Science Center]}
+    - {sourceBuildingId: library, eemName: Main Library, aliases: [Library]}
+    - {sourceBuildingId: student_center, eemName: Student Center, aliases: []}
+  cedar_row_apartments:
+    - {sourceBuildingId: cedar_row_a, eemName: Cedar Row A, aliases: []}
+    - {sourceBuildingId: cedar_row_b, eemName: Cedar Row B, aliases: []}
+    - {syntheticLocationId: cedar_row_common_house, eemName: Cedar Row Common House, sourceStatus: planned_location_only}
+  northlake_thermal_plant:
+    - {sourceBuildingId: science_center, eemName: Applied Science Center, aliases: [Science Center]}
+    - {sourceBuildingId: admin_hall, eemName: Admin Hall, aliases: []}
+    - {sourceBuildingId: student_center, eemName: Student Center, aliases: []}
+    - {sourceBuildingId: library, eemName: Main Library, aliases: [Library]}
+    - {syntheticLocationId: northlake_central_plant, eemName: Northlake Central Plant, sourceStatus: planned_location_only}
+
+utilityProviderTargets:
+  - id: valley_electric_district
+    displayName: Valley Electric District
+    commoditySetup: [electric]
+    rateSchedules: [VED-TOU-GS]
+    companiesUsingProvider: [northlake_university, cedar_row_apartments]
+  - id: sierra_gas_utility
+    displayName: Sierra Gas Utility
+    commoditySetup: [natural_gas]
+    rateSchedules: [SGU-GN-1]
+    companiesUsingProvider: [northlake_university]
+  - id: river_city_utilities
+    displayName: River City Utilities
+    commoditySetup: [water, sewer, stormwater]
+    rateSchedules: [RCU-W-TIER, RCU-S-VOL, RCU-SW-ERU]
+    companiesUsingProvider: [northlake_university, cedar_row_apartments]
+  - id: northlake_thermal_plant
+    displayName: Northlake Thermal Plant
+    commoditySetup: [chilled_water, steam]
+    rateSchedules: [NTP-ALLOC-CHW, NTP-ALLOC-STEAM]
+    companiesUsingProvider: [northlake_thermal_plant]
+  - id: helios_onsite_solar
+    displayName: Helios Onsite Solar
+    commoditySetup: [solar_generation]
+    rateSchedules: [HOS-PPA-2024]
+    companiesUsingProvider: [northlake_university, cedar_row_apartments]
+
+billingAccountTargets:
+  northlake_university:
+    externalUtilityAccounts:
+      - {sourceAccountId: ved_admin_hall, providerId: valley_electric_district, accountNumber: SYN-VED-A-0010001, location: Admin Hall, rateScheduleId: VED-TOU-GS}
+      - {sourceAccountId: ved_science_center, providerId: valley_electric_district, accountNumber: SYN-VED-A-0010002, location: Applied Science Center, rateScheduleId: VED-TOU-GS}
+      - {sourceAccountId: ved_library, providerId: valley_electric_district, accountNumber: SYN-VED-A-0010003, location: Main Library, rateScheduleId: VED-TOU-GS}
+      - {sourceAccountId: ved_student_center, providerId: valley_electric_district, accountNumber: SYN-VED-A-0010004, location: Student Center, rateScheduleId: VED-TOU-GS}
+      - {sourceAccountId: sgu_admin_hall, providerId: sierra_gas_utility, accountNumber: SYN-SGU-A-0020001, location: Admin Hall, rateScheduleId: SGU-GN-1}
+      - {sourceAccountId: sgu_science_center, providerId: sierra_gas_utility, accountNumber: SYN-SGU-A-0020002, location: Applied Science Center, rateScheduleId: SGU-GN-1}
+      - {sourceAccountId: sgu_library, providerId: sierra_gas_utility, accountNumber: SYN-SGU-A-0020003, location: Main Library, rateScheduleId: SGU-GN-1}
+      - {sourceAccountId: sgu_student_center, providerId: sierra_gas_utility, accountNumber: SYN-SGU-A-0020004, location: Student Center, rateScheduleId: SGU-GN-1}
+      - {sourceAccountId: rcu_admin_hall, providerId: river_city_utilities, accountNumber: SYN-RCU-A-0030001, location: Admin Hall, rateScheduleIds: [RCU-W-TIER, RCU-S-VOL, RCU-SW-ERU]}
+      - {sourceAccountId: rcu_student_center, providerId: river_city_utilities, accountNumber: SYN-RCU-A-0030002, location: Student Center, rateScheduleIds: [RCU-W-TIER, RCU-S-VOL, RCU-SW-ERU]}
+    ppaAgreements:
+      - {sourceAccountId: hos_science_center, providerId: helios_onsite_solar, agreementId: SYN-HOS-P-0000001, location: Applied Science Center, rateScheduleId: HOS-PPA-2024}
+      - {sourceAccountId: hos_student_center, providerId: helios_onsite_solar, agreementId: SYN-HOS-P-0000002, location: Student Center, rateScheduleId: HOS-PPA-2024}
+  cedar_row_apartments:
+    externalUtilityAccounts:
+      - {sourceAccountId: ved_cedar_row_a, providerId: valley_electric_district, accountNumber: SYN-VED-A-0010005, location: Cedar Row A, rateScheduleId: VED-TOU-GS}
+      - {sourceAccountId: ved_cedar_row_b, providerId: valley_electric_district, accountNumber: SYN-VED-A-0010006, location: Cedar Row B, rateScheduleId: VED-TOU-GS}
+      - {sourceAccountId: rcu_cedar_row_a, providerId: river_city_utilities, accountNumber: SYN-RCU-A-0030003, location: Cedar Row A, rateScheduleIds: [RCU-W-TIER, RCU-S-VOL]}
+      - {sourceAccountId: rcu_cedar_row_b, providerId: river_city_utilities, accountNumber: SYN-RCU-A-0030004, location: Cedar Row B, rateScheduleIds: [RCU-W-TIER, RCU-S-VOL]}
+    ppaAgreements:
+      - {sourceAccountId: hos_cedar_row_a, providerId: helios_onsite_solar, agreementId: SYN-HOS-P-0000003, location: Cedar Row A, rateScheduleId: HOS-PPA-2024}
+  northlake_thermal_plant:
+    internalCostCenters:
+      - {sourceAccountId: ntp_science_center, providerId: northlake_thermal_plant, costCenterId: SYN-NTP-C-0000001, location: Applied Science Center, rateScheduleIds: [NTP-ALLOC-CHW, NTP-ALLOC-STEAM]}
+      - {sourceAccountId: ntp_admin_hall, providerId: northlake_thermal_plant, costCenterId: SYN-NTP-C-0000002, location: Admin Hall, rateScheduleIds: [NTP-ALLOC-STEAM]}
+      - {sourceAccountId: ntp_library, providerId: northlake_thermal_plant, costCenterId: SYN-NTP-C-0000003, location: Main Library, rateScheduleIds: [NTP-ALLOC-STEAM]}
+      - {sourceAccountId: ntp_student_center, providerId: northlake_thermal_plant, costCenterId: SYN-NTP-C-0000004, location: Student Center, rateScheduleIds: [NTP-ALLOC-STEAM]}
+
+meterPointTargets:
+  northlake_university:
+    hierarchyPathPrefix: System / Northlake University / Campus Operations / Northlake Main Campus
+    locations:
+      - name: Admin Hall
+        sourceBuildingId: admin_hall
+        buildingRole: Office, classrooms, and administration.
+        weatherStation: KSAC
+        meters:
+          - id: ved_admin_hall_main
+            name: Admin Hall Electric Main
+            providerId: valley_electric_district
+            sourceAccountId: ved_admin_hall
+            measureType: Electric
+            hasBills: true
+            points:
+              - {sourceChannelId: ch_ved_admin_hall_kwh_monthly, name: Delivered kWh, pointType: Analog, unit: kWh, intervalMinutes: null, role: billing_usage}
+              - {sourceChannelId: ch_ved_admin_hall_kw_monthly, name: Billing Demand kW, pointType: Analog, unit: kW, intervalMinutes: null, role: billing_demand}
+          - id: sgu_admin_hall_gas
+            name: Admin Hall Gas Meter
+            providerId: sierra_gas_utility
+            sourceAccountId: sgu_admin_hall
+            measureType: Natural Gas
+            hasBills: true
+            points:
+              - {sourceChannelId: ch_sgu_admin_hall_therms_monthly, name: Gas Therms, pointType: Analog, unit: therms, intervalMinutes: null, role: billing_usage}
+          - id: rcu_admin_hall_water
+            name: Admin Hall Municipal Water
+            providerId: river_city_utilities
+            sourceAccountId: rcu_admin_hall
+            measureType: Water
+            hasBills: true
+            points:
+              - {sourceChannelId: ch_rcu_admin_hall_water_kgal_monthly, name: Potable Water, pointType: Analog, unit: kgal, intervalMinutes: null, role: billing_usage}
+              - {sourceChannelId: ch_rcu_admin_hall_sewer_kgal_monthly, name: Derived Sewer Volume, pointType: Analog, unit: kgal, intervalMinutes: null, role: derived_billing_usage}
+              - {sourceChannelId: ch_rcu_admin_hall_stormwater_eru_monthly, name: Stormwater ERUs, pointType: Analog, unit: eru, intervalMinutes: null, role: flat_service_fee}
+        externallyServedByThermalMeters: [ntp_admin_hall_steam]
+      - name: Applied Science Center
+        sourceBuildingId: science_center
+        sourceAliases: [Science Center]
+        buildingRole: Laboratory, classrooms, high baseload, chilled-water customer, solar host.
+        weatherStation: KSAC
+        meters:
+          - id: ved_science_center_interval
+            name: Applied Science Electric Interval
+            providerId: valley_electric_district
+            sourceAccountId: ved_science_center
+            measureType: Electric
+            hasBills: true
+            stage2GatewayProfiles: [gw_mv90_valley_mdef]
+            points:
+              - {sourceChannelId: ch_ved_science_center_kwh_15m, name: Delivered kWh 15m, pointType: Analog, unit: kWh, intervalMinutes: 15, role: interval_usage}
+              - {sourceChannelId: ch_ved_science_center_kw_15m, name: Billing Demand kW 15m, pointType: Analog, unit: kW, intervalMinutes: 15, role: interval_demand}
+          - id: sgu_science_center_gas
+            name: Applied Science Gas Meter
+            providerId: sierra_gas_utility
+            sourceAccountId: sgu_science_center
+            measureType: Natural Gas
+            hasBills: true
+            points:
+              - {sourceChannelId: ch_sgu_science_center_therms_monthly, name: Gas Therms, pointType: Analog, unit: therms, intervalMinutes: null, role: billing_usage}
+          - id: hos_science_center_array
+            name: Applied Science PV Array
+            providerId: helios_onsite_solar
+            sourceAccountId: hos_science_center
+            measureType: Solar Generation
+            hasBills: true
+            stage2GatewayProfiles: [gw_mv90_helios_mv9]
+            points:
+              - {sourceChannelId: ch_hos_science_center_gen_kwh_15m, name: PV Generated kWh 15m, pointType: Analog, unit: kWh, intervalMinutes: 15, role: interval_generation}
+              - {sourceChannelId: ch_hos_science_center_export_kwh_15m, name: PV Exported kWh 15m, pointType: Analog, unit: kWh, intervalMinutes: 15, role: interval_export}
+              - {sourceChannelId: ch_hos_science_center_gen_kw_15m, name: PV Generated kW 15m, pointType: Analog, unit: kW, intervalMinutes: 15, role: interval_generation_demand}
+          - id: science_center_environmental_sensors
+            name: Applied Science Environmental Sensors
+            providerId: null
+            measureType: Weather
+            logicalMeter: true
+            hasBills: false
+            stage2GatewayProfiles: [gw_spinwave_science_lab]
+            points:
+              - {sourceChannelId: ch_spinwave_science_lab_temp_f_15m, name: Lab Air Temperature, pointType: Analog, unit: degF, intervalMinutes: 15, role: sensor_observation}
+              - {sourceChannelId: ch_spinwave_science_lab_rh_15m, name: Lab Relative Humidity, pointType: Analog, unit: pct, intervalMinutes: 15, role: sensor_observation}
+        externallyServedByThermalMeters: [ntp_science_center_chilled_water, ntp_science_center_steam]
+      - name: Main Library
+        sourceBuildingId: library
+        sourceAliases: [Library]
+        buildingRole: Library, study space, meter replacement scenario, SQL historian proof.
+        weatherStation: KSAC
+        meters:
+          - id: ved_library_main_before_replacement
+            name: Main Library Electric Old Meter
+            providerId: valley_electric_district
+            sourceAccountId: ved_library
+            measureType: Electric
+            hasBills: true
+            lifecycleStatus: replaced
+            points:
+              - {sourceChannelId: ch_ved_library_kwh_monthly_old, name: Delivered kWh Old Meter, pointType: Analog, unit: kWh, intervalMinutes: null, role: billing_usage}
+          - id: ved_library_main_after_replacement
+            name: Main Library Electric New Meter
+            providerId: valley_electric_district
+            sourceAccountId: ved_library
+            measureType: Electric
+            hasBills: true
+            replacesMeterId: ved_library_main_before_replacement
+            points:
+              - {sourceChannelId: ch_ved_library_kwh_monthly_new, name: Delivered kWh New Meter, pointType: Analog, unit: kWh, intervalMinutes: null, role: billing_usage}
+          - id: sgu_library_gas
+            name: Main Library Gas Meter
+            providerId: sierra_gas_utility
+            sourceAccountId: sgu_library
+            measureType: Natural Gas
+            hasBills: true
+            points:
+              - {sourceChannelId: ch_sgu_library_therms_monthly, name: Gas Therms, pointType: Analog, unit: therms, intervalMinutes: null, role: billing_usage}
+          - id: library_historian_electric_interval
+            name: Main Library Electric Historian
+            providerId: null
+            measureType: Electric
+            logicalMeter: true
+            hasBills: false
+            stage2GatewayProfiles: [gw_odbc_library_historian]
+            points:
+              - {sourceChannelId: ch_odbc_library_electric_kwh_15m, name: Historian Delivered kWh 15m, pointType: Analog, unit: kWh, intervalMinutes: 15, role: interval_usage}
+        externallyServedByThermalMeters: [ntp_library_steam]
+      - name: Student Center
+        sourceBuildingId: student_center
+        buildingRole: Dining, events, gas correction scenario, AcquiSuite proof, solar host.
+        weatherStation: KSAC
+        meters:
+          - id: ved_student_center_interval
+            name: Student Center Electric Interval
+            providerId: valley_electric_district
+            sourceAccountId: ved_student_center
+            measureType: Electric
+            hasBills: true
+            stage2GatewayProfiles: [gw_acquisuite_student_electric]
+            points:
+              - {sourceChannelId: ch_ved_student_center_kwh_15m, name: Delivered kWh 15m, pointType: Analog, unit: kWh, intervalMinutes: 15, role: interval_usage}
+              - {sourceChannelId: ch_ved_student_center_kw_15m, name: Demand kW 15m, pointType: Analog, unit: kW, intervalMinutes: 15, role: interval_demand}
+          - id: sgu_student_center_gas
+            name: Student Center Gas Meter
+            providerId: sierra_gas_utility
+            sourceAccountId: sgu_student_center
+            measureType: Natural Gas
+            hasBills: true
+            stage2GatewayProfiles: [gw_mvrs_sierra_gas]
+            points:
+              - {sourceChannelId: ch_sgu_student_center_therms_monthly, name: Gas Therms Usage, pointType: AccumulatorDelta, unit: therms, intervalMinutes: 43200, role: handheld_usage_delta}
+              - {derivedPointId: eem_sgu_student_center_gas_register_reading, name: Gas Register Reading, pointType: Accumulator, unit: Reading, intervalMinutes: 43200, role: handheld_register_reading}
+          - id: rcu_student_center_water
+            name: Student Center Municipal Water
+            providerId: river_city_utilities
+            sourceAccountId: rcu_student_center
+            measureType: Water
+            hasBills: true
+            points:
+              - {sourceChannelId: ch_rcu_student_center_water_kgal_monthly, name: Potable Water, pointType: Analog, unit: kgal, intervalMinutes: null, role: billing_usage}
+              - {sourceChannelId: ch_rcu_student_center_sewer_kgal_monthly, name: Derived Sewer Volume, pointType: Analog, unit: kgal, intervalMinutes: null, role: derived_billing_usage}
+              - {sourceChannelId: ch_rcu_student_center_stormwater_eru_monthly, name: Stormwater ERUs, pointType: Analog, unit: eru, intervalMinutes: null, role: flat_service_fee}
+          - id: hos_student_center_array
+            name: Student Center PV Array
+            providerId: helios_onsite_solar
+            sourceAccountId: hos_student_center
+            measureType: Solar Generation
+            hasBills: true
+            stage2GatewayProfiles: [gw_mv90_helios_mv9]
+            points:
+              - {sourceChannelId: ch_hos_student_center_gen_kwh_15m, name: PV Generated kWh 15m, pointType: Analog, unit: kWh, intervalMinutes: 15, role: interval_generation}
+              - {sourceChannelId: ch_hos_student_center_export_kwh_15m, name: PV Exported kWh 15m, pointType: Analog, unit: kWh, intervalMinutes: 15, role: interval_export}
+              - {sourceChannelId: ch_hos_student_center_gen_kw_15m, name: PV Generated kW 15m, pointType: Analog, unit: kW, intervalMinutes: 15, role: interval_generation_demand}
+          - id: fake_gateway_smoke_meter
+            name: Student Center Fake Gateway Smoke
+            providerId: null
+            measureType: Electric
+            logicalMeter: true
+            hasBills: false
+            stage2GatewayProfiles: [gw_fake_smoke]
+            points:
+              - {sourceChannelId: ch_fake_gateway_smoke_kwh_15m, name: Fake Gateway Smoke kWh 15m, pointType: Analog, unit: kWh, intervalMinutes: 15, role: generated_smoke_test}
+        externallyServedByThermalMeters: [ntp_student_center_steam]
+  cedar_row_apartments:
+    hierarchyPathPrefix: System / Cedar Row Apartments / Cedar Row Apartments
+    locations:
+      - name: Cedar Row A
+        sourceBuildingId: cedar_row_a
+        buildingRole: Multifamily housing, municipal account renewal scenario, solar carport host.
+        weatherStation: KSAC
+        meters:
+          - id: ved_cedar_row_a_common
+            name: Cedar Row A Common Electric
+            providerId: valley_electric_district
+            sourceAccountId: ved_cedar_row_a
+            measureType: Electric
+            hasBills: true
+            points:
+              - {sourceChannelId: ch_ved_cedar_row_a_kwh_monthly, name: Common Area kWh, pointType: Analog, unit: kWh, intervalMinutes: null, role: billing_usage}
+          - id: rcu_cedar_row_a_water
+            name: Cedar Row A Municipal Water
+            providerId: river_city_utilities
+            sourceAccountId: rcu_cedar_row_a
+            measureType: Water
+            hasBills: true
+            stage2GatewayProfiles: [gw_fig_multi_format]
+            points:
+              - {sourceChannelId: ch_rcu_cedar_row_a_water_kgal_monthly, name: Potable Water, pointType: Analog, unit: kgal, intervalMinutes: null, role: billing_usage}
+              - {sourceChannelId: ch_rcu_cedar_row_a_sewer_kgal_monthly, name: Derived Sewer Volume, pointType: Analog, unit: kgal, intervalMinutes: null, role: derived_billing_usage}
+              - {sourceChannelId: ch_fig_cedar_row_a_water_kgal_60m, name: FIG Water Interval, pointType: Analog, unit: kgal, intervalMinutes: 60, role: interval_usage}
+          - id: hos_cedar_row_a_carport
+            name: Cedar Row A Solar Carport
+            providerId: helios_onsite_solar
+            sourceAccountId: hos_cedar_row_a
+            measureType: Solar Generation
+            hasBills: true
+            stage2GatewayProfiles: [gw_mv90_helios_mv9]
+            points:
+              - {sourceChannelId: ch_hos_cedar_row_a_gen_kwh_15m, name: PV Generated kWh 15m, pointType: Analog, unit: kWh, intervalMinutes: 15, role: interval_generation}
+              - {sourceChannelId: ch_hos_cedar_row_a_export_kwh_15m, name: PV Exported kWh 15m, pointType: Analog, unit: kWh, intervalMinutes: 15, role: interval_export}
+      - name: Cedar Row B
+        sourceBuildingId: cedar_row_b
+        buildingRole: Multifamily housing, Neptune handheld water route proof.
+        weatherStation: KSAC
+        meters:
+          - id: ved_cedar_row_b_common
+            name: Cedar Row B Common Electric
+            providerId: valley_electric_district
+            sourceAccountId: ved_cedar_row_b
+            measureType: Electric
+            hasBills: true
+            points:
+              - {sourceChannelId: ch_ved_cedar_row_b_kwh_monthly, name: Common Area kWh, pointType: Analog, unit: kWh, intervalMinutes: null, role: billing_usage}
+          - id: rcu_cedar_row_b_water
+            name: Cedar Row B Municipal Water
+            providerId: river_city_utilities
+            sourceAccountId: rcu_cedar_row_b
+            measureType: Water
+            hasBills: true
+            stage2GatewayProfiles: [gw_neptune_river_city_water]
+            points:
+              - {sourceChannelId: ch_rcu_cedar_row_b_water_kgal_monthly, name: Potable Water Usage, pointType: AccumulatorDelta, unit: kgal, intervalMinutes: 43200, role: handheld_usage_delta}
+              - {derivedPointId: eem_rcu_cedar_row_b_water_register_reading, name: Water Register Reading, pointType: Accumulator, unit: Reading, intervalMinutes: 43200, role: handheld_register_reading}
+              - {sourceChannelId: ch_rcu_cedar_row_b_sewer_kgal_monthly, name: Derived Sewer Volume, pointType: Analog, unit: kgal, intervalMinutes: null, role: derived_billing_usage}
+      - name: Cedar Row Common House
+        syntheticLocationId: cedar_row_common_house
+        buildingRole: Leasing, community room, laundry, and future common-area rollups.
+        weatherStation: KSAC
+        sourceStatus: planned_location_only
+        meters: []
+  northlake_thermal_plant:
+    hierarchyPathPrefix: System / Northlake Thermal Plant / Northlake Thermal Plant
+    locations:
+      - name: Chilled Water / Applied Science Center
+        sourceBuildingId: science_center
+        sourceAliases: [Science Center]
+        weatherStation: KSAC
+        meters:
+          - id: ntp_science_center_chilled_water
+            name: Applied Science Chilled Water BTU Meter
+            providerId: northlake_thermal_plant
+            sourceAccountId: ntp_science_center
+            measureType: Chilled Water
+            hasBills: true
+            stage2GatewayProfiles: [gw_bacnet_thermal_plant]
+            points:
+              - {sourceChannelId: ch_ntp_science_center_chw_ton_hours_hourly, name: Chilled Water Ton-Hours, pointType: Analog, unit: ton_hours, intervalMinutes: 60, role: interval_usage}
+              - {sourceChannelId: ch_ntp_science_center_chw_tons_hourly, name: Chilled Water Tons, pointType: Analog, unit: tons, intervalMinutes: 60, role: interval_demand}
+      - name: Steam / Applied Science Center
+        sourceBuildingId: science_center
+        sourceAliases: [Science Center]
+        meters:
+          - id: ntp_science_center_steam
+            name: Applied Science Steam Allocation
+            providerId: northlake_thermal_plant
+            sourceAccountId: ntp_science_center
+            measureType: Steam
+            hasBills: true
+            points:
+              - {sourceChannelId: ch_ntp_science_center_steam_klb_monthly, name: Steam klb, pointType: Analog, unit: klb, intervalMinutes: null, role: monthly_allocation}
+      - name: Steam / Admin Hall
+        sourceBuildingId: admin_hall
+        meters:
+          - id: ntp_admin_hall_steam
+            name: Admin Hall Steam Allocation
+            providerId: northlake_thermal_plant
+            sourceAccountId: ntp_admin_hall
+            measureType: Steam
+            hasBills: true
+            points:
+              - {sourceChannelId: ch_ntp_admin_hall_steam_klb_monthly, name: Steam klb, pointType: Analog, unit: klb, intervalMinutes: null, role: monthly_allocation}
+      - name: Steam / Main Library
+        sourceBuildingId: library
+        sourceAliases: [Library]
+        meters:
+          - id: ntp_library_steam
+            name: Main Library Steam Allocation
+            providerId: northlake_thermal_plant
+            sourceAccountId: ntp_library
+            measureType: Steam
+            hasBills: true
+            points:
+              - {sourceChannelId: ch_ntp_library_steam_klb_monthly, name: Steam klb, pointType: Analog, unit: klb, intervalMinutes: null, role: monthly_allocation}
+      - name: Steam / Student Center
+        sourceBuildingId: student_center
+        meters:
+          - id: ntp_student_center_steam
+            name: Student Center Steam Allocation
+            providerId: northlake_thermal_plant
+            sourceAccountId: ntp_student_center
+            measureType: Steam
+            hasBills: true
+            points:
+              - {sourceChannelId: ch_ntp_student_center_steam_klb_monthly, name: Steam klb, pointType: Analog, unit: klb, intervalMinutes: null, role: monthly_allocation}
+      - name: Plant Electric / Northlake Central Plant
+        syntheticLocationId: northlake_central_plant
+        sourceStatus: planned_location_only
+        meters:
+          - id: ntp_modbus_chiller_controller
+            name: Central Plant Chiller Controller
+            providerId: null
+            measureType: Electric
+            logicalMeter: true
+            hasBills: false
+            stage2GatewayProfiles: [gw_modbus_thermal_plant]
+            points:
+              - {sourceChannelId: ch_modbus_ntp_chiller_kw_5m, name: Chiller Demand kW 5m, pointType: Analog, unit: kW, intervalMinutes: 5, role: equipment_demand}
+              - {derivedPointId: eem_ntp_chiller_enable_status, name: Chiller Enable Status, pointType: Digital, unit: state, intervalMinutes: 5, role: equipment_status}
+
+weatherIndexTargets:
+  ownerCompanyId: northlake_university
+  hierarchyPath: System / Northlake University / Campus Operations / Sacramento Weather Reference
+  weatherMeters:
+    - id: weather_ksac
+      name: KSAC Sacramento Executive Airport
+      stationId: KSAC
+      measureType: Weather
+      latitude: 38.51250
+      longitude: -121.49347
+      points:
+        - {sourceChannelId: ch_weather_ksac_temp_f_hourly, name: KSAC Outside Air Temperature, pointType: Analog, unit: degF, intervalMinutes: 60, indexType: DegreeDays, createsRelatedPoints: [HDD_F_daily, CDD_F_daily], stage2GatewayProfiles: [gw_noaa_ksac_observations]}
+        - {sourceChannelId: ch_weather_ksac_rh_hourly, name: KSAC Relative Humidity, pointType: Analog, unit: pct, intervalMinutes: 60, stage2GatewayProfiles: [gw_noaa_ksac_observations]}
+        - {sourceChannelId: ch_weather_ksac_wind_mph_hourly, name: KSAC Wind Speed, pointType: Analog, unit: mph, intervalMinutes: 60, stage2GatewayProfiles: [gw_noaa_ksac_observations]}
+    - id: weather_ksmf
+      name: KSMF Sacramento International Airport
+      stationId: KSMF
+      measureType: Weather
+      latitude: 38.69542
+      longitude: -121.59077
+      points:
+        - {sourceChannelId: ch_weather_ksmf_temp_f_hourly, name: KSMF Outside Air Temperature, pointType: Analog, unit: degF, intervalMinutes: 60, indexType: DegreeDays, createsRelatedPoints: [HDD_F_daily, CDD_F_daily], stage2GatewayProfiles: [gw_aeris_ksmf_weather]}
+        - {sourceChannelId: ch_weather_ksmf_forecast_temp_f_hourly, name: KSMF Forecast Temperature, pointType: Analog, unit: degF, intervalMinutes: 60, stage2GatewayProfiles: [gw_aeris_ksmf_weather]}
+  stationAssignments:
+    - {companyId: northlake_university, location: Admin Hall, stationId: KSAC}
+    - {companyId: northlake_university, location: Applied Science Center, stationId: KSAC}
+    - {companyId: northlake_university, location: Main Library, stationId: KSAC}
+    - {companyId: northlake_university, location: Student Center, stationId: KSAC}
+    - {companyId: cedar_row_apartments, location: Cedar Row A, stationId: KSAC}
+    - {companyId: cedar_row_apartments, location: Cedar Row B, stationId: KSAC}
+    - {companyId: cedar_row_apartments, location: Cedar Row Common House, stationId: KSAC}
+    - {companyId: northlake_thermal_plant, location: Applied Science Center, stationId: KSAC}
+    - {companyId: northlake_thermal_plant, location: Admin Hall, stationId: KSAC}
+    - {companyId: northlake_thermal_plant, location: Main Library, stationId: KSAC}
+    - {companyId: northlake_thermal_plant, location: Student Center, stationId: KSAC}
+    - {companyId: northlake_thermal_plant, location: Northlake Central Plant, stationId: KSAC}
+
+aggregateTargets:
+  - id: agg_nlu_campus_electric_kwh_15m
+    companyId: northlake_university
+    parentPath: Campus Operations / Northlake Main Campus
+    aggregatePointName: Campus Interval Electric kWh Total
+    pointType: Analog
+    unit: kWh
+    intervalMinutes: 15
+    formula: sum
+    members:
+      - {sourceChannelId: ch_ved_science_center_kwh_15m, multiplier: 1, required: true}
+      - {sourceChannelId: ch_ved_student_center_kwh_15m, multiplier: 1, required: true}
+  - id: agg_nlu_campus_electric_kw_15m
+    companyId: northlake_university
+    parentPath: Campus Operations / Northlake Main Campus
+    aggregatePointName: Campus Coincident Electric kW
+    pointType: Analog
+    unit: kW
+    intervalMinutes: 15
+    formula: sum
+    members:
+      - {sourceChannelId: ch_ved_science_center_kw_15m, multiplier: 1, required: true}
+      - {sourceChannelId: ch_ved_student_center_kw_15m, multiplier: 1, required: true}
+  - id: agg_nlu_campus_solar_generation_kwh_15m
+    companyId: northlake_university
+    parentPath: Campus Operations / Northlake Main Campus
+    aggregatePointName: Campus PV Generated kWh
+    pointType: Analog
+    unit: kWh
+    intervalMinutes: 15
+    formula: sum
+    members:
+      - {sourceChannelId: ch_hos_science_center_gen_kwh_15m, multiplier: 1, required: true}
+      - {sourceChannelId: ch_hos_student_center_gen_kwh_15m, multiplier: 1, required: true}
+  - id: agg_nlu_science_net_electric_kwh_15m
+    companyId: northlake_university
+    parentPath: Campus Operations / Northlake Main Campus / Applied Science Center
+    aggregatePointName: Applied Science Net Electric kWh
+    pointType: Analog
+    unit: kWh
+    intervalMinutes: 15
+    formula: weighted_sum
+    members:
+      - {sourceChannelId: ch_ved_science_center_kwh_15m, multiplier: 1, required: true}
+      - {sourceChannelId: ch_hos_science_center_gen_kwh_15m, multiplier: -1, required: false}
+
+baselineTargets:
+  - id: bl_nlu_science_electric_kwh_15m
+    companyId: northlake_university
+    measuredPoint: ch_ved_science_center_kwh_15m
+    baselinePointName: Applied Science Electric kWh Baseline
+    pointType: Analog
+    unit: kWh
+    intervalMinutes: 15
+    relatedReasonType: B
+    indexInputs: [weather_ksac.HDD_F_daily, weather_ksac.CDD_F_daily]
+    stage3DataShape: Generated baseline archive values after interval data exists.
+  - id: bl_nlu_student_demand_kw_15m
+    companyId: northlake_university
+    measuredPoint: ch_ved_student_center_kw_15m
+    baselinePointName: Student Center Demand kW Baseline
+    pointType: Analog
+    unit: kW
+    intervalMinutes: 15
+    relatedReasonType: B
+    indexInputs: [weather_ksac.HDD_F_daily, weather_ksac.CDD_F_daily]
+    activityIndexCandidate: student_center_event_count_daily
+  - id: bl_ntp_science_chw_ton_hours_hourly
+    companyId: northlake_thermal_plant
+    measuredPoint: ch_ntp_science_center_chw_ton_hours_hourly
+    baselinePointName: Applied Science Chilled Water Ton-Hours Baseline
+    pointType: Analog
+    unit: ton_hours
+    intervalMinutes: 60
+    relatedReasonType: B
+    indexInputs: [weather_ksac.CDD_F_daily]
+
+activityIndexCandidates:
+  - id: student_center_event_count_daily
+    companyId: northlake_university
+    parentLocation: Student Center
+    pointName: Student Center Event Count
+    pointType: Analog
+    unit: count
+    intervalMinutes: 1440
+    indexType: Activity
+    sourceStatus: planned_stage3_generated
+
+billImageCoverage:
+  valleyElectric:
+    - {artifact: output/pdf/valley-electric-synthetic-bills/01-Valley-Electric-Admin-Hall-Standard-Monthly.pdf, meterIds: [ved_admin_hall_main]}
+    - {artifact: output/pdf/valley-electric-synthetic-bills/02-Valley-Electric-Science-Center-Summer-Demand.pdf, meterIds: [ved_science_center_interval]}
+    - {artifact: output/pdf/valley-electric-synthetic-bills/03-Valley-Electric-Library-Meter-Replacement.pdf, meterIds: [ved_library_main_before_replacement, ved_library_main_after_replacement]}
+    - {artifact: output/pdf/valley-electric-synthetic-bills/04-Valley-Electric-Student-Center-FY2025-Rate-Change.pdf, meterIds: [ved_student_center_interval]}
+  sierraGas:
+    - {artifact: output/pdf/sierra-gas-synthetic-bills/01-Sierra-Gas-Admin-Hall-Standard-Spring.pdf, meterIds: [sgu_admin_hall_gas]}
+    - {artifact: output/pdf/sierra-gas-synthetic-bills/02-Sierra-Gas-Science-Center-Winter-Heating.pdf, meterIds: [sgu_science_center_gas]}
+    - {artifact: output/pdf/sierra-gas-synthetic-bills/03-Sierra-Gas-Student-Center-Estimated-Read.pdf, meterIds: [sgu_student_center_gas]}
+    - {artifact: output/pdf/sierra-gas-synthetic-bills/04-Sierra-Gas-Student-Center-Corrected-Actual.pdf, meterIds: [sgu_student_center_gas]}
+  riverCity:
+    - {artifact: output/pdf/river-city-utilities-bills/01-River-City-Admin-Hall-Combined-Utility.pdf, meterIds: [rcu_admin_hall_water]}
+    - {artifact: output/pdf/river-city-utilities-bills/02-River-City-Student-Center-Large-Service.pdf, meterIds: [rcu_student_center_water]}
+    - {artifact: output/pdf/river-city-utilities-bills/03-River-City-Cedar-Row-A-Account-Renewal.pdf, meterIds: [rcu_cedar_row_a_water]}
+    - {artifact: output/pdf/river-city-utilities-bills/04-River-City-Cedar-Row-B-Route-Read.pdf, meterIds: [rcu_cedar_row_b_water]}
+  thermalPlant:
+    - {artifact: output/pdf/northlake-thermal-plant-allocations/01-Northlake-Thermal-Science-Center-Chilled-And-Steam.pdf, meterIds: [ntp_science_center_chilled_water, ntp_science_center_steam]}
+    - {artifact: output/pdf/northlake-thermal-plant-allocations/02-Northlake-Thermal-Science-Center-Summer-Cooling.pdf, meterIds: [ntp_science_center_chilled_water]}
+    - {artifact: output/pdf/northlake-thermal-plant-allocations/03-Northlake-Thermal-Admin-Hall-Steam-Only-Winter.pdf, meterIds: [ntp_admin_hall_steam]}
+    - {artifact: output/pdf/northlake-thermal-plant-allocations/04-Northlake-Thermal-Student-Center-Mixed-Heating.pdf, meterIds: [ntp_student_center_steam]}
+  helios:
+    - {artifact: output/pdf/helios-onsite-solar-invoices/01-Helios-Science-Center-Solar-PPA.pdf, meterIds: [hos_science_center_array]}
+    - {artifact: output/pdf/helios-onsite-solar-invoices/02-Helios-Student-Center-Midday-Generation.pdf, meterIds: [hos_student_center_array]}
+    - {artifact: output/pdf/helios-onsite-solar-invoices/03-Helios-Cedar-Row-A-Carport-REC-Transfer.pdf, meterIds: [hos_cedar_row_a_carport]}
+    - {artifact: output/pdf/helios-onsite-solar-invoices/04-Helios-Inverter-Outage-Backfill-Adjustment.pdf, meterIds: [hos_science_center_array, hos_student_center_array, hos_cedar_row_a_carport]}
+
+sourceGapsToResolveBeforeStage2:
+  - Confirm PointTypes rows and measure type/unit ids in the restored EEMSuite seed database.
+  - Expand handheld source/gateway binding to explicitly model register-reading points for Neptune and MVRS.
+  - Decide whether Cedar Row Common House remains location-only or gets its own common-area meters.
+  - Decide whether Student Center has chilled-water service; current source only models Student Center steam from the thermal plant.
+  - Decide final weather reference owner if Northlake University should not own public station meters.
+  - Add expected aggregate totals and baseline values once generated interval data exists.
+
+validationChecklist:
+  - Every source account in scenarios/demo-university-v1.yaml maps to a billing account, cost center, or PPA agreement shell.
+  - Every bill image artifact maps to at least one EEM meter target.
+  - Every source channel in scenarios/demo-university-v1.yaml maps to one EEM point target or to an explicit planned gap.
+  - All Stage 2 gateway point bindings map to existing Stage 1B point definitions.
+  - Aggregates only include members with matching unit and interval.
+  - Baseline point definitions have the same unit and interval as their measured point.
+  - Weather temperature points create HDD/CDD related points before weather station mapping is validated.
+  - Cedar Row and Thermal Plant points are not duplicated in the Northlake University company.

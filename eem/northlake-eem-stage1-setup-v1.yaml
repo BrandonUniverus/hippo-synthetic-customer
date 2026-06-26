@@ -1,0 +1,413 @@
+manifestVersion: 1
+id: northlake_eem_stage1_setup_v1
+customerScenarioId: demo_university_v1
+stage: 1
+displayName: Northlake EEM Stage 1 DBAdmin Setup
+purpose: >
+  App-facing setup manifest for building the blank Northlake EEM system through
+  DBAdmin before bills, archive data, gateways, workflows, or scheduled tasks
+  are configured.
+
+sourceReferences:
+  customerInventoryWorkbook: outputs/northlake-university/northlake-organization-inventory-filled.xlsx
+  sourceScenarioManifest: scenarios/demo-university-v1.yaml
+  securityManifest: security/northlake-eem-security-v1.yaml
+
+setupPrinciples:
+  - Drive this through the EEM applications, not direct seed inserts.
+  - Record generated EEM ids after each save; do not preassign positive CompanyIDs.
+  - Use the built-in system company for implementation and support access.
+  - Do not create billing accounts, GL accounts, bill validation, weather stations, bills, interval archives, gateways, workflows, or task schedules in this stage.
+
+systemCompany:
+  companyId: -1
+  displayName: System
+  createInDbAdmin: false
+  purpose: Built-in full-system context for DB/admin/setup access.
+  useFor:
+    - Bootstrap and setup users.
+    - EEM implementation/support users.
+    - Full-system groups that should not belong to a Northlake customer company.
+  groupsFromSecurityManifest:
+    - id: eem_system_db_admins
+      displayName: EEM System DB Admins
+    - id: eem_implementation_admins
+      displayName: EEM Implementation Admins
+    - id: eem_gateway_stage2_preppers
+      displayName: EEM Gateway Stage 2 Preppers
+    - id: eem_support_readonly
+      displayName: EEM Support Read Only
+  usersFromSecurityManifest:
+    - avery.singh
+    - morgan.patel
+    - taylor.bennett
+
+deferredDbAdminSections:
+  - section: Definitions / Weather Stations
+    reason: Stage 1 company shell only; weather mappings are needed later when hierarchy and weather-related points exist.
+  - section: Utility Accountant / Billing Accounts
+    reason: Stage 1 company setup can define utility providers later, but billing accounts are Stage 2/3 setup data.
+  - section: GL Accounts
+    reason: GL coding is not needed until bill entry/import behavior is exercised.
+  - section: Bill Validation
+    reason: Validation rules are only meaningful once bill scenarios and accounts exist.
+  - section: Bill Scenarios
+    reason: Company_Save creates the default Actual scenario; no custom scenarios are needed yet.
+
+companyDefaults:
+  definitions:
+    archiveIntervalMinutes: 60
+    timeZone:
+      eemTimeZoneId: 33
+      uiLabel: "(GMT-08:00) Pacific Time (US & Canada); Tijuana"
+      ianaName: America/Los_Angeles
+    country:
+      uiLabel: UNITED STATES
+      databaseValue: USA
+    analogAlarmSeverityDefaults:
+      highAlarm:
+        colorHex: "#FF0000"
+        text: High-Alarm
+      highWarning:
+        colorHex: "#FF8000"
+        text: High-Warning
+      normal:
+        colorHex: "#008040"
+        text: Ret-Norm
+      lowWarning:
+        colorHex: "#0098E1"
+        text: Low-Warning
+      lowAlarm:
+        colorHex: "#0000FF"
+        text: Low-Alarm
+    digitalStateColors:
+      state0:
+        colorHex: "#000000"
+      state1:
+        colorHex: "#008000"
+      state2:
+        colorHex: "#FF0000"
+      state3:
+        colorHex: "#FC8040"
+
+companiesToCreate:
+  - id: northlake_university
+    setupOrder: 1
+    companyName: Northlake University
+    companyType: campus_operations_company
+    recordGeneratedCompanyId: true
+    dbadminSections:
+      definitions:
+        useDefaultsFrom: companyDefaults.definitions
+      companyAddress:
+        line1: 4100 North Shore Drive
+        city: Sacramento
+        stateProvince: CA
+        postalCode: "95822"
+        country: UNITED STATES
+        latitude: 38.53520
+        longitude: -121.49390
+        coordinateSource: synthetic_plausible_sacramento
+      companyContact:
+        firstName: Jordan
+        lastName: Hale
+        title: Facilities Systems Manager
+        email: facilities.ops@northlake.example.edu
+        phone: 916-555-4100
+      levels:
+        - levelNumber: 1
+          description: Portfolio
+          type: UserDefined
+          internalLevelNbr: 0
+          fontAwesome: fa-folder-tree
+          userDefinedField: Portfolio Code
+          purpose: Separates campus operating rollups without duplicating separate operating companies.
+        - levelNumber: 2
+          description: Site
+          type: Site
+          internalLevelNbr: 1
+          fontAwesome: fa-location-dot
+          userDefinedField: Site Code
+          purpose: Northlake Main Campus.
+        - levelNumber: 3
+          description: Building
+          type: Location
+          internalLevelNbr: 2
+          fontAwesome: fa-building
+          userDefinedField: Building Code
+          purpose: Physical campus facilities such as Admin Hall, Applied Science Center, Student Center, and Main Library.
+        - levelNumber: 4
+          description: Meter
+          type: Meter
+          internalLevelNbr: 4
+          fontAwesome: fa-diagram-project
+          userDefinedField: Meter Tag
+          purpose: Physical or logical utility meters.
+        - levelNumber: 5
+          description: Point
+          type: Point
+          internalLevelNbr: 5
+          fontAwesome: fa-circle
+          userDefinedField: Source Channel
+          purpose: Usage, demand, generation, thermal, water, weather, and gateway channels.
+    initialHierarchyTargets:
+      - level: Portfolio
+        name: Campus Operations
+        parentPath: company
+        children:
+          - level: Site
+            name: Northlake Main Campus
+            children:
+              - level: Building
+                name: Admin Hall
+                sourceBuildingId: admin_hall
+              - level: Building
+                name: Applied Science Center
+                sourceBuildingId: science_center
+                sourceAliases: [Science Center]
+              - level: Building
+                name: Student Center
+                sourceBuildingId: student_center
+              - level: Building
+                name: Main Library
+                sourceBuildingId: library
+                sourceAliases: [Library]
+    groupsFromSecurityManifest:
+      - id: nlu_company_admins
+        displayName: NLU Company Admins
+      - id: nlu_database_admins
+        displayName: NLU Database Admins
+      - id: nlu_facilities_setup
+        displayName: NLU Facilities Setup
+      - id: nlu_utility_setup
+        displayName: NLU Utility Setup
+      - id: nlu_rates_admins
+        displayName: NLU Rates Admins
+      - id: nlu_bill_entry
+        displayName: NLU Bill Entry
+      - id: nlu_bill_import
+        displayName: NLU Bill Import
+      - id: nlu_reports_all
+        displayName: NLU Reports All Properties
+      - id: nlu_sustainability_reports
+        displayName: NLU Sustainability Reports
+      - id: nlu_audit_readonly
+        displayName: NLU Audit Read Only
+      - id: nlu_gateway_task_config_viewers
+        displayName: NLU Gateway and Task Config Viewers
+
+  - id: cedar_row_apartments
+    setupOrder: 2
+    companyName: Cedar Row Apartments
+    companyType: operating_company
+    recordGeneratedCompanyId: true
+    dbadminSections:
+      definitions:
+        useDefaultsFrom: companyDefaults.definitions
+      companyAddress:
+        line1: 1280 Cedar Row Lane
+        city: Sacramento
+        stateProvince: CA
+        postalCode: "95822"
+        country: UNITED STATES
+        latitude: 38.54720
+        longitude: -121.47060
+        coordinateSource: synthetic_plausible_sacramento
+      companyContact:
+        firstName: Maya
+        lastName: Chen
+        title: Cedar Row Property Manager
+        email: housing.ops@northlake.example.edu
+        phone: 916-555-4200
+      levels:
+        - levelNumber: 1
+          description: Property
+          type: Site
+          internalLevelNbr: 1
+          fontAwesome: fa-location-dot
+          userDefinedField: Property Code
+          purpose: Cedar Row Apartments as the operating property.
+        - levelNumber: 2
+          description: Building
+          type: Location
+          internalLevelNbr: 2
+          fontAwesome: fa-building
+          userDefinedField: Building Code
+          purpose: Cedar Row A, Cedar Row B, common house, and future housing facilities.
+        - levelNumber: 3
+          description: Meter
+          type: Meter
+          internalLevelNbr: 4
+          fontAwesome: fa-diagram-project
+          userDefinedField: Meter Tag
+          purpose: Common-area electric, municipal water, sewer, stormwater, and solar meters.
+        - levelNumber: 4
+          description: Point
+          type: Point
+          internalLevelNbr: 5
+          fontAwesome: fa-circle
+          userDefinedField: Source Channel
+          purpose: Usage, demand, generation, and route-read channels.
+    initialHierarchyTargets:
+      - level: Property
+        name: Cedar Row Apartments
+        parentPath: company
+        children:
+              - level: Building
+                name: Cedar Row A
+                sourceBuildingId: cedar_row_a
+              - level: Building
+                name: Cedar Row B
+                sourceBuildingId: cedar_row_b
+              - level: Building
+                name: Cedar Row Common House
+                syntheticLocationId: cedar_row_common_house
+                sourceStatus: planned_location_only
+    groupsFromSecurityManifest:
+      - id: cra_company_admins
+        displayName: Cedar Row Company Admins
+      - id: cra_bill_entry
+        displayName: Cedar Row Bill Entry
+      - id: cra_bill_import
+        displayName: Cedar Row Bill Import
+      - id: cra_housing_ops
+        displayName: Cedar Row Housing Operations
+      - id: cra_reports
+        displayName: Cedar Row Reports
+      - id: cra_audit_readonly
+        displayName: Cedar Row Audit Read Only
+
+  - id: northlake_thermal_plant
+    setupOrder: 3
+    companyName: Northlake Thermal Plant
+    companyType: internal_service_company
+    recordGeneratedCompanyId: true
+    dbadminSections:
+      definitions:
+        useDefaultsFrom: companyDefaults.definitions
+      companyAddress:
+        line1: 4122 Plant Service Road
+        city: Sacramento
+        stateProvince: CA
+        postalCode: "95822"
+        country: UNITED STATES
+        latitude: 38.53725
+        longitude: -121.49685
+        coordinateSource: synthetic_plausible_sacramento
+      companyContact:
+        firstName: Devon
+        lastName: Brooks
+        title: Thermal Plant Manager
+        email: devon.brooks@northlake.example.edu
+        phone: 916-555-4500
+      levels:
+        - levelNumber: 1
+          description: Plant
+          type: Site
+          internalLevelNbr: 1
+          fontAwesome: fa-industry
+          userDefinedField: Plant Code
+          purpose: Northlake Thermal Plant as an internal service provider.
+        - levelNumber: 2
+          description: Service Area
+          type: UserDefined
+          internalLevelNbr: 0
+          fontAwesome: fa-layer-group
+          userDefinedField: Service Area Code
+          purpose: Chilled water, steam, and plant-electric rollups before meter level.
+        - levelNumber: 3
+          description: Served Building
+          type: Location
+          internalLevelNbr: 2
+          fontAwesome: fa-building
+          userDefinedField: Served Building Code
+          purpose: Buildings receiving internal chilled-water or steam allocations.
+        - levelNumber: 4
+          description: Meter
+          type: Meter
+          internalLevelNbr: 4
+          fontAwesome: fa-diagram-project
+          userDefinedField: Meter Tag
+          purpose: Plant, allocation, and served-building thermal meters.
+        - levelNumber: 5
+          description: Point
+          type: Point
+          internalLevelNbr: 5
+          fontAwesome: fa-circle
+          userDefinedField: Source Channel
+          purpose: Ton-hour, tons, steam klb, and plant equipment demand channels.
+    initialHierarchyTargets:
+      - level: Plant
+        name: Northlake Thermal Plant
+        parentPath: company
+        children:
+          - level: Service Area
+            name: Chilled Water
+            children:
+              - level: Served Building
+                name: Applied Science Center
+                sourceBuildingId: science_center
+                sourceAliases: [Science Center]
+          - level: Service Area
+            name: Steam
+            children:
+              - level: Served Building
+                name: Applied Science Center
+                sourceBuildingId: science_center
+                sourceAliases: [Science Center]
+              - level: Served Building
+                name: Student Center
+                sourceBuildingId: student_center
+              - level: Served Building
+                name: Admin Hall
+                sourceBuildingId: admin_hall
+              - level: Served Building
+                name: Main Library
+                sourceBuildingId: library
+                sourceAliases: [Library]
+          - level: Service Area
+            name: Plant Electric
+            children:
+              - level: Served Building
+                name: Northlake Central Plant
+                syntheticLocationId: northlake_central_plant
+                sourceStatus: planned_location_only
+    groupsFromSecurityManifest:
+      - id: ntp_company_admins
+        displayName: Thermal Plant Company Admins
+      - id: ntp_plant_ops
+        displayName: Thermal Plant Operators
+      - id: ntp_rates_allocations
+        displayName: Thermal Rates and Allocations
+      - id: ntp_reports
+        displayName: Thermal Plant Reports
+      - id: ntp_audit_readonly
+        displayName: Thermal Plant Audit Read Only
+
+securitySetup:
+  sourceManifest: security/northlake-eem-security-v1.yaml
+  companyGroupModel: company -> group -> user
+  directUserPermissions: false
+  userIdSource: users[].username
+  displayNameSource: users[].displayName
+  emailSource: users[].email
+  disabledUserPolicy:
+    createUser: true
+    leaveInExpectedGroups: true
+    setInactive: true
+  groupCreation:
+    groupIdSource: securityManifest.companies[].groups[].id or securityManifest.systemCompany.groups[].id
+    groupNameSource: securityManifest.companies[].groups[].displayName or securityManifest.systemCompany.groups[].displayName
+    permissionMapping: >
+      Map semantic permissionProfiles to concrete DBAdmin permission tree rows
+      during app-driven setup; do not grant user-level permissions directly.
+
+validationChecklist:
+  - Exactly three new positive CompanyIDs are created.
+  - No Energy Hippo Implementation Support company is created.
+  - System-context setup groups remain under CompanyID -1.
+  - Each created company has archive interval 60, Pacific time, and UNITED STATES selected.
+  - Alarm severity text and colors match the DBAdmin Definitions screen defaults.
+  - Each created company has the expected Levels rows and Font Awesome icons before hierarchy nodes are created.
+  - Cedar Row hierarchy, meters, bills, points, and gateway bindings are owned only by the Cedar Row company, not duplicated under Northlake University.
+  - Billing accounts, GL accounts, bill validation, weather stations, bills, archives, gateways, workflows, and task schedules remain empty or default-only.

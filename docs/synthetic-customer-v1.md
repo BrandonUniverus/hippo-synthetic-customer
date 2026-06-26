@@ -18,6 +18,9 @@ These names are fictional and can be changed before external demos.
 - Primary weather station: KSAC, Sacramento Executive Airport.
 - Secondary weather station: KSMF, Sacramento International Airport.
 - Time zone: America/Los_Angeles.
+- Address coordinates are synthetic Sacramento-area values for weather and
+  mapping setup; see
+  [docs/northlake-address-coordinates.md](northlake-address-coordinates.md).
 
 ## Utility Providers
 
@@ -48,6 +51,37 @@ multi-service biller.
 
 The provider names are fictional. Rate structures may be loosely based on public
 examples, but bills and meter data must be synthetic.
+
+## Stage 1 EEM Security Setup
+
+The fake EEM users, companies, groups, and permission intent live in
+[`security/northlake-eem-security-v1.yaml`](../security/northlake-eem-security-v1.yaml),
+with the companion note in
+[`docs/northlake-eem-security.md`](northlake-eem-security.md).
+
+The DBAdmin-facing setup translation lives in
+[`eem/northlake-eem-stage1-setup-v1.yaml`](../eem/northlake-eem-stage1-setup-v1.yaml).
+It defines the company form fields, address/contact values, hierarchy levels
+including DBAdmin FontAwesome icon classes, deferred DBAdmin sections, and the
+decision to use the built-in system company `CompanyID = -1` for
+implementation/support users instead of creating an implementation-support
+company.
+
+The follow-on MetaWorld setup translation lives in
+[`eem/northlake-eem-metaworld-stage1b-v1.yaml`](../eem/northlake-eem-metaworld-stage1b-v1.yaml).
+It maps the source inventory into EEM utility setup, billing account shells,
+meter nodes, point nodes, weather station assignments, aggregate points, and
+baseline shells.
+
+This is app setup data, not customer-provided bill or archive source data. It is
+used to prove that a blank EEMSuite seed can be configured through the actual
+apps before bill records, interval archives, gateway execution, workflows, or
+scheduled task execution are introduced.
+
+For Stage 1, EEM companies are treated as data and security boundaries. Cedar
+Row assets belong to the Cedar Row company only; Northlake users who need Cedar
+Row visibility receive it through Cedar Row group membership rather than copied
+hierarchy or duplicate meters.
 
 ## Sites and Buildings
 

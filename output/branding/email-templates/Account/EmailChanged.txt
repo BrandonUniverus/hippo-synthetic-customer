@@ -1,0 +1,22 @@
+NORTHLAKE UNIVERSITY ENERGY PORTAL
+Account update
+
+YOUR EMAIL ADDRESS WAS CHANGED
+
+The email address for your Northlake University Energy Portal account was
+changed to {{NewEmail}} on {{ChangedOn}}. We're sending this notice to your previous address
+so you always know about changes to your account.
+
+If you made this change, no action is needed.
+
+Didn't make this change? Contact us right away so we can help secure your
+account. Get help: {{SupportUrl}}
+
+Go to the portal: {{LogoRedirectUrl}}
+
+--
+(c) {{CurrentYear}} Northlake University Energy Portal — powered by EEM Suite
+(Energy Hippo, a Univerus company). This is an automated message; replies are
+not monitored.
+Questions? energy.support@northlake.example.edu
+Sent by {{MachineName}}

@@ -1,0 +1,541 @@
+manifestVersion: 1
+id: northlake_eem_security_v1
+customerScenarioId: demo_university_v1
+stage: 1
+displayName: Northlake EEM Security Setup
+purpose: >
+  Fake EEM users, companies, groups, and permission intent for the Northlake
+  Stage 1 pre-go-live setup. This file describes who can configure and operate
+  the blank Northlake system before bills, intervals, gateways, or scheduled
+  tasks are loaded.
+
+identityPolicy:
+  usernames: firstname.lastname
+  passwords: not_stored_in_manifest
+  emailDomains:
+    customer: northlake.example.edu
+    implementationPartner: energyhippo.example.com
+  membershipModel: company_group_user
+  systemCompanyId: -1
+  directUserPermissions: false
+  disabledUsersRemainInExpectedMemberships: true
+  stage1TaskExecution: disabled
+
+permissionProfiles:
+  - id: company_admin
+    displayName: Company Administrator
+    intent: Manage company-scoped setup, users, groups, and security.
+    capabilities:
+      - companies.view
+      - companies.manage_settings
+      - users.manage
+      - groups.manage
+      - permissions.assign_company_scope
+      - audit.view
+
+  - id: system_db_admin
+    displayName: System Database Administrator
+    intent: Administer the EEM database and verify migrations in non-production environments.
+    capabilities:
+      - database.admin
+      - database.backup_restore
+      - database.migration_verify
+      - application.diagnostics
+      - audit.view
+
+  - id: company_data_admin
+    displayName: Company Data Administrator
+    intent: Manage company data setup without full security administration.
+    capabilities:
+      - hierarchy.manage
+      - accounts.manage
+      - meters.manage
+      - points.view
+      - imports.audit
+      - reports.view
+
+  - id: hierarchy_setup
+    displayName: Hierarchy Setup
+    intent: Build and maintain sites, buildings, accounts, meters, and rollups.
+    capabilities:
+      - sites.manage
+      - buildings.manage
+      - rollups.manage
+      - accounts.manage
+      - meters.manage
+      - providers.view
+
+  - id: utility_setup
+    displayName: Utility Setup
+    intent: Configure commodities, units, providers, accounts, and meter metadata.
+    capabilities:
+      - commodities.manage
+      - units.manage
+      - providers.manage
+      - utility_accounts.manage
+      - meters.manage
+      - bill_import_mappings.view
+
+  - id: rates_admin
+    displayName: Rates Administrator
+    intent: Configure tariff schedules, rate versions, charges, and allocation rules.
+    capabilities:
+      - rates.manage
+      - rate_charges.manage
+      - rate_versions.manage
+      - utility_accounts.view
+      - bills.view
+
+  - id: bill_entry
+    displayName: Bill Entry
+    intent: Manually enter and correct unposted bills.
+    capabilities:
+      - bills.create
+      - bills.edit_unposted
+      - bill_attachments.add
+      - bills.submit_for_review
+      - utility_accounts.view
+    restrictions:
+      - no_security_admin
+      - no_rate_setup
+      - no_gateway_setup
+
+  - id: bill_import
+    displayName: Bill Import
+    intent: Import bill files, review import batches, and reprocess rejected rows.
+    capabilities:
+      - bill_imports.create
+      - bill_imports.review
+      - bill_imports.reprocess
+      - bills.create_from_import
+      - import_mappings.view
+    restrictions:
+      - no_security_admin
+      - no_gateway_execution
+
+  - id: report_viewer
+    displayName: Report Viewer
+    intent: View and export operational, cost, usage, and rollup reports.
+    capabilities:
+      - reports.view
+      - dashboards.view
+      - report_exports.create
+      - bills.view
+      - hierarchy.view
+    restrictions:
+      - read_only
+
+  - id: sustainability_reporter
+    displayName: Sustainability Reporter
+    intent: View ENERGY STAR, emissions, solar, and sustainability reporting outputs.
+    capabilities:
+      - reports.view
+      - energystar.view
+      - energystar.export_prepare
+      - emissions.view
+      - renewable_attributes.view
+    restrictions:
+      - read_only_setup
+
+  - id: audit_readonly
+    displayName: Audit Read Only
+    intent: Validate setup and bill history without making changes.
+    capabilities:
+      - companies.view
+      - hierarchy.view
+      - providers.view
+      - rates.view
+      - bills.view
+      - reports.view
+      - security.view
+      - audit.view
+    restrictions:
+      - read_only
+
+  - id: plant_operator
+    displayName: Plant Operator
+    intent: Maintain thermal plant meter metadata and view allocation outputs.
+    capabilities:
+      - plant_assets.view
+      - plant_meters.manage
+      - thermal_allocations.view
+      - interval_status.view
+      - reports.view
+
+  - id: thermal_allocation_admin
+    displayName: Thermal Allocation Administrator
+    intent: Manage internal chilled-water and steam allocation rules.
+    capabilities:
+      - thermal_allocations.manage
+      - allocation_rates.manage
+      - cost_centers.manage
+      - bills.view
+      - reports.view
+
+  - id: gateway_task_config_viewer
+    displayName: Gateway Task Config Viewer
+    intent: See gateway, workflow, and task configuration before Stage 2 enables them.
+    capabilities:
+      - gateways.view
+      - tasks.view
+      - workflows.view
+      - points.view
+    restrictions:
+      - no_task_enable
+      - no_task_run
+      - no_schedule_edit
+
+  - id: implementation_admin
+    displayName: Implementation Administrator
+    intent: Partner role for app-driven setup validation in local/demo environments.
+    capabilities:
+      - companies.view
+      - hierarchy.manage
+      - providers.manage
+      - rates.manage
+      - users.view
+      - reports.view
+      - gateways.view
+      - tasks.view
+    restrictions:
+      - no_live_task_execution_in_stage1
+
+  - id: support_readonly
+    displayName: Support Read Only
+    intent: Partner support role for troubleshooting without changing customer data.
+    capabilities:
+      - companies.view
+      - hierarchy.view
+      - providers.view
+      - rates.view
+      - bills.view
+      - reports.view
+      - gateways.view
+      - tasks.view
+      - audit.view
+    restrictions:
+      - read_only
+
+systemCompany:
+  id: system
+  companyId: -1
+  displayName: System
+  companyType: built_in_system
+  createInDbAdmin: false
+  purpose: >
+    Built-in EEM system context for DB/admin/setup users. Implementation and
+    support users belong here instead of a created customer company.
+  groups:
+    - id: eem_system_db_admins
+      displayName: EEM System DB Admins
+      permissionProfiles: [system_db_admin]
+      users: [avery.singh]
+    - id: eem_implementation_admins
+      displayName: EEM Implementation Admins
+      permissionProfiles: [implementation_admin]
+      users: [avery.singh, morgan.patel]
+    - id: eem_gateway_stage2_preppers
+      displayName: EEM Gateway Stage 2 Preppers
+      permissionProfiles: [gateway_task_config_viewer]
+      users: [morgan.patel]
+    - id: eem_support_readonly
+      displayName: EEM Support Read Only
+      permissionProfiles: [support_readonly]
+      users: [taylor.bennett]
+
+companies:
+  - id: northlake_university
+    displayName: Northlake University
+    companyType: campus_operations_company
+    scope:
+      sites: [northlake_main_campus]
+      buildings: [admin_hall, science_center, library, student_center]
+      providers: [valley_electric_district, sierra_gas_utility, river_city_utilities, northlake_thermal_plant, helios_onsite_solar]
+    groups:
+      - id: nlu_company_admins
+        displayName: NLU Company Admins
+        permissionProfiles: [company_admin]
+        users: [samantha.ireland, jordan.hale]
+      - id: nlu_database_admins
+        displayName: NLU Database Admins
+        permissionProfiles: [company_data_admin, system_db_admin]
+        users: [emerson.fox, avery.singh]
+      - id: nlu_facilities_setup
+        displayName: NLU Facilities Setup
+        permissionProfiles: [hierarchy_setup, company_data_admin]
+        users: [jordan.hale, emerson.fox]
+      - id: nlu_utility_setup
+        displayName: NLU Utility Setup
+        permissionProfiles: [utility_setup]
+        users: [jordan.hale, priya.nandakumar]
+      - id: nlu_rates_admins
+        displayName: NLU Rates Admins
+        permissionProfiles: [rates_admin]
+        users: [priya.nandakumar, keiko.tan]
+      - id: nlu_bill_entry
+        displayName: NLU Bill Entry
+        permissionProfiles: [bill_entry]
+        users: [iris.morales, casey.holt]
+      - id: nlu_bill_import
+        displayName: NLU Bill Import
+        permissionProfiles: [bill_import]
+        users: [nora.chen, priya.nandakumar]
+      - id: nlu_reports_all
+        displayName: NLU Reports All Properties
+        permissionProfiles: [report_viewer]
+        users: [samantha.ireland, leo.martinez, quinn.roberts]
+      - id: nlu_sustainability_reports
+        displayName: NLU Sustainability Reports
+        permissionProfiles: [sustainability_reporter]
+        users: [leo.martinez, samantha.ireland]
+      - id: nlu_audit_readonly
+        displayName: NLU Audit Read Only
+        permissionProfiles: [audit_readonly]
+        users: [quinn.roberts]
+      - id: nlu_gateway_task_config_viewers
+        displayName: NLU Gateway and Task Config Viewers
+        permissionProfiles: [gateway_task_config_viewer]
+        users: [jordan.hale, avery.singh]
+      - id: nlu_science_center_scope
+        displayName: NLU Science Center Scoped Reports
+        permissionProfiles: [report_viewer]
+        nodeScope: [science_center]          # intra-company building-subset permission fixture (see eem/northlake-eem-permissions-v1.yaml)
+        users: [dana.okafor]
+
+  - id: cedar_row_apartments
+    displayName: Cedar Row Apartments
+    companyType: operating_company
+    scope:
+      sites: [cedar_row_apartments]
+      buildings: [cedar_row_a, cedar_row_b, cedar_row_common_house]
+      providers: [valley_electric_district, river_city_utilities, helios_onsite_solar]
+    groups:
+      - id: cra_company_admins
+        displayName: Cedar Row Company Admins
+        permissionProfiles: [company_admin]
+        users: [maya.chen]
+      - id: cra_bill_entry
+        displayName: Cedar Row Bill Entry
+        permissionProfiles: [bill_entry]
+        users: [marcus.reed]
+      - id: cra_bill_import
+        displayName: Cedar Row Bill Import
+        permissionProfiles: [bill_import]
+        users: [nora.chen]
+      - id: cra_housing_ops
+        displayName: Cedar Row Housing Operations
+        permissionProfiles: [hierarchy_setup, report_viewer]
+        users: [maya.chen, valerie.kim]
+      - id: cra_reports
+        displayName: Cedar Row Reports
+        permissionProfiles: [report_viewer, sustainability_reporter]
+        users: [maya.chen, valerie.kim, quinn.roberts]
+      - id: cra_audit_readonly
+        displayName: Cedar Row Audit Read Only
+        permissionProfiles: [audit_readonly]
+        users: [quinn.roberts]
+
+  - id: northlake_thermal_plant
+    displayName: Northlake Thermal Plant
+    companyType: internal_service_company
+    scope:
+      sites: [northlake_main_campus]
+      buildings: [science_center, admin_hall, student_center, library, northlake_central_plant]
+      providers: [northlake_thermal_plant, valley_electric_district, sierra_gas_utility]
+    groups:
+      - id: ntp_company_admins
+        displayName: Thermal Plant Company Admins
+        permissionProfiles: [company_admin]
+        users: [devon.brooks]
+      - id: ntp_plant_ops
+        displayName: Thermal Plant Operators
+        permissionProfiles: [plant_operator]
+        users: [devon.brooks, riley.santos]
+      - id: ntp_rates_allocations
+        displayName: Thermal Rates and Allocations
+        permissionProfiles: [rates_admin, thermal_allocation_admin]
+        users: [keiko.tan, priya.nandakumar]
+      - id: ntp_reports
+        displayName: Thermal Plant Reports
+        permissionProfiles: [report_viewer]
+        users: [devon.brooks, riley.santos, leo.martinez]
+      - id: ntp_audit_readonly
+        displayName: Thermal Plant Audit Read Only
+        permissionProfiles: [audit_readonly]
+        users: [quinn.roberts]
+
+users:
+  - id: samantha.ireland
+    username: samantha.ireland
+    displayName: Samantha Ireland
+    email: samantha.ireland@northlake.example.edu
+    title: Director of Campus Operations
+    primaryCompanyId: northlake_university
+    status: active
+
+  - id: jordan.hale
+    username: jordan.hale
+    displayName: Jordan Hale
+    email: jordan.hale@northlake.example.edu
+    title: Facilities Systems Manager
+    primaryCompanyId: northlake_university
+    status: active
+
+  - id: priya.nandakumar
+    username: priya.nandakumar
+    displayName: Priya Nandakumar
+    email: priya.nandakumar@northlake.example.edu
+    title: Energy Finance Lead
+    primaryCompanyId: northlake_university
+    status: active
+
+  - id: nora.chen
+    username: nora.chen
+    displayName: Nora Chen
+    email: nora.chen@northlake.example.edu
+    title: Utility Bill Import Specialist
+    primaryCompanyId: northlake_university
+    status: active
+
+  - id: iris.morales
+    username: iris.morales
+    displayName: Iris Morales
+    email: iris.morales@northlake.example.edu
+    title: Utility Bill Entry Clerk
+    primaryCompanyId: northlake_university
+    status: active
+
+  - id: leo.martinez
+    username: leo.martinez
+    displayName: Leo Martinez
+    email: leo.martinez@northlake.example.edu
+    title: Sustainability Analyst
+    primaryCompanyId: northlake_university
+    status: active
+
+  - id: emerson.fox
+    username: emerson.fox
+    displayName: Emerson Fox
+    email: emerson.fox@northlake.example.edu
+    title: Campus Data Administrator
+    primaryCompanyId: northlake_university
+    status: active
+
+  - id: maya.chen
+    username: maya.chen
+    displayName: Maya Chen
+    email: maya.chen@northlake.example.edu
+    title: Cedar Row Property Manager
+    primaryCompanyId: cedar_row_apartments
+    status: active
+
+  - id: marcus.reed
+    username: marcus.reed
+    displayName: Marcus Reed
+    email: marcus.reed@northlake.example.edu
+    title: Cedar Row Accounts Coordinator
+    primaryCompanyId: cedar_row_apartments
+    status: active
+
+  - id: valerie.kim
+    username: valerie.kim
+    displayName: Valerie Kim
+    email: valerie.kim@northlake.example.edu
+    title: Housing Operations Analyst
+    primaryCompanyId: cedar_row_apartments
+    status: active
+
+  - id: devon.brooks
+    username: devon.brooks
+    displayName: Devon Brooks
+    email: devon.brooks@northlake.example.edu
+    title: Thermal Plant Manager
+    primaryCompanyId: northlake_thermal_plant
+    status: active
+
+  - id: riley.santos
+    username: riley.santos
+    displayName: Riley Santos
+    email: riley.santos@northlake.example.edu
+    title: Thermal Plant Operator
+    primaryCompanyId: northlake_thermal_plant
+    status: active
+
+  - id: keiko.tan
+    username: keiko.tan
+    displayName: Keiko Tan
+    email: keiko.tan@northlake.example.edu
+    title: Thermal Allocation Accountant
+    primaryCompanyId: northlake_thermal_plant
+    status: active
+
+  - id: quinn.roberts
+    username: quinn.roberts
+    displayName: Quinn Roberts
+    email: quinn.roberts@northlake.example.edu
+    title: Internal Audit Reviewer
+    primaryCompanyId: northlake_university
+    status: active
+
+  - id: dana.okafor
+    username: dana.okafor
+    displayName: Dana Okafor
+    email: dana.okafor@northlake.example.edu
+    title: Science Center Building Coordinator
+    primaryCompanyId: northlake_university
+    status: active
+
+  - id: avery.singh
+    username: avery.singh
+    displayName: Avery Singh
+    email: avery.singh@energyhippo.example.com
+    title: EEM Database Administrator
+    primaryCompanyId: system
+    status: active
+
+  - id: morgan.patel
+    username: morgan.patel
+    displayName: Morgan Patel
+    email: morgan.patel@energyhippo.example.com
+    title: EEM Implementation Consultant
+    primaryCompanyId: system
+    status: active
+
+  - id: taylor.bennett
+    username: taylor.bennett
+    displayName: Taylor Bennett
+    email: taylor.bennett@energyhippo.example.com
+    title: EEM Support Analyst
+    primaryCompanyId: system
+    status: active
+
+  - id: casey.holt
+    username: casey.holt
+    displayName: Casey Holt
+    email: casey.holt@northlake.example.edu
+    title: Former Utility Bill Entry Clerk
+    primaryCompanyId: northlake_university
+    status: disabled
+    expectedToLogin: false
+    reason: Disabled-user permission regression case.
+
+validationExpectations:
+  counts:
+    companiesToCreate: 3
+    systemCompanyContexts: 1
+    securityContexts: 4
+    groups: 27
+    users: 19
+    activeUsers: 18
+    disabledUsers: 1
+  rules:
+    - Every active user belongs to at least one group.
+    - Every company has at least one company_admin group.
+    - Bill entry users do not receive security, rate setup, or gateway setup permission profiles.
+    - Report-only and audit users cannot edit hierarchy, utility setup, rates, bills, tasks, or gateways.
+    - Stage 1 users can view task and gateway configuration only through gateway_task_config_viewer.
+    - Disabled users can remain in source memberships but cannot authenticate.
+    - At least one user has cross-company bill import access.
+    - At least one user has cross-company read-only audit access.
+    - At least one system-company user has DB admin access through CompanyID -1.
+    - At least one group is scoped to a building subset within its company (intra-company node scope).

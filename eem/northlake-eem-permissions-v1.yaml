@@ -1,0 +1,238 @@
+manifestVersion: 1
+id: northlake_eem_permissions_v1
+customerScenarioId: demo_university_v1
+stage: 1
+roadmapPhase: 0            # docs/dream-customer/roadmap.md Phase 0 (foundation)
+displayName: Northlake EEM Permission Grants
+purpose: >
+  Concrete, load-ready permission grants that realize the 16 semantic permission
+  profiles in security/northlake-eem-security-v1.yaml against the REAL EEMSuite
+  permission surfaces (object names verified against the live catalog). Proves
+  screen/function gating, report access, node-scoped visibility, and AccessLevel-
+  based approval authority once loaded. Users still receive access only through
+  group membership; this file never grants a user directly.
+
+sourceReferences:
+  securityManifest: security/northlake-eem-security-v1.yaml
+  gapAnalysis: docs/dream-customer/subsystem-gap-analysis.md
+
+# The three EEMSuite permission surfaces this spec targets.
+permissionSurfaces:
+  appObjects:
+    table: Permissions_TBL
+    grain: (CompanyID, GroupID, PermissionType, MetaKey, AuthLevel)
+    catalog: SiEAppObjects (its Name is the Permissions_TBL.MetaKey)
+    types:
+      "$": "Library Rates (per-rate objects; 60 in catalog, GUID/HIPPO-coded)"
+      A: "Admin tabs (13: Users/Groups/SystemSettings/Hierarchy/Commodity/Units/UtilityProvider/UtilityAccountant/RateModeler/Schedule(s)/Aggregates/BillValidation)"
+      D: "Points/nodes (single object \"Points\"; node scope via MetaWorldPermissions_TBL)"
+      EX: "Bill Export (export_ap, export_ap2)"
+      F: "Functions (11: Bill Administration, System Administration, Bulk Data Entry, bill_entry_web, bill_images, project_tracking, ImpersonateUser, Point Group Editor, allow_dashboards, public_dashboards, Bill Validation)"
+      MI: "My Import/Export (11: myimport_intervaldata, myimport_MeterReadings, myimport_MeterSwap, myexport_FacilityDetail, ...)"
+      MU: "My Upload (type exists; no objects in current catalog)"
+      TS: "Task Manager (5: EEM Gateways, Bill Importer Tasks, Report Tasks, Standard Alerts, System Tasks)"
+  nodes:
+    table: MetaWorldPermissions_TBL
+    grain: (MetaWorldID, CompanyID, GroupID, InternalLevelNbr, AuthLevel)
+    note: Realizes PermissionType D; scopes which hierarchy nodes a group sees.
+  reports:
+    table: GuiPermissions
+    grain: (CompanyID, GroupID, GuiReportTypeID, ObjectName)
+    note: >
+      Grants a group a report by report type (module) + report ObjectName. A
+      "module" grant expands to a GuiPermissions row per report of that
+      GuiReportType. Module names are the GuiReportTypes.ModuleName values.
+
+authLevels: { 1: read, 2: edit, 3: approve/admin }
+
+# AccessLevel semantics that drive the acceptance tests.
+accessLevelRules:
+  - Bill QC approval (uaApprovedBill_Upd) requires AuthLevel >= 3 on Bill Administration.
+  - bill_entry submits at AuthLevel 2; only AuthLevel-3 holders approve.
+  - Read-only profiles never hold AuthLevel >= 2 on any editable object.
+  - Stage-1 "view-only tasks/gateways" restrictions are realized by capping TS grants at AuthLevel 1.
+
+# Profile -> concrete grants. A group's effective grants = union of its profiles'
+# grants (see groupGrantResolution).
+profileGrants:
+  company_admin:
+    appObjects:
+      - { type: A, object: UsersTab, authLevel: 3 }
+      - { type: A, object: GroupsTab, authLevel: 3 }
+      - { type: A, object: SystemSettingsTab, authLevel: 3 }
+      - { type: A, object: HierarchyTab, authLevel: 2 }
+      - { type: F, object: System Administration, authLevel: 3 }
+      - { type: F, object: Bill Administration, authLevel: 3 }
+    nodes: { authLevel: 2, scope: company_all }
+    reports: { modules: all }
+
+  system_db_admin:
+    appObjects:
+      - { type: A, object: SystemSettingsTab, authLevel: 3 }
+      - { type: F, object: System Administration, authLevel: 3 }
+      - { type: F, object: ImpersonateUser, authLevel: 3 }
+    nodes: { authLevel: 2, scope: company_all }
+    reports: { modules: [system_reports] }
+
+  company_data_admin:
+    appObjects:
+      - { type: A, object: HierarchyTab, authLevel: 2 }
+      - { type: A, object: CommodityTab, authLevel: 2 }
+      - { type: A, object: UnitsTab, authLevel: 2 }
+      - { type: F, object: Bill Administration, authLevel: 3 }   # data admin approves bills
+      - { type: F, object: Bulk Data Entry, authLevel: 2 }
+    nodes: { authLevel: 2, scope: company_all }
+    reports: { modules: all }
+
+  hierarchy_setup:
+    appObjects:
+      - { type: A, object: HierarchyTab, authLevel: 2 }
+      - { type: A, object: AggregatesTab, authLevel: 2 }
+    nodes: { authLevel: 2, scope: company_all }
+    reports: { modules: [system_reports, use_analysis] }
+
+  utility_setup:
+    appObjects:
+      - { type: A, object: UtilityProviderTab, authLevel: 2 }
+      - { type: A, object: UtilityAccountantTab, authLevel: 2 }
+      - { type: A, object: CommodityTab, authLevel: 2 }
+      - { type: A, object: UnitsTab, authLevel: 2 }
+    nodes: { authLevel: 2, scope: company_all }
+    reports: { modules: [system_reports] }
+
+  rates_admin:
+    appObjects:
+      - { type: A, object: RateModelerTab, authLevel: 2 }
+      - { type: A, object: ScheduleTab, authLevel: 2 }
+      - { type: "$", object: northlake_rate_library, authLevel: 2, note: "specific $ rate objects attach in Phase 2 once Northlake rates exist" }
+    nodes: { authLevel: 1, scope: company_all }
+    reports: { modules: [rate_analysis] }
+
+  bill_entry:
+    appObjects:
+      - { type: F, object: Bill Administration, authLevel: 2 }
+      - { type: F, object: bill_entry_web, authLevel: 2 }
+      - { type: F, object: bill_images, authLevel: 2 }
+    nodes: { authLevel: 1, scope: company_all }
+    reports: { modules: [bill_entry_process] }
+    restrictionsRealized: [no A/security objects, no $ rate objects, no TS gateway tasks]
+
+  bill_import:
+    appObjects:
+      - { type: MI, object: myimport_intervaldata, authLevel: 2 }
+      - { type: F, object: Bill Administration, authLevel: 2 }
+      - { type: TS, object: Bill Importer Tasks, authLevel: 1, note: view import tasks; no run in Stage 1 }
+    nodes: { authLevel: 1, scope: company_all }
+    reports: { modules: [bill_entry_process] }
+    restrictionsRealized: [no_security_admin, no_gateway_execution]
+
+  report_viewer:
+    appObjects: []   # report access lives on the GuiPermissions surface, not SiEAppObjects
+    nodes: { authLevel: 1, scope: company_all }
+    reports: { modules: [bp_bill_process, bt_bill_tracking, use_analysis], authLevel: 1 }
+    restrictionsRealized: [read_only]
+
+  sustainability_reporter:
+    appObjects: []
+    nodes: { authLevel: 1, scope: company_all }
+    reports: { modules: [energy_star_rating, green_house_gases, use_analysis] }
+    restrictionsRealized: [read_only_setup]
+
+  audit_readonly:
+    appObjects:
+      - { type: F, object: System Administration, authLevel: 1 }   # view-only
+    nodes: { authLevel: 1, scope: company_all }
+    reports: { modules: all, authLevel: 1, includesReports: [rp_Audit, rp_ActivityTracker] }
+    restrictionsRealized: [read_only]
+
+  plant_operator:
+    appObjects:
+      - { type: A, object: HierarchyTab, authLevel: 1 }
+      - { type: A, object: UtilityAccountantTab, authLevel: 1 }
+    nodes: { authLevel: 2, scope: company_all }
+    reports: { modules: [use_analysis, system_reports] }
+
+  thermal_allocation_admin:
+    appObjects:
+      - { type: A, object: RateModelerTab, authLevel: 2 }
+      - { type: A, object: UtilityAccountantTab, authLevel: 2 }
+    nodes: { authLevel: 2, scope: company_all }
+    reports: { modules: [tr_tenant_rebilling, rate_analysis] }
+
+  gateway_task_config_viewer:
+    appObjects:
+      - { type: TS, object: EEM Gateways, authLevel: 1 }
+      - { type: TS, object: Report Tasks, authLevel: 1 }
+      - { type: TS, object: System Tasks, authLevel: 1 }
+    nodes: { authLevel: 1, scope: company_all }
+    reports: { modules: [system_reports] }
+    restrictionsRealized: [no_task_enable, no_task_run, no_schedule_edit -> TS capped at AuthLevel 1]
+
+  implementation_admin:
+    appObjects:
+      - { type: A, object: HierarchyTab, authLevel: 2 }
+      - { type: A, object: UtilityProviderTab, authLevel: 2 }
+      - { type: A, object: RateModelerTab, authLevel: 2 }
+      - { type: F, object: System Administration, authLevel: 2 }
+      - { type: F, object: ImpersonateUser, authLevel: 2 }
+      - { type: TS, object: EEM Gateways, authLevel: 1 }
+    nodes: { authLevel: 2, scope: system_all }
+    reports: { modules: all }
+    restrictionsRealized: [no_live_task_execution_in_stage1 -> TS capped at AuthLevel 1]
+
+  support_readonly:
+    appObjects:
+      - { type: F, object: System Administration, authLevel: 1 }
+      - { type: TS, object: EEM Gateways, authLevel: 1 }
+    nodes: { authLevel: 1, scope: system_all }
+    reports: { modules: all, authLevel: 1 }
+    restrictionsRealized: [read_only]
+
+# How groups become grants.
+groupGrantResolution:
+  rule: >
+    For each group in security/northlake-eem-security-v1.yaml, effective grants =
+    the union of profileGrants for the group's permissionProfiles, with
+    CompanyID = the group's company, GroupID = the group id. Type-D node scope =
+    the company's scope.buildings (or a nodeScopeFixtures override). System-company
+    groups (CompanyID -1) use system_all scope.
+  scopeKeywords:
+    company_all: all hierarchy nodes under the group's company
+    system_all: full-system context (CompanyID -1)
+    node_subset: the explicit building list in a nodeScopeFixtures entry
+
+# Node-scope realization. Company scope already isolates Cedar Row from campus
+# (cross-company node scoping). This fixture proves INTRA-company building-subset
+# scoping, satisfying the "a non-admin user sees only their permitted nodes"
+# acceptance criterion.
+nodeScopeFixtures:
+  - id: intra_company_building_subset
+    group: nlu_science_center_scope     # added to security/northlake-eem-security-v1.yaml
+    company: northlake_university
+    scopeBuildings: [science_center]
+    profile: report_viewer
+    expectation: >
+      The single user in this group (dana.okafor) sees ONLY Science Center nodes
+      and reports filtered to them, never Admin Hall / Library / Student Center.
+
+expectedAssertions:
+  - id: approver_vs_viewer
+    assertionType: behavior
+    target: Bill Administration object
+    expectedValue: company_admin / company_data_admin (AuthLevel 3) can approve a bill; bill_entry (AuthLevel 2) and report_viewer (AuthLevel 1) cannot.
+  - id: node_scope_isolation_intra_company
+    assertionType: behavior
+    target: MetaWorldPermissions for nlu_science_center_scope
+    expectedValue: resolves to Science Center nodes only.
+  - id: cross_company_isolation
+    assertionType: behavior
+    target: Cedar Row groups
+    expectedValue: see only Cedar Row site/buildings, not campus nodes.
+  - id: disabled_user_no_auth
+    assertionType: behavior
+    target: casey.holt
+    expectedValue: remains in nlu_bill_entry membership but cannot authenticate.
+  - id: readonly_no_edit
+    assertionType: behavior
+    target: report_viewer / audit_readonly / support_readonly groups
+    expectedValue: no AuthLevel >= 2 grant on any editable object.
