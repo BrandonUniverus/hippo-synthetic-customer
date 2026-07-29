@@ -1,0 +1,373 @@
+# Northlake Synthetic Identity Provider
+
+This directory implements the realistic-provider portion of ADR-002a without
+changing EnergyHippo. It runs a pinned Keycloak realm behind trusted localhost
+HTTPS and derives all fictional users and groups from
+[`security/northlake-eem-security-v1.yaml`](../security/northlake-eem-security-v1.yaml).
+The same realm is a third-party-style OpenID Connect provider and SAML 2.0
+Identity Provider (IdP).
+
+## What is included
+
+- Keycloak 26.7.0 with real login, account, consent, session, logout, and admin pages.
+- PostgreSQL-backed users, sessions, realm configuration, and signing keys that
+  survive an ordinary stop/start.
+- Caddy 2.11.4 terminating HTTPS at `https://localhost:8443`.
+- 19 Northlake identities: 18 active and one deliberately disabled.
+- 27 groups plus claim shapes for company IDs and EEM permission-profile intent.
+- Stable UUIDv5 user, group, role, client, scope, and realm IDs.
+- Two exact confidential EEMSuite OIDC clients:
+  - `eemsuite-web`: authorization code with required PKCE `S256` and provider
+    consent; implicit is rejected.
+  - `eemsuite-web-legacy`: supports the current `id_token token` compatibility flow.
+- One exact SAML service-provider registration:
+  - entity ID `urn:energyhippo:eemsuite-web:saml`;
+  - HTTP-Redirect AuthnRequest input and forced HTTP-POST responses;
+  - signed response and signed assertion using RSA-SHA256;
+  - five-minute conditions, `OneTimeUse`, exact audience/ACS validation, and a
+    deterministic persistent NameID;
+  - SP-initiated login, IdP-initiated login, and SAML single logout;
+  - Northlake user, group, company, and permission-profile attributes.
+- Discovery, JWKS, UserInfo, refresh rotation and revocation, RP-initiated
+  logout, PAR, administrator audit events, and deterministic reset.
+- A live OIDC verifier that uses PAR, logs in and grants consent for an active user,
+  exchanges a PKCE code, validates the signed ID token and UserInfo, exercises
+  session prompts and refresh rotation, revokes the refresh token, logs out,
+  rejects the disabled user and an unregistered redirect, and proves the legacy
+  `form_post` response is available.
+- A live SAML verifier that checks metadata and published signing certificates,
+  rejects an unregistered ACS URL, validates both XML signatures and all
+  security bindings, checks mapped attributes, exercises SP- and IdP-initiated
+  login, performs signed single logout, proves the session ended, and rejects
+  the disabled user.
+
+The built-in Keycloak administration console is the initial admin page. This
+repository does not reimplement passwords, sessions, consent, or user storage.
+
+## Quick start
+
+From the repository root:
+
+```powershell
+python -m pip install -r .\identity\requirements.txt
+pwsh .\identity\scripts\Start-Identity.ps1
+```
+
+The first run:
+
+1. creates `identity/.env` with cryptographically random local secrets;
+2. generates the runtime realm from the checked-in security manifest;
+3. starts PostgreSQL, Keycloak, and Caddy;
+4. waits for HTTPS discovery;
+5. copies the local CA certificate to `identity/.runtime/certs`;
+6. executes the complete OIDC, SAML, and administration verifier.
+
+The command does not silently change a machine trust store. Trust the local CA
+once before using a browser or EEMSuite:
+
+```powershell
+pwsh .\identity\scripts\Trust-IdentityCertificate.ps1
+```
+
+Use `-StoreLocation LocalMachine` from an elevated terminal when EEMSuite runs
+under IIS or another service account. The default `CurrentUser` store is enough
+for a developer-launched process and browser.
+
+Then open:
+
+- Account/login: `https://localhost:8443/realms/northlake/account/`
+- Realm admin: `https://localhost:8443/admin/northlake/console/`
+- OIDC discovery: `https://localhost:8443/realms/northlake/.well-known/openid-configuration`
+- SAML IdP metadata: `https://localhost:8443/realms/northlake/protocol/saml/descriptor`
+
+View the generated local credentials:
+
+```powershell
+pwsh .\identity\scripts\Get-IdentityStatus.ps1 -ShowSecrets
+```
+
+Secrets are stored only in ignored files:
+
+- `identity/.env`
+- `identity/.runtime/connection.json`
+- `identity/.runtime/import/northlake-realm.json`
+
+## OIDC connection profiles
+
+`identity/.runtime/connection.json` contains ready-to-copy sectioned settings
+under `eemsuiteConfiguration.legacy` and `eemsuiteConfiguration.modern`.
+
+Start with the legacy profile to observe the current EEMSuite behavior without
+changing its default response type:
+
+```json
+{
+  "OpenIDConnect": {
+    "Description": "Northlake Synthetic Identity - legacy",
+    "ClientID": "eemsuite-web-legacy",
+    "ClientSecret": "<generated>",
+    "ResponseType": "id_token token",
+    "Scope": "openid profile email northlake",
+    "DiscoveryEndpoint": "https://localhost:8443/realms/northlake/.well-known/openid-configuration"
+  }
+}
+```
+
+Switch to the modern profile to test code and PKCE:
+
+```json
+{
+  "OpenIDConnect": {
+    "Description": "Northlake Synthetic Identity - modern",
+    "ClientID": "eemsuite-web",
+    "ClientSecret": "<generated>",
+    "ResponseType": "code",
+    "Scope": "openid profile email northlake",
+    "DiscoveryEndpoint": "https://localhost:8443/realms/northlake/.well-known/openid-configuration"
+  }
+}
+```
+
+These files do not modify EnergyHippo configuration or its database. EEMSuite
+still needs its existing third-party-login configuration and
+`AuthenticationWithOpenIDConnectEnabled` database setting. Unknown external
+identities still follow EEMSuite's existing link-to-an-EEM-user flow.
+
+The first registered callback is `https://localhost:7310/signin-oidc`.
+The generated clients also register:
+
+- `https://localdev.energyhippo.com/Hippo/signin-oidc`
+- `https://localhost/Hippo/signin-oidc`
+
+Edit `EEMSUITE_OIDC_REDIRECT_URIS` in the ignored `.env`, reset the realm, and
+rerun validation when another exact URI is needed. Wildcard callbacks are not
+used.
+
+## SAML service-provider contract
+
+`identity/.runtime/connection.json` contains the provider endpoints and the
+complete registration under `clients.saml`. These are the initial values for
+the future EEMSuite SAML relying party:
+
+```json
+{
+  "entityId": "urn:energyhippo:eemsuite-web:saml",
+  "identityProviderMetadata": "https://localhost:8443/realms/northlake/protocol/saml/descriptor",
+  "singleSignOnService": "https://localhost:8443/realms/northlake/protocol/saml",
+  "singleLogoutService": "https://localhost:8443/realms/northlake/protocol/saml",
+  "assertionConsumerService": "https://localhost:7310/saml/acs",
+  "serviceProviderLogout": "https://localhost:7310/saml/logout",
+  "nameIdFormat": "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent",
+  "responseBinding": "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
+}
+```
+
+The first ACS and logout URLs are verifier callbacks. The generated client also
+registers the corresponding `/Hippo/saml/acs` and `/Hippo/saml/logout` paths
+for `localdev.energyhippo.com` and `localhost`. If the selected .NET SAML
+middleware uses different paths, change `EEMSUITE_SAML_ACS_URLS` and
+`EEMSUITE_SAML_LOGOUT_URLS` in the ignored `.env`, put the active environment's
+URL first, and reset the realm. Exact URLs are intentional; no wildcard SAML
+callbacks are registered.
+
+The EEMSuite implementation should treat the following as mandatory validation,
+not merely claim parsing:
+
+- load the IdP entity ID and signing certificates from metadata over trusted
+  HTTPS;
+- require a valid RSA-SHA256 signature on both the `Response` and `Assertion`;
+- trust only the XML nodes returned by signature verification to prevent
+  signature-wrapping mistakes;
+- match `Destination`, bearer `Recipient`, and `Audience` to the configured
+  EEMSuite endpoints/entity ID;
+- correlate `InResponseTo` to a locally issued AuthnRequest for SP-initiated
+  login and preserve `RelayState`;
+- enforce `NotBefore`, `NotOnOrAfter`, `SubjectConfirmationData`, issuer,
+  success status, and a small clock-skew allowance;
+- reject replayed response/assertion IDs and honor `OneTimeUse`;
+- use `(IdP entity ID, persistent NameID)` as the external SAML identity key;
+- create the EEMSuite application session only after all protocol validation
+  and the existing external-user assignment/linking step succeeds.
+
+The assertion maps these attributes:
+
+- `username`, `email`, `given_name`, and `family_name`;
+- `groups`;
+- `synthetic_user_id`, `primary_company_id`, `title`, and `synthetic_status`;
+- `eem_company_ids` and `eem_permission_profiles`;
+- `realm_roles`.
+
+Keycloak's built-in admin console is the settings/user administration surface.
+It can be used to disable users, alter mappings, change signature behavior, or
+add negative-test clients without building a second identity application.
+
+### Deliberate bootstrap settings
+
+AuthnRequests are not yet required to be signed and assertions are not
+encrypted. Both stronger modes require the future EEMSuite service provider to
+own a private key and publish/import its public certificate. Once that exists,
+enable **Client signature required** and then **Encrypt assertions** in the
+SAML client's Keys tab, update the checked-in generator to make those settings
+deterministic, and extend the verifier. Artifact binding and ECP are disabled;
+the initial web implementation should use the normal browser POST profile.
+
+The current provider still signs both the outer response and embedded assertion,
+so an unsigned or tampered IdP result is never part of the baseline.
+
+## Operations
+
+### Status and credentials
+
+```powershell
+pwsh .\identity\scripts\Get-IdentityStatus.ps1
+pwsh .\identity\scripts\Get-IdentityStatus.ps1 -ShowSecrets
+```
+
+### Focused live verification
+
+```powershell
+pwsh .\identity\scripts\Test-Identity.ps1
+```
+
+### Stop and restart without changing state
+
+```powershell
+pwsh .\identity\scripts\Stop-Identity.ps1
+pwsh .\identity\scripts\Start-Identity.ps1
+```
+
+The database, realm, subjects, sessions, signing keys, and Caddy CA persist.
+
+### Rotate the identity signing key
+
+```powershell
+pwsh .\identity\scripts\Rotate-IdentitySigningKey.ps1
+```
+
+The script creates a higher-priority RS256 provider through Keycloak's
+authenticated Admin REST API, verifies that the new key is active, verifies that
+the previous key remains passive and published in JWKS, records the result under
+`identity/.runtime`, and reruns the complete OIDC/SAML verifier. The SAML portion
+also proves that IdP metadata publishes a certificate that validates newly
+signed responses. Reset returns the realm to one generated signing key.
+
+### Deterministic realm reset
+
+```powershell
+pwsh .\identity\scripts\Reset-Identity.ps1
+```
+
+Reset removes only the Compose-owned PostgreSQL volume after checking its
+ownership labels. It preserves the Caddy CA, regenerates the realm from the
+manifest, starts the stack, and reruns verification. PowerShell confirmation is
+required because user and session state is intentionally destroyed.
+
+### Remove local CA trust
+
+```powershell
+pwsh .\identity\scripts\Untrust-IdentityCertificate.ps1
+```
+
+The script removes only the thumbprint recorded when this stack installed its
+development CA.
+
+### Replace all local secrets
+
+```powershell
+pwsh .\identity\scripts\Initialize-Identity.ps1 -Force
+pwsh .\identity\scripts\Reset-Identity.ps1
+```
+
+Both commands require confirmation. Existing EEMSuite client configuration must
+be updated from the new `connection.json`.
+
+### Backup and upgrade
+
+For disposable workstation use, the checked-in manifest/generator plus the
+ignored `.env` are the reset source of truth. Do not commit database dumps,
+exported realms, credentials, or the Caddy CA.
+
+For a long-lived shared environment, back up all three of these before an
+upgrade:
+
+- the PostgreSQL database using the organization's normal PostgreSQL tooling;
+- the ignored `.env` in an approved secret store;
+- the Caddy data volume, because replacing its local CA invalidates existing
+  machine trust.
+
+Upgrades are deliberate source changes: update both the image tag and immutable
+digest in `compose.yml`, review the applicable Keycloak upgrade guide, start the
+existing database, and run the complete verifier. Also prove ordinary restart
+and signing-key rotation before promoting the new image. Never replace a pinned
+image with `latest`. Use reset instead of migration only when discarding all
+synthetic admin edits and sessions is acceptable.
+
+## Shared development machine
+
+The defaults bind only to `127.0.0.1`. For a shared machine:
+
+1. assign a stable DNS name;
+2. change `IDENTITY_HOST`, `IDENTITY_PUBLIC_BASE_URL`, and
+   `IDENTITY_BIND_ADDRESS=0.0.0.0` in the ignored `.env`;
+3. replace or distribute Caddy's development CA according to the development
+   network's trust policy;
+4. use exact shared-environment OIDC callback, SAML ACS, and SAML logout URIs;
+5. keep the admin console and credentials restricted to the development network.
+
+The issuer hostname and port must be identical from the browser, EEMSuite host,
+and any containerized test client. Changing the issuer is a new identity
+environment and changes the correct external identity key from `(old iss, sub)`
+to `(new iss, sub)`.
+
+## Source and generated-state contract
+
+Checked-in sources:
+
+- `security/northlake-eem-security-v1.yaml`: users, enabled state, companies,
+  groups, permission intent, and validation counts.
+- `realm/generate_realm.py`: protocol, client, claim, lifetime, and stable-ID rules.
+- `compose.yml`: immutable container versions and deployment boundary.
+- `Caddyfile`: HTTPS and proxy boundary.
+
+Ignored generated state:
+
+- secrets;
+- import JSON containing those secrets and test credentials;
+- connection profiles;
+- copied development CA;
+- PostgreSQL and Caddy Docker volumes.
+
+Passwords remain outside the security manifest. The realistic provider never
+writes directly to an EEM database.
+
+## Automated tests
+
+Realm generation:
+
+```powershell
+python -m unittest discover -s .\identity\tests -v
+```
+
+Static Python compilation:
+
+```powershell
+python -m compileall -q .\identity
+```
+
+Compose expansion:
+
+```powershell
+docker compose --project-directory .\identity --env-file .\identity\.env -f .\identity\compose.yml config --quiet
+```
+
+Live provider:
+
+```powershell
+pwsh .\identity\scripts\Test-Identity.ps1
+```
+
+The live provider verification is intentionally independent of EnergyHippo. Its
+job is to prove the provider is realistic and internally coherent so any next
+failure observed in an EEMSuite browser round trip belongs to the RP,
+configuration, certificate trust, or EEM user-linking path rather than a
+half-working mock provider.

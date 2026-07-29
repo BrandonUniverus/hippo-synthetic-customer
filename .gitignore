@@ -7,7 +7,14 @@ temp/
 # Local configuration
 .env
 .env.*
+!.env.example
 *.user
+
+# Local synthetic identity state and secrets
+identity/.runtime/
+identity/.env
+identity/.env.*
+!identity/.env.example
 
 # Tooling caches
 .vs/

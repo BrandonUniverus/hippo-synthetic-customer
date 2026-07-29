@@ -1,0 +1,4 @@
+cryptography==49.0.0
+lxml==6.1.1
+PyYAML==6.0.3
+signxml==5.1.0
