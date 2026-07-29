@@ -42,6 +42,9 @@ security/
   northlake-eem-security-v1.yaml Stage 1 EEM company/context/group/user setup.
 eem/
   northlake-eem-stage1-setup-v1.yaml DBAdmin-facing Stage 1 setup fields.
+identity/
+  README.md                    Runnable synthetic OIDC and SAML identity provider.
+  compose.yml                  Pinned Keycloak, PostgreSQL, and HTTPS proxy stack.
 generators/
   README.md                    Generator expectations and future command shape.
 ```
@@ -52,6 +55,12 @@ This repo currently contains the starting contract for the synthetic customer,
 including provider/gateway coverage, the Stage 1 EEM security manifest, and the
 DBAdmin-facing Stage 1 setup manifest. The next step is to drive those manifests
 through the apps and capture generated ids for validation.
+
+The repository also contains a runnable [synthetic identity provider](identity/README.md).
+It converts the Stage 1 security manifest into a resettable Keycloak realm with
+real login and administration pages, persistent sessions and keys, two OIDC
+clients, one SAML service-provider registration, and end-to-end protocol
+verification for both standards.
 
 ## Operating Rules
 

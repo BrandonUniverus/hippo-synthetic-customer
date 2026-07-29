@@ -1,0 +1,75 @@
+name: hippo-synthetic-identity
+
+services:
+  postgres:
+    image: postgres:17.10-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?Run Initialize-Identity.ps1 first}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 10s
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - identity-backend
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7.0@sha256:0f198be292568439d700cdbfb893e69a6009bb43a94a06a945b1d3d506c76b13
+    restart: unless-stopped
+    command:
+      - start
+      - --import-realm
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?Run Initialize-Identity.ps1 first}
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:?Run Initialize-Identity.ps1 first}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?Run Initialize-Identity.ps1 first}
+      KC_HOSTNAME: ${IDENTITY_PUBLIC_BASE_URL:-https://localhost:8443}
+      KC_HTTP_ENABLED: "true"
+      KC_PROXY_HEADERS: xforwarded
+      KC_HEALTH_ENABLED: "true"
+      KC_METRICS_ENABLED: "true"
+      KC_CACHE: local
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./.runtime/import:/opt/keycloak/data/import:ro
+    networks:
+      - identity-backend
+
+  caddy:
+    image: caddy:2.11.4-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+    restart: unless-stopped
+    environment:
+      IDENTITY_HOST: ${IDENTITY_HOST:-localhost}
+    ports:
+      - "${IDENTITY_BIND_ADDRESS:-127.0.0.1}:${IDENTITY_HTTPS_PORT:-8443}:8443"
+    depends_on:
+      keycloak:
+        condition: service_started
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - identity-backend
+      - identity-edge
+
+volumes:
+  postgres-data:
+  caddy-data:
+  caddy-config:
+
+networks:
+  identity-backend:
+    internal: true
+  identity-edge:

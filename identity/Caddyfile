@@ -1,0 +1,17 @@
+{
+	admin off
+	auto_https disable_redirects
+}
+
+https://{$IDENTITY_HOST:localhost}:8443 {
+	tls internal
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=0"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+	}
+
+	reverse_proxy keycloak:8080
+}
