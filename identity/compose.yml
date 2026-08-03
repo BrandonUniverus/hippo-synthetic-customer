@@ -51,6 +51,7 @@ services:
     restart: unless-stopped
     environment:
       IDENTITY_HOST: ${IDENTITY_HOST:-localhost}
+      EEMSUITE_APPLICATION_HOME_URL: ${EEMSUITE_APPLICATION_HOME_URL:-https://localdev.energyhippo.com/Hippo/}
     ports:
       - "${IDENTITY_BIND_ADDRESS:-127.0.0.1}:${IDENTITY_HTTPS_PORT:-8443}:8443"
     depends_on:
@@ -58,6 +59,7 @@ services:
         condition: service_started
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./portal:/srv/northlake-portal:ro
       - caddy-data:/data
       - caddy-config:/config
     networks:

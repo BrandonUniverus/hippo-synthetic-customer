@@ -28,6 +28,7 @@ class GenerateRealmTests(unittest.TestCase):
             "EEMSUITE_OIDC_CLIENT_SECRET": "modern-client-secret-for-tests",
             "EEMSUITE_OIDC_LEGACY_CLIENT_SECRET": "legacy-client-secret-for-tests",
             "SYNTHETIC_USER_PASSWORD": "A1!synthetic-user-password-for-tests",
+            "EEMSUITE_APPLICATION_HOME_URL": "https://localdev.energyhippo.com/Hippo/",
             "EEMSUITE_OIDC_REDIRECT_URIS": (
                 "https://localhost:7310/signin-oidc;"
                 "https://localdev.energyhippo.com/Hippo/signin-oidc"
@@ -69,6 +70,9 @@ class GenerateRealmTests(unittest.TestCase):
         self.assertEqual(19, len(realm["users"]))
         self.assertEqual(18, sum(user["enabled"] for user in realm["users"]))
         self.assertEqual(27, len(realm["groups"]))
+        self.assertTrue(
+            all(user["realmRoles"] == ["default-roles-northlake"] for user in realm["users"])
+        )
         casey = next(user for user in realm["users"] if user["username"] == "casey.holt")
         self.assertFalse(casey["enabled"])
         self.assertIn("/nlu_bill_entry", casey["groups"])
@@ -92,11 +96,27 @@ class GenerateRealmTests(unittest.TestCase):
         self.assertFalse(modern["directAccessGrantsEnabled"])
         self.assertIn("basic", modern["defaultClientScopes"])
         self.assertIn("offline_access", modern["optionalClientScopes"])
+        self.assertEqual(
+            "https://localdev.energyhippo.com/Hippo/signout-oidc",
+            modern["attributes"]["frontchannel.logout.url"],
+        )
+        self.assertEqual(
+            "https://localdev.energyhippo.com/Hippo/",
+            modern["baseUrl"],
+        )
 
         legacy = clients["eemsuite-web-legacy"]
         self.assertTrue(legacy["implicitFlowEnabled"])
         self.assertFalse(legacy["consentRequired"])
         self.assertNotIn("pkce.code.challenge.method", legacy["attributes"])
+        self.assertEqual(
+            modern["attributes"]["frontchannel.logout.url"],
+            legacy["attributes"]["frontchannel.logout.url"],
+        )
+        self.assertEqual(modern["baseUrl"], legacy["baseUrl"])
+        self.assertEqual(1800, realm["accessCodeLifespanLogin"])
+        self.assertEqual(1800, realm["accessCodeLifespanUserAction"])
+        self.assertEqual(modern["baseUrl"], connection["applicationHomeUrl"])
 
         self.assertEqual(
             "code",
@@ -114,6 +134,10 @@ class GenerateRealmTests(unittest.TestCase):
         saml = clients[entity_id]
 
         self.assertEqual("saml", saml["protocol"])
+        self.assertEqual(
+            "https://localdev.energyhippo.com/Hippo/",
+            saml["baseUrl"],
+        )
         self.assertEqual(
             [
                 "https://localhost:7310/saml/acs",

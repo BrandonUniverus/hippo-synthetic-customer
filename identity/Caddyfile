@@ -1,10 +1,21 @@
 {
 	admin off
 	auto_https disable_redirects
+
+	pki {
+		ca local {
+			intermediate_lifetime 180d
+		}
+	}
 }
 
 https://{$IDENTITY_HOST:localhost}:8443 {
-	tls internal
+	tls {
+		issuer internal {
+			ca local
+			lifetime 720h
+		}
+	}
 	encode zstd gzip
 
 	header {
@@ -13,5 +24,18 @@ https://{$IDENTITY_HOST:localhost}:8443 {
 		Referrer-Policy "no-referrer"
 	}
 
-	reverse_proxy keycloak:8080
+	@portal path /
+	handle @portal {
+		root * /srv/northlake-portal
+		file_server
+	}
+
+	@energyhippo path /open-energyhippo
+	handle @energyhippo {
+		redir {$EEMSUITE_APPLICATION_HOME_URL:https://localdev.energyhippo.com/Hippo/} 302
+	}
+
+	handle {
+		reverse_proxy keycloak:8080
+	}
 }

@@ -353,6 +353,33 @@ def _submit_login(
         raise
 
 
+def _submit_consent(
+    opener: Any,
+    consent_form: ParsedForm,
+    base_url: str,
+    callback: str,
+) -> tuple[int, str | None]:
+    consent_values = dict(consent_form.inputs)
+    consent_values.pop("cancel", None)
+    consent_values["accept"] = consent_values.get("accept") or "Yes"
+    consent_request = Request(
+        urljoin(base_url, consent_form.action),
+        data=urlencode(consent_values).encode("utf-8"),
+        headers={
+            "Content-Type": "application/x-www-form-urlencoded",
+            "User-Agent": VERIFIER_USER_AGENT,
+        },
+    )
+    try:
+        with opener.open(consent_request, timeout=20) as response:
+            return response.status, response.headers.get("Location")
+    except HTTPError as error:
+        location = error.headers.get("Location")
+        if error.code in {301, 302, 303, 307, 308} and location and location.startswith(callback):
+            return error.code, location
+        raise
+
+
 def _parse_saml_xml(document: bytes, description: str) -> Any:
     parser = etree.XMLParser(
         resolve_entities=False,
@@ -1169,6 +1196,19 @@ def _verify_admin(
         raise VerificationError("Admin API did not return exactly 18 enabled users.")
     if len(groups) != 27:
         raise VerificationError(f"Admin API returned {len(groups)} groups; expected 27.")
+    active_user = next(
+        user
+        for user in users
+        if user["username"] == profile["testUsers"]["active"]["username"]
+    )
+    effective_realm_roles = _json_request(
+        f"{profile['baseUrl']}/admin/realms/{profile['realm']}/users/"
+        f"{active_user['id']}/role-mappings/realm/composite",
+        context,
+        bearer=admin_token,
+    )
+    if "offline_access" not in {role["name"] for role in effective_realm_roles}:
+        raise VerificationError("Active synthetic user is not allowed to request offline access.")
 
     by_client_id = {client["clientId"]: client for client in clients}
     for client in profile["clients"].values():
@@ -1288,6 +1328,27 @@ def _verify_modern_code_flow(
         opener,
         login_document,
         profile["testUsers"]["active"]["username"],
+        f"{profile['testUsers']['password']}-invalid",
+        redirect_uri,
+    )
+    invalid_document = response_body.decode("utf-8", errors="replace")
+    if (
+        status != 200
+        or location
+        or "invalid" not in invalid_document.lower()
+        or not any(
+            "login-actions/authenticate" in form.action
+            for form in _forms(response_body)
+        )
+    ):
+        raise VerificationError(
+            "Modern client did not allow retry after invalid credentials."
+        )
+
+    status, location, response_body = _submit_login(
+        opener,
+        response_body,
+        profile["testUsers"]["active"]["username"],
         profile["testUsers"]["password"],
         redirect_uri,
     )
@@ -1304,30 +1365,12 @@ def _verify_modern_code_flow(
     if status != 200 or consent_form is None:
         raise VerificationError("Modern login did not present the Keycloak consent page.")
 
-    consent_values = dict(consent_form.inputs)
-    consent_values.pop("cancel", None)
-    consent_values["accept"] = consent_values.get("accept") or "Yes"
-    consent_request = Request(
-        urljoin(profile["baseUrl"], consent_form.action),
-        data=urlencode(consent_values).encode("utf-8"),
-        headers={
-            "Content-Type": "application/x-www-form-urlencoded",
-            "User-Agent": VERIFIER_USER_AGENT,
-        },
+    status, location = _submit_consent(
+        opener,
+        consent_form,
+        profile["baseUrl"],
+        redirect_uri,
     )
-    try:
-        with opener.open(consent_request, timeout=20) as response:
-            status = response.status
-            location = response.headers.get("Location")
-    except HTTPError as error:
-        location = error.headers.get("Location")
-        if (
-            error.code not in {301, 302, 303, 307, 308}
-            or not location
-            or not location.startswith(redirect_uri)
-        ):
-            raise
-        status = error.code
     if status not in {301, 302, 303, 307, 308} or not location:
         raise VerificationError("Modern login did not redirect with an authorization code.")
 
@@ -1352,6 +1395,8 @@ def _verify_modern_code_flow(
     )
     if not {"access_token", "id_token", "refresh_token"}.issubset(tokens):
         raise VerificationError("Modern token response did not include access, ID, and refresh tokens.")
+    if "offline_access" in set(tokens.get("scope", "").split()):
+        raise VerificationError("Online SSO setup unexpectedly granted offline access.")
 
     claims = _verify_id_token(
         tokens["id_token"],
@@ -1458,6 +1503,163 @@ def _verify_modern_code_flow(
         ):
             raise VerificationError("max_age=0 did not produce the expected login_required error.")
 
+    offline_verifier = _base64url(secrets.token_bytes(48))
+    offline_challenge = _base64url(
+        hashlib.sha256(offline_verifier.encode("ascii")).digest()
+    )
+    offline_state = _base64url(secrets.token_bytes(18))
+    offline_nonce = _base64url(secrets.token_bytes(18))
+    offline_parameters = _authorization_parameters(
+        client,
+        redirect_uri,
+        response_type="code",
+        state=offline_state,
+        nonce=offline_nonce,
+        code_challenge=offline_challenge,
+        prompt="consent",
+        acr_values="1",
+        scope=f"{client['scope']} offline_access",
+    )
+    offline_pushed_request = _json_request(
+        discovery["pushed_authorization_request_endpoint"],
+        context,
+        data={
+            **offline_parameters,
+            "client_secret": client["clientSecret"],
+        },
+    )
+    if (
+        not offline_pushed_request.get("request_uri")
+        or offline_pushed_request.get("expires_in", 0) <= 0
+    ):
+        raise VerificationError("Offline PAR did not return a usable request URI and lifetime.")
+    offline_authorization_url = (
+        f"{profile['authorizationEndpoint']}?"
+        + urlencode(
+            {
+                "client_id": client["clientId"],
+                "request_uri": offline_pushed_request["request_uri"],
+            }
+        )
+    )
+    offline_request = Request(
+        offline_authorization_url,
+        headers={"User-Agent": VERIFIER_USER_AGENT},
+    )
+    try:
+        with opener.open(offline_request, timeout=20) as response:
+            status = response.status
+            location = response.headers.get("Location")
+            response_body = response.read()
+    except HTTPError as error:
+        location = error.headers.get("Location")
+        if (
+            error.code not in {301, 302, 303, 307, 308}
+            or not location
+            or not location.startswith(redirect_uri)
+        ):
+            raise
+        status = error.code
+        response_body = error.read()
+    offline_forms = _forms(response_body)
+    offline_consent_form = next(
+        (
+            form
+            for form in offline_forms
+            if "login-actions/consent" in form.action
+        ),
+        None,
+    )
+    if status != 200 or location or offline_consent_form is None:
+        raise VerificationError(
+            "Offline-access authorization did not reuse SSO and present consent without a "
+            f"password (status={status}, location={location!r}, "
+            f"forms={[form.action for form in offline_forms]!r})."
+        )
+    status, location = _submit_consent(
+        opener,
+        offline_consent_form,
+        profile["baseUrl"],
+        redirect_uri,
+    )
+    if status not in {301, 302, 303, 307, 308} or not location:
+        raise VerificationError(
+            "Offline-access consent did not redirect with an authorization code."
+        )
+    offline_parameters = parse_qs(urlparse(location).query)
+    if (
+        offline_parameters.get("state") != [offline_state]
+        or "code" not in offline_parameters
+    ):
+        raise VerificationError(
+            "Offline-access callback did not preserve state and authorization code."
+        )
+    if offline_parameters.get("iss") != [profile["issuer"]]:
+        raise VerificationError(
+            "Offline-access callback omitted or changed the authorization issuer."
+        )
+    offline_tokens = _json_request(
+        profile["tokenEndpoint"],
+        context,
+        data={
+            "grant_type": "authorization_code",
+            "client_id": client["clientId"],
+            "client_secret": client["clientSecret"],
+            "code": offline_parameters["code"][0],
+            "redirect_uri": redirect_uri,
+            "code_verifier": offline_verifier,
+        },
+    )
+    if not {"access_token", "id_token", "refresh_token"}.issubset(offline_tokens):
+        raise VerificationError(
+            "Offline token response did not include access, ID, and refresh tokens."
+        )
+    if "offline_access" not in set(offline_tokens.get("scope", "").split()):
+        raise VerificationError("Offline token response did not grant offline access.")
+    offline_claims = _verify_id_token(
+        offline_tokens["id_token"],
+        jwks,
+        issuer=profile["issuer"],
+        client_id=client["clientId"],
+        nonce=offline_nonce,
+    )
+    if offline_claims.get("sub") != profile["testUsers"]["active"]["subject"]:
+        raise VerificationError("Offline ID token changed the stable synthetic subject.")
+
+    converted_state = _base64url(secrets.token_bytes(12))
+    converted_url = _authorization_url(
+        profile,
+        session_client,
+        redirect_uri,
+        response_type="code",
+        state=converted_state,
+        nonce=_base64url(secrets.token_bytes(12)),
+        prompt="none",
+    )
+    try:
+        opener.open(
+            Request(converted_url, headers={"User-Agent": VERIFIER_USER_AGENT}),
+            timeout=20,
+        )
+        raise VerificationError(
+            "Offline token exchange did not return an authorization response."
+        )
+    except HTTPError as error:
+        converted_location = error.headers.get("Location", "")
+        if error.code not in {301, 302, 303, 307, 308} or not converted_location.startswith(
+            redirect_uri
+        ):
+            raise
+        converted_parameters = parse_qs(urlparse(converted_location).query)
+        if (
+            converted_parameters.get("state") != [converted_state]
+            or converted_parameters.get("error") != ["login_required"]
+        ):
+            raise VerificationError(
+                "Offline token exchange did not remove the online provider session "
+                f"(callback={converted_parameters!r})."
+            )
+
     rotated_tokens = _json_request(
         profile["tokenEndpoint"],
         context,
@@ -1465,12 +1667,12 @@ def _verify_modern_code_flow(
             "grant_type": "refresh_token",
             "client_id": client["clientId"],
             "client_secret": client["clientSecret"],
-            "refresh_token": tokens["refresh_token"],
+            "refresh_token": offline_tokens["refresh_token"],
         },
     )
     if not {"access_token", "id_token", "refresh_token"}.issubset(rotated_tokens):
         raise VerificationError("Refresh did not return rotated access, ID, and refresh tokens.")
-    if rotated_tokens["refresh_token"] == tokens["refresh_token"]:
+    if rotated_tokens["refresh_token"] == offline_tokens["refresh_token"]:
         raise VerificationError("Refresh token was not rotated.")
     refreshed_claims = _verify_id_token(
         rotated_tokens["id_token"],
@@ -1545,8 +1747,10 @@ def _verify_modern_code_flow(
             raise VerificationError("RP-initiated logout did not preserve state.")
 
     print(
-        "[OK] Modern client: PAR, login + consent, code + PKCE S256, signed ID token, "
-        "UserInfo, prompt/max_age session checks, refresh rotation/revocation, and RP logout."
+        "[OK] Modern client: PAR, invalid-credential retry, login + consent, code + "
+        "PKCE S256, signed ID token, UserInfo, prompt/max_age online-session checks, "
+        "passwordless offline-access grant + session conversion, refresh "
+        "rotation/revocation, and RP logout."
     )
 
 
@@ -1693,9 +1897,13 @@ def _verify_negative_protocol_cases(
     print("[OK] Negative protocol: unregistered redirects and modern implicit flow are rejected.")
 
 
-def verify(connection_path: Path, ca_path: Path) -> None:
+def verify(connection_path: Path, ca_path: Path, suite: str = "all") -> None:
     profile = json.loads(connection_path.read_text(encoding="utf-8"))
     context = ssl.create_default_context(cafile=str(ca_path))
+
+    if suite == "saml":
+        _verify_saml(profile, context)
+        return
 
     discovery = _json_request(profile["discoveryEndpoint"], context)
     if discovery.get("issuer") != profile["issuer"]:
@@ -1746,17 +1954,23 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Verify the live Northlake identity provider.")
     parser.add_argument("--connection", required=True, type=Path)
     parser.add_argument("--ca-file", required=True, type=Path)
+    parser.add_argument(
+        "--suite",
+        choices=("all", "saml"),
+        default="all",
+        help="Run the complete provider verifier or only the focused SAML suite.",
+    )
     return parser.parse_args()
 
 
 def main() -> int:
     args = _parse_args()
     try:
-        verify(args.connection.resolve(), args.ca_file.resolve())
+        verify(args.connection.resolve(), args.ca_file.resolve(), args.suite)
     except (OSError, HTTPError, URLError, VerificationError, KeyError, json.JSONDecodeError) as error:
         print(f"[ERROR] {error}", file=sys.stderr)
         return 1
-    print("[OK] Northlake synthetic identity verification completed.")
+    print(f"[OK] Northlake synthetic identity {args.suite} verification completed.")
     return 0
 
 

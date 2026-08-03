@@ -45,6 +45,7 @@ $lines = @(
     "EEMSUITE_OIDC_LEGACY_CLIENT_SECRET=$(New-IdentitySecret)",
     "SYNTHETIC_USER_PASSWORD=$(New-IdentitySecret -AsPassword)",
     "",
+    "EEMSUITE_APPLICATION_HOME_URL=https://localdev.energyhippo.com/Hippo/",
     "EEMSUITE_OIDC_REDIRECT_URIS=https://localhost:7310/signin-oidc;https://localdev.energyhippo.com/Hippo/signin-oidc;https://localhost/Hippo/signin-oidc",
     "",
     "EEMSUITE_SAML_ENTITY_ID=urn:energyhippo:eemsuite-web:saml",

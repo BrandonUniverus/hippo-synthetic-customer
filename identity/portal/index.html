@@ -1,0 +1,785 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="color-scheme" content="dark">
+  <title>Northlake Synthetic Identity</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --background: #091418;
+      --surface: rgba(14, 31, 37, 0.88);
+      --surface-strong: #102a32;
+      --line: rgba(151, 198, 211, 0.18);
+      --text: #f5fbfc;
+      --muted: #a9c0c6;
+      --teal: #48d1c5;
+      --teal-strong: #76e5db;
+      --blue: #58a9f2;
+      --ink: #061113;
+      --shadow: 0 28px 80px rgba(0, 0, 0, 0.42);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      min-width: 320px;
+      background: var(--background);
+    }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      overflow-x: hidden;
+      color: var(--text);
+      font-family:
+        Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 12% 8%, rgba(72, 209, 197, 0.17), transparent 28rem),
+        radial-gradient(circle at 94% 18%, rgba(88, 169, 242, 0.15), transparent 32rem),
+        linear-gradient(145deg, #081217 0%, #0a171c 46%, #061013 100%);
+    }
+
+    body::before,
+    body::after {
+      position: fixed;
+      z-index: 0;
+      content: "";
+      pointer-events: none;
+      transform: rotate(14deg);
+      border: 1px solid rgba(118, 229, 219, 0.08);
+      border-radius: 3.5rem;
+    }
+
+    body::before {
+      top: -19rem;
+      right: -10rem;
+      width: 38rem;
+      height: 38rem;
+      background: linear-gradient(145deg, rgba(72, 209, 197, 0.05), transparent 60%);
+    }
+
+    body::after {
+      bottom: -24rem;
+      left: -15rem;
+      width: 44rem;
+      height: 44rem;
+      background: linear-gradient(145deg, rgba(88, 169, 242, 0.06), transparent 62%);
+    }
+
+    a {
+      color: inherit;
+    }
+
+    .shell {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      min-height: 100vh;
+      width: min(1180px, calc(100% - 40px));
+      margin: 0 auto;
+      flex-direction: column;
+    }
+
+    .topbar {
+      display: flex;
+      min-height: 92px;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 14px;
+      text-decoration: none;
+    }
+
+    .brand-mark {
+      display: grid;
+      width: 42px;
+      height: 42px;
+      place-items: center;
+      border: 1px solid rgba(118, 229, 219, 0.36);
+      border-radius: 13px;
+      color: var(--teal-strong);
+      background: linear-gradient(145deg, rgba(72, 209, 197, 0.16), rgba(88, 169, 242, 0.09));
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      font-size: 15px;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+    }
+
+    .brand-copy {
+      display: grid;
+      gap: 2px;
+    }
+
+    .brand-name {
+      font-size: 15px;
+      font-weight: 760;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+    }
+
+    .brand-subtitle {
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: 0.04em;
+    }
+
+    .environment {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      padding: 8px 12px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--muted);
+      background: rgba(8, 22, 26, 0.62);
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .environment::before {
+      width: 7px;
+      height: 7px;
+      content: "";
+      border-radius: 50%;
+      background: var(--teal);
+      box-shadow: 0 0 0 4px rgba(72, 209, 197, 0.12);
+    }
+
+    main {
+      display: grid;
+      flex: 1;
+      grid-template-columns: minmax(0, 1.08fr) minmax(360px, 0.92fr);
+      align-items: center;
+      gap: clamp(48px, 8vw, 108px);
+      padding: 72px 0;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin: 0 0 24px;
+      color: var(--teal-strong);
+      font-size: 12px;
+      font-weight: 780;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+    }
+
+    .eyebrow::before {
+      width: 28px;
+      height: 1px;
+      content: "";
+      background: currentColor;
+    }
+
+    h1 {
+      max-width: 720px;
+      margin: 0;
+      font-size: clamp(44px, 6.2vw, 76px);
+      font-weight: 720;
+      letter-spacing: -0.055em;
+      line-height: 0.98;
+      text-wrap: balance;
+    }
+
+    h1 span {
+      color: var(--teal-strong);
+    }
+
+    .lede {
+      max-width: 650px;
+      margin: 28px 0 0;
+      color: var(--muted);
+      font-size: clamp(17px, 1.7vw, 20px);
+      line-height: 1.65;
+      text-wrap: pretty;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 36px;
+    }
+
+    .button {
+      display: inline-flex;
+      min-height: 52px;
+      align-items: center;
+      justify-content: center;
+      gap: 11px;
+      padding: 0 20px;
+      border: 1px solid transparent;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 760;
+      text-decoration: none;
+      transition:
+        transform 160ms ease,
+        border-color 160ms ease,
+        background 160ms ease;
+    }
+
+    .button:hover {
+      transform: translateY(-2px);
+    }
+
+    .button:focus-visible,
+    .footer-links a:focus-visible {
+      outline: 3px solid rgba(118, 229, 219, 0.5);
+      outline-offset: 4px;
+    }
+
+    .button-primary {
+      color: var(--ink);
+      background: linear-gradient(135deg, var(--teal-strong), #65cce8);
+      box-shadow: 0 12px 28px rgba(72, 209, 197, 0.16);
+    }
+
+    .button-secondary {
+      border-color: rgba(151, 198, 211, 0.23);
+      color: var(--text);
+      background: rgba(16, 42, 50, 0.68);
+    }
+
+    .button svg {
+      width: 18px;
+      height: 18px;
+      flex: 0 0 auto;
+    }
+
+    .action-note {
+      display: flex;
+      align-items: flex-start;
+      gap: 9px;
+      max-width: 590px;
+      margin: 18px 0 0;
+      color: #8daab1;
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .action-note svg {
+      width: 15px;
+      height: 15px;
+      flex: 0 0 auto;
+      margin-top: 2px;
+      color: var(--blue);
+    }
+
+    .flow-card {
+      position: relative;
+      overflow: hidden;
+      padding: 34px;
+      border: 1px solid rgba(151, 198, 211, 0.2);
+      border-radius: 24px;
+      background:
+        linear-gradient(145deg, rgba(19, 49, 58, 0.84), rgba(10, 27, 33, 0.94));
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(18px);
+    }
+
+    .flow-card::before {
+      position: absolute;
+      top: 0;
+      right: 0;
+      left: 0;
+      height: 3px;
+      content: "";
+      background: linear-gradient(90deg, var(--teal), var(--blue));
+    }
+
+    .card-kicker {
+      margin: 0 0 9px;
+      color: var(--teal-strong);
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+    }
+
+    h2 {
+      margin: 0;
+      font-size: 25px;
+      font-weight: 720;
+      letter-spacing: -0.025em;
+    }
+
+    .steps {
+      display: grid;
+      gap: 0;
+      margin: 28px 0 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .step {
+      position: relative;
+      display: grid;
+      grid-template-columns: 36px 1fr;
+      gap: 15px;
+      padding-bottom: 24px;
+    }
+
+    .step:last-child {
+      padding-bottom: 0;
+    }
+
+    .step:not(:last-child)::after {
+      position: absolute;
+      top: 36px;
+      bottom: 0;
+      left: 17px;
+      width: 1px;
+      content: "";
+      background: linear-gradient(var(--teal), rgba(72, 209, 197, 0.08));
+    }
+
+    .step-number {
+      display: grid;
+      z-index: 1;
+      width: 36px;
+      height: 36px;
+      place-items: center;
+      border: 1px solid rgba(118, 229, 219, 0.28);
+      border-radius: 11px;
+      color: var(--teal-strong);
+      background: var(--surface-strong);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .step-copy {
+      padding-top: 2px;
+    }
+
+    .step-title {
+      margin: 0 0 5px;
+      font-size: 15px;
+      font-weight: 720;
+    }
+
+    .step-description {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .boundary {
+      display: flex;
+      gap: 11px;
+      margin-top: 28px;
+      padding: 15px;
+      border: 1px solid rgba(88, 169, 242, 0.18);
+      border-radius: 13px;
+      color: #b9cbd0;
+      background: rgba(7, 19, 24, 0.58);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    .boundary svg {
+      width: 18px;
+      height: 18px;
+      flex: 0 0 auto;
+      color: var(--blue);
+    }
+
+    .saml-contract {
+      padding: 0 0 72px;
+    }
+
+    .contract-card {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(390px, 0.95fr);
+      gap: clamp(36px, 6vw, 78px);
+      padding: clamp(30px, 5vw, 54px);
+      border: 1px solid rgba(151, 198, 211, 0.2);
+      border-radius: 24px;
+      background:
+        linear-gradient(135deg, rgba(14, 38, 45, 0.95), rgba(8, 24, 30, 0.95));
+      box-shadow: 0 22px 68px rgba(0, 0, 0, 0.28);
+    }
+
+    .contract-copy {
+      align-self: center;
+    }
+
+    .contract-copy h2 {
+      max-width: 620px;
+      font-size: clamp(27px, 3.5vw, 38px);
+      line-height: 1.15;
+    }
+
+    .contract-description {
+      max-width: 640px;
+      margin: 18px 0 0;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.7;
+    }
+
+    .contract-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 26px;
+    }
+
+    .contract-actions .button {
+      min-height: 46px;
+    }
+
+    .contract-note {
+      max-width: 640px;
+      margin: 16px 0 0;
+      color: #8daab1;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    .contract-grid {
+      display: grid;
+      align-content: start;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin: 0;
+    }
+
+    .contract-item {
+      min-width: 0;
+      padding: 18px;
+      border: 1px solid rgba(151, 198, 211, 0.15);
+      border-radius: 14px;
+      background: rgba(6, 17, 21, 0.58);
+    }
+
+    .contract-item-wide {
+      grid-column: 1 / -1;
+    }
+
+    .contract-item dt {
+      margin-bottom: 8px;
+      color: var(--teal-strong);
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .contract-item dd {
+      margin: 0;
+      overflow-wrap: anywhere;
+      color: #d9e8eb;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    footer {
+      display: flex;
+      min-height: 82px;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      border-top: 1px solid var(--line);
+      color: #809aa1;
+      font-size: 12px;
+    }
+
+    .footer-links {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 20px;
+    }
+
+    .footer-links a {
+      color: var(--muted);
+      text-underline-offset: 4px;
+    }
+
+    @media (max-width: 900px) {
+      main {
+        grid-template-columns: 1fr;
+        padding: 64px 0;
+      }
+
+      .intro {
+        max-width: 720px;
+      }
+
+      .flow-card {
+        max-width: 640px;
+      }
+
+      .contract-card {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 600px) {
+      .shell {
+        width: min(100% - 28px, 1180px);
+      }
+
+      .topbar {
+        min-height: 80px;
+      }
+
+      .brand-subtitle,
+      .environment span {
+        display: none;
+      }
+
+      main {
+        gap: 44px;
+        padding: 52px 0;
+      }
+
+      h1 {
+        font-size: clamp(42px, 13vw, 58px);
+      }
+
+      .actions {
+        display: grid;
+      }
+
+      .button {
+        width: 100%;
+      }
+
+      .flow-card {
+        padding: 28px 22px;
+        border-radius: 20px;
+      }
+
+      .saml-contract {
+        padding-bottom: 52px;
+      }
+
+      .contract-card {
+        padding: 28px 22px;
+        border-radius: 20px;
+      }
+
+      .contract-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .contract-item-wide {
+        grid-column: auto;
+      }
+
+      .contract-actions {
+        display: grid;
+      }
+
+      footer {
+        align-items: flex-start;
+        flex-direction: column;
+        padding: 24px 0;
+      }
+
+      .footer-links {
+        justify-content: flex-start;
+        gap: 14px 18px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .button {
+        transition: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="Northlake Synthetic Identity home">
+        <span class="brand-mark" aria-hidden="true">NL</span>
+        <span class="brand-copy">
+          <span class="brand-name">Northlake</span>
+          <span class="brand-subtitle">Synthetic Identity</span>
+        </span>
+      </a>
+      <span class="environment">
+        <span>Local development provider</span>
+      </span>
+    </header>
+
+    <main>
+      <section class="intro" aria-labelledby="page-title">
+        <p class="eyebrow">OIDC + SAML test provider</p>
+        <h1 id="page-title">Sign in once. Test either path with <span>Northlake.</span></h1>
+        <p class="lede">
+          Establish your Northlake identity session, then open EnergyHippo and
+          choose its OIDC or SAML third-party sign-in. Northlake supplies the
+          same users, groups, company IDs, and permission-profile intent through
+          both protocols so the relying application can be compared honestly.
+        </p>
+
+        <div class="actions">
+          <a
+            class="button button-primary"
+            href="/realms/northlake/account/"
+            target="_blank"
+            rel="noopener"
+            aria-describedby="new-tab-note"
+          >
+            Sign in to Northlake
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M14 5h5v5M19 5l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M18 13v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+          </a>
+          <a class="button button-secondary" href="/open-energyhippo">
+            Open EnergyHippo
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M5 12h14M14 7l5 5-5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </a>
+        </div>
+        <p class="action-note" id="new-tab-note">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.7"/>
+            <path d="M12 10v6M12 7.25v.1" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
+          </svg>
+          Northlake opens in a new tab so this launchpad stays available. Sign
+          in there, return here, then continue to EnergyHippo.
+        </p>
+      </section>
+
+      <aside class="flow-card" aria-labelledby="flow-title">
+        <p class="card-kicker">Session handoff</p>
+        <h2 id="flow-title">How the repeat login works</h2>
+        <ol class="steps">
+          <li class="step">
+            <span class="step-number">01</span>
+            <div class="step-copy">
+              <p class="step-title">Authenticate with Northlake</p>
+              <p class="step-description">
+                Keycloak validates the user and creates the provider's browser
+                session.
+              </p>
+            </div>
+          </li>
+          <li class="step">
+            <span class="step-number">02</span>
+            <div class="step-copy">
+              <p class="step-title">Choose Northlake in EnergyHippo</p>
+              <p class="step-description">
+                EnergyHippo starts its selected OIDC authorization request or
+                SAML AuthnRequest and owns the complete callback validation.
+              </p>
+            </div>
+          </li>
+          <li class="step">
+            <span class="step-number">03</span>
+            <div class="step-copy">
+              <p class="step-title">Return without another password</p>
+              <p class="step-description">
+                Northlake reuses its SSO session, then returns either OIDC
+                tokens or a signed SAML response to the registered callback.
+              </p>
+            </div>
+          </li>
+        </ol>
+        <div class="boundary">
+          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M7 10V8a5 5 0 0 1 10 0v2M6 10h12v9H6z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+            <path d="M12 14v2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+          <span>
+            This page never handles passwords or tokens. It only links the real
+            identity provider to the relying application's own login flow.
+          </span>
+        </div>
+      </aside>
+    </main>
+
+    <section class="saml-contract" aria-labelledby="saml-contract-title">
+      <div class="contract-card">
+        <div class="contract-copy">
+          <p class="card-kicker">SAML 2.0 provider ready</p>
+          <h2 id="saml-contract-title">Northlake is ready for the EnergyHippo service provider.</h2>
+          <p class="contract-description">
+            Keycloak returns a persistent NameID and the Northlake attribute set
+            in an HTTP-POST response. Both the outer response and assertion are
+            signed with RSA-SHA256; the focused verifier checks signatures,
+            issuer, audience, destination, recipient, time bounds, request
+            correlation, replay resistance, logout, and disabled users.
+          </p>
+          <div class="contract-actions">
+            <a class="button button-primary" href="/realms/northlake/protocol/saml/descriptor">
+              Open SAML metadata
+            </a>
+            <a
+              class="button button-secondary"
+              href="/realms/northlake/protocol/saml/clients/eemsuite-web-saml"
+              target="_blank"
+              rel="noopener"
+              aria-describedby="saml-launch-note"
+            >
+              Launch IdP-initiated SSO
+            </a>
+          </div>
+          <p class="contract-note" id="saml-launch-note">
+            IdP-initiated SSO posts to the SAML client's current default ACS.
+            Use it after the EnergyHippo ACS is active and configured first, or
+            the browser will correctly report that the relying party is unavailable.
+          </p>
+        </div>
+
+        <dl class="contract-grid" aria-label="Northlake SAML service-provider contract">
+          <div class="contract-item contract-item-wide">
+            <dt>Service-provider entity ID</dt>
+            <dd>urn:energyhippo:eemsuite-web:saml</dd>
+          </div>
+          <div class="contract-item">
+            <dt>NameID</dt>
+            <dd>persistent</dd>
+          </div>
+          <div class="contract-item">
+            <dt>Response binding</dt>
+            <dd>HTTP-POST</dd>
+          </div>
+          <div class="contract-item contract-item-wide">
+            <dt>Identity key</dt>
+            <dd>(IdP entity ID, persistent NameID)</dd>
+          </div>
+          <div class="contract-item contract-item-wide">
+            <dt>Baseline signatures</dt>
+            <dd>Response + Assertion · RSA-SHA256</dd>
+          </div>
+        </dl>
+      </div>
+    </section>
+
+    <footer>
+      <span>Northlake synthetic environment · Development use only</span>
+      <nav class="footer-links" aria-label="Identity provider resources">
+        <a href="/realms/northlake/account/">Account</a>
+        <a href="/admin/northlake/console/">Realm admin</a>
+        <a href="/realms/northlake/.well-known/openid-configuration">OIDC discovery</a>
+        <a href="/realms/northlake/protocol/saml/descriptor">SAML metadata</a>
+      </nav>
+    </footer>
+  </div>
+</body>
+</html>

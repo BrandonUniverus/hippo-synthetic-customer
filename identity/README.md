@@ -12,7 +12,10 @@ Identity Provider (IdP).
 - Keycloak 26.7.0 with real login, account, consent, session, logout, and admin pages.
 - PostgreSQL-backed users, sessions, realm configuration, and signing keys that
   survive an ordinary stop/start.
-- Caddy 2.11.4 terminating HTTPS at `https://localhost:8443`.
+- Caddy 2.11.4 terminating HTTPS at `https://localhost:8443`, with a
+  30-day localhost certificate beneath a 180-day intermediate CA.
+- A small Northlake launchpad that establishes a provider session and directs
+  the tester to EnergyHippo without handling passwords or tokens itself.
 - 19 Northlake identities: 18 active and one deliberately disabled.
 - 27 groups plus claim shapes for company IDs and EEM permission-profile intent.
 - Stable UUIDv5 user, group, role, client, scope, and realm IDs.
@@ -73,12 +76,41 @@ Use `-StoreLocation LocalMachine` from an elevated terminal when EEMSuite runs
 under IIS or another service account. The default `CurrentUser` store is enough
 for a developer-launched process and browser.
 
+Caddy's development root remains valid for ten years and persists in the
+Compose-owned data volume. The 30-day localhost leaf and 180-day intermediate
+renew automatically. This avoids the default 12-hour leaf rotation that can
+leave a long-running browser holding an expired development certificate without
+weakening certificate validation.
+
 Then open:
 
+- Northlake launchpad: `https://localhost:8443/`
 - Account/login: `https://localhost:8443/realms/northlake/account/`
 - Realm admin: `https://localhost:8443/admin/northlake/console/`
 - OIDC discovery: `https://localhost:8443/realms/northlake/.well-known/openid-configuration`
 - SAML IdP metadata: `https://localhost:8443/realms/northlake/protocol/saml/descriptor`
+
+## Northlake SSO launchpad
+
+The root page is intentionally a launchpad rather than a second authentication
+application:
+
+1. **Sign in to Northlake** opens Keycloak's account console in a new tab. A
+   successful login establishes the normal Northlake realm SSO session.
+2. **Open EnergyHippo** sends the tester to `EEMSUITE_APPLICATION_HOME_URL`.
+3. The tester chooses Northlake on EnergyHippo's third-party login page.
+   EnergyHippo still starts and validates its own OIDC authorization request,
+   but Keycloak can complete that request without another password prompt while
+   the provider session remains valid.
+
+The relying party must not force `prompt=login` or `max_age=0` when session
+reuse is desired. Logout, session expiry, or a browser that does not carry the
+Northlake cookie correctly requires authentication again.
+
+This keeps the trust boundary realistic: the launchpad never sees a password,
+authorization code, or token. A future Northlake customer website can be added
+as a separate synthetic relying party with its own client and callback instead
+of coupling API, upload, and webhook scenarios to the identity provider.
 
 View the generated local credentials:
 
@@ -139,9 +171,21 @@ The generated clients also register:
 - `https://localdev.energyhippo.com/Hippo/signin-oidc`
 - `https://localhost/Hippo/signin-oidc`
 
+`https://localhost:7310` is a verifier callback, not a permanently running
+application. Keycloak's **Back to Application** link instead uses
+`EEMSUITE_APPLICATION_HOME_URL`, which defaults to
+`https://localdev.energyhippo.com/Hippo/`. The launchpad's **Open EnergyHippo**
+action uses the same value. Change that ignored `.env` setting when another
+EEMSuite origin is active.
+
 Edit `EEMSUITE_OIDC_REDIRECT_URIS` in the ignored `.env`, reset the realm, and
 rerun validation when another exact URI is needed. Wildcard callbacks are not
 used.
+
+The development realm allows 30 minutes for the overall login and for each
+individual login page. Once a login transaction has expired, a relying party
+using one-time PAR must initiate a fresh authorization request; the provider
+cannot safely replay the expired request.
 
 ## SAML service-provider contract
 
@@ -228,6 +272,28 @@ pwsh .\identity\scripts\Get-IdentityStatus.ps1 -ShowSecrets
 ```powershell
 pwsh .\identity\scripts\Test-Identity.ps1
 ```
+
+To work on the SAML consumer without being blocked by an unrelated OIDC
+regression, run the SAML suite independently:
+
+```powershell
+pwsh .\identity\scripts\Test-SamlIdentity.ps1
+```
+
+That focused command still performs the complete SAML proof: trusted metadata,
+response and assertion signatures, exact issuer/destination/recipient/audience,
+time conditions and `OneTimeUse`, persistent NameID, request correlation,
+attributes, SP- and IdP-initiated login, signed logout, replay-resistant IDs,
+invalid ACS rejection, and the disabled-user path.
+
+## Future SCIM 2.0 test integration
+
+SCIM should remain separate from the Keycloak login protocols. EnergyHippo will
+be the SCIM service provider; Northlake should act like the customer's Entra
+provisioning client and drive repeatable `/Users` and `/Groups` sequences into
+it. The proposed boundary, mappings, negative cases, and cross-protocol
+provision-then-SAML-login scenario are captured in
+[SCIM-2.0-TESTING.md](SCIM-2.0-TESTING.md).
 
 ### Stop and restart without changing state
 

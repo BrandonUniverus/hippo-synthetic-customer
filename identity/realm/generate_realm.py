@@ -19,6 +19,7 @@ import yaml
 REALM_NAME = "northlake"
 MODERN_CLIENT_ID = "eemsuite-web"
 LEGACY_CLIENT_ID = "eemsuite-web-legacy"
+DEFAULT_EEMSUITE_APPLICATION_HOME_URL = "https://localdev.energyhippo.com/Hippo/"
 DEFAULT_SAML_ENTITY_ID = "urn:energyhippo:eemsuite-web:saml"
 DEFAULT_SAML_ACS_URLS = (
     "https://localhost:7310/saml/acs",
@@ -430,6 +431,7 @@ def _client(
     client_id: str,
     secret: str,
     redirect_uris: list[str],
+    application_home_url: str,
     *,
     implicit_enabled: bool,
     require_pkce: bool,
@@ -437,6 +439,7 @@ def _client(
     attributes = {
         "backchannel.logout.revoke.offline.tokens": "true",
         "backchannel.logout.session.required": "true",
+        "frontchannel.logout.url": f"{application_home_url.rstrip('/')}/signout-oidc",
         "frontchannel.logout.session.required": "true",
         "oauth2.device.authorization.grant.enabled": "false",
         "oidc.ciba.grant.enabled": "false",
@@ -468,9 +471,9 @@ def _client(
         "secret": secret,
         "redirectUris": redirect_uris,
         "webOrigins": _origins(redirect_uris),
-        "rootUrl": _origins(redirect_uris)[0],
-        "baseUrl": "/",
-        "adminUrl": _origins(redirect_uris)[0],
+        "rootUrl": application_home_url,
+        "baseUrl": application_home_url,
+        "adminUrl": application_home_url,
         "standardFlowEnabled": True,
         "implicitFlowEnabled": implicit_enabled,
         "directAccessGrantsEnabled": False,
@@ -495,8 +498,8 @@ def _saml_client(
     entity_id: str,
     assertion_consumer_service_urls: list[str],
     single_logout_service_urls: list[str],
+    application_home_url: str,
 ) -> dict[str, Any]:
-    root_url = _origins(assertion_consumer_service_urls)[0]
     return {
         "id": _stable_id("client", entity_id),
         "clientId": entity_id,
@@ -509,8 +512,8 @@ def _saml_client(
         "consentRequired": False,
         "alwaysDisplayInConsole": True,
         "redirectUris": assertion_consumer_service_urls,
-        "rootUrl": root_url,
-        "baseUrl": root_url,
+        "rootUrl": application_home_url,
+        "baseUrl": application_home_url,
         "frontchannelLogout": True,
         "protocol": "saml",
         "attributes": {
@@ -608,6 +611,18 @@ def build_realm(
     """Build the Keycloak realm and local connection profile."""
 
     _require_environment(environment)
+    application_home_url = environment.get(
+        "EEMSUITE_APPLICATION_HOME_URL",
+        DEFAULT_EEMSUITE_APPLICATION_HOME_URL,
+    ).strip()
+    parsed_application_home_url = urlparse(application_home_url)
+    if (
+        parsed_application_home_url.scheme != "https"
+        or not parsed_application_home_url.netloc
+    ):
+        raise RealmGenerationError(
+            "EEMSUITE_APPLICATION_HOME_URL must be an absolute HTTPS URL."
+        )
     saml_entity_id = environment.get(
         "EEMSUITE_SAML_ENTITY_ID",
         DEFAULT_SAML_ENTITY_ID,
@@ -698,6 +713,7 @@ def build_realm(
                     }
                 ],
                 "requiredActions": [],
+                "realmRoles": [f"default-roles-{REALM_NAME}"],
                 "groups": sorted(user_groups[user["id"]]),
             }
         )
@@ -731,6 +747,8 @@ def build_realm(
         "refreshTokenMaxReuse": 0,
         "accessTokenLifespan": 300,
         "accessTokenLifespanForImplicitFlow": 300,
+        "accessCodeLifespanLogin": 1800,
+        "accessCodeLifespanUserAction": 1800,
         "ssoSessionIdleTimeout": 1800,
         "ssoSessionMaxLifespan": 28800,
         "offlineSessionIdleTimeout": 2592000,
@@ -762,6 +780,7 @@ def build_realm(
                 MODERN_CLIENT_ID,
                 environment["EEMSUITE_OIDC_CLIENT_SECRET"],
                 redirect_uris,
+                application_home_url,
                 implicit_enabled=False,
                 require_pkce=True,
             ),
@@ -769,6 +788,7 @@ def build_realm(
                 LEGACY_CLIENT_ID,
                 environment["EEMSUITE_OIDC_LEGACY_CLIENT_SECRET"],
                 redirect_uris,
+                application_home_url,
                 implicit_enabled=True,
                 require_pkce=False,
             ),
@@ -776,6 +796,7 @@ def build_realm(
                 saml_entity_id,
                 saml_assertion_consumer_service_urls,
                 saml_single_logout_service_urls,
+                application_home_url,
             ),
         ],
         "eventsEnabled": True,
@@ -797,6 +818,7 @@ def build_realm(
             "manifestVersion": manifest["manifestVersion"],
             "customerScenarioId": manifest["customerScenarioId"],
         },
+        "applicationHomeUrl": application_home_url,
         "baseUrl": base_url,
         "issuer": issuer,
         "discoveryEndpoint": discovery,
