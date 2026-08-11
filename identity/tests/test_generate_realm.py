@@ -14,6 +14,7 @@ from cryptography.hazmat.primitives.asymmetric import ec, rsa
 from cryptography.x509.oid import NameOID
 
 from identity.configuration.settings import ProviderSettings, SettingsDocument, write_settings_document
+from identity.configuration.users import SyntheticUserStore
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -95,6 +96,10 @@ class GenerateRealmTests(unittest.TestCase):
                 "customerScenarioId": "demo_university_v1",
             },
             connection["realmSource"],
+        )
+        self.assertEqual(
+            {"total": 19, "enabled": 18, "local": 0},
+            connection["userInventory"],
         )
 
     def test_clients_separate_modern_and_legacy_behavior(self) -> None:
@@ -409,6 +414,52 @@ class GenerateRealmTests(unittest.TestCase):
         self.assertEqual(
             active_user["attributes"][persistent_attribute][0],
             first_connection["testUsers"]["active"]["samlNameId"],
+        )
+
+    def test_local_user_overlay_keeps_subject_and_password_across_regeneration(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            overlay_path = Path(temporary_directory) / "users.json"
+            store = SyntheticUserStore(
+                self.manifest,
+                overlay_path,
+                self.environment["SYNTHETIC_USER_PASSWORD"],
+            )
+            user, password = store.create(
+                {
+                    "username": "alex.rivera",
+                    "firstName": "Alex",
+                    "lastName": "Rivera",
+                    "email": "alex.rivera@northlake.example.edu",
+                    "enabled": True,
+                    "title": "Synthetic Integration Tester",
+                }
+            )
+            manifest = generate_realm._load_manifest(self.manifest)
+
+            first, first_connection = generate_realm.build_realm(
+                manifest,
+                self.environment,
+                overlay_path,
+            )
+            second, _ = generate_realm.build_realm(
+                manifest,
+                self.environment,
+                overlay_path,
+            )
+
+        first_user = next(
+            candidate for candidate in first["users"] if candidate["username"] == "alex.rivera"
+        )
+        second_user = next(
+            candidate for candidate in second["users"] if candidate["username"] == "alex.rivera"
+        )
+        self.assertEqual(user["syntheticUserId"], first_user["attributes"]["synthetic_user_id"][0])
+        self.assertEqual(first_user["id"], second_user["id"])
+        self.assertEqual([], first_user["groups"])
+        self.assertEqual(password, first_user["credentials"][0]["value"])
+        self.assertEqual(
+            {"total": 20, "enabled": 19, "local": 1},
+            first_connection["userInventory"],
         )
 
     def test_userinfo_claim_sources_include_groups_and_eem_shapes(self) -> None:

@@ -19,7 +19,8 @@ Identity Provider (IdP).
   registrations.
 - A small Northlake launchpad that establishes a provider session and directs
   the tester to EnergyHippo without handling passwords or tokens itself.
-- 19 Northlake identities: 18 active and one deliberately disabled.
+- 19 checked-in Northlake identities: 18 active and one deliberately disabled,
+  plus ignored local additions managed through the Phase 2 page.
 - 27 groups plus claim shapes for company IDs and EEM permission-profile intent.
 - Stable UUIDv5 user, group, role, client, scope, and realm IDs.
 - Two exact confidential EEMSuite OIDC clients:
@@ -110,11 +111,33 @@ disposable Keycloak realm, so current synthetic sessions and in-realm edits are
 discarded. A public hostname or HTTPS port change is saved as pending and takes
 effect after the normal stop/start scripts recreate the edge container.
 
-The form deliberately covers only the common one-provider settings in Phase 1.
-Users, groups, multiple concurrent realms, advanced protocol profiles, and a
-general JSON editor are added in later ADR-002b phases. Do not expose the
-configuration service on a shared or production network merely because this
-localhost lab does not require an administrator login.
+The provider form deliberately covers only the common one-provider settings in
+Phase 1. Synthetic users have the separate Phase 2 surface below; groups,
+multiple concurrent realms, advanced protocol profiles, and a general JSON
+editor remain later ADR-002b phases. Do not expose the configuration service on
+a shared or production network merely because this localhost lab does not
+require an administrator login.
+
+## Synthetic user management
+
+`https://localhost:8443/configure/users` lists the checked-in fictional users
+and lets a developer create or edit the small Phase 2 identity shape: username,
+first and last name, fictional email, enabled state, and synthetic title. It
+accepts only the repository's reserved example email domains and deliberately
+has no password input, bulk import, or general attribute editor.
+
+Creating a user or selecting **Generate new password** produces a random
+development-only password and displays it once for copying. The record and its
+credential are stored in ignored `identity/.runtime/users.json`; neither the
+checked-in security manifest nor EnergyHippo is changed. Editing a checked-in
+identity creates an override in the same ignored document. The persisted
+synthetic user id remains the UUIDv5 subject seed across ordinary provider and
+user applies.
+
+Every user save regenerates the one disposable Keycloak realm. Current sessions,
+consent, and manual in-realm edits are therefore discarded. New Phase 2 users
+start without company, group, or permission assignments; Phase 3 adds those
+claim-shaping relationships without implying EnergyHippo authorization.
 
 ## Northlake SSO launchpad
 
@@ -431,6 +454,7 @@ Checked-in sources:
 - `realm/generate_realm.py`: protocol, client, claim, lifetime, and stable-ID rules.
 - `configuration/fields.json`: presentation metadata for the Phase 1 form.
 - `configuration/settings.py`: typed configuration validation and generated contract.
+- `configuration/users.py`: typed fictional-user validation and ignored overlay storage.
 - `configuration/server.py`: loopback configuration API and disposable-realm apply boundary.
 - `compose.yml`: immutable container versions and deployment boundary.
 - `Caddyfile`: HTTPS and proxy boundary.
@@ -441,6 +465,7 @@ Ignored generated state:
 - import JSON containing those secrets and test credentials;
 - connection profiles;
 - the saved local provider configuration document;
+- local synthetic-user overrides and their generated development passwords;
 - copied development CA;
 - PostgreSQL and Caddy Docker volumes.
 

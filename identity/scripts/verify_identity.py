@@ -1190,10 +1190,21 @@ def _verify_admin(
         bearer=admin_token,
     )
 
-    if len(users) != 19:
-        raise VerificationError(f"Admin API returned {len(users)} users; expected 19.")
-    if sum(bool(user["enabled"]) for user in users) != 18:
-        raise VerificationError("Admin API did not return exactly 18 enabled users.")
+    expected_user_inventory = profile.get(
+        "userInventory",
+        {"total": 19, "enabled": 18, "local": 0},
+    )
+    if len(users) != expected_user_inventory["total"]:
+        raise VerificationError(
+            f"Admin API returned {len(users)} users; expected "
+            f"{expected_user_inventory['total']}."
+        )
+    enabled_user_count = sum(bool(user["enabled"]) for user in users)
+    if enabled_user_count != expected_user_inventory["enabled"]:
+        raise VerificationError(
+            f"Admin API returned {enabled_user_count} enabled users; expected "
+            f"{expected_user_inventory['enabled']}."
+        )
     if len(groups) != 27:
         raise VerificationError(f"Admin API returned {len(groups)} groups; expected 27.")
     active_user = next(
@@ -1309,7 +1320,8 @@ def _verify_admin(
     if disabled is None or disabled["enabled"]:
         raise VerificationError("Disabled-user regression identity was not disabled.")
     print(
-        f"[OK] Admin API: 19 users, 18 enabled, 27 groups, and {len(profile['clients'])} "
+        f"[OK] Admin API: {len(users)} users, {enabled_user_count} enabled, 27 groups, "
+        f"and {len(profile['clients'])} "
         "exact EEMSuite OIDC/SAML clients."
     )
 

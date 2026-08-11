@@ -41,6 +41,7 @@ class PortalTests(unittest.TestCase):
             any(link.get("target") == "_blank" for link in account_links),
         )
         self.assertIn("/open-energyhippo", links_by_href)
+        self.assertIn("/configure/users", links_by_href)
         self.assertIn(
             "/realms/northlake/.well-known/openid-configuration",
             links_by_href,

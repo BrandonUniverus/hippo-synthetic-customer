@@ -29,6 +29,7 @@ from identity.configuration.settings import (
     SettingsValidationError,
     load_settings_document,
 )
+from identity.configuration.users import UserValidationError, merge_user_overlay
 
 
 DEFAULT_REALM_NAME = "northlake"
@@ -699,6 +700,7 @@ def _expected_identity_attributes(
 def build_realm(
     manifest: dict[str, Any],
     environment: dict[str, str],
+    user_overlay_path: Path | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Build the Keycloak realm and local connection profile."""
 
@@ -820,7 +822,12 @@ def build_realm(
     source_groups = _collect_groups(manifest)
     _validate_manifest(manifest, source_groups)
 
-    users = manifest["users"]
+    password = environment["SYNTHETIC_USER_PASSWORD"]
+    users = merge_user_overlay(
+        manifest["users"],
+        user_overlay_path,
+        password,
+    )
     user_groups: dict[str, list[str]] = defaultdict(list)
     user_companies: dict[str, set[str]] = defaultdict(set)
     user_profiles: dict[str, set[str]] = defaultdict(set)
@@ -854,7 +861,6 @@ def build_realm(
             }
         )
 
-    password = environment["SYNTHETIC_USER_PASSWORD"]
     keycloak_users: list[dict[str, Any]] = []
     for user in users:
         display_name = user["displayName"].strip()
@@ -886,7 +892,7 @@ def build_realm(
                 "credentials": [
                     {
                         "type": "password",
-                        "value": password,
+                        "value": user.get("_password", password),
                         "temporary": False,
                     }
                 ],
@@ -1123,6 +1129,11 @@ def build_realm(
             "manifestVersion": manifest["manifestVersion"],
             "customerScenarioId": manifest["customerScenarioId"],
         },
+        "userInventory": {
+            "total": len(users),
+            "enabled": sum(user["status"] == "active" for user in users),
+            "local": sum(user.get("_source") == "local" for user in users),
+        },
         "applicationHomeUrl": application_home_url,
         "baseUrl": base_url,
         "issuer": issuer,
@@ -1170,7 +1181,7 @@ def build_realm(
                     user_profiles,
                 ),
             },
-            "password": password,
+            "password": active_user.get("_password", password),
         },
         "admin": {
             "username": environment.get("KEYCLOAK_ADMIN", "admin"),
@@ -1221,6 +1232,7 @@ def generate(
     output_path: Path,
     connection_output_path: Path,
     settings_path: Path | None = None,
+    user_overlay_path: Path | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     environment = _load_env(env_path)
     if settings_path is not None and settings_path.is_file():
@@ -1231,6 +1243,7 @@ def generate(
         environment,
         output_path,
         connection_output_path,
+        user_overlay_path,
     )
 
 
@@ -1239,9 +1252,14 @@ def generate_from_environment(
     environment: dict[str, str],
     output_path: Path,
     connection_output_path: Path,
+    user_overlay_path: Path | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     manifest = _load_manifest(manifest_path)
-    realm, connection_profile = build_realm(manifest, environment)
+    realm, connection_profile = build_realm(
+        manifest,
+        environment,
+        user_overlay_path,
+    )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     connection_output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1263,6 +1281,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--manifest", required=True, type=Path)
     parser.add_argument("--env-file", required=True, type=Path)
     parser.add_argument("--settings-file", type=Path)
+    parser.add_argument("--users-file", type=Path)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--connection-output", required=True, type=Path)
     return parser.parse_args()
@@ -1277,8 +1296,15 @@ def main() -> int:
             args.output.resolve(),
             args.connection_output.resolve(),
             args.settings_file.resolve() if args.settings_file else None,
+            args.users_file.resolve() if args.users_file else None,
         )
-    except (OSError, RealmGenerationError, SettingsValidationError, yaml.YAMLError) as error:
+    except (
+        OSError,
+        RealmGenerationError,
+        SettingsValidationError,
+        UserValidationError,
+        yaml.YAMLError,
+    ) as error:
         print(f"[ERROR] {error}", file=sys.stderr)
         return 1
 

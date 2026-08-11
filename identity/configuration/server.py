@@ -21,6 +21,7 @@ from identity.configuration.settings import (
     load_settings_document,
     write_settings_document,
 )
+from identity.configuration.users import SyntheticUserStore, UserValidationError
 from identity.realm.generate_realm import generate_from_environment
 
 
@@ -162,6 +163,7 @@ class ConfigurationApplication:
         self.manifest_path = manifest_path
         self.field_catalog_path = field_catalog_path
         self.settings_path = runtime_directory / "configuration.json"
+        self.user_overlay_path = runtime_directory / "users.json"
         self.realm_output_path = runtime_directory / "import" / "northlake-realm.json"
         self.connection_output_path = runtime_directory / "connection.json"
         self.keycloak_client = keycloak_client
@@ -169,6 +171,11 @@ class ConfigurationApplication:
         self.last_apply_error: str | None = None
         self._apply_lock = threading.Lock()
         self.field_catalog = self._load_field_catalog()
+        self.user_store = SyntheticUserStore(
+            manifest_path,
+            self.user_overlay_path,
+            self.environment["SYNTHETIC_USER_PASSWORD"],
+        )
 
     def _load_field_catalog(self) -> dict[str, Any]:
         payload = json.loads(self.field_catalog_path.read_text(encoding="utf-8"))
@@ -204,6 +211,7 @@ class ConfigurationApplication:
                 effective_environment,
                 temporary_realm,
                 temporary_connection,
+                self.user_overlay_path,
             )
             self.realm_output_path.parent.mkdir(parents=True, exist_ok=True)
             os.replace(temporary_realm, self.realm_output_path)
@@ -330,6 +338,66 @@ class ConfigurationApplication:
                     return
             time.sleep(2)
 
+    def users(self) -> dict[str, Any]:
+        users = self.user_store.public_users()
+        return {
+            "users": users,
+            "counts": {
+                "total": len(users),
+                "enabled": sum(user["enabled"] for user in users),
+                "local": sum(user["source"] == "local" for user in users),
+            },
+        }
+
+    def _apply_user_overlay(self, user: dict[str, Any], password: str | None) -> tuple[int, dict[str, Any]]:
+        document = self._document()
+        realm = self._generate(document.settings)
+        try:
+            self.keycloak_client.replace_realm(realm, document.applied_realm_key)
+            self.keycloak_client.wait_until_healthy(document.settings)
+        except KeycloakApplyError as failure:
+            self.last_apply_error = str(failure)
+            return HTTPStatus.BAD_GATEWAY, {
+                "message": (
+                    "The synthetic-user overlay was saved, but the disposable realm could not "
+                    "be regenerated. Northlake will include it on the next ordinary start."
+                ),
+                "user": user,
+                "applied": False,
+                "applyError": self.last_apply_error,
+            }
+        self.last_apply_error = None
+        payload: dict[str, Any] = {
+            "message": "Synthetic user saved and the disposable realm was regenerated.",
+            "user": user,
+            "applied": True,
+        }
+        if password is not None:
+            payload["generatedPassword"] = password
+            payload["message"] = (
+                "Synthetic user saved. Copy the generated development password now."
+            )
+        return HTTPStatus.OK, payload
+
+    def create_user(self, values: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+        with self._apply_lock:
+            user, password = self.user_store.create(values)
+            return self._apply_user_overlay(user, password)
+
+    def update_user(
+        self,
+        synthetic_user_id: str,
+        values: dict[str, Any],
+    ) -> tuple[int, dict[str, Any]]:
+        with self._apply_lock:
+            user = self.user_store.update(synthetic_user_id, values)
+            return self._apply_user_overlay(user, None)
+
+    def reset_user_password(self, synthetic_user_id: str) -> tuple[int, dict[str, Any]]:
+        with self._apply_lock:
+            user, password = self.user_store.reset_password(synthetic_user_id)
+            return self._apply_user_overlay(user, password)
+
 
 class ConfigurationRequestHandler(BaseHTTPRequestHandler):
     application: ConfigurationApplication
@@ -361,15 +429,21 @@ class ConfigurationRequestHandler(BaseHTTPRequestHandler):
                 self._static("index.html", "text/html; charset=utf-8")
             elif path == "/configure/app.js":
                 self._static("app.js", "text/javascript; charset=utf-8")
+            elif path == "/configure/users":
+                self._static("users.html", "text/html; charset=utf-8")
+            elif path == "/configure/users.js":
+                self._static("users.js", "text/javascript; charset=utf-8")
             elif path == "/configure/styles.css":
                 self._static("styles.css", "text/css; charset=utf-8")
             elif path == "/configure/api/state":
                 self._json(HTTPStatus.OK, self.application.state())
+            elif path == "/configure/api/users":
+                self._json(HTTPStatus.OK, self.application.users())
             elif path == "/configure/health":
                 self._json(HTTPStatus.OK, {"status": "ok"})
             else:
                 self._json(HTTPStatus.NOT_FOUND, {"message": "Not found."})
-        except (OSError, SettingsValidationError, RuntimeError) as failure:
+        except (OSError, SettingsValidationError, UserValidationError, RuntimeError) as failure:
             self._json(
                 HTTPStatus.INTERNAL_SERVER_ERROR,
                 {"message": "Configuration service state is unavailable.", "detail": str(failure)},
@@ -389,6 +463,53 @@ class ConfigurationRequestHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         path = parse.urlparse(self.path).path
+        if path == "/configure/api/users/create":
+            try:
+                status, payload = self.application.create_user(self._request_values())
+                self._json(status, payload)
+            except UserValidationError as failure:
+                self._json(
+                    HTTPStatus.BAD_REQUEST,
+                    {"message": "Check the highlighted synthetic-user values.", "errors": failure.errors},
+                )
+            except (OSError, ValueError, RuntimeError) as failure:
+                self._json(
+                    HTTPStatus.INTERNAL_SERVER_ERROR,
+                    {"message": "The synthetic-user operation failed.", "detail": str(failure)},
+                )
+            return
+        user_route_prefix = "/configure/api/users/"
+        if path.startswith(user_route_prefix) and (
+            path.endswith("/update") or path.endswith("/reset-password")
+        ):
+            suffix = "/update" if path.endswith("/update") else "/reset-password"
+            encoded_user_id = path[len(user_route_prefix) : -len(suffix)]
+            synthetic_user_id = parse.unquote(encoded_user_id)
+            if not synthetic_user_id or "/" in synthetic_user_id:
+                self._json(HTTPStatus.NOT_FOUND, {"message": "Synthetic user not found."})
+                return
+            try:
+                if suffix == "/update":
+                    status, payload = self.application.update_user(
+                        synthetic_user_id,
+                        self._request_values(),
+                    )
+                else:
+                    status, payload = self.application.reset_user_password(
+                        synthetic_user_id
+                    )
+                self._json(status, payload)
+            except UserValidationError as failure:
+                self._json(
+                    HTTPStatus.BAD_REQUEST,
+                    {"message": "Check the highlighted synthetic-user values.", "errors": failure.errors},
+                )
+            except (OSError, ValueError, RuntimeError) as failure:
+                self._json(
+                    HTTPStatus.INTERNAL_SERVER_ERROR,
+                    {"message": "The synthetic-user operation failed.", "detail": str(failure)},
+                )
+            return
         if path not in {
             "/configure/api/preview",
             "/configure/api/save",

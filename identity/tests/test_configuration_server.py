@@ -90,6 +90,7 @@ class ConfigurationServerTests(unittest.TestCase):
         self,
         path: str,
         values: dict | None = None,
+        method: str | None = None,
     ) -> tuple[int, dict]:
         body = (
             json.dumps({"values": values}).encode("utf-8")
@@ -99,7 +100,7 @@ class ConfigurationServerTests(unittest.TestCase):
         http_request = request.Request(
             f"{self.base_url}{path}",
             data=body,
-            method="POST" if body is not None else "GET",
+            method=method or ("POST" if body is not None else "GET"),
             headers={"Content-Type": "application/json"},
         )
         try:
@@ -119,6 +120,81 @@ class ConfigurationServerTests(unittest.TestCase):
         serialized = json.dumps(state)
         self.assertNotIn(self.environment["KEYCLOAK_ADMIN_PASSWORD"], serialized)
         self.assertNotIn(self.environment["EEMSUITE_OIDC_CLIENT_SECRET"], serialized)
+
+    def test_user_form_lists_base_users_without_authentication_or_secrets(self) -> None:
+        with request.urlopen(f"{self.base_url}/configure/users", timeout=10) as response:
+            document = response.read().decode("utf-8")
+        status, payload = self._json_request("/configure/api/users")
+
+        self.assertEqual(200, status)
+        self.assertIn("Shape fictional identities", document)
+        self.assertEqual({"total": 19, "enabled": 18, "local": 0}, payload["counts"])
+        serialized = json.dumps(payload)
+        self.assertNotIn(self.environment["SYNTHETIC_USER_PASSWORD"], serialized)
+        self.assertNotIn("generatedPassword", serialized)
+
+    def test_create_disable_reenable_and_reset_password_regenerates_the_realm(self) -> None:
+        values = {
+            "username": "alex.rivera",
+            "firstName": "Alex",
+            "lastName": "Rivera",
+            "email": "alex.rivera@northlake.example.edu",
+            "enabled": True,
+            "title": "Synthetic Integration Tester",
+        }
+
+        create_status, created = self._json_request(
+            "/configure/api/users/create",
+            values,
+        )
+        user_id = created["user"]["syntheticUserId"]
+        disable_status, disabled = self._json_request(
+            f"/configure/api/users/{user_id}/update",
+            {**values, "enabled": False},
+        )
+        enable_status, enabled = self._json_request(
+            f"/configure/api/users/{user_id}/update",
+            values,
+        )
+        reset_status, reset = self._json_request(
+            f"/configure/api/users/{user_id}/reset-password",
+            method="POST",
+        )
+        list_status, listed = self._json_request("/configure/api/users")
+
+        self.assertEqual(200, create_status)
+        self.assertEqual(28, len(created["generatedPassword"]))
+        self.assertEqual(200, disable_status)
+        self.assertFalse(disabled["user"]["enabled"])
+        self.assertEqual(200, enable_status)
+        self.assertTrue(enabled["user"]["enabled"])
+        self.assertEqual(200, reset_status)
+        self.assertNotEqual(created["generatedPassword"], reset["generatedPassword"])
+        self.assertEqual(200, list_status)
+        self.assertEqual(20, listed["counts"]["total"])
+        self.assertEqual(1, listed["counts"]["local"])
+        self.assertNotIn("generatedPassword", json.dumps(listed))
+        self.assertEqual(4, len(self.keycloak.replacements))
+        self.assertTrue(self.application.user_overlay_path.is_file())
+
+    def test_invalid_user_fails_before_overlay_or_realm_mutation(self) -> None:
+        status, payload = self._json_request(
+            "/configure/api/users/create",
+            {
+                "username": "alex.rivera",
+                "firstName": "Alex",
+                "lastName": "Rivera",
+                "email": "alex@real-company.org",
+                "enabled": True,
+                "title": "Synthetic Integration Tester",
+                "password": "must-not-be-accepted",
+            },
+        )
+
+        self.assertEqual(400, status)
+        self.assertIn("_form", payload["errors"])
+        self.assertFalse(self.application.user_overlay_path.exists())
+        self.assertEqual([], self.keycloak.replacements)
 
     def test_invalid_apply_fails_before_writing_or_mutating_keycloak(self) -> None:
         values = ProviderSettings.from_environment(self.environment).to_values()
