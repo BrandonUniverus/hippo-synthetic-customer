@@ -157,6 +157,74 @@ class KeycloakAdminClient:
             expected_statuses=(HTTPStatus.CREATED,),
         )
 
+    def impersonate(self, realm_key: str, username: str) -> list[str]:
+        if not realm_key or realm_key == "master" or "/" in realm_key:
+            raise KeycloakApplyError("Browser-session realm key is unsafe.")
+        if not username or len(username) > 254 or any(ord(character) < 32 for character in username):
+            raise KeycloakApplyError("Browser-session username is unsafe.")
+        token = self._token()
+        escaped_realm = parse.quote(realm_key, safe="")
+        query = parse.urlencode({"username": username, "exact": "true"})
+        users_request = request.Request(
+            f"{self.base_url}/admin/realms/{escaped_realm}/users?{query}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        try:
+            with request.urlopen(users_request, timeout=20) as response:
+                users = json.load(response)
+        except (
+            error.HTTPError,
+            error.URLError,
+            TimeoutError,
+            json.JSONDecodeError,
+        ) as failure:
+            raise KeycloakApplyError("Keycloak browser-session user lookup failed.") from failure
+        matches = [
+            user
+            for user in users
+            if isinstance(user, dict) and user.get("username") == username
+        ] if isinstance(users, list) else []
+        if len(matches) != 1 or not isinstance(matches[0].get("id"), str):
+            raise KeycloakApplyError("Keycloak browser-session user lookup was not exact.")
+        user_id = parse.quote(matches[0]["id"], safe="")
+        impersonation_request = request.Request(
+            f"{self.base_url}/admin/realms/{escaped_realm}/users/{user_id}/impersonation",
+            data=b"",
+            method="POST",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        try:
+            with request.urlopen(impersonation_request, timeout=20) as response:
+                payload = json.load(response)
+                cookies = response.headers.get_all("Set-Cookie") or []
+        except (
+            error.HTTPError,
+            error.URLError,
+            TimeoutError,
+            json.JSONDecodeError,
+        ) as failure:
+            raise KeycloakApplyError("Keycloak browser-session bootstrap failed.") from failure
+        if not isinstance(payload, dict) or not isinstance(payload.get("redirect"), str):
+            raise KeycloakApplyError("Keycloak returned no browser-session redirect.")
+        expected_path = f"Path=/realms/{realm_key}/"
+        safe_cookies: list[str] = []
+        for cookie in cookies:
+            name = cookie.partition("=")[0]
+            if (
+                name not in {"KEYCLOAK_IDENTITY", "KEYCLOAK_SESSION"}
+                or expected_path not in cookie
+                or "\r" in cookie
+                or "\n" in cookie
+            ):
+                raise KeycloakApplyError("Keycloak returned an unsafe browser-session cookie.")
+            safe_cookies.append(cookie if "; Secure" in cookie else f"{cookie}; Secure")
+        if {cookie.partition("=")[0] for cookie in safe_cookies} != {
+            "KEYCLOAK_IDENTITY",
+            "KEYCLOAK_SESSION",
+        }:
+            raise KeycloakApplyError("Keycloak returned an incomplete browser session.")
+        return safe_cookies
+
     def wait_until_healthy(
         self,
         settings: ProviderSettings,
@@ -850,6 +918,41 @@ class ConfigurationApplication:
         os.replace(temporary_path, self.scenario_verification_path)
         return result
 
+    def bootstrap_browser_session(
+        self,
+        slot: str,
+        cookie_mode: str,
+    ) -> tuple[str, list[str]]:
+        if slot not in SCENARIO_SLOTS:
+            raise ScenarioValidationError({"_form": "Select labA or labB."})
+        if cookie_mode not in {"Lax", "None"}:
+            raise ScenarioValidationError({"_form": "Cookie mode must be Lax or None."})
+        document = self._scenario_document()
+        connection_path = scenario_connection_path(self.scenario_connection_directory, slot)
+        if not connection_path.is_file():
+            raise RuntimeError("Apply the selected lab realm before bootstrapping its browser session.")
+        connection = json.loads(connection_path.read_text(encoding="utf-8"))
+        realm_key = connection.get("realm")
+        username = connection.get("testUsers", {}).get("active", {}).get("username")
+        customer_base_url = connection.get("customerSite", {}).get("publicBaseUrl")
+        if (
+            not isinstance(realm_key, str)
+            or document.applied_realm_keys.get(slot) != realm_key
+            or not isinstance(username, str)
+            or not isinstance(customer_base_url, str)
+        ):
+            raise RuntimeError("The selected browser-session realm is not currently applied.")
+        cookies = self.keycloak_client.impersonate(realm_key, username)
+        redirect = f"{customer_base_url}/customer/login?" + parse.urlencode(
+            {
+                "slot": slot,
+                "returnTo": "/customer/",
+                "login_hint": username,
+                "cookieMode": cookie_mode,
+            }
+        )
+        return redirect, cookies
+
     def apply_scenarios(
         self,
         values: dict[str, Any],
@@ -1197,6 +1300,35 @@ class ConfigurationRequestHandler(BaseHTTPRequestHandler):
         self._headers(HTTPStatus.OK, content_type, len(body))
         self.wfile.write(body)
 
+    def _redirect(self, location: str, cookies: list[str] | None = None) -> None:
+        self.send_response(HTTPStatus.SEE_OTHER)
+        self.send_header("Location", location)
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Content-Length", "0")
+        for cookie in cookies or []:
+            self.send_header("Set-Cookie", cookie)
+        self.end_headers()
+
+    def _browser_session_page(self, slot: str, cookie_mode: str) -> None:
+        if slot not in SCENARIO_SLOTS or cookie_mode not in {"Lax", "None"}:
+            self._json(HTTPStatus.BAD_REQUEST, {"message": "Invalid browser-session bootstrap."})
+            return
+        action = f"/configure/api/scenarios/browser-session/{slot}?" + parse.urlencode(
+            {"cookieMode": cookie_mode}
+        )
+        body = f"""<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<title>Northlake browser-session bootstrap</title><link rel="stylesheet" href="/configure/styles.css"></head>
+<body><main class="shell"><section class="hero"><p class="eyebrow">PHASE 7 · LOCAL LAB ONLY</p>
+<h1>Start a synthetic provider session</h1><p>This uses Keycloak administrator impersonation for
+<strong>{slot}</strong>, then immediately starts the real customer OIDC code + PKCE flow. It avoids
+reading or exposing the generated password and is not counted as password-authentication evidence.</p>
+<form method="post" action="{action}"><button class="primary-button" type="submit">Continue to customer OIDC</button></form>
+<p><a href="https://customer.localtest.me:8443/customer/">Cancel and return to the customer lab</a></p>
+</section></main></body></html>""".encode("utf-8")
+        self._headers(HTTPStatus.OK, "text/html; charset=utf-8", len(body))
+        self.wfile.write(body)
+
     def do_GET(self) -> None:
         path = parse.urlparse(self.path).path
         try:
@@ -1224,6 +1356,10 @@ class ConfigurationRequestHandler(BaseHTTPRequestHandler):
                 self._static("scenarios.html", "text/html; charset=utf-8")
             elif path == "/configure/scenarios.js":
                 self._static("scenarios.js", "text/javascript; charset=utf-8")
+            elif path.startswith("/configure/browser-session/"):
+                slot = path.rsplit("/", 1)[-1]
+                query = parse.parse_qs(parse.urlparse(self.path).query)
+                self._browser_session_page(slot, query.get("cookieMode", ["Lax"])[0])
             elif path == "/configure/styles.css":
                 self._static("styles.css", "text/css; charset=utf-8")
             elif path == "/configure/api/state":
@@ -1278,6 +1414,27 @@ class ConfigurationRequestHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         path = parse.urlparse(self.path).path
+        browser_session_prefix = "/configure/api/scenarios/browser-session/"
+        if path.startswith(browser_session_prefix):
+            slot = path[len(browser_session_prefix) :]
+            query = parse.parse_qs(parse.urlparse(self.path).query)
+            try:
+                location, cookies = self.application.bootstrap_browser_session(
+                    slot,
+                    query.get("cookieMode", ["Lax"])[0],
+                )
+                self._redirect(location, cookies)
+            except ScenarioValidationError as failure:
+                self._json(
+                    HTTPStatus.BAD_REQUEST,
+                    {"message": "Invalid browser-session bootstrap.", "errors": failure.errors},
+                )
+            except (OSError, ValueError, RuntimeError) as failure:
+                self._json(
+                    HTTPStatus.INTERNAL_SERVER_ERROR,
+                    {"message": "Browser-session bootstrap failed.", "detail": str(failure)},
+                )
+            return
         oidc_routes = {
             "/configure/api/oidc/preview",
             "/configure/api/oidc/save",

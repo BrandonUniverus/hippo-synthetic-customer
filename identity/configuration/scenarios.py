@@ -455,6 +455,7 @@ class ScenarioSettings:
                 "NORTHLAKE_PROVIDER_DISPLAY_NAME": realm.display_name,
                 "NORTHLAKE_ENABLE_OIDC": "true",
                 "NORTHLAKE_ENABLE_SAML": "true",
+                "NORTHLAKE_CUSTOMER_SITE_ENABLED": "true",
                 "EEMSUITE_APPLICATION_HOME_URL": self.application_home_url,
                 "NORTHLAKE_OIDC_PROVIDER_KEY": realm.oidc_provider_key,
                 "NORTHLAKE_OIDC_CONFIGURATION_MODE": realm.oidc_configuration_mode,

@@ -5,16 +5,6 @@ param(
 
 . (Join-Path $PSScriptRoot "Identity.Common.ps1")
 
-if ((Test-Path -LiteralPath $script:IdentityEnvironmentFile -PathType Leaf) -and -not $Force) {
-    Write-Host "[OK] Identity environment already exists: $script:IdentityEnvironmentFile"
-    Write-Host "Use -Force to replace all local identity secrets."
-    return
-}
-
-if (-not $PSCmdlet.ShouldProcess($script:IdentityEnvironmentFile, "Generate local identity secrets")) {
-    return
-}
-
 function New-IdentitySecret {
     param(
         [int] $ByteCount = 32,
@@ -28,6 +18,37 @@ function New-IdentitySecret {
         return "A1!$token"
     }
     return $token
+}
+
+if ((Test-Path -LiteralPath $script:IdentityEnvironmentFile -PathType Leaf) -and -not $Force) {
+    $existingKeys = @{}
+    foreach ($rawLine in Get-Content -LiteralPath $script:IdentityEnvironmentFile) {
+        $line = $rawLine.Trim()
+        if (-not $line -or $line.StartsWith("#", [System.StringComparison]::Ordinal) -or -not $line.Contains("=")) {
+            continue
+        }
+        $existingKeys[$line.Split("=", 2)[0].Trim()] = $true
+    }
+    if (-not $existingKeys.ContainsKey("NORTHLAKE_CUSTOMER_CLIENT_SECRET")) {
+        if (-not $PSCmdlet.ShouldProcess($script:IdentityEnvironmentFile, "Add the Phase 7 synthetic customer client secret")) {
+            return
+        }
+        Add-Content -LiteralPath $script:IdentityEnvironmentFile -Encoding utf8NoBOM -Value @(
+            "",
+            "# Separate confidential client used only by the synthetic customer website.",
+            "NORTHLAKE_CUSTOMER_CLIENT_SECRET=$(New-IdentitySecret)"
+        )
+        Write-Host "[OK] Added the Phase 7 synthetic customer client secret."
+    }
+    else {
+        Write-Host "[OK] Identity environment already exists: $script:IdentityEnvironmentFile"
+    }
+    Write-Host "Use -Force to replace all local identity secrets."
+    return
+}
+
+if (-not $PSCmdlet.ShouldProcess($script:IdentityEnvironmentFile, "Generate local identity secrets")) {
+    return
 }
 
 $lines = @(
@@ -47,6 +68,7 @@ $lines = @(
     "",
     "EEMSUITE_OIDC_CLIENT_SECRET=$(New-IdentitySecret)",
     "EEMSUITE_OIDC_LEGACY_CLIENT_SECRET=$(New-IdentitySecret)",
+    "NORTHLAKE_CUSTOMER_CLIENT_SECRET=$(New-IdentitySecret)",
     "SYNTHETIC_USER_PASSWORD=$(New-IdentitySecret -AsPassword)",
     "",
     "EEMSUITE_APPLICATION_HOME_URL=https://localdev.energyhippo.com/Hippo/",

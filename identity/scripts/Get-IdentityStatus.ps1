@@ -62,6 +62,7 @@ if (Test-Path -LiteralPath $script:IdentityScenarioSettings -PathType Leaf) {
     Write-Host "Lab A issuer:     $($profile.baseUrl)/realms/$($scenarioState.values.realms.labA.realmKey)"
     Write-Host "Lab B issuer:     $($profile.baseUrl)/realms/$($scenarioState.values.realms.labB.realmKey)"
     Write-Host "Subject mode:     $(if ($scenarioState.values.sharedExternalSubject) { 'equal subject, distinct issuer' } else { 'distinct subject, distinct issuer' })"
+    Write-Host "Customer RP:      $($environment.NORTHLAKE_CUSTOMER_PUBLIC_BASE_URL.TrimEnd('/'))/customer/"
 }
 
 if ($ShowSecrets) {

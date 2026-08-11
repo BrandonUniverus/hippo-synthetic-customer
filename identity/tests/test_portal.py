@@ -43,6 +43,7 @@ class PortalTests(unittest.TestCase):
         self.assertIn("/open-energyhippo", links_by_href)
         self.assertIn("/configure/users", links_by_href)
         self.assertIn("/configure/groups", links_by_href)
+        self.assertIn("https://customer.localtest.me:8443/customer/", links_by_href)
         self.assertIn(
             "/realms/northlake/.well-known/openid-configuration",
             links_by_href,
@@ -97,6 +98,8 @@ class PortalTests(unittest.TestCase):
         self.assertIn("@configuration path /configure /configure/*", caddyfile)
         self.assertIn("reverse_proxy configuration:8081", caddyfile)
         self.assertIn("configuration:", compose)
+        self.assertIn("customer-site:", compose)
+        self.assertIn("reverse_proxy customer-site:8082", caddyfile)
         self.assertIn('href="/configure"', (IDENTITY_ROOT / "portal" / "index.html").read_text(encoding="utf-8"))
 
 

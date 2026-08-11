@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Northlake Customer · Identity Browser Lab</title>
+  <link rel="stylesheet" href="/customer/styles.css">
+</head>
+<body>
+  <header class="masthead">
+    <div>
+      <p class="eyebrow">NORTHLAKE SYNTHETIC CUSTOMER</p>
+      <h1>Identity browser lab</h1>
+      <p class="lede">A separate OIDC relying party for real session, consent, prompt, deep-link, and logout evidence.</p>
+    </div>
+    <a class="provider-link" href="https://localhost:8443/configure/scenarios">Provider configuration</a>
+  </header>
+
+  <main>
+    <section id="banner" class="banner" aria-live="polite">Loading lab state…</section>
+
+    <section class="panel session-panel">
+      <div>
+        <p class="section-label">CURRENT RP SESSION</p>
+        <h2 id="session-title">No customer session</h2>
+        <p id="session-detail">Sign in through either disposable realm to begin.</p>
+      </div>
+      <div id="session-actions" class="actions"></div>
+    </section>
+
+    <section>
+      <div class="section-heading">
+        <div>
+          <p class="section-label">TWO REALMS · TWO CLIENTS EACH</p>
+          <h2>Browser scenarios</h2>
+        </div>
+        <p>Primary login has no consent prompt. The second client requires consent so cross-client reuse can be observed independently.</p>
+      </div>
+      <div id="realm-grid" class="realm-grid"></div>
+    </section>
+
+    <section class="grid-two">
+      <article class="panel">
+        <p class="section-label">SAFE RETURN</p>
+        <h2>Deep-link round trip</h2>
+        <p>The RP stores only a same-origin <code>/customer/…</code> path. Absolute, scheme-relative, fragmented, or malformed destinations fall back to the lab home.</p>
+        <a class="button secondary" href="/customer/deep-link/reports/monthly?view=variance">Open protected report deep link</a>
+      </article>
+      <article class="panel warning-panel">
+        <p class="section-label">HONEST BOUNDARY</p>
+        <h2>What this does not claim</h2>
+        <p>This lab does not claim OIDC Session Management, Back-Channel Logout, embedded Keycloak login, or a new SAML SP. Installed EnergyHippo browser evidence remains separate.</p>
+      </article>
+    </section>
+
+    <section class="panel evidence-panel">
+      <div class="section-heading compact">
+        <div>
+          <p class="section-label">REDACTED RUNTIME EVIDENCE</p>
+          <h2>Recent events</h2>
+        </div>
+        <form method="post" action="/customer/evidence/clear"><button class="button quiet" type="submit">Clear evidence</button></form>
+      </div>
+      <div id="silent-result" class="silent-result" aria-live="polite"></div>
+      <div id="evidence" class="evidence-list"></div>
+      <iframe id="silent-frame" title="Silent OIDC check" hidden></iframe>
+    </section>
+  </main>
+
+  <footer>Northlake is fictional. This localhost-only site stores no browser-visible tokens or client secrets.</footer>
+  <script src="/customer/app.js" defer></script>
+</body>
+</html>

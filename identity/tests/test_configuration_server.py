@@ -9,6 +9,7 @@ from pathlib import Path
 from urllib import error, request
 
 from identity.configuration.server import ConfigurationApplication, create_server
+from identity.configuration.scenarios import ScenarioValidationError
 from identity.tests.test_configuration_saml import create_public_certificate
 from identity.configuration.settings import ProviderSettings
 
@@ -20,12 +21,20 @@ class FakeKeycloakAdminClient:
     def __init__(self) -> None:
         self.replacements: list[tuple[str, str | None]] = []
         self.health_checks: list[str] = []
+        self.impersonations: list[tuple[str, str]] = []
 
     def replace_realm(self, realm: dict, previous_realm_key: str | None) -> None:
         self.replacements.append((realm["realm"], previous_realm_key))
 
     def wait_until_healthy(self, settings: ProviderSettings) -> None:
         self.health_checks.append(settings.realm_key)
+
+    def impersonate(self, realm_key: str, username: str) -> list[str]:
+        self.impersonations.append((realm_key, username))
+        return [
+            f"KEYCLOAK_IDENTITY=test; Path=/realms/{realm_key}/; HttpOnly; SameSite=Lax; Secure",
+            f"KEYCLOAK_SESSION=test; Path=/realms/{realm_key}/; SameSite=Lax; Secure",
+        ]
 
 
 class ConfigurationServerTests(unittest.TestCase):
@@ -41,6 +50,7 @@ class ConfigurationServerTests(unittest.TestCase):
             "KEYCLOAK_DB_PASSWORD": "database-secret-value-123",
             "EEMSUITE_OIDC_CLIENT_SECRET": "modern-secret-value-123",
             "EEMSUITE_OIDC_LEGACY_CLIENT_SECRET": "legacy-secret-value-123",
+            "NORTHLAKE_CUSTOMER_CLIENT_SECRET": "customer-secret-value-123",
             "SYNTHETIC_USER_PASSWORD": "A1!synthetic-user-password",
             "EEMSUITE_APPLICATION_HOME_URL": "https://localdev.energyhippo.com/Hippo/",
             "EEMSUITE_OIDC_REDIRECT_URIS": "https://localhost:7310/signin-oidc",
@@ -394,6 +404,40 @@ class ConfigurationServerTests(unittest.TestCase):
             self.keycloak.replacements[-1],
         )
         self.assertEqual(2, len(self.scenario_verifier_calls))
+
+    def test_browser_session_bootstrap_is_explicit_bounded_and_password_free(self) -> None:
+        with request.urlopen(
+            f"{self.base_url}/configure/browser-session/labA?cookieMode=Lax",
+            timeout=10,
+        ) as response:
+            document = response.read().decode("utf-8")
+        self.assertIn("Keycloak administrator impersonation", document)
+        self.assertIn("not counted as password-authentication evidence", document)
+        self.assertNotIn(self.environment["SYNTHETIC_USER_PASSWORD"], document)
+
+        _, state = self._json_request("/configure/api/scenarios")
+        apply_status, _ = self._json_request(
+            "/configure/api/scenarios/apply",
+            state["values"],
+        )
+        self.assertEqual(200, apply_status)
+
+        location, cookies = self.application.bootstrap_browser_session("labA", "None")
+        self.assertEqual(
+            [("northlake-lab-a", "samantha.ireland")],
+            self.keycloak.impersonations,
+        )
+        self.assertTrue(location.startswith("https://customer.localtest.me:8443/customer/login?"))
+        self.assertIn("cookieMode=None", location)
+        self.assertEqual({"KEYCLOAK_IDENTITY", "KEYCLOAK_SESSION"}, {
+            cookie.partition("=")[0] for cookie in cookies
+        })
+        self.assertTrue(all("Secure" in cookie for cookie in cookies))
+
+        with self.assertRaises(ScenarioValidationError):
+            self.application.bootstrap_browser_session("labC", "None")
+        with self.assertRaises(ScenarioValidationError):
+            self.application.bootstrap_browser_session("labA", "Strict")
 
     def test_scenario_rejects_arbitrary_keycloak_json_before_realm_mutation(self) -> None:
         _, state = self._json_request("/configure/api/scenarios")

@@ -54,6 +54,10 @@ Identity Provider (IdP).
   `northlake` realm. Named scenarios vary issuer/subject relationships, bounded
   claim shape, OIDC discovery/PAR settings, and exact provider-specific SAML
   registrations without accepting arbitrary Keycloak JSON.
+- A separate synthetic customer website at `https://customer.localtest.me:8443/customer/`
+  with a confidential code + PKCE client and a second consent-gated probe client
+  in each disposable realm. Its different hostname creates a real cross-site
+  boundary for browser session, silent-auth, and Front-Channel Logout evidence.
 
 The built-in Keycloak administration console is the initial admin page. This
 repository does not reimplement passwords, sessions, consent, or user storage.
@@ -100,6 +104,7 @@ Then open:
 - OIDC profile configuration: `https://localhost:8443/configure/oidc`
 - SAML profile configuration: `https://localhost:8443/configure/saml`
 - Concurrent provider scenarios: `https://localhost:8443/configure/scenarios`
+- Synthetic customer browser lab: `https://customer.localtest.me:8443/customer/`
 - Account/login: `https://localhost:8443/realms/northlake/account/`
 - Realm admin: `https://localhost:8443/admin/northlake/console/`
 - OIDC discovery: `https://localhost:8443/realms/northlake/.well-known/openid-configuration`
@@ -294,6 +299,57 @@ This is provider-side evidence only. Selecting both providers in a running
 EnergyHippo instance and proving that equal external subjects remain isolated is
 an explicit installed-EnergyHippo proof gap; Northlake does not write or seed
 EnergyHippo configuration or database rows.
+
+## Customer browser and session lab
+
+`https://customer.localtest.me:8443/customer/` is the Phase 7 synthetic relying
+party. It is a separate service and origin from Keycloak and EnergyHippo. Each
+disposable lab realm receives two exact confidential OIDC registrations:
+
+- `northlake-customer-{realm}` uses authorization code, PKCE S256, and no
+  provider consent prompt;
+- `northlake-probe-{realm}` uses the same secure flow but requires consent, so
+  a tester can distinguish provider SSO reuse from client-specific consent.
+
+The page exercises normal login with `login_hint`, top-level `prompt=none`, an
+iframe `prompt=none` check, `max_age=0`, local logout, RP-initiated logout,
+provider administrator session termination, and a bounded deep-link return. It
+can issue the local RP cookie as either `SameSite=Lax` or `SameSite=None`.
+When a fresh disposable realm has no browser session and no password is saved,
+the page also links to an explicit localhost confirmation page that uses
+Keycloak administrator impersonation to establish only the synthetic provider
+session before starting the normal OIDC flow. This never exposes the generated
+password and is recorded as test setup, not password-authentication evidence.
+Because Keycloak is `localhost` and the RP is `customer.localtest.me` (which
+resolves to `127.0.0.1`), a real
+Front-Channel Logout iframe can arrive while a Lax RP cookie is unavailable;
+the endpoint records that as delivery without session state instead of claiming
+logout succeeded. The None profile permits a second run where the endpoint can
+bind `iss` plus `sid` and clear the RP session.
+
+Provider-initiated administrator termination is intentionally classified
+separately: Keycloak ends the provider session while the local RP session
+remains until the RP checks upstream state or logs out. It is not reported as a
+Front-Channel Logout or Back-Channel Logout success.
+
+All OIDC state, nonce, PKCE verifier, authorization code, ID token, and client
+secret handling remains server-side. The browser state API and ignored
+`identity/.runtime/browser-evidence.json` contain only redacted outcomes. Safe
+return paths must remain beneath `/customer/`; external and malformed values
+fall back to the customer home page.
+
+Run the password-free provider-side contract check with:
+
+```powershell
+pwsh .\identity\scripts\Test-IdentityBrowserLab.ps1
+```
+
+Then use the real browser page for the interactive matrix. A SAML SP was not
+added because the Phase 5 verifier and installed EnergyHippo SP already own the
+SAML browser evidence; duplicating it here would not prove a new Phase 7
+property. OIDC Session Management, Back-Channel Logout, embedded Keycloak login,
+and installed-EnergyHippo session behavior remain explicit non-claims or proof
+gaps.
 
 ## Northlake SSO launchpad
 

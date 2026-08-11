@@ -68,6 +68,8 @@ services:
       KEYCLOAK_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?Run Initialize-Identity.ps1 first}
       EEMSUITE_OIDC_CLIENT_SECRET: ${EEMSUITE_OIDC_CLIENT_SECRET:?Run Initialize-Identity.ps1 first}
       EEMSUITE_OIDC_LEGACY_CLIENT_SECRET: ${EEMSUITE_OIDC_LEGACY_CLIENT_SECRET:?Run Initialize-Identity.ps1 first}
+      NORTHLAKE_CUSTOMER_CLIENT_SECRET: ${NORTHLAKE_CUSTOMER_CLIENT_SECRET:?Run Initialize-Identity.ps1 first}
+      NORTHLAKE_CUSTOMER_PUBLIC_BASE_URL: ${NORTHLAKE_CUSTOMER_PUBLIC_BASE_URL:-https://customer.localtest.me:8443}
       SYNTHETIC_USER_PASSWORD: ${SYNTHETIC_USER_PASSWORD:?Run Initialize-Identity.ps1 first}
       EEMSUITE_APPLICATION_HOME_URL: ${EEMSUITE_APPLICATION_HOME_URL:-https://localdev.energyhippo.com/Hippo/}
       EEMSUITE_OIDC_REDIRECT_URIS: ${EEMSUITE_OIDC_REDIRECT_URIS:-https://localhost:7310/signin-oidc}
@@ -97,11 +99,46 @@ services:
     networks:
       - identity-backend
 
+  customer-site:
+    image: hippo-synthetic-identity-customer:local
+    build:
+      context: ..
+      dockerfile: identity/customer/Dockerfile
+    restart: unless-stopped
+    environment:
+      NORTHLAKE_RUNTIME_DIRECTORY: /runtime
+      NORTHLAKE_KEYCLOAK_INTERNAL_URL: http://keycloak:8080
+      IDENTITY_PUBLIC_BASE_URL: ${IDENTITY_PUBLIC_BASE_URL:-https://localhost:8443}
+      NORTHLAKE_CUSTOMER_PUBLIC_BASE_URL: ${NORTHLAKE_CUSTOMER_PUBLIC_BASE_URL:-https://customer.localtest.me:8443}
+      NORTHLAKE_CUSTOMER_CLIENT_SECRET: ${NORTHLAKE_CUSTOMER_CLIENT_SECRET:?Run Initialize-Identity.ps1 first}
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:?Run Initialize-Identity.ps1 first}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?Run Initialize-Identity.ps1 first}
+    depends_on:
+      keycloak:
+        condition: service_started
+      configuration:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8082/customer/health', timeout=3)"
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+    volumes:
+      - ./.runtime:/runtime
+    networks:
+      - identity-backend
+
   caddy:
     image: caddy:2.11.4-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
     restart: unless-stopped
     environment:
       IDENTITY_HOST: ${IDENTITY_HOST:-localhost}
+      NORTHLAKE_CUSTOMER_HOST: ${NORTHLAKE_CUSTOMER_HOST:-customer.localtest.me}
       EEMSUITE_APPLICATION_HOME_URL: ${EEMSUITE_APPLICATION_HOME_URL:-https://localdev.energyhippo.com/Hippo/}
     ports:
       - "${IDENTITY_BIND_ADDRESS:-127.0.0.1}:${IDENTITY_HTTPS_PORT:-8443}:8443"
@@ -109,6 +146,8 @@ services:
       keycloak:
         condition: service_started
       configuration:
+        condition: service_healthy
+      customer-site:
         condition: service_healthy
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro

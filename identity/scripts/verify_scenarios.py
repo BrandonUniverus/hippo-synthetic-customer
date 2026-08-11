@@ -129,9 +129,38 @@ def _verify_admin_shape(profile: dict[str, Any], context: ssl.SSLContext) -> Non
         raise identity_verifier.VerificationError(
             f"{profile['realm']} SAML claim shape drifted."
         )
+    customer_site = profile.get("customerSite")
+    if not isinstance(customer_site, dict) or set(customer_site.get("clients", {})) != {
+        "customer",
+        "probe",
+    }:
+        raise identity_verifier.VerificationError(
+            f"{profile['realm']} omitted the Phase 7 customer clients."
+        )
+    for kind, expected in customer_site["clients"].items():
+        actual = clients_by_id.get(expected["clientId"])
+        attributes = actual.get("attributes", {}) if actual else {}
+        if (
+            actual is None
+            or actual.get("protocol") != "openid-connect"
+            or actual.get("implicitFlowEnabled")
+            or not actual.get("standardFlowEnabled")
+            or actual.get("directAccessGrantsEnabled")
+            or not actual.get("frontchannelLogout")
+            or actual.get("consentRequired") != expected["consentRequired"]
+            or actual.get("redirectUris") != [expected["redirectUri"]]
+            or attributes.get("pkce.code.challenge.method") != "S256"
+            or attributes.get("frontchannel.logout.url")
+            != expected["frontChannelLogoutUri"]
+            or attributes.get("frontchannel.logout.session.required") != "true"
+            or attributes.get("backchannel.logout.session.required") != "false"
+        ):
+            raise identity_verifier.VerificationError(
+                f"{profile['realm']} synthetic {kind} RP client drifted."
+            )
     print(
-        f"[OK] {profile['realm']} installed one bounded Modern OIDC and one Standard SAML "
-        "registration with the selected claim shape."
+        f"[OK] {profile['realm']} installed the bounded EEM OIDC/SAML registrations plus "
+        "two isolated synthetic customer clients with exact callbacks."
     )
 
 

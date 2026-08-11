@@ -35,6 +35,7 @@ class ScenarioSettingsTests(unittest.TestCase):
             "KEYCLOAK_DB_PASSWORD": "database-secret-value-123",
             "EEMSUITE_OIDC_CLIENT_SECRET": "modern-secret-value-123",
             "EEMSUITE_OIDC_LEGACY_CLIENT_SECRET": "legacy-secret-value-123",
+            "NORTHLAKE_CUSTOMER_CLIENT_SECRET": "customer-secret-value-123",
             "SYNTHETIC_USER_PASSWORD": "A1!synthetic-user-password",
             "EEMSUITE_APPLICATION_HOME_URL": "https://localhost/Hippo/",
             "EEMSUITE_OIDC_REDIRECT_URIS": "https://localhost:7310/signin-oidc",
@@ -100,6 +101,27 @@ class ScenarioSettingsTests(unittest.TestCase):
         self.assertNotEqual(
             connection_a["clients"]["modern"]["providerKey"],
             connection_b["clients"]["modern"]["providerKey"],
+        )
+        self.assertEqual(
+            {"customer", "probe"},
+            set(connection_a["customerSite"]["clients"]),
+        )
+        self.assertNotEqual(
+            connection_a["customerSite"]["clients"]["customer"]["clientId"],
+            connection_b["customerSite"]["clients"]["customer"]["clientId"],
+        )
+        customer_a = {
+            client["clientId"]: client
+            for client in realm_a["clients"]
+            if client["clientId"].startswith("northlake-")
+        }
+        self.assertFalse(customer_a["northlake-customer-northlake-lab-a"]["consentRequired"])
+        self.assertTrue(customer_a["northlake-probe-northlake-lab-a"]["consentRequired"])
+        self.assertEqual(
+            "S256",
+            customer_a["northlake-probe-northlake-lab-a"]["attributes"][
+                "pkce.code.challenge.method"
+            ],
         )
 
     def test_isolation_and_claim_drift_change_only_the_bounded_dimensions(self) -> None:

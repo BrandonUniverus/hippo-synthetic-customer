@@ -602,6 +602,66 @@ def _client(
     }
 
 
+def _customer_site_client(
+    realm_name: str,
+    kind: str,
+    secret: str,
+    public_base_url: str,
+) -> dict[str, Any]:
+    client_id = f"northlake-{kind}-{realm_name}"
+    callback = f"{public_base_url}/customer/oidc/callback/{realm_name}/{kind}"
+    signed_out = f"{public_base_url}/customer/signed-out/{realm_name}"
+    frontchannel_logout = (
+        f"{public_base_url}/customer/frontchannel-logout/{realm_name}/{kind}"
+    )
+    return {
+        "id": _stable_id(realm_name, "client", client_id),
+        "clientId": client_id,
+        "name": (
+            "Northlake synthetic customer website"
+            if kind == "customer"
+            else "Northlake cross-client consent probe"
+        ),
+        "description": (
+            "Synthetic OIDC RP used for real-browser session and logout evidence."
+            if kind == "customer"
+            else "Second synthetic OIDC client used for cross-client SSO and consent evidence."
+        ),
+        "enabled": True,
+        "consentRequired": kind == "probe",
+        "alwaysDisplayInConsole": False,
+        "clientAuthenticatorType": "client-secret",
+        "secret": secret,
+        "redirectUris": [callback],
+        "webOrigins": [public_base_url],
+        "rootUrl": f"{public_base_url}/customer/",
+        "baseUrl": f"{public_base_url}/customer/",
+        "adminUrl": f"{public_base_url}/customer/",
+        "standardFlowEnabled": True,
+        "implicitFlowEnabled": False,
+        "directAccessGrantsEnabled": False,
+        "serviceAccountsEnabled": False,
+        "publicClient": False,
+        "frontchannelLogout": True,
+        "protocol": "openid-connect",
+        "attributes": {
+            "backchannel.logout.revoke.offline.tokens": "false",
+            "backchannel.logout.session.required": "false",
+            "frontchannel.logout.url": frontchannel_logout,
+            "frontchannel.logout.session.required": "true",
+            "oauth2.device.authorization.grant.enabled": "false",
+            "oidc.ciba.grant.enabled": "false",
+            "pkce.code.challenge.method": "S256",
+            "post.logout.redirect.uris": signed_out,
+            "pushed.authorization.request.required": "false",
+            "use.refresh.tokens": "false",
+        },
+        "fullScopeAllowed": True,
+        "defaultClientScopes": ["basic", "roles", "profile", "email", "northlake"],
+        "optionalClientScopes": [],
+    }
+
+
 def _saml_claim_mapper(entity_id: str, claim: str) -> dict[str, Any]:
     property_claims = {
         "username": "username",
@@ -789,10 +849,43 @@ def build_realm(
         )
     enable_oidc = _environment_boolean(environment, "NORTHLAKE_ENABLE_OIDC", True)
     enable_saml = _environment_boolean(environment, "NORTHLAKE_ENABLE_SAML", True)
+    enable_customer_site = _environment_boolean(
+        environment,
+        "NORTHLAKE_CUSTOMER_SITE_ENABLED",
+        False,
+    )
     if not enable_oidc and not enable_saml:
         raise RealmGenerationError("At least one of OIDC or SAML must be enabled.")
+    if enable_customer_site and not enable_oidc:
+        raise RealmGenerationError("The synthetic customer site requires OIDC.")
     oidc_settings = OidcSettings.from_environment(environment) if enable_oidc else None
     oidc_allowed_claims = _northlake_oidc_claims(environment) if enable_oidc else ()
+
+    customer_public_base_url = environment.get(
+        "NORTHLAKE_CUSTOMER_PUBLIC_BASE_URL",
+        "https://customer.localtest.me:8443",
+    ).strip().rstrip("/")
+    customer_url = urlparse(customer_public_base_url)
+    if enable_customer_site and (
+        customer_url.scheme != "https"
+        or not customer_url.hostname
+        or customer_url.username is not None
+        or customer_url.password is not None
+        or customer_url.query
+        or customer_url.fragment
+        or customer_url.path not in {"", "/"}
+    ):
+        raise RealmGenerationError(
+            "NORTHLAKE_CUSTOMER_PUBLIC_BASE_URL must be an HTTPS origin."
+        )
+    customer_secret = environment.get("NORTHLAKE_CUSTOMER_CLIENT_SECRET", "")
+    if enable_customer_site and (
+        len(customer_secret) < 16 or customer_secret.startswith("replace-")
+    ):
+        raise RealmGenerationError(
+            "NORTHLAKE_CUSTOMER_CLIENT_SECRET is missing or is still a placeholder. "
+            "Run identity/scripts/Initialize-Identity.ps1."
+        )
 
     application_home_url = environment.get(
         "EEMSUITE_APPLICATION_HOME_URL",
@@ -1050,6 +1143,24 @@ def build_realm(
         if enable_oidc and oidc_settings is not None
         else []
     )
+    customer_site_clients = (
+        [
+            _customer_site_client(
+                realm_name,
+                "customer",
+                customer_secret,
+                customer_public_base_url,
+            ),
+            _customer_site_client(
+                realm_name,
+                "probe",
+                customer_secret,
+                customer_public_base_url,
+            ),
+        ]
+        if enable_customer_site
+        else []
+    )
 
     realm = {
         "id": _stable_id(realm_name, "realm", realm_name),
@@ -1098,7 +1209,7 @@ def build_realm(
             *_standard_client_scopes(realm_name),
             _northlake_client_scope(realm_name, oidc_allowed_claims),
         ],
-        "clients": [*oidc_clients, *saml_clients],
+        "clients": [*oidc_clients, *saml_clients, *customer_site_clients],
         "eventsEnabled": True,
         "eventsExpiration": 604800,
         "eventsListeners": ["jboss-logging"],
@@ -1235,6 +1346,35 @@ def build_realm(
         if enable_oidc and oidc_settings is not None
         else {}
     )
+    customer_site_profile = (
+        {
+            "publicBaseUrl": customer_public_base_url,
+            "crossSiteProviderOrigin": base_url,
+            "clients": {
+                kind: {
+                    "clientId": f"northlake-{kind}-{realm_name}",
+                    "redirectUri": (
+                        f"{customer_public_base_url}/customer/oidc/callback/"
+                        f"{realm_name}/{kind}"
+                    ),
+                    "postLogoutRedirectUri": (
+                        f"{customer_public_base_url}/customer/signed-out/{realm_name}"
+                    ),
+                    "frontChannelLogoutUri": (
+                        f"{customer_public_base_url}/customer/frontchannel-logout/"
+                        f"{realm_name}/{kind}"
+                    ),
+                    "consentRequired": kind == "probe",
+                    "pkce": "S256",
+                }
+                for kind in ("customer", "probe")
+            },
+            "cookieModes": ["Lax", "None"],
+            "expectedRestrictedIframeOutcome": "delivery-without-rp-session-cookie",
+        }
+        if enable_customer_site
+        else None
+    )
     oidc_eemsuite_configuration = (
         {
             "modern": {
@@ -1315,6 +1455,7 @@ def build_realm(
         "masterAdminConsole": f"{base_url}/admin/master/console/",
         "accountConsole": f"{issuer}/account/",
         "clients": {**oidc_connection_profiles, **saml_connection_profiles},
+        **({"customerSite": customer_site_profile} if customer_site_profile else {}),
         "testUsers": {
             "active": {
                 "username": active_user["username"],

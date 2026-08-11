@@ -69,6 +69,7 @@ function Get-IdentityEnvironment {
         NORTHLAKE_REALM_KEY = "northlake"
         NORTHLAKE_ENABLE_OIDC = "true"
         NORTHLAKE_ENABLE_SAML = "true"
+        NORTHLAKE_CUSTOMER_PUBLIC_BASE_URL = "https://customer.localtest.me:8443"
     }
     foreach ($key in $defaults.Keys) {
         if (-not $values.ContainsKey($key)) {
