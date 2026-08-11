@@ -110,9 +110,19 @@ class FormParser(HTMLParser):
 
 
 class StopAtCallbackRedirect(HTTPRedirectHandler):
-    def __init__(self, callback_prefix: str) -> None:
+    def __init__(self, callback_prefix: str | tuple[str, ...]) -> None:
         super().__init__()
         self.callback_prefix = callback_prefix
+
+    @property
+    def callback_prefix(self) -> str | tuple[str, ...]:
+        if len(self.callback_prefixes) == 1:
+            return self.callback_prefixes[0]
+        return self.callback_prefixes
+
+    @callback_prefix.setter
+    def callback_prefix(self, value: str | tuple[str, ...]) -> None:
+        self.callback_prefixes = (value,) if isinstance(value, str) else value
 
     def redirect_request(
         self,
@@ -123,7 +133,7 @@ class StopAtCallbackRedirect(HTTPRedirectHandler):
         headers: Any,
         newurl: str,
     ) -> Request | None:
-        if newurl.startswith(self.callback_prefix):
+        if any(newurl.startswith(prefix) for prefix in self.callback_prefixes):
             return None
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
@@ -309,7 +319,7 @@ def _authorization_url(
 def _open_login(
     context: ssl.SSLContext,
     authorization_url: str,
-    callback: str,
+    callback: str | tuple[str, ...],
 ) -> tuple[Any, bytes]:
     opener = build_opener(
         HTTPSHandler(context=context),

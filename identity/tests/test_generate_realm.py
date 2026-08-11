@@ -13,8 +13,13 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec, rsa
 from cryptography.x509.oid import NameOID
 
-from identity.configuration.settings import ProviderSettings, SettingsDocument, write_settings_document
 from identity.configuration.groups import SyntheticGroupStore
+from identity.configuration.oidc import (
+    OidcSettings,
+    OidcSettingsDocument,
+    write_oidc_settings_document,
+)
+from identity.configuration.settings import ProviderSettings, SettingsDocument, write_settings_document
 from identity.configuration.users import SyntheticUserStore
 
 
@@ -144,6 +149,100 @@ class GenerateRealmTests(unittest.TestCase):
             "id_token token",
             connection["eemsuiteConfiguration"]["legacy"]["OpenIDConnect"]["ResponseType"],
         )
+
+    def test_oidc_configuration_shapes_the_realm_and_connection_profile(self) -> None:
+        self.environment.update(
+            {
+                "NORTHLAKE_OIDC_CONFIGURATION_MODE": "Authority",
+                "NORTHLAKE_OIDC_PAR_BEHAVIOR": "Require",
+                "NORTHLAKE_OIDC_TOKEN_ENDPOINT_AUTH_METHOD": "ClientSecretBasic",
+                "NORTHLAKE_OIDC_ACCESS_TOKEN_LIFETIME_SECONDS": "420",
+                "NORTHLAKE_OIDC_MODERN_CLIENT_ID": "northlake-modern-basic",
+                "NORTHLAKE_OIDC_MODERN_REDIRECT_URIS": (
+                    "https://localhost:7310/signin-northlake"
+                ),
+                "NORTHLAKE_OIDC_MODERN_POST_LOGOUT_REDIRECT_URIS": (
+                    "https://localhost:7310/signed-out"
+                ),
+                "NORTHLAKE_OIDC_MODERN_SCOPES": "openid email northlake",
+                "NORTHLAKE_OIDC_MODERN_CONSENT_REQUIRED": "false",
+                "NORTHLAKE_OIDC_LEGACY_ENABLED": "false",
+            }
+        )
+
+        realm, connection = self._generate()
+        oidc_clients = [
+            client for client in realm["clients"] if client["protocol"] == "openid-connect"
+        ]
+
+        self.assertEqual(420, realm["accessTokenLifespan"])
+        self.assertEqual(1, len(oidc_clients))
+        modern = oidc_clients[0]
+        self.assertEqual("northlake-modern-basic", modern["clientId"])
+        self.assertFalse(modern["consentRequired"])
+        self.assertEqual(
+            "true",
+            modern["attributes"]["pushed.authorization.request.required"],
+        )
+        self.assertEqual(
+            "https://localhost:7310/signed-out",
+            modern["attributes"]["post.logout.redirect.uris"],
+        )
+        self.assertNotIn("profile", modern["defaultClientScopes"])
+
+        profile = connection["clients"]["modern"]
+        self.assertEqual("Authority", profile["configurationMode"])
+        self.assertEqual("Require", profile["parBehavior"])
+        self.assertEqual("ClientSecretBasic", profile["tokenEndpointAuthMethod"])
+        self.assertEqual("openid email northlake", profile["scope"])
+        self.assertNotIn("legacy", connection["clients"])
+        self.assertNotIn(
+            "historicalLegacy",
+            connection["oidcConfiguration"]["profiles"],
+        )
+        self.assertEqual(
+            connection["issuer"],
+            connection["oidcConfiguration"]["profiles"]["modern"]["metadataAddress"],
+        )
+
+    def test_saved_oidc_document_overrides_environment_during_host_generation(self) -> None:
+        values = OidcSettings.from_environment(self.environment).to_values()
+        values.update(
+            {
+                "parBehavior": "Disable",
+                "modernClientId": "saved-modern-client",
+                "legacyEnabled": False,
+            }
+        )
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            temporary = Path(temporary_directory)
+            env_path = temporary / ".env"
+            realm_path = temporary / "realm.json"
+            connection_path = temporary / "connection.json"
+            oidc_path = temporary / "oidc.json"
+            env_path.write_text(
+                "\n".join(f"{key}={value}" for key, value in self.environment.items()),
+                encoding="utf-8",
+            )
+            write_oidc_settings_document(
+                oidc_path,
+                OidcSettingsDocument(settings=OidcSettings.from_values(values)),
+            )
+
+            realm, connection = generate_realm.generate(
+                self.manifest,
+                env_path,
+                realm_path,
+                connection_path,
+                oidc_settings_path=oidc_path,
+            )
+
+        oidc_clients = [
+            client for client in realm["clients"] if client["protocol"] == "openid-connect"
+        ]
+        self.assertEqual(["saved-modern-client"], [client["clientId"] for client in oidc_clients])
+        self.assertEqual("Disable", connection["clients"]["modern"]["parBehavior"])
+        self.assertNotIn("legacy", connection["clients"])
 
     def test_saml_client_is_signed_exact_and_maps_northlake_attributes(self) -> None:
         realm, connection = self._generate()

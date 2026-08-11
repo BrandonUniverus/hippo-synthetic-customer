@@ -13,6 +13,8 @@ RUN python -m pip install --no-cache-dir -r /app/identity/requirements.txt
 COPY identity/__init__.py /app/identity/__init__.py
 COPY identity/configuration /app/identity/configuration
 COPY identity/realm /app/identity/realm
+COPY identity/scripts/verify_identity.py /app/identity/scripts/verify_identity.py
+COPY identity/scripts/verify_oidc_baseline.py /app/identity/scripts/verify_oidc_baseline.py
 COPY security/northlake-eem-security-v1.yaml /app/security/northlake-eem-security-v1.yaml
 
 EXPOSE 8081

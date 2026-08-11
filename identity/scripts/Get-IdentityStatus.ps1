@@ -31,7 +31,16 @@ if ($profile.PSObject.Properties["groupInventory"]) {
 }
 if ($profile.clients.PSObject.Properties["modern"]) {
     Write-Host "Modern client:   $($profile.clients.modern.clientId) (code + PKCE S256)"
-    Write-Host "Legacy client:   $($profile.clients.legacy.clientId) (id_token token)"
+    if ($profile.clients.PSObject.Properties["legacy"]) {
+        Write-Host "Legacy client:   $($profile.clients.legacy.clientId) (historical id_token token)"
+    }
+    else {
+        Write-Host "Legacy client:   disabled"
+    }
+    Write-Host "OIDC mode:       $($profile.clients.modern.configurationMode)"
+    Write-Host "OIDC PAR:        $($profile.clients.modern.parBehavior)"
+    Write-Host "OIDC auth:       $($profile.clients.modern.tokenEndpointAuthMethod)"
+    Write-Host "OIDC scopes:     $($profile.clients.modern.scope)"
 }
 else {
     Write-Host "OIDC clients:    disabled"
@@ -54,6 +63,8 @@ if ($ShowSecrets) {
     Write-Host "Admin password:       $($profile.admin.password)"
     if ($profile.clients.PSObject.Properties["modern"]) {
         Write-Host "Modern client secret: $($profile.clients.modern.clientSecret)"
-        Write-Host "Legacy client secret: $($profile.clients.legacy.clientSecret)"
+        if ($profile.clients.PSObject.Properties["legacy"]) {
+            Write-Host "Legacy client secret: $($profile.clients.legacy.clientSecret)"
+        }
     }
 }

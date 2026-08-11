@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="color-scheme" content="dark">
+  <title>Configure Northlake OIDC Profiles</title>
+  <link rel="stylesheet" href="/configure/styles.css">
+  <script src="/configure/oidc.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Northlake Synthetic Identity home">
+      <span class="brand-mark" aria-hidden="true">NL</span>
+      <span>
+        <strong>Northlake</strong>
+        <small>Synthetic Identity Lab</small>
+      </span>
+    </a>
+    <nav class="utility-nav" aria-label="Configuration sections">
+      <a href="/configure">Provider</a>
+      <a href="/configure/oidc" aria-current="page">OIDC</a>
+      <a href="/configure/users">Users</a>
+      <a href="/configure/groups">Groups</a>
+      <span class="environment">Unauthenticated localhost tool</span>
+    </nav>
+  </header>
+
+  <main>
+    <section class="intro" aria-labelledby="page-title">
+      <p class="eyebrow">Phase 4 · OIDC baseline profiles</p>
+      <h1 id="page-title">Configure bounded OIDC profiles.</h1>
+      <p>
+        Shape the recommended Modern client and the explicitly historical Legacy client,
+        apply them to the disposable Keycloak realm, and run a focused protocol verifier.
+        The generated panel maps directly to supported EnergyHippo System Administration
+        fields without changing EnergyHippo.
+      </p>
+    </section>
+
+    <div id="load-error" class="notice notice-error" role="alert" hidden></div>
+
+    <div class="workspace" id="workspace" hidden>
+      <form id="oidc-form" novalidate>
+        <div id="form-error" class="notice notice-error" role="alert" hidden></div>
+
+        <section class="field-group">
+          <div class="field-group-header">
+            <h2>Provider behavior</h2>
+            <p>Exercise EnergyHippo's bounded configuration branches and Keycloak token behavior.</p>
+          </div>
+          <div class="field-grid">
+            <div class="field">
+              <label for="configurationMode">EEM configuration mode</label>
+              <select id="configurationMode" name="configurationMode">
+                <option value="Authority">Authority</option>
+                <option value="Discovery">Discovery</option>
+                <option value="Static">Static endpoints</option>
+              </select>
+              <p class="field-help">Changes the ready-to-copy System Administration contract.</p>
+              <p class="field-error" id="error-configurationMode" hidden></p>
+            </div>
+            <div class="field">
+              <label for="parBehavior">Pushed authorization requests</label>
+              <select id="parBehavior" name="parBehavior">
+                <option value="UseIfAvailable">Use if available</option>
+                <option value="Require">Require</option>
+                <option value="Disable">Disable</option>
+              </select>
+              <p class="field-help">Modern only; the verifier proves the selected path.</p>
+              <p class="field-error" id="error-parBehavior" hidden></p>
+            </div>
+            <div class="field">
+              <label for="tokenEndpointAuthMethod">Token endpoint authentication</label>
+              <select id="tokenEndpointAuthMethod" name="tokenEndpointAuthMethod">
+                <option value="ClientSecretPost">Client secret POST</option>
+                <option value="ClientSecretBasic">Client secret Basic</option>
+              </select>
+              <p class="field-help">Applied to PAR, token, refresh, and revocation requests.</p>
+              <p class="field-error" id="error-tokenEndpointAuthMethod" hidden></p>
+            </div>
+            <div class="field">
+              <label for="accessTokenLifetimeSeconds">Access token lifetime (seconds)</label>
+              <input id="accessTokenLifetimeSeconds" name="accessTokenLifetimeSeconds" type="number" min="60" max="3600">
+              <p class="field-help">The focused verifier checks the signed token's actual lifetime.</p>
+              <p class="field-error" id="error-accessTokenLifetimeSeconds" hidden></p>
+            </div>
+          </div>
+        </section>
+
+        <section class="field-group">
+          <div class="field-group-header">
+            <p class="card-kicker">Recommended for new providers</p>
+            <h2>Modern · authorization code + PKCE S256</h2>
+            <p>Confidential code flow with discovery, UserInfo, refresh rotation, and RP logout.</p>
+          </div>
+          <div class="field-grid">
+            <div class="field">
+              <label for="modernClientId">Client ID</label>
+              <input id="modernClientId" name="modernClientId" type="text" spellcheck="false">
+              <p class="field-error" id="error-modernClientId" hidden></p>
+            </div>
+            <div class="field">
+              <label for="modernScopes">Scopes</label>
+              <input id="modernScopes" name="modernScopes" type="text" spellcheck="false">
+              <p class="field-help">Bounded to openid, profile, email, northlake, and offline_access.</p>
+              <p class="field-error" id="error-modernScopes" hidden></p>
+            </div>
+            <div class="field field-wide">
+              <label for="modernRedirectUris">Exact redirect URIs</label>
+              <textarea id="modernRedirectUris" name="modernRedirectUris" spellcheck="false"></textarea>
+              <p class="field-error" id="error-modernRedirectUris" hidden></p>
+            </div>
+            <div class="field field-wide">
+              <label for="modernPostLogoutRedirectUris">Exact post-logout redirect URIs</label>
+              <textarea id="modernPostLogoutRedirectUris" name="modernPostLogoutRedirectUris" spellcheck="false"></textarea>
+              <p class="field-error" id="error-modernPostLogoutRedirectUris" hidden></p>
+            </div>
+            <div class="field field-checkbox">
+              <label class="checkbox-label" for="modernConsentRequired">
+                <input id="modernConsentRequired" name="modernConsentRequired" type="checkbox">
+                Require provider consent during the Modern login test
+              </label>
+              <p class="field-error" id="error-modernConsentRequired" hidden></p>
+            </div>
+          </div>
+        </section>
+
+        <section class="field-group legacy-profile">
+          <div class="field-group-header">
+            <p class="card-kicker">Historical compatibility only</p>
+            <h2>Legacy · implicit id_token token</h2>
+            <p>Not recommended for new providers. Retain it only to reproduce existing integrations.</p>
+          </div>
+          <div class="field-grid">
+            <div class="field field-checkbox">
+              <label class="checkbox-label" for="legacyEnabled">
+                <input id="legacyEnabled" name="legacyEnabled" type="checkbox">
+                Enable the Historical Legacy client and verifier path
+              </label>
+              <p class="field-error" id="error-legacyEnabled" hidden></p>
+            </div>
+            <div class="field">
+              <label for="legacyClientId">Client ID</label>
+              <input id="legacyClientId" name="legacyClientId" type="text" spellcheck="false">
+              <p class="field-error" id="error-legacyClientId" hidden></p>
+            </div>
+            <div class="field">
+              <label for="legacyScopes">Scopes</label>
+              <input id="legacyScopes" name="legacyScopes" type="text" spellcheck="false">
+              <p class="field-error" id="error-legacyScopes" hidden></p>
+            </div>
+            <div class="field field-wide">
+              <label for="legacyRedirectUris">Exact redirect URIs</label>
+              <textarea id="legacyRedirectUris" name="legacyRedirectUris" spellcheck="false"></textarea>
+              <p class="field-error" id="error-legacyRedirectUris" hidden></p>
+            </div>
+            <div class="field field-wide">
+              <label for="legacyPostLogoutRedirectUris">Exact post-logout redirect URIs</label>
+              <textarea id="legacyPostLogoutRedirectUris" name="legacyPostLogoutRedirectUris" spellcheck="false"></textarea>
+              <p class="field-error" id="error-legacyPostLogoutRedirectUris" hidden></p>
+            </div>
+          </div>
+        </section>
+
+        <section class="apply-panel" aria-labelledby="apply-title">
+          <div>
+            <h2 id="apply-title">Save, inspect, or prove</h2>
+            <p>Apply replaces only the disposable Northlake realm and immediately runs the focused verifier.</p>
+          </div>
+          <div class="actions">
+            <button class="button button-secondary" type="button" id="preview-button">Refresh preview</button>
+            <button class="button button-secondary" type="button" id="save-button">Save</button>
+            <button class="button button-primary" type="submit" id="apply-button">Apply and verify</button>
+          </div>
+        </section>
+      </form>
+
+      <aside class="result-column" aria-label="OIDC result and verification">
+        <section class="result-card status-card" aria-labelledby="status-title">
+          <div class="card-heading">
+            <div>
+              <p class="card-kicker">Disposable realm</p>
+              <h2 id="status-title">OIDC status</h2>
+            </div>
+            <span id="status-badge" class="status-badge">Loaded</span>
+          </div>
+          <p id="operation-status" class="operation-status" role="status">Ready to preview, save, or apply.</p>
+          <dl class="status-list">
+            <div><dt>Mode</dt><dd id="summary-mode">—</dd></div>
+            <div><dt>PAR</dt><dd id="summary-par">—</dd></div>
+            <div><dt>Client auth</dt><dd id="summary-auth">—</dd></div>
+            <div><dt>Legacy</dt><dd id="summary-legacy">—</dd></div>
+          </dl>
+        </section>
+
+        <section class="result-card" aria-labelledby="verification-title">
+          <div class="card-heading">
+            <div>
+              <p class="card-kicker">Live protocol evidence</p>
+              <h2 id="verification-title">Focused verifier</h2>
+            </div>
+            <button class="copy-button" type="button" id="verify-button">Run again</button>
+          </div>
+          <p id="verification-time" class="operation-status">Not run from this configuration yet.</p>
+          <pre id="verification-output" tabindex="0">No verification result.</pre>
+        </section>
+
+        <section class="result-card" aria-labelledby="preview-title">
+          <div class="card-heading">
+            <div>
+              <p class="card-kicker">Secrets excluded</p>
+              <h2 id="preview-title">Ready-to-copy EEM values</h2>
+            </div>
+            <button class="copy-button" type="button" id="copy-button">Copy</button>
+          </div>
+          <pre id="json-preview" tabindex="0"></pre>
+        </section>
+      </aside>
+    </div>
+  </main>
+
+  <footer>
+    <span>Development use only · no EnergyHippo writes</span>
+    <span><a href="/configure">Provider configuration</a> · <a href="/">Identity launchpad</a></span>
+  </footer>
+</body>
+</html>

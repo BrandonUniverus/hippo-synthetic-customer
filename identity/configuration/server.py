@@ -4,15 +4,26 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
+import sys
 import tempfile
 import threading
 import time
+from datetime import UTC, datetime
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 from urllib import error, parse, request
 
+from identity.configuration.groups import GroupValidationError, SyntheticGroupStore
+from identity.configuration.oidc import (
+    OidcSettings,
+    OidcSettingsDocument,
+    OidcValidationError,
+    load_oidc_settings_document,
+    write_oidc_settings_document,
+)
 from identity.configuration.settings import (
     FIELD_KEYS,
     ProviderSettings,
@@ -21,7 +32,6 @@ from identity.configuration.settings import (
     load_settings_document,
     write_settings_document,
 )
-from identity.configuration.groups import SyntheticGroupStore, GroupValidationError
 from identity.configuration.users import SyntheticUserStore, UserValidationError
 from identity.realm.generate_realm import generate_from_environment
 
@@ -158,6 +168,7 @@ class ConfigurationApplication:
         manifest_path: Path,
         field_catalog_path: Path,
         keycloak_client: KeycloakAdminClient,
+        oidc_verifier: Callable[[Path, Path], dict[str, Any]] | None = None,
     ):
         self.environment = dict(environment)
         self.runtime_directory = runtime_directory
@@ -166,9 +177,13 @@ class ConfigurationApplication:
         self.settings_path = runtime_directory / "configuration.json"
         self.user_overlay_path = runtime_directory / "users.json"
         self.group_overlay_path = runtime_directory / "groups.json"
+        self.oidc_settings_path = runtime_directory / "oidc.json"
+        self.oidc_verification_path = runtime_directory / "oidc-verification.json"
+        self.root_certificate_path = runtime_directory / "certs" / "caddy-local-root.crt"
         self.realm_output_path = runtime_directory / "import" / "northlake-realm.json"
         self.connection_output_path = runtime_directory / "connection.json"
         self.keycloak_client = keycloak_client
+        self.oidc_verifier = oidc_verifier
         self.startup_settings = ProviderSettings.from_environment(self.environment)
         self.last_apply_error: str | None = None
         self._apply_lock = threading.Lock()
@@ -202,9 +217,18 @@ class ConfigurationApplication:
     def _document(self) -> SettingsDocument:
         return load_settings_document(self.settings_path, self.environment)
 
-    def _generate(self, settings: ProviderSettings) -> dict[str, Any]:
+    def _generate(
+        self,
+        settings: ProviderSettings,
+        oidc_settings: OidcSettings | None = None,
+    ) -> dict[str, Any]:
         effective_environment = dict(self.environment)
         effective_environment.update(settings.to_environment_overlay())
+        selected_oidc_settings = oidc_settings or load_oidc_settings_document(
+            self.oidc_settings_path,
+            effective_environment,
+        ).settings
+        effective_environment.update(selected_oidc_settings.to_environment_overlay())
         self.runtime_directory.mkdir(parents=True, exist_ok=True)
         with tempfile.TemporaryDirectory(
             prefix="northlake-config-",
@@ -225,6 +249,149 @@ class ConfigurationApplication:
             os.replace(temporary_realm, self.realm_output_path)
             os.replace(temporary_connection, self.connection_output_path)
         return realm
+
+    def _oidc_document(self) -> OidcSettingsDocument:
+        provider = self._document().settings
+        effective_environment = dict(self.environment)
+        effective_environment.update(provider.to_environment_overlay())
+        return load_oidc_settings_document(self.oidc_settings_path, effective_environment)
+
+    def _last_oidc_verification(self) -> dict[str, Any] | None:
+        if not self.oidc_verification_path.is_file():
+            return None
+        payload = json.loads(self.oidc_verification_path.read_text(encoding="utf-8"))
+        return payload if isinstance(payload, dict) else None
+
+    def _clear_oidc_verification(self) -> None:
+        self.oidc_verification_path.unlink(missing_ok=True)
+
+    def oidc_state(self) -> dict[str, Any]:
+        provider = self._document().settings
+        document = self._oidc_document()
+        return {
+            "values": document.settings.to_values(),
+            "preview": document.settings.preview(provider),
+            "updatedAtUtc": document.updated_at_utc,
+            "lastVerification": self._last_oidc_verification(),
+        }
+
+    def preview_oidc(self, values: dict[str, Any]) -> dict[str, Any]:
+        settings = OidcSettings.from_values(values)
+        return {
+            "values": settings.to_values(),
+            "preview": settings.preview(self._document().settings),
+        }
+
+    def save_oidc(self, values: dict[str, Any]) -> dict[str, Any]:
+        settings = OidcSettings.from_values(values)
+        write_oidc_settings_document(
+            self.oidc_settings_path,
+            OidcSettingsDocument(settings=settings),
+        )
+        self._clear_oidc_verification()
+        return {
+            "message": "OIDC profiles saved locally. Apply to regenerate the disposable realm.",
+            "values": settings.to_values(),
+            "preview": settings.preview(self._document().settings),
+            "applied": False,
+        }
+
+    def _default_oidc_verifier(self, connection_path: Path, ca_path: Path) -> dict[str, Any]:
+        verifier_path = Path(
+            os.environ.get(
+                "NORTHLAKE_OIDC_VERIFIER_PATH",
+                "/app/identity/scripts/verify_oidc_baseline.py",
+            )
+        )
+        command = [
+            sys.executable,
+            str(verifier_path),
+            "--connection",
+            str(connection_path),
+            "--ca-file",
+            str(ca_path),
+        ]
+        host_alias = os.environ.get("NORTHLAKE_VERIFIER_HOST_ALIAS", "").strip()
+        if host_alias:
+            command.extend(["--resolve-host", f"localhost={host_alias}"])
+        try:
+            completed = subprocess.run(
+                command,
+                capture_output=True,
+                check=False,
+                text=True,
+                timeout=120,
+            )
+        except (OSError, subprocess.TimeoutExpired) as failure:
+            return {
+                "passed": False,
+                "exitCode": None,
+                "classification": "verifier-error",
+                "output": str(failure),
+            }
+        output = "\n".join(
+            part.strip() for part in (completed.stdout, completed.stderr) if part.strip()
+        )
+        return {
+            "passed": completed.returncode == 0,
+            "exitCode": completed.returncode,
+            "classification": (
+                "passed" if completed.returncode == 0 else "provider-contract-break"
+            ),
+            "output": output[-24_000:],
+        }
+
+    def verify_oidc(self) -> dict[str, Any]:
+        verifier = self.oidc_verifier or self._default_oidc_verifier
+        result = dict(verifier(self.connection_output_path, self.root_certificate_path))
+        result["checkedAtUtc"] = datetime.now(UTC).isoformat()
+        self.oidc_verification_path.parent.mkdir(parents=True, exist_ok=True)
+        temporary_path = self.oidc_verification_path.with_suffix(".json.tmp")
+        temporary_path.write_text(
+            json.dumps(result, indent=2, ensure_ascii=False) + os.linesep,
+            encoding="utf-8",
+        )
+        os.replace(temporary_path, self.oidc_verification_path)
+        return result
+
+    def apply_oidc(self, values: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+        oidc_settings = OidcSettings.from_values(values)
+        with self._apply_lock:
+            provider_document = self._document()
+            write_oidc_settings_document(
+                self.oidc_settings_path,
+                OidcSettingsDocument(settings=oidc_settings),
+            )
+            self._clear_oidc_verification()
+            realm = self._generate(provider_document.settings, oidc_settings)
+            try:
+                self.keycloak_client.replace_realm(
+                    realm,
+                    provider_document.applied_realm_key,
+                )
+                self.keycloak_client.wait_until_healthy(provider_document.settings)
+            except KeycloakApplyError as failure:
+                return HTTPStatus.BAD_GATEWAY, {
+                    "message": (
+                        "OIDC profiles were saved, but the disposable realm could not be applied."
+                    ),
+                    "values": oidc_settings.to_values(),
+                    "preview": oidc_settings.preview(provider_document.settings),
+                    "applied": False,
+                    "applyError": str(failure),
+                }
+            verification = self.verify_oidc()
+            return HTTPStatus.OK, {
+                "message": (
+                    "OIDC profiles applied and verified."
+                    if verification.get("passed")
+                    else "OIDC profiles applied; the focused verifier found a contract break."
+                ),
+                "values": oidc_settings.to_values(),
+                "preview": oidc_settings.preview(provider_document.settings),
+                "applied": True,
+                "verification": verification,
+            }
 
     def state(self) -> dict[str, Any]:
         document = self._document()
@@ -518,6 +685,10 @@ class ConfigurationRequestHandler(BaseHTTPRequestHandler):
                 self._static("groups.html", "text/html; charset=utf-8")
             elif path == "/configure/groups.js":
                 self._static("groups.js", "text/javascript; charset=utf-8")
+            elif path == "/configure/oidc":
+                self._static("oidc.html", "text/html; charset=utf-8")
+            elif path == "/configure/oidc.js":
+                self._static("oidc.js", "text/javascript; charset=utf-8")
             elif path == "/configure/styles.css":
                 self._static("styles.css", "text/css; charset=utf-8")
             elif path == "/configure/api/state":
@@ -526,6 +697,8 @@ class ConfigurationRequestHandler(BaseHTTPRequestHandler):
                 self._json(HTTPStatus.OK, self.application.users())
             elif path == "/configure/api/groups":
                 self._json(HTTPStatus.OK, self.application.groups())
+            elif path == "/configure/api/oidc":
+                self._json(HTTPStatus.OK, self.application.oidc_state())
             elif path == "/configure/api/groups/claims":
                 query = parse.parse_qs(parse.urlparse(self.path).query)
                 user_ids = query.get("userId", [])
@@ -540,6 +713,7 @@ class ConfigurationRequestHandler(BaseHTTPRequestHandler):
         except (
             OSError,
             SettingsValidationError,
+            OidcValidationError,
             UserValidationError,
             GroupValidationError,
             RuntimeError,
@@ -563,6 +737,41 @@ class ConfigurationRequestHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         path = parse.urlparse(self.path).path
+        oidc_routes = {
+            "/configure/api/oidc/preview",
+            "/configure/api/oidc/save",
+            "/configure/api/oidc/apply",
+            "/configure/api/oidc/verify",
+        }
+        if path in oidc_routes:
+            try:
+                values = self._request_values()
+                if path == "/configure/api/oidc/preview":
+                    self._json(HTTPStatus.OK, self.application.preview_oidc(values))
+                elif path == "/configure/api/oidc/save":
+                    self._json(HTTPStatus.OK, self.application.save_oidc(values))
+                elif path == "/configure/api/oidc/apply":
+                    status, payload = self.application.apply_oidc(values)
+                    self._json(status, payload)
+                else:
+                    self._json(
+                        HTTPStatus.OK,
+                        {
+                            "message": "Focused OIDC verification completed.",
+                            "verification": self.application.verify_oidc(),
+                        },
+                    )
+            except OidcValidationError as failure:
+                self._json(
+                    HTTPStatus.BAD_REQUEST,
+                    {"message": "Check the highlighted OIDC values.", "errors": failure.errors},
+                )
+            except (OSError, ValueError, RuntimeError) as failure:
+                self._json(
+                    HTTPStatus.INTERNAL_SERVER_ERROR,
+                    {"message": "The OIDC configuration operation failed.", "detail": str(failure)},
+                )
+            return
         if path == "/configure/api/groups/create":
             try:
                 status, payload = self.application.create_group(self._request_values())

@@ -24,10 +24,13 @@ Identity Provider (IdP).
 - 27 checked-in groups plus ignored local additions, editable synthetic
   membership, and claim shapes for company IDs and EEM permission-profile intent.
 - Stable UUIDv5 user, group, role, client, scope, and realm IDs.
-- Two exact confidential EEMSuite OIDC clients:
-  - `eemsuite-web`: authorization code with required PKCE `S256` and provider
-    consent; implicit is rejected.
-  - `eemsuite-web-legacy`: supports the current `id_token token` compatibility flow.
+- Two bounded confidential OIDC profiles whose IDs, callbacks, post-logout
+  callbacks, scopes, consent, PAR policy, client authentication, and access-token
+  lifetime can be changed through the local configuration page:
+  - Modern: authorization code with required PKCE `S256`, discovery, UserInfo,
+    refresh rotation/revocation, and supported RP-initiated logout.
+  - Historical Legacy: optional `id_token token` + `form_post` compatibility
+    evidence that is explicitly not recommended for new providers.
 - One exact SAML service-provider registration:
   - entity ID `urn:energyhippo:eemsuite-web:saml`;
   - HTTP-Redirect AuthnRequest input and forced HTTP-POST responses;
@@ -38,11 +41,10 @@ Identity Provider (IdP).
   - Northlake user, group, company, and permission-profile attributes.
 - Discovery, JWKS, UserInfo, refresh rotation and revocation, RP-initiated
   logout, PAR, administrator audit events, and deterministic reset.
-- A live OIDC verifier that uses PAR, logs in and grants consent for an active user,
-  exchanges a PKCE code, validates the signed ID token and UserInfo, exercises
-  session prompts and refresh rotation, revokes the refresh token, logs out,
-  rejects the disabled user and an unregistered redirect, and proves the legacy
-  `form_post` response is available.
+- A focused configurable OIDC verifier that exercises the selected PAR and
+  client-authentication branches, code + PKCE, configured consent, signed ID
+  token, UserInfo, access-token lifetime, refresh rotation/revocation, logout,
+  invalid redirect rejection, and the optional Historical Legacy `form_post` flow.
 - A live SAML verifier that checks metadata and published signing certificates,
   rejects an unregistered ACS URL, validates both XML signatures and all
   security bindings, checks mapped attributes, exercises SP- and IdP-initiated
@@ -91,6 +93,7 @@ Then open:
 
 - Northlake launchpad: `https://localhost:8443/`
 - Local provider configuration: `https://localhost:8443/configure`
+- OIDC profile configuration: `https://localhost:8443/configure/oidc`
 - Account/login: `https://localhost:8443/realms/northlake/account/`
 - Realm admin: `https://localhost:8443/admin/northlake/console/`
 - OIDC discovery: `https://localhost:8443/realms/northlake/.well-known/openid-configuration`
@@ -113,8 +116,8 @@ discarded. A public hostname or HTTPS port change is saved as pending and takes
 effect after the normal stop/start scripts recreate the edge container.
 
 The provider form deliberately covers only the common one-provider settings in
-Phase 1. Synthetic users and groups have the separate Phase 2 and Phase 3
-surfaces below; multiple concurrent realms, advanced protocol profiles, and a
+Phase 1. Synthetic users, groups, and bounded OIDC profiles have the separate
+Phase 2, Phase 3, and Phase 4 surfaces below; multiple concurrent realms and a
 bounded scenario JSON editor remain later ADR-002b phases. Do not expose the
 configuration service on a shared or production network merely because this
 localhost lab does not require an administrator login.
@@ -165,6 +168,51 @@ Replace `samantha.ireland` with any enabled generated username. The verifier rea
 credential only from ignored generated realm state and never writes to
 EnergyHippo.
 
+## Bounded OIDC profile configuration
+
+`https://localhost:8443/configure/oidc` is the Phase 4 control surface. It is
+intentionally small: every field maps either to a Keycloak client behavior that
+Northlake can prove or to an existing EnergyHippo System Administration branch.
+It does not expose every Keycloak option and never writes EnergyHippo source,
+configuration, or database state.
+
+The configurable matrix is:
+
+- EEM configuration mode: `Authority`, `Discovery`, or `Static`;
+- PAR behavior: `UseIfAvailable`, `Require`, or `Disable`;
+- token endpoint authentication: `ClientSecretPost` or `ClientSecretBasic`;
+- access-token lifetime from 60 through 3,600 seconds;
+- exact Modern and Historical Legacy client IDs, redirect URIs, post-logout
+  redirect URIs, and bounded scopes;
+- Modern provider consent on or off;
+- Historical Legacy enabled or disabled.
+
+**Refresh preview** validates the values and produces a secret-free,
+ready-to-copy System Administration object. `Static` includes the explicit
+authorization, token, issuer, JWKS, UserInfo, and introspection endpoints;
+`Authority` and `Discovery` instead provide the appropriate metadata address.
+Client-secret fields contain only the ignored local source location, never the
+secret itself.
+
+**Save** writes `identity/.runtime/oidc.json` without changing the current
+realm. **Apply and verify** saves the same document, replaces the one disposable
+realm, and immediately runs the focused verifier. Its persisted, secret-free
+result is displayed on the page. A failed verifier is reported as a provider
+contract break after the realm apply, which lets later phases deliberately show
+unsupported or broken combinations instead of converting them into false
+successes.
+
+Run the same focused proof from the host with:
+
+```powershell
+pwsh .\identity\scripts\Test-OidcIdentity.ps1
+```
+
+The Modern profile is the default and the recommendation for new providers.
+Historical Legacy exists only to reproduce already-existing implicit-flow
+registrations. Disabling it removes the Keycloak client and records a controlled
+skip in the focused verifier.
+
 ## Northlake SSO launchpad
 
 The root page is intentionally a launchpad rather than a second authentication
@@ -202,25 +250,12 @@ Secrets are stored only in ignored files:
 ## OIDC connection profiles
 
 `identity/.runtime/connection.json` contains ready-to-copy sectioned settings
-under `eemsuiteConfiguration.legacy` and `eemsuiteConfiguration.modern`.
+under `eemsuiteConfiguration.modern` and, when enabled,
+`eemsuiteConfiguration.legacy`. That ignored host file contains the generated
+client secrets. The browser preview under `oidcConfiguration.profiles` is the
+safe version for review and never contains them.
 
-Start with the legacy profile to observe the current EEMSuite behavior without
-changing its default response type:
-
-```json
-{
-  "OpenIDConnect": {
-    "Description": "Northlake Synthetic Identity - legacy",
-    "ClientID": "eemsuite-web-legacy",
-    "ClientSecret": "<generated>",
-    "ResponseType": "id_token token",
-    "Scope": "openid profile email northlake",
-    "DiscoveryEndpoint": "https://localhost:8443/realms/northlake/.well-known/openid-configuration"
-  }
-}
-```
-
-Switch to the modern profile to test code and PKCE:
+Start new-provider testing with Modern code + PKCE:
 
 ```json
 {
@@ -230,7 +265,28 @@ Switch to the modern profile to test code and PKCE:
     "ClientSecret": "<generated>",
     "ResponseType": "code",
     "Scope": "openid profile email northlake",
-    "DiscoveryEndpoint": "https://localhost:8443/realms/northlake/.well-known/openid-configuration"
+    "DiscoveryEndpoint": "https://localhost:8443/realms/northlake/.well-known/openid-configuration",
+    "ProtocolProfile": "Modern",
+    "ParBehavior": "UseIfAvailable",
+    "TokenEndpointAuthMethod": "ClientSecretPost"
+  }
+}
+```
+
+Use Historical Legacy only to reproduce an existing compatibility registration:
+
+```json
+{
+  "OpenIDConnect": {
+    "Description": "Northlake Synthetic Identity - historical legacy",
+    "ClientID": "eemsuite-web-legacy",
+    "ClientSecret": "<generated>",
+    "ResponseType": "id_token token",
+    "Scope": "openid profile email northlake",
+    "DiscoveryEndpoint": "https://localhost:8443/realms/northlake/.well-known/openid-configuration",
+    "ProtocolProfile": "Legacy",
+    "ParBehavior": "Disable",
+    "TokenEndpointAuthMethod": "ClientSecretPost"
   }
 }
 ```
@@ -253,9 +309,9 @@ application. Keycloak's **Back to Application** link instead uses
 action uses the same value. Change that ignored `.env` setting when another
 EEMSuite origin is active.
 
-Edit `EEMSUITE_OIDC_REDIRECT_URIS` in the ignored `.env`, reset the realm, and
-rerun validation when another exact URI is needed. Wildcard callbacks are not
-used.
+Use `/configure/oidc` for exact callback, post-logout callback, and scope changes.
+The `.env` values remain the defaults when no ignored Phase 4 document exists.
+Wildcard callbacks are not used.
 
 The development realm allows 30 minutes for the overall login and for each
 individual login page. Once a login transaction has expired, a relying party
@@ -357,6 +413,12 @@ pwsh .\identity\scripts\Get-IdentityStatus.ps1 -ShowSecrets
 
 ```powershell
 pwsh .\identity\scripts\Test-Identity.ps1
+```
+
+Run only the bounded OIDC profile matrix currently installed in the realm:
+
+```powershell
+pwsh .\identity\scripts\Test-OidcIdentity.ps1
 ```
 
 To work on the SAML consumer without being blocked by an unrelated OIDC
@@ -480,9 +542,12 @@ Checked-in sources:
 - `realm/generate_realm.py`: protocol, client, claim, lifetime, and stable-ID rules.
 - `configuration/fields.json`: presentation metadata for the Phase 1 form.
 - `configuration/settings.py`: typed configuration validation and generated contract.
+- `configuration/oidc.py`: bounded OIDC profile validation, ignored-document contract,
+  and secret-free EnergyHippo System Administration preview.
 - `configuration/users.py`: typed fictional-user validation and ignored overlay storage.
 - `configuration/groups.py`: typed fictional-group and membership overlay storage.
 - `configuration/server.py`: loopback configuration API and disposable-realm apply boundary.
+- `scripts/verify_oidc_baseline.py`: focused Modern and Historical Legacy live proof.
 - `compose.yml`: immutable container versions and deployment boundary.
 - `Caddyfile`: HTTPS and proxy boundary.
 
@@ -492,6 +557,7 @@ Ignored generated state:
 - import JSON containing those secrets and test credentials;
 - connection profiles;
 - the saved local provider configuration document;
+- the saved local OIDC profile document and focused verification result;
 - local synthetic-user overrides and their generated development passwords;
 - local synthetic-group additions and checked-in-group membership overrides;
 - copied development CA;

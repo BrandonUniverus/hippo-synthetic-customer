@@ -512,15 +512,22 @@ h1 {
 }
 
 #configuration-form,
+#oidc-form,
 .result-card {
   border: 1px solid var(--line);
   background: linear-gradient(145deg, rgba(16, 42, 50, 0.9), rgba(8, 25, 30, 0.94));
   box-shadow: var(--shadow);
 }
 
-#configuration-form {
+#configuration-form,
+#oidc-form {
   overflow: hidden;
   border-radius: 22px;
+}
+
+.legacy-profile {
+  border-left: 3px solid rgba(101, 183, 247, 0.42);
+  background: rgba(40, 83, 120, 0.08);
 }
 
 .field-group {
@@ -878,8 +885,15 @@ footer {
     display: none;
   }
 
+  .topbar {
+    flex-wrap: wrap;
+    padding: 14px 0;
+  }
+
   .utility-nav {
+    width: 100%;
     gap: 12px;
+    overflow-x: auto;
   }
 
   main {

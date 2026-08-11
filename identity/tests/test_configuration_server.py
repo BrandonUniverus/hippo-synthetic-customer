@@ -57,6 +57,7 @@ class ConfigurationServerTests(unittest.TestCase):
             ),
         }
         self.keycloak = FakeKeycloakAdminClient()
+        self.verifier_calls: list[tuple[Path, Path]] = []
         self.application = self._application(self.environment, self.keycloak)
         self.server = create_server(self.application, "127.0.0.1", 0)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
@@ -74,6 +75,15 @@ class ConfigurationServerTests(unittest.TestCase):
         environment: dict[str, str],
         keycloak: FakeKeycloakAdminClient,
     ) -> ConfigurationApplication:
+        def verify_oidc(connection_path: Path, ca_path: Path) -> dict:
+            self.verifier_calls.append((connection_path, ca_path))
+            return {
+                "passed": True,
+                "exitCode": 0,
+                "classification": "passed",
+                "output": "[OK] Focused OIDC verifier passed.",
+            }
+
         return ConfigurationApplication(
             environment=environment,
             runtime_directory=self.runtime_directory,
@@ -84,6 +94,7 @@ class ConfigurationServerTests(unittest.TestCase):
                 REPOSITORY_ROOT / "identity" / "configuration" / "fields.json"
             ),
             keycloak_client=keycloak,
+            oidc_verifier=verify_oidc,
         )
 
     def _json_request(
@@ -143,6 +154,82 @@ class ConfigurationServerTests(unittest.TestCase):
         self.assertIn("does not grant EnergyHippo authorization", document)
         self.assertEqual({"total": 27, "base": 27, "local": 0}, payload["counts"])
         self.assertNotIn("password", json.dumps(payload).lower())
+
+    def test_oidc_form_and_secret_free_copy_values_are_available_without_authentication(self) -> None:
+        with request.urlopen(f"{self.base_url}/configure/oidc", timeout=10) as response:
+            document = response.read().decode("utf-8")
+        status, payload = self._json_request("/configure/api/oidc")
+
+        self.assertEqual(200, status)
+        self.assertIn("Configure bounded OIDC profiles", document)
+        self.assertEqual("Discovery", payload["values"]["configurationMode"])
+        self.assertIn("modern", payload["preview"]["profiles"])
+        serialized = json.dumps(payload)
+        self.assertNotIn(self.environment["EEMSUITE_OIDC_CLIENT_SECRET"], serialized)
+        self.assertNotIn(self.environment["EEMSUITE_OIDC_LEGACY_CLIENT_SECRET"], serialized)
+
+    def test_oidc_validation_rejects_an_unregistered_configuration_shape(self) -> None:
+        _, state = self._json_request("/configure/api/oidc")
+        values = state["values"]
+        values["configurationMode"] = "Invented"
+
+        status, payload = self._json_request("/configure/api/oidc/apply", values)
+
+        self.assertEqual(400, status)
+        self.assertIn("configurationMode", payload["errors"])
+        self.assertEqual([], self.keycloak.replacements)
+        self.assertEqual([], self.verifier_calls)
+
+    def test_oidc_apply_regenerates_realm_runs_verifier_and_persists_safe_result(self) -> None:
+        _, state = self._json_request("/configure/api/oidc")
+        values = state["values"]
+        values.update(
+            {
+                "configurationMode": "Static",
+                "parBehavior": "Require",
+                "tokenEndpointAuthMethod": "ClientSecretBasic",
+                "accessTokenLifetimeSeconds": 420,
+                "modernConsentRequired": False,
+                "legacyEnabled": False,
+            }
+        )
+
+        status, payload = self._json_request("/configure/api/oidc/apply", values)
+        _, persisted = self._json_request("/configure/api/oidc")
+
+        self.assertEqual(200, status)
+        self.assertTrue(payload["applied"])
+        self.assertTrue(payload["verification"]["passed"])
+        self.assertEqual("Static", persisted["values"]["configurationMode"])
+        self.assertEqual("Require", persisted["values"]["parBehavior"])
+        self.assertFalse(persisted["values"]["legacyEnabled"])
+        self.assertTrue(persisted["lastVerification"]["passed"])
+        self.assertEqual(1, len(self.keycloak.replacements))
+        self.assertEqual(1, len(self.keycloak.health_checks))
+        self.assertEqual(1, len(self.verifier_calls))
+        generated_realm = json.loads(
+            self.application.realm_output_path.read_text(encoding="utf-8")
+        )
+        oidc_clients = [
+            client
+            for client in generated_realm["clients"]
+            if client["protocol"] == "openid-connect"
+        ]
+        self.assertEqual(1, len(oidc_clients))
+        self.assertEqual(
+            "true",
+            oidc_clients[0]["attributes"]["pushed.authorization.request.required"],
+        )
+        self.assertNotIn(
+            self.environment["EEMSUITE_OIDC_CLIENT_SECRET"],
+            json.dumps(persisted),
+        )
+
+        save_status, saved = self._json_request("/configure/api/oidc/save", values)
+        _, after_save = self._json_request("/configure/api/oidc")
+        self.assertEqual(200, save_status)
+        self.assertFalse(saved["applied"])
+        self.assertIsNone(after_save["lastVerification"])
 
     def test_create_membership_rename_and_delete_group_regenerates_the_realm(self) -> None:
         _, users = self._json_request("/configure/api/users")

@@ -25,17 +25,21 @@ if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from identity.configuration.settings import (
+    ProviderSettings,
     REALM_KEY_PATTERN,
     SettingsValidationError,
     load_settings_document,
+)
+from identity.configuration.oidc import (
+    OidcSettings,
+    OidcValidationError,
+    load_oidc_settings_document,
 )
 from identity.configuration.groups import GroupValidationError, merge_group_overlay
 from identity.configuration.users import UserValidationError, merge_user_overlay
 
 
 DEFAULT_REALM_NAME = "northlake"
-MODERN_CLIENT_ID = "eemsuite-web"
-LEGACY_CLIENT_ID = "eemsuite-web-legacy"
 DEFAULT_EEMSUITE_APPLICATION_HOME_URL = "https://localdev.energyhippo.com/Hippo/"
 STANDARD_SAML_PROVIDER_KEY = "northlake-saml-standard"
 SAML2INT_PROVIDER_KEY = "northlake-saml2int"
@@ -507,10 +511,14 @@ def _client(
     client_id: str,
     secret: str,
     redirect_uris: list[str],
+    post_logout_redirect_uris: list[str],
     application_home_url: str,
+    scopes: tuple[str, ...],
     *,
     implicit_enabled: bool,
     require_pkce: bool,
+    consent_required: bool,
+    par_behavior: str,
 ) -> dict[str, Any]:
     attributes = {
         "backchannel.logout.revoke.offline.tokens": "true",
@@ -520,8 +528,8 @@ def _client(
         "oauth2.device.authorization.grant.enabled": "false",
         "oidc.ciba.grant.enabled": "false",
         "par.request.uri.lifespan": "60",
-        "post.logout.redirect.uris": "##".join(redirect_uris),
-        "pushed.authorization.request.required": "false",
+        "post.logout.redirect.uris": "##".join(post_logout_redirect_uris),
+        "pushed.authorization.request.required": str(par_behavior == "Require").lower(),
         "use.refresh.tokens": "true",
     }
     if require_pkce:
@@ -541,7 +549,7 @@ def _client(
             else "Compatibility client for EEMSuite's current id_token token response type."
         ),
         "enabled": True,
-        "consentRequired": require_pkce,
+        "consentRequired": consent_required,
         "alwaysDisplayInConsole": True,
         "clientAuthenticatorType": "client-secret",
         "secret": secret,
@@ -562,9 +570,11 @@ def _client(
         "defaultClientScopes": [
             "basic",
             "roles",
-            "profile",
-            "email",
-            "northlake",
+            *[
+                scope
+                for scope in ("profile", "email", "northlake")
+                if scope in scopes
+            ],
         ],
         "optionalClientScopes": ["offline_access"],
     }
@@ -726,6 +736,7 @@ def build_realm(
     enable_saml = _environment_boolean(environment, "NORTHLAKE_ENABLE_SAML", True)
     if not enable_oidc and not enable_saml:
         raise RealmGenerationError("At least one of OIDC or SAML must be enabled.")
+    oidc_settings = OidcSettings.from_environment(environment) if enable_oidc else None
 
     application_home_url = environment.get(
         "EEMSUITE_APPLICATION_HOME_URL",
@@ -922,10 +933,6 @@ def build_realm(
         for profile in manifest.get("permissionProfiles", [])
     ]
 
-    redirect_uris = (
-        _url_list(environment, "EEMSUITE_OIDC_REDIRECT_URIS") if enable_oidc else []
-    )
-
     base_url = environment.get("IDENTITY_PUBLIC_BASE_URL", "https://localhost:8443").rstrip("/")
     issuer = f"{base_url}/realms/{realm_name}"
     discovery = f"{issuer}/.well-known/openid-configuration"
@@ -961,24 +968,38 @@ def build_realm(
         [
             _client(
                 realm_name,
-                MODERN_CLIENT_ID,
+                oidc_settings.modern_client_id,
                 environment["EEMSUITE_OIDC_CLIENT_SECRET"],
-                redirect_uris,
+                list(oidc_settings.modern_redirect_uris),
+                list(oidc_settings.modern_post_logout_redirect_uris),
                 application_home_url,
+                oidc_settings.modern_scopes,
                 implicit_enabled=False,
                 require_pkce=True,
+                consent_required=oidc_settings.modern_consent_required,
+                par_behavior=oidc_settings.par_behavior,
             ),
-            _client(
-                realm_name,
-                LEGACY_CLIENT_ID,
-                environment["EEMSUITE_OIDC_LEGACY_CLIENT_SECRET"],
-                redirect_uris,
-                application_home_url,
-                implicit_enabled=True,
-                require_pkce=False,
+            *(
+                [
+                    _client(
+                        realm_name,
+                        oidc_settings.legacy_client_id,
+                        environment["EEMSUITE_OIDC_LEGACY_CLIENT_SECRET"],
+                        list(oidc_settings.legacy_redirect_uris),
+                        list(oidc_settings.legacy_post_logout_redirect_uris),
+                        application_home_url,
+                        oidc_settings.legacy_scopes,
+                        implicit_enabled=True,
+                        require_pkce=False,
+                        consent_required=False,
+                        par_behavior="Disable",
+                    )
+                ]
+                if oidc_settings.legacy_enabled
+                else []
             ),
         ]
-        if enable_oidc
+        if enable_oidc and oidc_settings is not None
         else []
     )
 
@@ -992,8 +1013,12 @@ def build_realm(
         "defaultSignatureAlgorithm": "RS256",
         "revokeRefreshToken": True,
         "refreshTokenMaxReuse": 0,
-        "accessTokenLifespan": 300,
-        "accessTokenLifespanForImplicitFlow": 300,
+        "accessTokenLifespan": (
+            oidc_settings.access_token_lifetime_seconds if oidc_settings is not None else 300
+        ),
+        "accessTokenLifespanForImplicitFlow": (
+            oidc_settings.access_token_lifetime_seconds if oidc_settings is not None else 300
+        ),
         "accessCodeLifespanLogin": 1800,
         "accessCodeLifespanUserAction": 1800,
         "ssoSessionIdleTimeout": 1800,
@@ -1088,48 +1113,95 @@ def build_realm(
     oidc_connection_profiles = (
         {
             "modern": {
-                "clientId": MODERN_CLIENT_ID,
+                "clientId": oidc_settings.modern_client_id,
                 "clientSecret": environment["EEMSUITE_OIDC_CLIENT_SECRET"],
                 "responseType": "code",
-                "scope": "openid profile email northlake",
-                "redirectUris": redirect_uris,
+                "scope": " ".join(oidc_settings.modern_scopes),
+                "redirectUris": list(oidc_settings.modern_redirect_uris),
+                "postLogoutRedirectUris": list(
+                    oidc_settings.modern_post_logout_redirect_uris
+                ),
+                "protocolProfile": "Modern",
+                "configurationMode": oidc_settings.configuration_mode,
+                "parBehavior": oidc_settings.par_behavior,
+                "tokenEndpointAuthMethod": oidc_settings.token_endpoint_auth_method,
+                "consentRequired": oidc_settings.modern_consent_required,
             },
-            "legacy": {
-                "clientId": LEGACY_CLIENT_ID,
-                "clientSecret": environment["EEMSUITE_OIDC_LEGACY_CLIENT_SECRET"],
-                "responseType": "id_token token",
-                "scope": "openid profile email northlake",
-                "redirectUris": redirect_uris,
-            },
+            **(
+                {
+                    "legacy": {
+                        "clientId": oidc_settings.legacy_client_id,
+                        "clientSecret": environment[
+                            "EEMSUITE_OIDC_LEGACY_CLIENT_SECRET"
+                        ],
+                        "responseType": "id_token token",
+                        "scope": " ".join(oidc_settings.legacy_scopes),
+                        "redirectUris": list(oidc_settings.legacy_redirect_uris),
+                        "postLogoutRedirectUris": list(
+                            oidc_settings.legacy_post_logout_redirect_uris
+                        ),
+                        "protocolProfile": "Legacy",
+                        "configurationMode": oidc_settings.configuration_mode,
+                        "parBehavior": "Disable",
+                        "tokenEndpointAuthMethod": (
+                            oidc_settings.token_endpoint_auth_method
+                        ),
+                        "consentRequired": False,
+                        "historicalExistingProviderOnly": True,
+                    }
+                }
+                if oidc_settings.legacy_enabled
+                else {}
+            ),
         }
-        if enable_oidc
+        if enable_oidc and oidc_settings is not None
         else {}
     )
     oidc_eemsuite_configuration = (
         {
-            "legacy": {
-                "OpenIDConnect": {
-                    "Description": f"{provider_display_name} - legacy",
-                    "ClientID": LEGACY_CLIENT_ID,
-                    "ClientSecret": environment["EEMSUITE_OIDC_LEGACY_CLIENT_SECRET"],
-                    "ResponseType": "id_token token",
-                    "Scope": "openid profile email northlake",
-                    "DiscoveryEndpoint": discovery,
-                }
-            },
             "modern": {
                 "OpenIDConnect": {
                     "Description": f"{provider_display_name} - modern",
-                    "ClientID": MODERN_CLIENT_ID,
+                    "ClientID": oidc_settings.modern_client_id,
                     "ClientSecret": environment["EEMSUITE_OIDC_CLIENT_SECRET"],
                     "ResponseType": "code",
-                    "Scope": "openid profile email northlake",
+                    "Scope": " ".join(oidc_settings.modern_scopes),
                     "DiscoveryEndpoint": discovery,
+                    "ProtocolProfile": "Modern",
+                    "ParBehavior": oidc_settings.par_behavior,
+                    "TokenEndpointAuthMethod": oidc_settings.token_endpoint_auth_method,
                 }
             },
+            **(
+                {
+                    "legacy": {
+                        "OpenIDConnect": {
+                            "Description": f"{provider_display_name} - historical legacy",
+                            "ClientID": oidc_settings.legacy_client_id,
+                            "ClientSecret": environment[
+                                "EEMSUITE_OIDC_LEGACY_CLIENT_SECRET"
+                            ],
+                            "ResponseType": "id_token token",
+                            "Scope": " ".join(oidc_settings.legacy_scopes),
+                            "DiscoveryEndpoint": discovery,
+                            "ProtocolProfile": "Legacy",
+                            "ParBehavior": "Disable",
+                            "TokenEndpointAuthMethod": (
+                                oidc_settings.token_endpoint_auth_method
+                            ),
+                        }
+                    }
+                }
+                if oidc_settings.legacy_enabled
+                else {}
+            ),
         }
-        if enable_oidc
+        if enable_oidc and oidc_settings is not None
         else {}
+    )
+    provider_settings = ProviderSettings.from_environment(environment)
+    oidc_configuration_preview = (
+        oidc_settings.preview(provider_settings) if oidc_settings is not None else None
     )
     connection_profile = {
         "realm": realm_name,
@@ -1147,6 +1219,7 @@ def build_realm(
             "total": len(source_groups),
             "local": sum(group.get("_source") == "local" for group in source_groups),
         },
+        "oidcConfiguration": oidc_configuration_preview,
         "applicationHomeUrl": application_home_url,
         "baseUrl": base_url,
         "issuer": issuer,
@@ -1247,11 +1320,15 @@ def generate(
     settings_path: Path | None = None,
     user_overlay_path: Path | None = None,
     group_overlay_path: Path | None = None,
+    oidc_settings_path: Path | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     environment = _load_env(env_path)
     if settings_path is not None and settings_path.is_file():
         settings_document = load_settings_document(settings_path, environment)
         environment.update(settings_document.settings.to_environment_overlay())
+    if oidc_settings_path is not None and oidc_settings_path.is_file():
+        oidc_document = load_oidc_settings_document(oidc_settings_path, environment)
+        environment.update(oidc_document.settings.to_environment_overlay())
     return generate_from_environment(
         manifest_path,
         environment,
@@ -1300,6 +1377,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--settings-file", type=Path)
     parser.add_argument("--users-file", type=Path)
     parser.add_argument("--groups-file", type=Path)
+    parser.add_argument("--oidc-settings-file", type=Path)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--connection-output", required=True, type=Path)
     return parser.parse_args()
@@ -1316,12 +1394,14 @@ def main() -> int:
             args.settings_file.resolve() if args.settings_file else None,
             args.users_file.resolve() if args.users_file else None,
             args.groups_file.resolve() if args.groups_file else None,
+            args.oidc_settings_file.resolve() if args.oidc_settings_file else None,
         )
     except (
         OSError,
         RealmGenerationError,
         SettingsValidationError,
         GroupValidationError,
+        OidcValidationError,
         UserValidationError,
         yaml.YAMLError,
     ) as error:

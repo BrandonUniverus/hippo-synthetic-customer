@@ -9,6 +9,8 @@ $script:IdentityImportDirectory = Join-Path $script:IdentityRuntimeDirectory "im
 $script:IdentityConnectionProfile = Join-Path $script:IdentityRuntimeDirectory "connection.json"
 $script:IdentityConfigurationSettings = Join-Path $script:IdentityRuntimeDirectory "configuration.json"
 $script:IdentityConfigurationModel = Join-Path $script:IdentityRoot "configuration\settings.py"
+$script:IdentityOidcSettings = Join-Path $script:IdentityRuntimeDirectory "oidc.json"
+$script:IdentityOidcConfigurationModel = Join-Path $script:IdentityRoot "configuration\oidc.py"
 $script:IdentityUserOverlay = Join-Path $script:IdentityRuntimeDirectory "users.json"
 $script:IdentityGroupOverlay = Join-Path $script:IdentityRuntimeDirectory "groups.json"
 $script:IdentityCertificateDirectory = Join-Path $script:IdentityRuntimeDirectory "certs"
@@ -80,6 +82,18 @@ function Get-IdentityEnvironment {
             $values[$key] = [string] $overlay[$key]
         }
     }
+    if (Test-Path -LiteralPath $script:IdentityOidcSettings -PathType Leaf) {
+        $oidcOverlayJson = & python $script:IdentityOidcConfigurationModel `
+            --settings-file $script:IdentityOidcSettings `
+            --print-environment-overlay
+        if ($LASTEXITCODE -ne 0) {
+            throw "Saved OIDC configuration is invalid. Open /configure/oidc or remove the ignored settings document."
+        }
+        $oidcOverlay = $oidcOverlayJson | ConvertFrom-Json -AsHashtable
+        foreach ($key in $oidcOverlay.Keys) {
+            $values[$key] = [string] $oidcOverlay[$key]
+        }
+    }
     return $values
 }
 
@@ -139,6 +153,9 @@ function New-IdentityRealm {
     }
     if (Test-Path -LiteralPath $script:IdentityGroupOverlay -PathType Leaf) {
         $generatorArguments += @("--groups-file", $script:IdentityGroupOverlay)
+    }
+    if (Test-Path -LiteralPath $script:IdentityOidcSettings -PathType Leaf) {
+        $generatorArguments += @("--oidc-settings-file", $script:IdentityOidcSettings)
     }
     & python $script:IdentityRealmGenerator @generatorArguments
     if ($LASTEXITCODE -ne 0) {
