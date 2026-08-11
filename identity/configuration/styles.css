@@ -603,6 +603,19 @@ textarea {
   line-height: 1.55;
 }
 
+.json-editor {
+  min-height: 32rem;
+  font-family: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  tab-size: 2;
+}
+
+.lifecycle-actions {
+  margin-top: 1.25rem;
+  flex-wrap: wrap;
+}
+
 input:focus,
 textarea:focus,
 select:focus,

@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="color-scheme" content="dark">
+  <title>Configure Northlake SCIM Client</title>
+  <link rel="stylesheet" href="/configure/styles.css">
+  <script src="/configure/scim.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Northlake Synthetic Identity home">
+      <span class="brand-mark" aria-hidden="true">NL</span>
+      <span><strong>Northlake</strong><small>Synthetic Identity Lab</small></span>
+    </a>
+    <nav class="utility-nav" aria-label="Configuration sections">
+      <a href="/configure">Provider</a>
+      <a href="/configure/oidc">OIDC</a>
+      <a href="/configure/saml">SAML</a>
+      <a href="/configure/scenarios">Scenarios</a>
+      <a href="/configure/scim" aria-current="page">SCIM</a>
+      <a href="/configure/users">Users</a>
+      <a href="/configure/groups">Groups</a>
+      <span class="environment">Unauthenticated localhost tool</span>
+    </nav>
+  </header>
+
+  <main>
+    <section class="intro" aria-labelledby="page-title">
+      <p class="eyebrow">Phase 8 · SCIM and cross-protocol lifecycle</p>
+      <h1 id="page-title">Provision EnergyHippo without turning Keycloak into SCIM.</h1>
+      <p>
+        Northlake acts like a customer's provisioning client. EnergyHippo remains the
+        SCIM service provider, while Keycloak independently proves OIDC or SAML
+        authentication. Connection secrets stay in ignored runtime state and never
+        appear in this page's API responses or evidence files.
+      </p>
+    </section>
+
+    <div id="load-error" class="notice notice-error" role="alert" hidden></div>
+
+    <div class="workspace" id="workspace" hidden>
+      <div>
+        <form id="scim-form" novalidate>
+          <div id="form-error" class="notice notice-error" role="alert" hidden></div>
+
+          <section class="field-group">
+            <div class="field-group-header">
+              <p class="card-kicker">Ignored local configuration</p>
+              <h2>Provisioning connections</h2>
+              <p>
+                Keep the JSON small and typed. Add a second object when testing
+                connection isolation. Company IDs, templates, and group bindings are
+                expected EEM administration values; they are never sent as caller-controlled
+                User attributes.
+              </p>
+            </div>
+            <div class="field-grid">
+              <div class="field">
+                <label for="selectedConnectionKey">Selected connection</label>
+                <select id="selectedConnectionKey" name="selectedConnectionKey"></select>
+                <p class="field-error" id="error-selectedConnectionKey" hidden></p>
+              </div>
+              <div class="field">
+                <label for="credential">Bearer credential</label>
+                <input id="credential" name="credential" type="password" autocomplete="new-password" spellcheck="false">
+                <p class="field-help" id="credential-help">Leave blank to retain the saved credential.</p>
+                <p class="field-error" id="error-credential" hidden></p>
+              </div>
+              <div class="field field-wide">
+                <label for="connectionsJson">Connections JSON</label>
+                <textarea id="connectionsJson" name="connectionsJson" class="json-editor" spellcheck="false"></textarea>
+                <p class="field-help">
+                  HTTPS is mandatory. Each base URL must end in <code>/scim/v2</code>.
+                  Optional trust certificates are filenames under <code>identity/.runtime/certs</code>.
+                </p>
+                <p class="field-error" id="error-connections" hidden></p>
+              </div>
+            </div>
+          </section>
+
+          <section class="apply-panel" aria-labelledby="connection-action-title">
+            <div>
+              <h2 id="connection-action-title">Save and discover</h2>
+              <p>
+                First create the matching connection through supported EnergyHippo
+                System Administration, rotate its credential once, and paste it here.
+              </p>
+            </div>
+            <div class="actions">
+              <button class="button button-secondary" type="button" id="format-button">Format JSON</button>
+              <button class="button button-secondary" type="submit" id="save-button">Save locally</button>
+              <button class="button button-primary" type="button" id="verify-button">Test discovery</button>
+            </div>
+          </section>
+        </form>
+
+        <section class="field-group" aria-labelledby="lifecycle-title">
+          <div class="field-group-header">
+            <p class="card-kicker">Supported resource lifecycle</p>
+            <h2 id="lifecycle-title">Run one deterministic User and Group sequence</h2>
+            <p>
+              The runner creates or reconciles one synthetic User, proves filtering and
+              PUT/PATCH, deactivates and reactivates it, and removes then restores one
+              sanctioned Group membership. It leaves the User active and membership present.
+            </p>
+          </div>
+          <div class="field-grid">
+            <div class="field">
+              <label for="syntheticUserId">Synthetic user</label>
+              <select id="syntheticUserId"></select>
+              <p class="field-error" id="error-syntheticUserId" hidden></p>
+            </div>
+            <div class="field">
+              <label for="groupBindingKey">Sanctioned group binding</label>
+              <select id="groupBindingKey"></select>
+              <p class="field-help">Choose “User only” when Group capability is intentionally disabled.</p>
+              <p class="field-error" id="error-groupBindingKey" hidden></p>
+            </div>
+          </div>
+          <div class="actions lifecycle-actions">
+            <button class="button button-primary" type="button" id="lifecycle-button">Run lifecycle</button>
+            <button class="button button-secondary" type="button" id="deactivate-button">Deactivate for denial test</button>
+            <button class="button button-secondary" type="button" id="reactivate-button">Reactivate after test</button>
+          </div>
+          <div class="notice" role="note">
+            <strong>Cross-protocol checkpoint:</strong> after the lifecycle passes, authenticate
+            the selected subject through EEM's configured Northlake OIDC or SAML provider.
+            Then deactivate here and repeat the same valid provider authentication. EEM must
+            deny its local session decision even though Keycloak authentication still succeeds.
+          </div>
+        </section>
+      </div>
+
+      <aside class="result-column" aria-label="SCIM configuration and evidence">
+        <section class="result-card status-card" aria-labelledby="status-title">
+          <div class="card-heading">
+            <div><p class="card-kicker">Provisioning client</p><h2 id="status-title">SCIM status</h2></div>
+            <span id="status-badge" class="status-badge">Loaded</span>
+          </div>
+          <p id="operation-status" class="operation-status" role="status">Ready to save or test.</p>
+          <dl class="status-list">
+            <div><dt>Connection</dt><dd id="summary-connection">—</dd></div>
+            <div><dt>Credential</dt><dd id="summary-credential">—</dd></div>
+            <div><dt>SCIM role</dt><dd>Client</dd></div>
+            <div><dt>Keycloak role</dt><dd>OIDC/SAML only</dd></div>
+          </dl>
+        </section>
+
+        <section class="result-card" aria-labelledby="verification-title">
+          <p class="card-kicker">Discovery evidence</p>
+          <h2 id="verification-title">Service-provider contract</h2>
+          <p id="verification-time" class="operation-status">Not run.</p>
+          <pre id="verification-output" tabindex="0">No discovery evidence.</pre>
+        </section>
+
+        <section class="result-card" aria-labelledby="lifecycle-result-title">
+          <p class="card-kicker">Lifecycle evidence</p>
+          <h2 id="lifecycle-result-title">User, Group, and auth handoff</h2>
+          <p id="lifecycle-time" class="operation-status">Not run.</p>
+          <pre id="lifecycle-output" tabindex="0">No lifecycle evidence.</pre>
+        </section>
+
+        <section class="result-card" aria-labelledby="preview-title">
+          <div class="card-heading">
+            <div><p class="card-kicker">Secrets excluded</p><h2 id="preview-title">Administration contract</h2></div>
+            <button class="copy-button" type="button" id="copy-button">Copy</button>
+          </div>
+          <pre id="json-preview" tabindex="0"></pre>
+        </section>
+      </aside>
+    </div>
+  </main>
+
+  <footer>
+    <span>Development use only · SCIM credentials remain in ignored runtime state</span>
+    <span><a href="/configure/scenarios">Authentication scenarios</a> · <a href="/">Identity launchpad</a></span>
+  </footer>
+</body>
+</html>

@@ -81,6 +81,11 @@ services:
       EEMSUITE_SAML2INT_ACS_URLS: ${EEMSUITE_SAML2INT_ACS_URLS:-https://localhost/Hippo/saml/northlake-saml2int/acs}
       EEMSUITE_SAML2INT_LOGOUT_URLS: ${EEMSUITE_SAML2INT_LOGOUT_URLS:-https://localhost/Hippo/saml/northlake-saml2int/logout}
       EEMSUITE_SAML2INT_SP_CERTIFICATE_FILE: /runtime/certs/saml2int-sp-public.cer
+      EEMSUITE_SCIM_BASE_URL: ${EEMSUITE_SCIM_BASE_URL:-https://localdev.energyhippo.com/Public/scim/v2}
+      EEMSUITE_SCIM_EXPECTED_COMPANY_IDS: ${EEMSUITE_SCIM_EXPECTED_COMPANY_IDS:-1}
+      EEMSUITE_SCIM_PROVISIONING_TEMPLATE: ${EEMSUITE_SCIM_PROVISIONING_TEMPLATE:-Northlake external-only users}
+      EEMSUITE_SCIM_GROUP_BINDING_ATTRIBUTE: ${EEMSUITE_SCIM_GROUP_BINDING_ATTRIBUTE:-externalId}
+      EEMSUITE_SCIM_TRUSTED_CA_CERTIFICATE: ${EEMSUITE_SCIM_TRUSTED_CA_CERTIFICATE:-}
     depends_on:
       keycloak:
         condition: service_started
@@ -96,8 +101,11 @@ services:
       start_period: 5s
     volumes:
       - ./.runtime:/runtime
+    extra_hosts:
+      - "localdev.energyhippo.com:host-gateway"
     networks:
       - identity-backend
+      - identity-edge
 
   customer-site:
     image: hippo-synthetic-identity-customer:local

@@ -35,6 +35,22 @@ from identity.configuration.saml import (
     write_public_certificate,
     write_saml_settings_document,
 )
+from identity.configuration.scim import (
+    ScimClient,
+    ScimConnectionSettings,
+    ScimProtocolError,
+    ScimSettings,
+    ScimSettingsDocument,
+    ScimUserFixture,
+    ScimValidationError,
+    create_scim_client,
+    load_scim_credentials,
+    load_scim_settings_document,
+    safe_scim_preview,
+    write_redacted_evidence,
+    write_scim_credentials,
+    write_scim_settings_document,
+)
 from identity.configuration.scenarios import (
     SCENARIO_PRESETS,
     SCENARIO_SLOTS,
@@ -264,6 +280,9 @@ class ConfigurationApplication:
         oidc_verifier: Callable[[Path, Path], dict[str, Any]] | None = None,
         saml_verifier: Callable[[Path, Path], dict[str, Any]] | None = None,
         scenario_verifier: Callable[[list[Path], Path], dict[str, Any]] | None = None,
+        scim_client_factory: Callable[
+            [ScimConnectionSettings, str, Path], ScimClient
+        ] | None = None,
     ):
         self.environment = dict(environment)
         self.runtime_directory = runtime_directory
@@ -282,6 +301,10 @@ class ConfigurationApplication:
         self.scenario_settings_path = runtime_directory / "scenarios.json"
         self.scenario_verification_path = runtime_directory / "scenario-verification.json"
         self.scenario_connection_directory = runtime_directory / "scenarios"
+        self.scim_settings_path = runtime_directory / "scim.json"
+        self.scim_credentials_path = runtime_directory / "scim-credentials.json"
+        self.scim_verification_path = runtime_directory / "scim-verification.json"
+        self.scim_lifecycle_path = runtime_directory / "scim-lifecycle.json"
         self.root_certificate_path = runtime_directory / "certs" / "caddy-local-root.crt"
         self.realm_output_path = runtime_directory / "import" / "northlake-realm.json"
         self.connection_output_path = runtime_directory / "connection.json"
@@ -289,6 +312,7 @@ class ConfigurationApplication:
         self.oidc_verifier = oidc_verifier
         self.saml_verifier = saml_verifier
         self.scenario_verifier = scenario_verifier
+        self.scim_client_factory = scim_client_factory or create_scim_client
         self.startup_settings = ProviderSettings.from_environment(self.environment)
         self.last_apply_error: str | None = None
         self._apply_lock = threading.Lock()
@@ -1023,6 +1047,278 @@ class ConfigurationApplication:
                 "verification": verification,
             }
 
+    def _scim_document(self) -> ScimSettingsDocument:
+        return load_scim_settings_document(self.scim_settings_path, self.environment)
+
+    def _scim_credentials(self) -> dict[str, str]:
+        return load_scim_credentials(self.scim_credentials_path)
+
+    @staticmethod
+    def _read_redacted_result(path: Path) -> dict[str, Any] | None:
+        if not path.is_file():
+            return None
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            raise RuntimeError("A saved SCIM evidence document is invalid.")
+        return payload
+
+    def _clear_scim_results(self) -> None:
+        self.scim_verification_path.unlink(missing_ok=True)
+        self.scim_lifecycle_path.unlink(missing_ok=True)
+
+    def _scim_fixture_users(self) -> list[dict[str, Any]]:
+        return [
+            {
+                "syntheticUserId": user["syntheticUserId"],
+                "username": user["username"],
+                "displayName": f"{user['firstName']} {user['lastName']}".strip(),
+                "enabled": user["enabled"],
+            }
+            for user in self.user_store.public_users()
+        ]
+
+    def scim_state(self) -> dict[str, Any]:
+        document = self._scim_document()
+        credentials = self._scim_credentials()
+        configured_keys = {connection.connection_key for connection in document.settings.connections}
+        credential_status = {
+            connection_key: connection_key in credentials
+            for connection_key in configured_keys
+        }
+        available_group_ids = {
+            group["groupId"] for group in self.group_store.public_state()["groups"]
+        }
+        return {
+            "values": document.settings.to_values(),
+            "preview": safe_scim_preview(document.settings, credential_status),
+            "credentialStatus": credential_status,
+            "fixtures": {
+                "users": self._scim_fixture_users(),
+                "groupBindings": [
+                    {
+                        "connectionKey": connection.connection_key,
+                        **binding.to_values(),
+                        "syntheticGroupAvailable": binding.synthetic_group_id
+                        in available_group_ids,
+                    }
+                    for connection in document.settings.connections
+                    for binding in connection.group_bindings
+                ],
+            },
+            "updatedAtUtc": document.updated_at_utc,
+            "lastVerification": self._read_redacted_result(self.scim_verification_path),
+            "lastLifecycle": self._read_redacted_result(self.scim_lifecycle_path),
+        }
+
+    def save_scim(self, values: dict[str, Any]) -> dict[str, Any]:
+        settings = ScimSettings.from_values(values)
+        credentials = self._scim_credentials()
+        credential = values.get("credential", "")
+        if credential:
+            credentials[settings.selected_connection_key] = credential
+        configured_keys = {connection.connection_key for connection in settings.connections}
+        credentials = {
+            key: value for key, value in credentials.items() if key in configured_keys
+        }
+        write_scim_settings_document(
+            self.scim_settings_path,
+            ScimSettingsDocument(settings=settings),
+        )
+        write_scim_credentials(self.scim_credentials_path, credentials)
+        self._clear_scim_results()
+        credential_status = {
+            key: key in credentials for key in sorted(configured_keys)
+        }
+        return {
+            "message": (
+                "SCIM client configuration saved locally. EnergyHippo administration "
+                "still owns the connection, company scope, template, and sanctioned groups."
+            ),
+            "values": settings.to_values(),
+            "preview": safe_scim_preview(settings, credential_status),
+            "credentialStatus": credential_status,
+        }
+
+    def _scim_client(
+        self,
+        connection_key: str | None,
+    ) -> tuple[ScimClient, ScimConnectionSettings]:
+        settings = self._scim_document().settings
+        connection = settings.connection(connection_key)
+        credential = self._scim_credentials().get(connection.connection_key)
+        if credential is None:
+            raise ScimValidationError(
+                {"credential": "Paste the one-time SCIM bearer credential and save first."}
+            )
+        return (
+            self.scim_client_factory(connection, credential, self.runtime_directory),
+            connection,
+        )
+
+    @staticmethod
+    def _scim_selection(values: dict[str, Any]) -> str | None:
+        extra = set(values) - {"connectionKey"}
+        if extra:
+            raise ScimValidationError(
+                {"_form": "Unknown SCIM verification values are not allowed."}
+            )
+        connection_key = values.get("connectionKey")
+        if connection_key is not None and not isinstance(connection_key, str):
+            raise ScimValidationError(
+                {"connectionKey": "Select one configured SCIM connection."}
+            )
+        return connection_key
+
+    def verify_scim(self, values: dict[str, Any]) -> dict[str, Any]:
+        connection_key = self._scim_selection(values)
+        client, connection = self._scim_client(connection_key)
+        try:
+            result = client.discover()
+            result.update(
+                {
+                    "checkedAtUtc": datetime.now(UTC).isoformat(),
+                    "connectionKey": connection.connection_key,
+                    "redacted": True,
+                }
+            )
+        except ScimProtocolError as failure:
+            result = {
+                **failure.evidence(),
+                "checkedAtUtc": datetime.now(UTC).isoformat(),
+                "connectionKey": connection.connection_key,
+                "redacted": True,
+            }
+        write_redacted_evidence(self.scim_verification_path, result)
+        return result
+
+    def _scim_lifecycle_selection(
+        self,
+        values: dict[str, Any],
+    ) -> tuple[str | None, str, str | None]:
+        extra = set(values) - {"connectionKey", "syntheticUserId", "groupBindingKey"}
+        if extra:
+            raise ScimValidationError(
+                {"_form": "Unknown SCIM lifecycle values are not allowed."}
+            )
+        connection_key = values.get("connectionKey")
+        synthetic_user_id = values.get("syntheticUserId")
+        group_binding_key = values.get("groupBindingKey")
+        if connection_key is not None and not isinstance(connection_key, str):
+            raise ScimValidationError(
+                {"connectionKey": "Select one configured SCIM connection."}
+            )
+        if not isinstance(synthetic_user_id, str) or not synthetic_user_id:
+            raise ScimValidationError(
+                {"syntheticUserId": "Select one enabled synthetic user."}
+            )
+        if group_binding_key in {None, ""}:
+            group_binding_key = None
+        elif not isinstance(group_binding_key, str):
+            raise ScimValidationError(
+                {"groupBindingKey": "Select one configured sanctioned-group binding."}
+            )
+        return connection_key, synthetic_user_id, group_binding_key
+
+    def run_scim_lifecycle(self, values: dict[str, Any]) -> dict[str, Any]:
+        connection_key, synthetic_user_id, group_binding_key = (
+            self._scim_lifecycle_selection(values)
+        )
+        client, connection = self._scim_client(connection_key)
+        matching_users = [
+            user
+            for user in self.user_store.public_users()
+            if user["syntheticUserId"] == synthetic_user_id
+        ]
+        if len(matching_users) != 1 or not matching_users[0]["enabled"]:
+            raise ScimValidationError(
+                {"syntheticUserId": "Select one currently enabled synthetic user."}
+            )
+        fixture = ScimUserFixture.from_public_user(matching_users[0])
+        binding = connection.binding(group_binding_key) if group_binding_key else None
+        if binding is not None:
+            available_group_ids = {
+                group["groupId"] for group in self.group_store.public_state()["groups"]
+            }
+            if binding.synthetic_group_id not in available_group_ids:
+                raise ScimValidationError(
+                    {"groupBindingKey": "The binding references a missing synthetic group."}
+                )
+        try:
+            result = client.run_lifecycle(fixture, binding)
+        except ScimProtocolError as failure:
+            result = {
+                **failure.evidence(),
+                "checkedAtUtc": datetime.now(UTC).isoformat(),
+                "connectionKey": connection.connection_key,
+                "redacted": True,
+            }
+        write_redacted_evidence(self.scim_lifecycle_path, result)
+        return result
+
+    def set_scim_lifecycle_user_active(
+        self,
+        values: dict[str, Any],
+        active: bool,
+    ) -> dict[str, Any]:
+        connection_key = self._scim_selection(values)
+        previous = self._read_redacted_result(self.scim_lifecycle_path)
+        if (
+            previous is None
+            or previous.get("connectionKey") != (connection_key or self._scim_document().settings.selected_connection_key)
+            or not isinstance(previous.get("userResourceId"), str)
+        ):
+            raise ScimValidationError(
+                {"_form": "Run the SCIM lifecycle for this connection first."}
+            )
+        client, connection = self._scim_client(connection_key)
+        resource_id = previous["userResourceId"]
+        try:
+            user, etag, read_response = client.get_user(resource_id)
+            user, _, patch_response = client.set_user_active(resource_id, active, etag)
+            if user.get("active") is not active:
+                raise ScimProtocolError(
+                    "The SCIM User lifecycle state did not match the request.",
+                    classification="lifecycle-state-mismatch",
+                )
+            result = {
+                "passed": True,
+                "classification": (
+                    "scim-user-reactivated-authentication-proof-required"
+                    if active
+                    else "scim-user-deactivated-authentication-denial-proof-required"
+                ),
+                "checkedAtUtc": datetime.now(UTC).isoformat(),
+                "connectionKey": connection.connection_key,
+                "userResourceId": resource_id,
+                "active": active,
+                "requests": [
+                    {
+                        "step": "user-read",
+                        "status": read_response.status,
+                        "etagPresent": bool(etag),
+                    },
+                    {
+                        "step": "user-reactivated" if active else "user-deactivated",
+                        "status": patch_response.status,
+                        "etagPresent": bool(patch_response.headers.get("etag")),
+                    },
+                ],
+                "crossProtocol": {
+                    "status": "authentication-proof-required",
+                    "expectedEemDecision": "allow-after-federated-proof" if active else "deny-local-session",
+                },
+                "redacted": True,
+            }
+        except ScimProtocolError as failure:
+            result = {
+                **failure.evidence(),
+                "checkedAtUtc": datetime.now(UTC).isoformat(),
+                "connectionKey": connection.connection_key,
+                "redacted": True,
+            }
+        write_redacted_evidence(self.scim_lifecycle_path, result)
+        return result
+
     def state(self) -> dict[str, Any]:
         document = self._document()
         return {
@@ -1356,6 +1652,10 @@ reading or exposing the generated password and is not counted as password-authen
                 self._static("scenarios.html", "text/html; charset=utf-8")
             elif path == "/configure/scenarios.js":
                 self._static("scenarios.js", "text/javascript; charset=utf-8")
+            elif path == "/configure/scim":
+                self._static("scim.html", "text/html; charset=utf-8")
+            elif path == "/configure/scim.js":
+                self._static("scim.js", "text/javascript; charset=utf-8")
             elif path.startswith("/configure/browser-session/"):
                 slot = path.rsplit("/", 1)[-1]
                 query = parse.parse_qs(parse.urlparse(self.path).query)
@@ -1374,6 +1674,8 @@ reading or exposing the generated password and is not counted as password-authen
                 self._json(HTTPStatus.OK, self.application.saml_state())
             elif path == "/configure/api/scenarios":
                 self._json(HTTPStatus.OK, self.application.scenario_state())
+            elif path == "/configure/api/scim":
+                self._json(HTTPStatus.OK, self.application.scim_state())
             elif path == "/configure/api/groups/claims":
                 query = parse.parse_qs(parse.urlparse(self.path).query)
                 user_ids = query.get("userId", [])
@@ -1391,6 +1693,7 @@ reading or exposing the generated password and is not counted as password-authen
             OidcValidationError,
             SamlValidationError,
             ScenarioValidationError,
+            ScimValidationError,
             UserValidationError,
             GroupValidationError,
             RuntimeError,
@@ -1433,6 +1736,82 @@ reading or exposing the generated password and is not counted as password-authen
                 self._json(
                     HTTPStatus.INTERNAL_SERVER_ERROR,
                     {"message": "Browser-session bootstrap failed.", "detail": str(failure)},
+                )
+            return
+        scim_routes = {
+            "/configure/api/scim/save",
+            "/configure/api/scim/verify",
+            "/configure/api/scim/lifecycle",
+            "/configure/api/scim/deactivate",
+            "/configure/api/scim/reactivate",
+        }
+        if path in scim_routes:
+            try:
+                values = self._request_values()
+                if path == "/configure/api/scim/save":
+                    self._json(HTTPStatus.OK, self.application.save_scim(values))
+                elif path == "/configure/api/scim/verify":
+                    result = self.application.verify_scim(values)
+                    self._json(
+                        HTTPStatus.OK,
+                        {
+                            "message": "SCIM discovery verification completed.",
+                            "verification": result,
+                        },
+                    )
+                elif path == "/configure/api/scim/lifecycle":
+                    result = self.application.run_scim_lifecycle(values)
+                    self._json(
+                        HTTPStatus.OK,
+                        {
+                            "message": "SCIM User and Group lifecycle completed.",
+                            "lifecycle": result,
+                        },
+                    )
+                else:
+                    active = path.endswith("/reactivate")
+                    result = self.application.set_scim_lifecycle_user_active(
+                        values,
+                        active,
+                    )
+                    self._json(
+                        HTTPStatus.OK,
+                        {
+                            "message": (
+                                "SCIM user reactivated. Run the federated allow check."
+                                if active
+                                else "SCIM user deactivated. Run the federated denial check."
+                            ),
+                            "lifecycle": result,
+                        },
+                    )
+            except ScimValidationError as failure:
+                self._json(
+                    HTTPStatus.BAD_REQUEST,
+                    {
+                        "message": "Check the highlighted SCIM values.",
+                        "errors": failure.errors,
+                    },
+                )
+            except ScimProtocolError as failure:
+                self._json(
+                    HTTPStatus.OK,
+                    {
+                        "message": "The SCIM check completed with a provider or transport break.",
+                        "verification": {
+                            **failure.evidence(),
+                            "checkedAtUtc": datetime.now(UTC).isoformat(),
+                            "redacted": True,
+                        },
+                    },
+                )
+            except (OSError, ValueError, RuntimeError) as failure:
+                self._json(
+                    HTTPStatus.INTERNAL_SERVER_ERROR,
+                    {
+                        "message": "The SCIM client operation failed.",
+                        "detail": str(failure),
+                    },
                 )
             return
         oidc_routes = {

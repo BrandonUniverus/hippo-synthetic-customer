@@ -569,13 +569,63 @@ encryption shape, and unsigned-request rejection. It deliberately records the
 installed EnergyHippo signed-request and private-key decryption proof as a gap;
 only the supported EnergyHippo runtime can supply that evidence.
 
-## Future SCIM 2.0 test integration
+## SCIM 2.0 provisioning client
 
-SCIM should remain separate from the Keycloak login protocols. EnergyHippo will
-be the SCIM service provider; Northlake should act like the customer's Entra
-provisioning client and drive repeatable `/Users` and `/Groups` sequences into
-it. The proposed boundary, mappings, negative cases, and cross-protocol
-provision-then-SAML-login scenario are captured in
+SCIM remains separate from the Keycloak login protocols. EnergyHippo is the
+SCIM service provider; Northlake acts like a customer's Entra provisioning
+client and drives repeatable `/Users` and sanctioned `/Groups` sequences into
+the supported EnergyHippo API.
+
+Open `https://localhost:8443/configure/scim` to configure up to eight test
+connections. The non-secret typed JSON records:
+
+- the exact HTTPS service-provider base URL ending in `/scim/v2`;
+- the company IDs, provisioning template, limits, and group-binding mode that
+  must match supported EnergyHippo System Administration;
+- one or more synthetic-to-sanctioned Group bindings; and
+- an optional certificate filename under `identity/.runtime/certs` when the
+  EnergyHippo development certificate is not already trusted in the container.
+
+Paste the one-time connection credential only in the password field. It is
+stored separately in ignored `identity/.runtime/scim-credentials.json`, is
+never returned by the configuration API, and never appears in evidence.
+Northlake refuses HTTP, credential-bearing URLs, redirects, untrusted TLS, and
+unexpected response media types.
+
+After the matching EnergyHippo provisioning connection has been created and
+enabled through its supported administrator surface, run discovery:
+
+```powershell
+pwsh .\identity\scripts\Test-ScimIdentity.ps1 -Mode Discovery
+```
+
+Run the bounded User and Group lifecycle:
+
+```powershell
+pwsh .\identity\scripts\Test-ScimIdentity.ps1 `
+  -Mode Lifecycle `
+  -SyntheticUserId samantha.ireland `
+  -GroupBindingKey nlu-company-admins
+```
+
+The lifecycle discovers the connection-aware contract; creates or reconciles
+the synthetic User; proves `externalId` and `userName` filtering, PUT, ETag,
+deactivation, and reactivation; binds the pre-sanctioned Group; removes and
+restores membership; and leaves the user active with membership present. It
+does not provision passwords, create EEM groups, grant permissions, or mutate
+an EEM database directly.
+
+Cross-protocol proof remains an explicit handoff because SCIM provisioning and
+Keycloak authentication are independent decisions:
+
+1. run the lifecycle and authenticate the selected subject through EEM's
+   configured Northlake OIDC or SAML provider;
+2. run `-Mode Deactivate` and repeat that valid provider authentication—EEM
+   must deny its local session decision;
+3. run `-Mode Reactivate`, repeat the configured federated proof, and confirm
+   the local policy allows only the still-sanctioned access.
+
+The detailed boundary and negative matrix are in
 [SCIM-2.0-TESTING.md](SCIM-2.0-TESTING.md).
 
 ### Stop and restart without changing state
@@ -681,6 +731,8 @@ Checked-in sources:
   and secret-free EnergyHippo System Administration preview.
 - `configuration/users.py`: typed fictional-user validation and ignored overlay storage.
 - `configuration/groups.py`: typed fictional-group and membership overlay storage.
+- `configuration/scim.py`: typed multi-connection SCIM client, strict HTTPS
+  transport, discovery validation, lifecycle runner, and redacted evidence boundary.
 - `configuration/server.py`: loopback configuration API and disposable-realm apply boundary.
 - `scripts/verify_oidc_baseline.py`: focused Modern and Historical Legacy live proof.
 - `compose.yml`: immutable container versions and deployment boundary.
@@ -693,6 +745,8 @@ Ignored generated state:
 - connection profiles;
 - the saved local provider configuration document;
 - the saved local OIDC profile document and focused verification result;
+- the saved SCIM connection document, separate bearer credential store, and
+  redacted discovery/lifecycle evidence;
 - local synthetic-user overrides and their generated development passwords;
 - local synthetic-group additions and checked-in-group membership overrides;
 - copied development CA;

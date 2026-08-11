@@ -65,6 +65,15 @@ if (Test-Path -LiteralPath $script:IdentityScenarioSettings -PathType Leaf) {
     Write-Host "Customer RP:      $($environment.NORTHLAKE_CUSTOMER_PUBLIC_BASE_URL.TrimEnd('/'))/customer/"
 }
 
+if (Test-Path -LiteralPath $script:IdentityScimSettings -PathType Leaf) {
+    $scimState = Get-Content -LiteralPath $script:IdentityScimSettings -Raw | ConvertFrom-Json
+    Write-Host ""
+    Write-Host "SCIM role:        client (EnergyHippo is the service provider)"
+    Write-Host "SCIM connection:  $($scimState.values.selectedConnectionKey)"
+    Write-Host "SCIM profiles:    $($scimState.values.connections.Count)"
+    Write-Host "SCIM secret file: $(if (Test-Path -LiteralPath $script:IdentityScimCredentials -PathType Leaf) { 'present; see /configure/scim for per-connection status' } else { 'not created' })"
+}
+
 if ($ShowSecrets) {
     Write-Host ""
     Write-Warning "Displaying local development secrets."

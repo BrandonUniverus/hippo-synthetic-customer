@@ -1,15 +1,16 @@
 # Northlake SCIM 2.0 Test Integration
 
-**Status:** Integration design only; no SCIM endpoint or client is implemented
-in this change.
+**Status:** Northlake SCIM 2.0 client and deterministic User/Group lifecycle are
+implemented. Installed EnergyHippo connection and cross-protocol browser proof
+remain environment acceptance, not provider-side evidence.
 
 ## Decision
 
 Keep SCIM provisioning separate from the Northlake Keycloak OIDC/SAML identity
 provider.
 
-EnergyHippo will be the SCIM 2.0 service provider. A future harness in this
-repository will act as the Northlake customer's provisioning client, in the
+EnergyHippo is the SCIM 2.0 service provider. A harness in this repository acts
+as the Northlake customer's provisioning client, in the
 same role as Microsoft Entra. It will send deterministic `User` and `Group`
 operations to EnergyHippo and verify both the SCIM responses and the resulting
 login behavior.
@@ -20,6 +21,13 @@ This matches the protocol roles in the SCIM core schema and HTTP protocol:
   schemas for users, groups, discovery, and extensions.
 - [RFC 7644](https://www.rfc-editor.org/rfc/rfc7644.html) defines the HTTP
   operations, filtering, pagination, PATCH, errors, and bulk behavior.
+
+The lab also tracks the current standards edge without claiming it. [RFC
+9865](https://www.rfc-editor.org/rfc/rfc9865.html) added cursor pagination in
+October 2025, and [RFC 9967](https://www.rfc-editor.org/rfc/rfc9967.html) added
+the SCIM profile for Security Event Tokens. ADR-002b deliberately defers cursor
+pagination and asynchronous event delivery; Phase 8 advertises both as future
+capabilities rather than silently treating RFC 7644 as the end of SCIM work.
 
 Keycloak continues to answer only the authentication question: "did Northlake
 authenticate this subject?" SCIM answers the lifecycle question: "which EEM
@@ -79,7 +87,7 @@ correlates separately through `(IdP entity ID, persistent NameID)`. Both links
 point at the same internal EEM user rather than being treated as interchangeable
 external identifiers.
 
-## First executable scenario
+## Executable scenario
 
 The highest-value end-to-end test is:
 
@@ -99,36 +107,35 @@ The highest-value end-to-end test is:
 This separates authentication success from application authorization and
 deprovisioning, which is the real integration risk.
 
-## Required runner coverage
+## Runner coverage and remaining matrix
 
-The Northlake runner should add scenarios in this order:
+The Phase 8 runner covers discovery, the positive User lifecycle, sanctioned
+Group membership, and the explicit deactivate/reactivate handoff. The remaining
+negative and scale matrix should be added in this order:
 
-1. Discovery, content types, schema URNs, and authentication failures.
-2. User create/read/filter/replace/PATCH/deactivate and idempotent retry.
-3. Group create, membership add/remove, pagination, and mapped permissions.
-4. Duplicate `externalId` and `userName`, unsupported filters, malformed PATCH,
+1. Duplicate `externalId` and `userName`, unsupported filters, malformed PATCH,
    stale version, missing member, and cross-tenant isolation.
-5. `429`/`5xx` retry behavior, out-of-order operations, repeated DELETE, and
+2. `429`/`5xx` retry behavior, out-of-order operations, repeated DELETE, and
    concurrent membership changes.
-6. Cross-protocol reconciliation with both SAML and OIDC after provision,
+3. Cross-protocol reconciliation with both SAML and OIDC after provision,
    update, group change, and deactivation.
 
 Bulk can follow after the normal resource lifecycle is correct. Password
 provisioning should remain unsupported unless a later product requirement
 explicitly introduces it.
 
-## Suggested repository shape
+## Implemented repository shape
 
 ```text
 identity/
-  scim/
-    fixtures/          # generated from the Northlake manifest
-    scenarios/         # ordered provisioning and negative cases
-    runner/            # SCIM 2.0 client and response assertions
+  configuration/
+    scim.py             # typed settings, HTTPS client, lifecycle, redaction
+    scim.html/.js       # localhost configuration and manual auth handoff
   scripts/
     Test-ScimIdentity.ps1
+  .runtime/             # ignored settings, credentials, and evidence
 ```
 
-The runner should emit a redacted machine-readable result alongside concise
-console output, just like the current identity verifier. It should never become
+The runner emits a redacted machine-readable result alongside concise console
+output, like the existing identity verifiers. It must never become
 the production SCIM service or share Keycloak's database.
