@@ -10,6 +10,7 @@ $script:IdentityConnectionProfile = Join-Path $script:IdentityRuntimeDirectory "
 $script:IdentityConfigurationSettings = Join-Path $script:IdentityRuntimeDirectory "configuration.json"
 $script:IdentityConfigurationModel = Join-Path $script:IdentityRoot "configuration\settings.py"
 $script:IdentityUserOverlay = Join-Path $script:IdentityRuntimeDirectory "users.json"
+$script:IdentityGroupOverlay = Join-Path $script:IdentityRuntimeDirectory "groups.json"
 $script:IdentityCertificateDirectory = Join-Path $script:IdentityRuntimeDirectory "certs"
 $script:IdentityRootCertificate = Join-Path $script:IdentityCertificateDirectory "caddy-local-root.crt"
 $script:IdentityManifest = Join-Path $script:RepositoryRoot "security\northlake-eem-security-v1.yaml"
@@ -135,6 +136,9 @@ function New-IdentityRealm {
     }
     if (Test-Path -LiteralPath $script:IdentityUserOverlay -PathType Leaf) {
         $generatorArguments += @("--users-file", $script:IdentityUserOverlay)
+    }
+    if (Test-Path -LiteralPath $script:IdentityGroupOverlay -PathType Leaf) {
+        $generatorArguments += @("--groups-file", $script:IdentityGroupOverlay)
     }
     & python $script:IdentityRealmGenerator @generatorArguments
     if ($LASTEXITCODE -ne 0) {

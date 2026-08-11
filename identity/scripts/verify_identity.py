@@ -748,7 +748,12 @@ def _validate_saml_response(
             if isinstance(expected_value, list)
             else [str(expected_value)]
         )
-        if actual_values is None or set(actual_values) != set(expected_values):
+        values_match = (
+            actual_values is None or actual_values == []
+            if not expected_values
+            else actual_values is not None and set(actual_values) == set(expected_values)
+        )
+        if not values_match:
             raise VerificationError(
                 f"SAML attribute {attribute_name} did not match the generated user profile."
             )
@@ -1205,8 +1210,15 @@ def _verify_admin(
             f"Admin API returned {enabled_user_count} enabled users; expected "
             f"{expected_user_inventory['enabled']}."
         )
-    if len(groups) != 27:
-        raise VerificationError(f"Admin API returned {len(groups)} groups; expected 27.")
+    expected_group_inventory = profile.get(
+        "groupInventory",
+        {"total": 27, "local": 0},
+    )
+    if len(groups) != expected_group_inventory["total"]:
+        raise VerificationError(
+            f"Admin API returned {len(groups)} groups; expected "
+            f"{expected_group_inventory['total']}."
+        )
     active_user = next(
         user
         for user in users
@@ -1320,7 +1332,8 @@ def _verify_admin(
     if disabled is None or disabled["enabled"]:
         raise VerificationError("Disabled-user regression identity was not disabled.")
     print(
-        f"[OK] Admin API: {len(users)} users, {enabled_user_count} enabled, 27 groups, "
+        f"[OK] Admin API: {len(users)} users, {enabled_user_count} enabled, "
+        f"{len(groups)} groups, "
         f"and {len(profile['clients'])} "
         "exact EEMSuite OIDC/SAML clients."
     )

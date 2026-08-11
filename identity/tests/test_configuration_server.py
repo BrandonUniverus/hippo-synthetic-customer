@@ -133,6 +133,82 @@ class ConfigurationServerTests(unittest.TestCase):
         self.assertNotIn(self.environment["SYNTHETIC_USER_PASSWORD"], serialized)
         self.assertNotIn("generatedPassword", serialized)
 
+    def test_group_form_lists_base_groups_without_authentication_or_eem_mutation(self) -> None:
+        with request.urlopen(f"{self.base_url}/configure/groups", timeout=10) as response:
+            document = response.read().decode("utf-8")
+        status, payload = self._json_request("/configure/api/groups")
+
+        self.assertEqual(200, status)
+        self.assertIn("Shape protocol claims", document)
+        self.assertIn("does not grant EnergyHippo authorization", document)
+        self.assertEqual({"total": 27, "base": 27, "local": 0}, payload["counts"])
+        self.assertNotIn("password", json.dumps(payload).lower())
+
+    def test_create_membership_rename_and_delete_group_regenerates_the_realm(self) -> None:
+        _, users = self._json_request("/configure/api/users")
+        member_id = users["users"][0]["syntheticUserId"]
+
+        create_status, created = self._json_request(
+            "/configure/api/groups/create",
+            {"groupId": "phase3_reviewers", "displayName": "Phase 3 Reviewers"},
+        )
+        member_status, with_member = self._json_request(
+            "/configure/api/groups/phase3_reviewers/members",
+            {"members": [member_id]},
+        )
+        claim_status, claims = self._json_request(
+            f"/configure/api/groups/claims?userId={member_id}"
+        )
+        rename_status, renamed = self._json_request(
+            "/configure/api/groups/phase3_reviewers/update",
+            {"groupId": "phase3_identity_reviewers", "displayName": "Identity Reviewers"},
+        )
+        delete_status, deleted = self._json_request(
+            "/configure/api/groups/phase3_identity_reviewers/delete",
+            method="POST",
+        )
+        _, listed = self._json_request("/configure/api/groups")
+
+        self.assertEqual(200, create_status)
+        self.assertEqual("local", created["group"]["source"])
+        self.assertEqual(200, member_status)
+        self.assertEqual([member_id], with_member["group"]["memberIds"])
+        self.assertEqual(200, claim_status)
+        self.assertIn("phase3_reviewers", claims["oidc"]["groups"])
+        self.assertIn("phase3_reviewers", claims["saml"]["groups"])
+        self.assertEqual(200, rename_status)
+        self.assertEqual("phase3_identity_reviewers", renamed["group"]["groupId"])
+        self.assertEqual(200, delete_status)
+        self.assertTrue(deleted["group"]["deleted"])
+        self.assertEqual({"total": 27, "base": 27, "local": 0}, listed["counts"])
+        self.assertEqual(4, len(self.keycloak.replacements))
+
+    def test_invalid_group_changes_fail_before_overlay_or_realm_mutation(self) -> None:
+        _, state = self._json_request("/configure/api/groups")
+        base_group_id = state["groups"][0]["groupId"]
+
+        invalid_status, invalid = self._json_request(
+            "/configure/api/groups/create",
+            {"groupId": "INVALID GROUP", "displayName": "Invalid Group"},
+        )
+        rename_status, rename = self._json_request(
+            f"/configure/api/groups/{base_group_id}/update",
+            {"groupId": "renamed_base", "displayName": "Renamed Base"},
+        )
+        delete_status, delete = self._json_request(
+            f"/configure/api/groups/{base_group_id}/delete",
+            method="POST",
+        )
+
+        self.assertEqual(400, invalid_status)
+        self.assertIn("groupId", invalid["errors"])
+        self.assertEqual(400, rename_status)
+        self.assertIn("_form", rename["errors"])
+        self.assertEqual(400, delete_status)
+        self.assertIn("_form", delete["errors"])
+        self.assertFalse(self.application.group_overlay_path.exists())
+        self.assertEqual([], self.keycloak.replacements)
+
     def test_create_disable_reenable_and_reset_password_regenerates_the_realm(self) -> None:
         values = {
             "username": "alex.rivera",

@@ -14,6 +14,7 @@ from cryptography.hazmat.primitives.asymmetric import ec, rsa
 from cryptography.x509.oid import NameOID
 
 from identity.configuration.settings import ProviderSettings, SettingsDocument, write_settings_document
+from identity.configuration.groups import SyntheticGroupStore
 from identity.configuration.users import SyntheticUserStore
 
 
@@ -461,6 +462,62 @@ class GenerateRealmTests(unittest.TestCase):
             {"total": 20, "enabled": 19, "local": 1},
             first_connection["userInventory"],
         )
+
+    def test_local_group_membership_is_stable_without_adding_eem_authorization(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            temporary_root = Path(temporary_directory)
+            user_overlay_path = temporary_root / "users.json"
+            group_overlay_path = temporary_root / "groups.json"
+            user_store = SyntheticUserStore(
+                self.manifest,
+                user_overlay_path,
+                self.environment["SYNTHETIC_USER_PASSWORD"],
+            )
+            local_user, _ = user_store.create(
+                {
+                    "username": "alex.rivera",
+                    "firstName": "Alex",
+                    "lastName": "Rivera",
+                    "email": "alex.rivera@northlake.example.edu",
+                    "enabled": True,
+                    "title": "Synthetic Integration Tester",
+                }
+            )
+            group_store = SyntheticGroupStore(
+                self.manifest,
+                group_overlay_path,
+                user_store,
+            )
+            group_store.create(
+                {"groupId": "phase3_reviewers", "displayName": "Phase 3 Reviewers"}
+            )
+            group_store.set_members(
+                "phase3_reviewers",
+                [local_user["syntheticUserId"]],
+            )
+            manifest = generate_realm._load_manifest(self.manifest)
+
+            first, first_connection = generate_realm.build_realm(
+                manifest,
+                self.environment,
+                user_overlay_path,
+                group_overlay_path,
+            )
+            second, _ = generate_realm.build_realm(
+                manifest,
+                self.environment,
+                user_overlay_path,
+                group_overlay_path,
+            )
+
+        first_group = next(group for group in first["groups"] if group["name"] == "phase3_reviewers")
+        second_group = next(group for group in second["groups"] if group["name"] == "phase3_reviewers")
+        generated_user = next(user for user in first["users"] if user["username"] == "alex.rivera")
+        self.assertEqual(first_group["id"], second_group["id"])
+        self.assertEqual(["/phase3_reviewers"], generated_user["groups"])
+        self.assertEqual([], generated_user["attributes"]["eem_company_ids"])
+        self.assertEqual([], generated_user["attributes"]["eem_permission_profiles"])
+        self.assertEqual({"total": 28, "local": 1}, first_connection["groupInventory"])
 
     def test_userinfo_claim_sources_include_groups_and_eem_shapes(self) -> None:
         realm, _ = self._generate()

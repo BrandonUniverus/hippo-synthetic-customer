@@ -267,6 +267,178 @@ footer {
   border-top: 1px solid var(--line);
 }
 
+.group-workspace {
+  display: grid;
+  grid-template-columns: minmax(380px, 0.76fr) minmax(520px, 1.24fr);
+  align-items: start;
+  gap: 28px;
+}
+
+.group-directory,
+.group-editor,
+.membership-editor,
+.claim-preview {
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: linear-gradient(145deg, rgba(16, 42, 50, 0.9), rgba(8, 25, 30, 0.94));
+  box-shadow: var(--shadow);
+}
+
+.group-directory {
+  overflow: hidden;
+}
+
+.group-detail-column {
+  position: sticky;
+  top: 22px;
+  display: grid;
+  gap: 18px;
+}
+
+.group-editor,
+.membership-editor,
+.claim-preview {
+  padding: 28px;
+}
+
+.group-list {
+  display: grid;
+  max-height: 760px;
+  overflow-y: auto;
+}
+
+.group-row {
+  display: grid;
+  width: 100%;
+  min-height: 74px;
+  padding: 15px 18px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--text);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  text-align: left;
+}
+
+.group-row:hover,
+.group-row[aria-pressed="true"] {
+  background: rgba(72, 209, 197, 0.09);
+}
+
+.group-row[aria-pressed="true"] {
+  box-shadow: inset 3px 0 0 var(--teal);
+}
+
+.group-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 26px;
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
+}
+
+.member-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  max-height: 420px;
+  margin-top: 22px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.member-option {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: rgba(5, 17, 21, 0.5);
+  cursor: pointer;
+}
+
+.member-option:has(input:checked) {
+  border-color: rgba(118, 229, 219, 0.42);
+  background: rgba(72, 209, 197, 0.09);
+}
+
+.member-option input {
+  width: 17px;
+  min-height: 17px;
+  flex: 0 0 auto;
+  margin: 2px 0 0;
+  accent-color: var(--teal-dark);
+}
+
+.member-option strong,
+.member-option small {
+  display: block;
+  min-width: 0;
+}
+
+.member-option strong {
+  font-size: 12px;
+}
+
+.member-option small {
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.claim-preview .card-heading select {
+  width: min(100%, 310px);
+}
+
+.claim-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 22px;
+}
+
+.claim-grid > div {
+  min-width: 0;
+}
+
+.claim-grid span {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.claim-grid pre {
+  min-height: 150px;
+  margin-top: 9px;
+}
+
+.claim-disclaimer {
+  margin: 18px 0 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+input:disabled {
+  cursor: not-allowed;
+  opacity: 0.64;
+}
+
 .password-result {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -672,7 +844,8 @@ footer {
 
 @media (max-width: 1080px) {
   .workspace,
-  .user-workspace {
+  .user-workspace,
+  .group-workspace {
     grid-template-columns: 1fr;
   }
 
@@ -686,6 +859,10 @@ footer {
   }
 
   .user-editor {
+    position: static;
+  }
+
+  .group-detail-column {
     position: static;
   }
 }
@@ -713,7 +890,9 @@ footer {
   .result-column,
   .apply-panel,
   .user-form-grid,
-  .password-result {
+  .password-result,
+  .member-list,
+  .claim-grid {
     grid-template-columns: 1fr;
   }
 
@@ -734,13 +913,25 @@ footer {
   }
 
   .directory-heading,
-  .user-actions {
+  .user-actions,
+  .group-actions,
+  .claim-preview .card-heading {
     align-items: stretch;
     flex-direction: column;
   }
 
   .user-editor {
     padding: 24px 20px;
+  }
+
+  .group-editor,
+  .membership-editor,
+  .claim-preview {
+    padding: 24px 20px;
+  }
+
+  .claim-preview .card-heading select {
+    width: 100%;
   }
 
   .password-result .copy-button {

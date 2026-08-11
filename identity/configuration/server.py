@@ -21,6 +21,7 @@ from identity.configuration.settings import (
     load_settings_document,
     write_settings_document,
 )
+from identity.configuration.groups import SyntheticGroupStore, GroupValidationError
 from identity.configuration.users import SyntheticUserStore, UserValidationError
 from identity.realm.generate_realm import generate_from_environment
 
@@ -164,6 +165,7 @@ class ConfigurationApplication:
         self.field_catalog_path = field_catalog_path
         self.settings_path = runtime_directory / "configuration.json"
         self.user_overlay_path = runtime_directory / "users.json"
+        self.group_overlay_path = runtime_directory / "groups.json"
         self.realm_output_path = runtime_directory / "import" / "northlake-realm.json"
         self.connection_output_path = runtime_directory / "connection.json"
         self.keycloak_client = keycloak_client
@@ -175,6 +177,11 @@ class ConfigurationApplication:
             manifest_path,
             self.user_overlay_path,
             self.environment["SYNTHETIC_USER_PASSWORD"],
+        )
+        self.group_store = SyntheticGroupStore(
+            manifest_path,
+            self.group_overlay_path,
+            self.user_store,
         )
 
     def _load_field_catalog(self) -> dict[str, Any]:
@@ -212,6 +219,7 @@ class ConfigurationApplication:
                 temporary_realm,
                 temporary_connection,
                 self.user_overlay_path,
+                self.group_overlay_path,
             )
             self.realm_output_path.parent.mkdir(parents=True, exist_ok=True)
             os.replace(temporary_realm, self.realm_output_path)
@@ -349,7 +357,11 @@ class ConfigurationApplication:
             },
         }
 
-    def _apply_user_overlay(self, user: dict[str, Any], password: str | None) -> tuple[int, dict[str, Any]]:
+    def _apply_identity_overlay(
+        self,
+        result_key: str,
+        result: dict[str, Any],
+    ) -> tuple[int, dict[str, Any]]:
         document = self._document()
         realm = self._generate(document.settings)
         try:
@@ -359,30 +371,31 @@ class ConfigurationApplication:
             self.last_apply_error = str(failure)
             return HTTPStatus.BAD_GATEWAY, {
                 "message": (
-                    "The synthetic-user overlay was saved, but the disposable realm could not "
+                    "The ignored identity overlay was saved, but the disposable realm could not "
                     "be regenerated. Northlake will include it on the next ordinary start."
                 ),
-                "user": user,
+                result_key: result,
                 "applied": False,
                 "applyError": self.last_apply_error,
             }
         self.last_apply_error = None
         payload: dict[str, Any] = {
-            "message": "Synthetic user saved and the disposable realm was regenerated.",
-            "user": user,
+            "message": "Identity overlay saved and the disposable realm was regenerated.",
+            result_key: result,
             "applied": True,
         }
-        if password is not None:
-            payload["generatedPassword"] = password
-            payload["message"] = (
-                "Synthetic user saved. Copy the generated development password now."
-            )
         return HTTPStatus.OK, payload
 
     def create_user(self, values: dict[str, Any]) -> tuple[int, dict[str, Any]]:
         with self._apply_lock:
             user, password = self.user_store.create(values)
-            return self._apply_user_overlay(user, password)
+            status, payload = self._apply_identity_overlay("user", user)
+            payload["generatedPassword"] = password
+            if status == HTTPStatus.OK:
+                payload["message"] = (
+                    "Synthetic user saved. Copy the generated development password now."
+                )
+            return status, payload
 
     def update_user(
         self,
@@ -391,12 +404,80 @@ class ConfigurationApplication:
     ) -> tuple[int, dict[str, Any]]:
         with self._apply_lock:
             user = self.user_store.update(synthetic_user_id, values)
-            return self._apply_user_overlay(user, None)
+            status, payload = self._apply_identity_overlay("user", user)
+            if status == HTTPStatus.OK:
+                payload["message"] = (
+                    "Synthetic user saved and the disposable realm was regenerated."
+                )
+            return status, payload
 
     def reset_user_password(self, synthetic_user_id: str) -> tuple[int, dict[str, Any]]:
         with self._apply_lock:
             user, password = self.user_store.reset_password(synthetic_user_id)
-            return self._apply_user_overlay(user, password)
+            status, payload = self._apply_identity_overlay("user", user)
+            payload["generatedPassword"] = password
+            if status == HTTPStatus.OK:
+                payload["message"] = (
+                    "Synthetic user saved. Copy the generated development password now."
+                )
+            return status, payload
+
+    def groups(self) -> dict[str, Any]:
+        return self.group_store.public_state()
+
+    def group_claims(self, synthetic_user_id: str) -> dict[str, Any]:
+        return self.group_store.user_claim_preview(synthetic_user_id)
+
+    def create_group(self, values: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+        with self._apply_lock:
+            group = self.group_store.create(values)
+            status, payload = self._apply_identity_overlay("group", group)
+            if status == HTTPStatus.OK:
+                payload["message"] = (
+                    "Synthetic group created and the disposable realm was regenerated."
+                )
+            return status, payload
+
+    def update_group(
+        self,
+        group_id: str,
+        values: dict[str, Any],
+    ) -> tuple[int, dict[str, Any]]:
+        with self._apply_lock:
+            group = self.group_store.update(group_id, values)
+            status, payload = self._apply_identity_overlay("group", group)
+            if status == HTTPStatus.OK:
+                payload["message"] = (
+                    "Synthetic group renamed and the disposable realm was regenerated."
+                )
+            return status, payload
+
+    def delete_group(self, group_id: str) -> tuple[int, dict[str, Any]]:
+        with self._apply_lock:
+            self.group_store.delete(group_id)
+            result = {"groupId": group_id, "deleted": True}
+            status, payload = self._apply_identity_overlay("group", result)
+            if status == HTTPStatus.OK:
+                payload["message"] = (
+                    "Local synthetic group removed and the disposable realm was regenerated."
+                )
+            return status, payload
+
+    def set_group_members(
+        self,
+        group_id: str,
+        values: dict[str, Any],
+    ) -> tuple[int, dict[str, Any]]:
+        if set(values) != {"members"}:
+            raise GroupValidationError({"_form": "Membership updates require only a members list."})
+        with self._apply_lock:
+            group = self.group_store.set_members(group_id, values["members"])
+            status, payload = self._apply_identity_overlay("group", group)
+            if status == HTTPStatus.OK:
+                payload["message"] = (
+                    "Synthetic memberships saved and the disposable realm was regenerated."
+                )
+            return status, payload
 
 
 class ConfigurationRequestHandler(BaseHTTPRequestHandler):
@@ -433,17 +514,36 @@ class ConfigurationRequestHandler(BaseHTTPRequestHandler):
                 self._static("users.html", "text/html; charset=utf-8")
             elif path == "/configure/users.js":
                 self._static("users.js", "text/javascript; charset=utf-8")
+            elif path == "/configure/groups":
+                self._static("groups.html", "text/html; charset=utf-8")
+            elif path == "/configure/groups.js":
+                self._static("groups.js", "text/javascript; charset=utf-8")
             elif path == "/configure/styles.css":
                 self._static("styles.css", "text/css; charset=utf-8")
             elif path == "/configure/api/state":
                 self._json(HTTPStatus.OK, self.application.state())
             elif path == "/configure/api/users":
                 self._json(HTTPStatus.OK, self.application.users())
+            elif path == "/configure/api/groups":
+                self._json(HTTPStatus.OK, self.application.groups())
+            elif path == "/configure/api/groups/claims":
+                query = parse.parse_qs(parse.urlparse(self.path).query)
+                user_ids = query.get("userId", [])
+                if len(user_ids) != 1:
+                    self._json(HTTPStatus.BAD_REQUEST, {"message": "Select one synthetic user."})
+                else:
+                    self._json(HTTPStatus.OK, self.application.group_claims(user_ids[0]))
             elif path == "/configure/health":
                 self._json(HTTPStatus.OK, {"status": "ok"})
             else:
                 self._json(HTTPStatus.NOT_FOUND, {"message": "Not found."})
-        except (OSError, SettingsValidationError, UserValidationError, RuntimeError) as failure:
+        except (
+            OSError,
+            SettingsValidationError,
+            UserValidationError,
+            GroupValidationError,
+            RuntimeError,
+        ) as failure:
             self._json(
                 HTTPStatus.INTERNAL_SERVER_ERROR,
                 {"message": "Configuration service state is unavailable.", "detail": str(failure)},
@@ -463,6 +563,60 @@ class ConfigurationRequestHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         path = parse.urlparse(self.path).path
+        if path == "/configure/api/groups/create":
+            try:
+                status, payload = self.application.create_group(self._request_values())
+                self._json(status, payload)
+            except GroupValidationError as failure:
+                self._json(
+                    HTTPStatus.BAD_REQUEST,
+                    {"message": "Check the highlighted synthetic-group values.", "errors": failure.errors},
+                )
+            except (OSError, ValueError, RuntimeError) as failure:
+                self._json(
+                    HTTPStatus.INTERNAL_SERVER_ERROR,
+                    {"message": "The synthetic-group operation failed.", "detail": str(failure)},
+                )
+            return
+        group_route_prefix = "/configure/api/groups/"
+        group_suffixes = ("/update", "/delete", "/members")
+        matching_group_suffix = next(
+            (suffix for suffix in group_suffixes if path.endswith(suffix)),
+            None,
+        )
+        if path.startswith(group_route_prefix) and matching_group_suffix is not None:
+            encoded_group_id = path[
+                len(group_route_prefix) : -len(matching_group_suffix)
+            ]
+            group_id = parse.unquote(encoded_group_id)
+            if not group_id or "/" in group_id:
+                self._json(HTTPStatus.NOT_FOUND, {"message": "Synthetic group not found."})
+                return
+            try:
+                if matching_group_suffix == "/update":
+                    status, payload = self.application.update_group(
+                        group_id,
+                        self._request_values(),
+                    )
+                elif matching_group_suffix == "/delete":
+                    status, payload = self.application.delete_group(group_id)
+                else:
+                    status, payload = self.application.set_group_members(
+                        group_id,
+                        self._request_values(),
+                    )
+                self._json(status, payload)
+            except GroupValidationError as failure:
+                self._json(
+                    HTTPStatus.BAD_REQUEST,
+                    {"message": "Check the highlighted synthetic-group values.", "errors": failure.errors},
+                )
+            except (OSError, ValueError, RuntimeError) as failure:
+                self._json(
+                    HTTPStatus.INTERNAL_SERVER_ERROR,
+                    {"message": "The synthetic-group operation failed.", "detail": str(failure)},
+                )
+            return
         if path == "/configure/api/users/create":
             try:
                 status, payload = self.application.create_user(self._request_values())

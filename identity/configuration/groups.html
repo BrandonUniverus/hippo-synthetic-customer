@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="color-scheme" content="dark">
+  <title>Manage Northlake Synthetic Groups</title>
+  <link rel="stylesheet" href="/configure/styles.css">
+  <script src="/configure/groups.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Northlake Synthetic Identity home">
+      <span class="brand-mark" aria-hidden="true">NL</span>
+      <span>
+        <strong>Northlake</strong>
+        <small>Synthetic Identity Lab</small>
+      </span>
+    </a>
+    <nav class="utility-nav" aria-label="Configuration sections">
+      <a href="/configure">Provider</a>
+      <a href="/configure/users">Users</a>
+      <a href="/configure/groups" aria-current="page">Groups</a>
+      <span class="environment">Unauthenticated localhost tool</span>
+    </nav>
+  </header>
+
+  <main>
+    <section class="intro" aria-labelledby="page-title">
+      <p class="eyebrow">Phase 3 · synthetic group management</p>
+      <h1 id="page-title">Shape protocol claims with fictional groups.</h1>
+      <p>
+        Preserve the checked-in Northlake groups, add small local test groups, and
+        change fictional memberships. The preview shows what the configured OIDC and
+        SAML group mappings emit; it does not grant EnergyHippo authorization.
+      </p>
+    </section>
+
+    <div id="group-load-error" class="notice notice-error" role="alert" hidden></div>
+
+    <div class="group-workspace" id="group-workspace" hidden>
+      <section class="group-directory" aria-labelledby="group-directory-title">
+        <div class="directory-heading">
+          <div>
+            <p class="card-kicker">Provider groups</p>
+            <h2 id="group-directory-title">Northlake groups</h2>
+          </div>
+          <button class="button button-primary" id="new-group-button" type="button">
+            New local group
+          </button>
+        </div>
+        <div class="user-counts" id="group-counts" aria-live="polite"></div>
+        <div class="group-list" id="group-list" aria-label="Synthetic groups"></div>
+      </section>
+
+      <div class="group-detail-column">
+        <section class="group-editor" aria-labelledby="group-editor-title">
+          <div class="card-heading">
+            <div>
+              <p class="card-kicker" id="group-editor-kicker">Local addition</p>
+              <h2 id="group-editor-title">Create a synthetic group</h2>
+            </div>
+            <span class="status-badge" id="group-source-badge">New</span>
+          </div>
+          <p class="operation-status" id="group-operation-status" role="status">
+            New groups carry no company or permission meaning.
+          </p>
+          <div id="group-form-error" class="notice notice-error" role="alert" hidden></div>
+
+          <form id="group-form" novalidate>
+            <input id="selected-group-id" type="hidden">
+            <div class="user-form-grid">
+              <div class="field field-wide">
+                <label for="group-id">Group id and emitted value</label>
+                <input id="group-id" name="groupId" autocomplete="off" spellcheck="false">
+                <p class="field-help">For example, phase3_reviewers. Renaming changes the emitted value.</p>
+                <p class="field-error" id="group-error-groupId" hidden></p>
+              </div>
+              <div class="field field-wide">
+                <label for="group-display-name">Display name</label>
+                <input id="group-display-name" name="displayName" autocomplete="off">
+                <p class="field-error" id="group-error-displayName" hidden></p>
+              </div>
+            </div>
+            <div class="group-actions">
+              <button class="button button-secondary" id="delete-group-button" type="button" hidden>
+                Remove local group
+              </button>
+              <button class="button button-primary" id="save-group-button" type="submit">
+                Create and reset realm
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <section class="membership-editor" id="membership-editor" aria-labelledby="membership-title" hidden>
+          <div class="card-heading">
+            <div>
+              <p class="card-kicker">Claim membership</p>
+              <h2 id="membership-title">Synthetic members</h2>
+            </div>
+            <span class="status-badge" id="member-count-badge">0 members</span>
+          </div>
+          <p class="operation-status">
+            Membership affects provider group claims only. Checked-in group metadata
+            remains source controlled.
+          </p>
+          <div class="member-list" id="member-list"></div>
+          <div class="group-actions">
+            <button class="button button-primary" id="save-members-button" type="button">
+              Save memberships and reset realm
+            </button>
+          </div>
+        </section>
+
+        <section class="claim-preview" id="claim-preview" aria-labelledby="claim-preview-title" hidden>
+          <div class="card-heading">
+            <div>
+              <p class="card-kicker">Configured mapper output</p>
+              <h2 id="claim-preview-title">Group claim preview</h2>
+            </div>
+            <select id="claim-user" aria-label="Preview claims for user"></select>
+          </div>
+          <div class="claim-grid">
+            <div>
+              <span>Selected group emits</span>
+              <pre id="selected-group-claims"></pre>
+            </div>
+            <div>
+              <span>Selected user receives</span>
+              <pre id="selected-user-claims"></pre>
+            </div>
+          </div>
+          <p class="claim-disclaimer">
+            These are provider claims and SAML attributes. EnergyHippo must still apply
+            its own linking and authorization policy.
+          </p>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <span>Development use only · provider claims only · no EnergyHippo writes</span>
+    <span><a href="/configure/users">Synthetic users</a> · <a href="/">Identity launchpad</a></span>
+  </footer>
+</body>
+</html>

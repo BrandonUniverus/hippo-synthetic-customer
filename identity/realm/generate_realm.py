@@ -29,6 +29,7 @@ from identity.configuration.settings import (
     SettingsValidationError,
     load_settings_document,
 )
+from identity.configuration.groups import GroupValidationError, merge_group_overlay
 from identity.configuration.users import UserValidationError, merge_user_overlay
 
 
@@ -701,6 +702,7 @@ def build_realm(
     manifest: dict[str, Any],
     environment: dict[str, str],
     user_overlay_path: Path | None = None,
+    group_overlay_path: Path | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Build the Keycloak realm and local connection profile."""
 
@@ -828,6 +830,11 @@ def build_realm(
         user_overlay_path,
         password,
     )
+    source_groups = merge_group_overlay(
+        source_groups,
+        group_overlay_path,
+        {user["id"] for user in users},
+    )
     user_groups: dict[str, list[str]] = defaultdict(list)
     user_companies: dict[str, set[str]] = defaultdict(set)
     user_profiles: dict[str, set[str]] = defaultdict(set)
@@ -836,14 +843,16 @@ def build_realm(
     for group in source_groups:
         group_id = group["id"]
         permission_profiles = sorted(group.get("permissionProfiles", []))
+        company_id = group.get("companyId", "")
         for user_id in group.get("users", []):
             user_groups[user_id].append(f"/{group_id}")
-            user_companies[user_id].add(group["companyId"])
+            if company_id:
+                user_companies[user_id].add(company_id)
             user_profiles[user_id].update(permission_profiles)
 
         attributes = {
             "synthetic_group_id": [group_id],
-            "company_id": [group["companyId"]],
+            "company_id": [company_id],
             "company_display_name": [group["companyDisplayName"]],
             "permission_profiles": permission_profiles,
         }
@@ -1134,6 +1143,10 @@ def build_realm(
             "enabled": sum(user["status"] == "active" for user in users),
             "local": sum(user.get("_source") == "local" for user in users),
         },
+        "groupInventory": {
+            "total": len(source_groups),
+            "local": sum(group.get("_source") == "local" for group in source_groups),
+        },
         "applicationHomeUrl": application_home_url,
         "baseUrl": base_url,
         "issuer": issuer,
@@ -1233,6 +1246,7 @@ def generate(
     connection_output_path: Path,
     settings_path: Path | None = None,
     user_overlay_path: Path | None = None,
+    group_overlay_path: Path | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     environment = _load_env(env_path)
     if settings_path is not None and settings_path.is_file():
@@ -1244,6 +1258,7 @@ def generate(
         output_path,
         connection_output_path,
         user_overlay_path,
+        group_overlay_path,
     )
 
 
@@ -1253,12 +1268,14 @@ def generate_from_environment(
     output_path: Path,
     connection_output_path: Path,
     user_overlay_path: Path | None = None,
+    group_overlay_path: Path | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     manifest = _load_manifest(manifest_path)
     realm, connection_profile = build_realm(
         manifest,
         environment,
         user_overlay_path,
+        group_overlay_path,
     )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -1282,6 +1299,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--env-file", required=True, type=Path)
     parser.add_argument("--settings-file", type=Path)
     parser.add_argument("--users-file", type=Path)
+    parser.add_argument("--groups-file", type=Path)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--connection-output", required=True, type=Path)
     return parser.parse_args()
@@ -1297,11 +1315,13 @@ def main() -> int:
             args.connection_output.resolve(),
             args.settings_file.resolve() if args.settings_file else None,
             args.users_file.resolve() if args.users_file else None,
+            args.groups_file.resolve() if args.groups_file else None,
         )
     except (
         OSError,
         RealmGenerationError,
         SettingsValidationError,
+        GroupValidationError,
         UserValidationError,
         yaml.YAMLError,
     ) as error:

@@ -42,6 +42,7 @@ class PortalTests(unittest.TestCase):
         )
         self.assertIn("/open-energyhippo", links_by_href)
         self.assertIn("/configure/users", links_by_href)
+        self.assertIn("/configure/groups", links_by_href)
         self.assertIn(
             "/realms/northlake/.well-known/openid-configuration",
             links_by_href,

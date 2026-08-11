@@ -26,6 +26,9 @@ Write-Host "Disabled user:   $($profile.testUsers.disabled.username)"
 if ($profile.PSObject.Properties["userInventory"]) {
     Write-Host "User inventory:  $($profile.userInventory.total) total, $($profile.userInventory.enabled) enabled, $($profile.userInventory.local) local"
 }
+if ($profile.PSObject.Properties["groupInventory"]) {
+    Write-Host "Group inventory: $($profile.groupInventory.total) total, $($profile.groupInventory.local) local"
+}
 if ($profile.clients.PSObject.Properties["modern"]) {
     Write-Host "Modern client:   $($profile.clients.modern.clientId) (code + PKCE S256)"
     Write-Host "Legacy client:   $($profile.clients.legacy.clientId) (id_token token)"

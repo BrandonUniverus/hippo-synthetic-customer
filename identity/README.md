@@ -16,12 +16,13 @@ Identity Provider (IdP).
   30-day localhost certificate beneath a 180-day intermediate CA.
 - An unauthenticated, loopback-only configuration page for the ordinary
   provider name, realm, public URL, application URLs, and baseline OIDC/SAML
-  registrations.
+  registrations, with separate fictional-user and fictional-group pages.
 - A small Northlake launchpad that establishes a provider session and directs
   the tester to EnergyHippo without handling passwords or tokens itself.
 - 19 checked-in Northlake identities: 18 active and one deliberately disabled,
   plus ignored local additions managed through the Phase 2 page.
-- 27 groups plus claim shapes for company IDs and EEM permission-profile intent.
+- 27 checked-in groups plus ignored local additions, editable synthetic
+  membership, and claim shapes for company IDs and EEM permission-profile intent.
 - Stable UUIDv5 user, group, role, client, scope, and realm IDs.
 - Two exact confidential EEMSuite OIDC clients:
   - `eemsuite-web`: authorization code with required PKCE `S256` and provider
@@ -112,11 +113,11 @@ discarded. A public hostname or HTTPS port change is saved as pending and takes
 effect after the normal stop/start scripts recreate the edge container.
 
 The provider form deliberately covers only the common one-provider settings in
-Phase 1. Synthetic users have the separate Phase 2 surface below; groups,
-multiple concurrent realms, advanced protocol profiles, and a general JSON
-editor remain later ADR-002b phases. Do not expose the configuration service on
-a shared or production network merely because this localhost lab does not
-require an administrator login.
+Phase 1. Synthetic users and groups have the separate Phase 2 and Phase 3
+surfaces below; multiple concurrent realms, advanced protocol profiles, and a
+bounded scenario JSON editor remain later ADR-002b phases. Do not expose the
+configuration service on a shared or production network merely because this
+localhost lab does not require an administrator login.
 
 ## Synthetic user management
 
@@ -138,6 +139,31 @@ Every user save regenerates the one disposable Keycloak realm. Current sessions,
 consent, and manual in-realm edits are therefore discarded. New Phase 2 users
 start without company, group, or permission assignments; Phase 3 adds those
 claim-shaping relationships without implying EnergyHippo authorization.
+
+## Synthetic group management
+
+`https://localhost:8443/configure/groups` lists the 27 checked-in fictional
+provider groups and lets a developer add, rename, or remove ignored local groups.
+Checked-in group definitions remain immutable, while membership for either a
+checked-in or local group can be changed through an ignored overlay. Local groups
+have no company or permission-profile meaning by default.
+
+The page previews the exact group value selected for the OIDC `groups` claim and
+SAML `groups` attribute, plus the complete group list for a selected fictional
+user. Every save regenerates the disposable realm. These provider memberships do
+not create an EnergyHippo group, company assignment, permission, or user link.
+
+To validate a generated user's real signed ID token, UserInfo response, and
+signed SAML assertion against the same persisted membership without printing the
+development password, run:
+
+```powershell
+pwsh .\identity\scripts\Test-IdentityGroupClaims.ps1 -Username samantha.ireland
+```
+
+Replace `samantha.ireland` with any enabled generated username. The verifier reads the
+credential only from ignored generated realm state and never writes to
+EnergyHippo.
 
 ## Northlake SSO launchpad
 
@@ -455,6 +481,7 @@ Checked-in sources:
 - `configuration/fields.json`: presentation metadata for the Phase 1 form.
 - `configuration/settings.py`: typed configuration validation and generated contract.
 - `configuration/users.py`: typed fictional-user validation and ignored overlay storage.
+- `configuration/groups.py`: typed fictional-group and membership overlay storage.
 - `configuration/server.py`: loopback configuration API and disposable-realm apply boundary.
 - `compose.yml`: immutable container versions and deployment boundary.
 - `Caddyfile`: HTTPS and proxy boundary.
@@ -466,6 +493,7 @@ Ignored generated state:
 - connection profiles;
 - the saved local provider configuration document;
 - local synthetic-user overrides and their generated development passwords;
+- local synthetic-group additions and checked-in-group membership overrides;
 - copied development CA;
 - PostgreSQL and Caddy Docker volumes.
 
@@ -496,6 +524,7 @@ Live provider:
 
 ```powershell
 pwsh .\identity\scripts\Test-Identity.ps1
+pwsh .\identity\scripts\Test-IdentityGroupClaims.ps1 -Username samantha.ireland
 ```
 
 The live provider verification is intentionally independent of EnergyHippo. Its
