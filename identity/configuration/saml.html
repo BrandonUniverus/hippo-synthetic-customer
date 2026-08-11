@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="color-scheme" content="dark">
+  <title>Configure Northlake SAML Profiles</title>
+  <link rel="stylesheet" href="/configure/styles.css">
+  <script src="/configure/saml.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Northlake Synthetic Identity home">
+      <span class="brand-mark" aria-hidden="true">NL</span>
+      <span><strong>Northlake</strong><small>Synthetic Identity Lab</small></span>
+    </a>
+    <nav class="utility-nav" aria-label="Configuration sections">
+      <a href="/configure">Provider</a>
+      <a href="/configure/oidc">OIDC</a>
+      <a href="/configure/saml" aria-current="page">SAML</a>
+      <a href="/configure/users">Users</a>
+      <a href="/configure/groups">Groups</a>
+      <span class="environment">Unauthenticated localhost tool</span>
+    </nav>
+  </header>
+
+  <main>
+    <section class="intro" aria-labelledby="page-title">
+      <p class="eyebrow">Phase 5 · SAML baseline profiles</p>
+      <h1 id="page-title">Configure Standard and Saml2Int.</h1>
+      <p>
+        Register exact provider-specific callbacks, choose EnergyHippo's supported
+        subject and validation policies, and prove the Northlake side. Saml2Int accepts
+        only a public RSA certificate; its matching private key never leaves EnergyHippo.
+      </p>
+    </section>
+
+    <div id="load-error" class="notice notice-error" role="alert" hidden></div>
+    <div class="workspace" id="workspace" hidden>
+      <form id="saml-form" novalidate>
+        <div id="form-error" class="notice notice-error" role="alert" hidden></div>
+
+        <section class="field-group">
+          <div class="field-group-header">
+            <p class="card-kicker">Broad interoperable baseline</p>
+            <h2>Standard</h2>
+            <p>Signed response and assertion, plaintext assertion, persistent or attribute-bound subject, and optional SLO.</p>
+          </div>
+          <div class="field-grid">
+            <div class="field field-checkbox">
+              <label class="checkbox-label" for="standardEnabled"><input id="standardEnabled" type="checkbox"> Enable Standard</label>
+              <p class="field-error" id="error-standardEnabled" hidden></p>
+            </div>
+            <div class="field"><label for="standardProviderKey">Provider key</label><input id="standardProviderKey" spellcheck="false"><p class="field-error" id="error-standardProviderKey" hidden></p></div>
+            <div class="field field-wide"><label for="standardEntityId">SP entity ID</label><input id="standardEntityId" spellcheck="false"><p class="field-error" id="error-standardEntityId" hidden></p></div>
+            <div class="field field-wide"><label for="standardAssertionConsumerServiceUrls">Exact ACS URLs</label><textarea id="standardAssertionConsumerServiceUrls" spellcheck="false"></textarea><p class="field-help">Every URL must end in the provider-specific /saml/{providerKey}/acs route.</p><p class="field-error" id="error-standardAssertionConsumerServiceUrls" hidden></p></div>
+            <div class="field field-wide"><label for="standardLogoutServiceUrls">Exact logout URLs</label><textarea id="standardLogoutServiceUrls" spellcheck="false"></textarea><p class="field-error" id="error-standardLogoutServiceUrls" hidden></p></div>
+            <div class="field"><label for="standardSubjectBindingKind">Subject binding</label><select id="standardSubjectBindingKind"><option value="PersistentNameId">Persistent NameID</option><option value="Attribute">Signed attribute</option></select><p class="field-error" id="error-standardSubjectBindingKind" hidden></p></div>
+            <div class="field"><label for="standardSubjectAttribute">Subject attribute</label><select id="standardSubjectAttribute"><option value="">Not used</option><option value="synthetic_user_id">synthetic_user_id</option><option value="username">username</option><option value="email">email</option><option value="urn:oasis:names:tc:SAML:attribute:subject-id">OASIS subject-id</option></select><p class="field-error" id="error-standardSubjectAttribute" hidden></p></div>
+            <div class="field field-wide"><label for="standardAllowedClaims">Allowed claims · one per line</label><textarea id="standardAllowedClaims" spellcheck="false"></textarea><p class="field-error" id="error-standardAllowedClaims" hidden></p></div>
+            <div class="field field-wide"><label for="standardAllowedAuthenticationContextClassReferences">Permitted authentication contexts · one URI per line</label><textarea id="standardAllowedAuthenticationContextClassReferences" spellcheck="false"></textarea><p class="field-help">An empty list means EnergyHippo accepts any valid context.</p><p class="field-error" id="error-standardAllowedAuthenticationContextClassReferences" hidden></p></div>
+            <div class="field field-checkbox"><label class="checkbox-label" for="standardAllowUnsolicitedResponses"><input id="standardAllowUnsolicitedResponses" type="checkbox"> Allow IdP-initiated unsolicited responses in EnergyHippo</label><p class="field-error" id="error-standardAllowUnsolicitedResponses" hidden></p></div>
+            <div class="field field-checkbox"><label class="checkbox-label" for="standardEnableSingleLogout"><input id="standardEnableSingleLogout" type="checkbox"> Enable signed SAML single logout</label><p class="field-error" id="error-standardEnableSingleLogout" hidden></p></div>
+          </div>
+        </section>
+
+        <section class="field-group legacy-profile">
+          <div class="field-group-header">
+            <p class="card-kicker">Strict encrypted deployment profile</p>
+            <h2>Saml2Int</h2>
+            <p>Signed AuthnRequests, directly signed responses, and AES-256-GCM encrypted assertions using only EnergyHippo's public certificate.</p>
+          </div>
+          <div class="field-grid">
+            <div class="field field-checkbox"><label class="checkbox-label" for="saml2IntEnabled"><input id="saml2IntEnabled" type="checkbox"> Enable Saml2Int</label><p class="field-error" id="error-saml2IntEnabled" hidden></p></div>
+            <div class="field"><label for="saml2IntProviderKey">Provider key</label><input id="saml2IntProviderKey" spellcheck="false"><p class="field-error" id="error-saml2IntProviderKey" hidden></p></div>
+            <div class="field field-wide"><label for="saml2IntEntityId">SP entity ID</label><input id="saml2IntEntityId" spellcheck="false"><p class="field-error" id="error-saml2IntEntityId" hidden></p></div>
+            <div class="field field-wide"><label for="saml2IntAssertionConsumerServiceUrls">Exact ACS URLs</label><textarea id="saml2IntAssertionConsumerServiceUrls" spellcheck="false"></textarea><p class="field-error" id="error-saml2IntAssertionConsumerServiceUrls" hidden></p></div>
+            <div class="field field-wide"><label for="saml2IntLogoutServiceUrls">Exact logout URLs</label><textarea id="saml2IntLogoutServiceUrls" spellcheck="false"></textarea><p class="field-error" id="error-saml2IntLogoutServiceUrls" hidden></p></div>
+            <div class="field"><label for="saml2IntSubjectBindingKind">Subject binding</label><select id="saml2IntSubjectBindingKind"><option value="PersistentNameId">Persistent NameID</option><option value="Attribute">Signed attribute</option></select><p class="field-error" id="error-saml2IntSubjectBindingKind" hidden></p></div>
+            <div class="field"><label for="saml2IntSubjectAttribute">Subject attribute</label><select id="saml2IntSubjectAttribute"><option value="">Not used</option><option value="synthetic_user_id">synthetic_user_id</option><option value="username">username</option><option value="email">email</option><option value="urn:oasis:names:tc:SAML:attribute:subject-id">OASIS subject-id</option></select><p class="field-error" id="error-saml2IntSubjectAttribute" hidden></p></div>
+            <div class="field field-wide"><label for="saml2IntAllowedClaims">Allowed claims · one per line</label><textarea id="saml2IntAllowedClaims" spellcheck="false"></textarea><p class="field-error" id="error-saml2IntAllowedClaims" hidden></p></div>
+            <div class="field field-wide"><label for="saml2IntAllowedAuthenticationContextClassReferences">Permitted authentication contexts · one URI per line</label><textarea id="saml2IntAllowedAuthenticationContextClassReferences" spellcheck="false"></textarea><p class="field-error" id="error-saml2IntAllowedAuthenticationContextClassReferences" hidden></p></div>
+            <div class="field field-checkbox"><label class="checkbox-label" for="saml2IntAllowUnsolicitedResponses"><input id="saml2IntAllowUnsolicitedResponses" type="checkbox"> Allow IdP-initiated unsolicited responses in EnergyHippo</label><p class="field-error" id="error-saml2IntAllowUnsolicitedResponses" hidden></p></div>
+            <div class="field field-checkbox"><label class="checkbox-label" for="saml2IntEnableSingleLogout"><input id="saml2IntEnableSingleLogout" type="checkbox"> Enable signed SAML single logout</label><p class="field-error" id="error-saml2IntEnableSingleLogout" hidden></p></div>
+            <div class="field field-wide">
+              <label for="saml2IntCertificate">EnergyHippo public RSA certificate</label>
+              <input id="saml2IntCertificate" type="file" accept=".cer,.crt,.pem,application/pkix-cert,application/x-x509-ca-cert">
+              <p class="field-help">PEM or DER X.509, RSA 2048+ and currently valid. Northlake rejects private-key material.</p>
+              <p class="field-error" id="error-saml2IntCertificateBase64" hidden></p>
+            </div>
+          </div>
+        </section>
+
+        <section class="apply-panel" aria-labelledby="apply-title">
+          <div><h2 id="apply-title">Save, inspect, or prove</h2><p>Apply replaces only the disposable realm and runs provider-side SAML checks.</p></div>
+          <div class="actions">
+            <button class="button button-secondary" type="button" id="preview-button">Refresh preview</button>
+            <button class="button button-secondary" type="button" id="save-button">Save</button>
+            <button class="button button-primary" type="submit" id="apply-button">Apply and verify</button>
+          </div>
+        </section>
+      </form>
+
+      <aside class="result-column" aria-label="SAML result and verification">
+        <section class="result-card status-card" aria-labelledby="status-title">
+          <div class="card-heading"><div><p class="card-kicker">Disposable realm</p><h2 id="status-title">SAML status</h2></div><span id="status-badge" class="status-badge">Loaded</span></div>
+          <p id="operation-status" class="operation-status" role="status">Ready to preview, save, or apply.</p>
+          <dl class="status-list">
+            <div><dt>Standard</dt><dd id="summary-standard">—</dd></div>
+            <div><dt>Saml2Int</dt><dd id="summary-saml2int">—</dd></div>
+            <div><dt>SP certificate</dt><dd id="summary-certificate">—</dd></div>
+            <div><dt>Installed EEM proof</dt><dd>Required separately</dd></div>
+          </dl>
+        </section>
+        <section class="result-card" aria-labelledby="verification-title">
+          <div class="card-heading"><div><p class="card-kicker">Provider-side evidence</p><h2 id="verification-title">Focused verifier</h2></div><button class="copy-button" type="button" id="verify-button">Run again</button></div>
+          <p id="verification-time" class="operation-status">Not run from this configuration yet.</p>
+          <pre id="verification-output" tabindex="0">No verification result.</pre>
+        </section>
+        <section class="result-card" aria-labelledby="preview-title">
+          <div class="card-heading"><div><p class="card-kicker">Secrets excluded</p><h2 id="preview-title">Ready-to-copy EEM values</h2></div><button class="copy-button" type="button" id="copy-button">Copy</button></div>
+          <pre id="json-preview" tabindex="0"></pre>
+        </section>
+      </aside>
+    </div>
+  </main>
+  <footer><span>Development use only · no EnergyHippo writes</span><span><a href="/configure">Provider configuration</a> · <a href="/">Identity launchpad</a></span></footer>
+</body>
+</html>

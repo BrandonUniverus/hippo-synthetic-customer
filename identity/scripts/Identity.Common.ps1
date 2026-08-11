@@ -11,10 +11,13 @@ $script:IdentityConfigurationSettings = Join-Path $script:IdentityRuntimeDirecto
 $script:IdentityConfigurationModel = Join-Path $script:IdentityRoot "configuration\settings.py"
 $script:IdentityOidcSettings = Join-Path $script:IdentityRuntimeDirectory "oidc.json"
 $script:IdentityOidcConfigurationModel = Join-Path $script:IdentityRoot "configuration\oidc.py"
+$script:IdentitySamlSettings = Join-Path $script:IdentityRuntimeDirectory "saml.json"
+$script:IdentitySamlConfigurationModel = Join-Path $script:IdentityRoot "configuration\saml.py"
 $script:IdentityUserOverlay = Join-Path $script:IdentityRuntimeDirectory "users.json"
 $script:IdentityGroupOverlay = Join-Path $script:IdentityRuntimeDirectory "groups.json"
 $script:IdentityCertificateDirectory = Join-Path $script:IdentityRuntimeDirectory "certs"
 $script:IdentityRootCertificate = Join-Path $script:IdentityCertificateDirectory "caddy-local-root.crt"
+$script:IdentitySaml2IntCertificate = Join-Path $script:IdentityCertificateDirectory "saml2int-sp-public.cer"
 $script:IdentityManifest = Join-Path $script:RepositoryRoot "security\northlake-eem-security-v1.yaml"
 $script:IdentityRealmGenerator = Join-Path $script:IdentityRoot "realm\generate_realm.py"
 $script:IdentityRealmOutput = Join-Path $script:IdentityImportDirectory "northlake-realm.json"
@@ -94,6 +97,19 @@ function Get-IdentityEnvironment {
             $values[$key] = [string] $oidcOverlay[$key]
         }
     }
+    if (Test-Path -LiteralPath $script:IdentitySamlSettings -PathType Leaf) {
+        $samlOverlayJson = & python $script:IdentitySamlConfigurationModel `
+            --settings-file $script:IdentitySamlSettings `
+            --certificate-file $script:IdentitySaml2IntCertificate `
+            --print-environment-overlay
+        if ($LASTEXITCODE -ne 0) {
+            throw "Saved SAML configuration is invalid. Open /configure/saml or remove the ignored settings document."
+        }
+        $samlOverlay = $samlOverlayJson | ConvertFrom-Json -AsHashtable
+        foreach ($key in $samlOverlay.Keys) {
+            $values[$key] = [string] $samlOverlay[$key]
+        }
+    }
     return $values
 }
 
@@ -156,6 +172,12 @@ function New-IdentityRealm {
     }
     if (Test-Path -LiteralPath $script:IdentityOidcSettings -PathType Leaf) {
         $generatorArguments += @("--oidc-settings-file", $script:IdentityOidcSettings)
+    }
+    if (Test-Path -LiteralPath $script:IdentitySamlSettings -PathType Leaf) {
+        $generatorArguments += @(
+            "--saml-settings-file", $script:IdentitySamlSettings,
+            "--saml-certificate-file", $script:IdentitySaml2IntCertificate
+        )
     }
     & python $script:IdentityRealmGenerator @generatorArguments
     if ($LASTEXITCODE -ne 0) {

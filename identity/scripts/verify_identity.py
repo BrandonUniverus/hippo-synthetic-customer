@@ -422,8 +422,9 @@ def _saml_timestamp(value: str | None, description: str) -> datetime:
 def _saml_authentication_url(
     profile: dict[str, Any],
     assertion_consumer_service_url: str,
+    client_key: str = "saml",
 ) -> tuple[str, str, str]:
-    client = profile["clients"]["saml"]
+    client = profile["clients"][client_key]
     request_id = f"_{_base64url(secrets.token_bytes(18))}"
     relay_state = _base64url(secrets.token_bytes(18))
     issue_instant = (
@@ -749,9 +750,44 @@ def _validate_saml_response(
     )
     if authn_instant > now + skew or authn_instant < now - timedelta(minutes=10):
         raise VerificationError("SAML AuthnInstant was outside the current login window.")
+    authentication_contexts = authn_statements[0].findall(
+        "./saml:AuthnContext/saml:AuthnContextClassRef",
+        namespaces=SAML_NAMESPACES,
+    )
+    if len(authentication_contexts) != 1 or not authentication_contexts[0].text:
+        raise VerificationError("SAML assertion omitted one authentication context.")
+    allowed_authentication_contexts = profile["clients"]["saml"].get(
+        "allowedAuthenticationContextClassReferences",
+        [],
+    )
+    if (
+        allowed_authentication_contexts
+        and authentication_contexts[0].text not in allowed_authentication_contexts
+    ):
+        raise VerificationError(
+            "SAML authentication context "
+            f"{authentication_contexts[0].text!r} was outside the configured allowlist."
+        )
 
     attributes = _saml_attribute_values(assertion)
-    for attribute_name, expected_value in expected_user["expectedAttributes"].items():
+    client = profile["clients"]["saml"]
+    allowed_claims = client.get(
+        "allowedClaims",
+        list(expected_user["expectedAttributes"]) + ["realm_roles"],
+    )
+    unexpected_claims = sorted(set(attributes) - set(allowed_claims))
+    if unexpected_claims:
+        raise VerificationError(
+            f"SAML assertion emitted a claim outside the allowlist: {unexpected_claims[0]}."
+        )
+    for attribute_name in allowed_claims:
+        if attribute_name == "realm_roles":
+            continue
+        if attribute_name not in expected_user["expectedAttributes"]:
+            raise VerificationError(
+                f"SAML verifier has no expected value for allowlisted claim {attribute_name}."
+            )
+        expected_value = expected_user["expectedAttributes"][attribute_name]
         actual_values = attributes.get(attribute_name)
         expected_values = (
             [str(value) for value in expected_value]
@@ -768,8 +804,15 @@ def _validate_saml_response(
                 f"SAML attribute {attribute_name} did not match the generated user profile."
             )
     expected_roles = set(expected_user["expectedAttributes"]["eem_permission_profiles"])
-    if not expected_roles.issubset(attributes.get("realm_roles", [])):
+    if "realm_roles" in allowed_claims and not expected_roles.issubset(
+        attributes.get("realm_roles", [])
+    ):
         raise VerificationError("SAML realm_roles omitted expected permission-profile roles.")
+    subject_attribute = client.get("subjectAttribute")
+    if client.get("subjectBindingKind") == "Attribute" and not attributes.get(
+        subject_attribute or ""
+    ):
+        raise VerificationError("SAML attribute-bound subject was not emitted.")
     if any(name.startswith("saml.persistent.name.id.for.") for name in attributes):
         raise VerificationError("Internal persistent-NameID state leaked into SAML attributes.")
 
@@ -1105,7 +1148,8 @@ def _verify_saml(
         request_id=request_id,
         expected_user=profile["testUsers"]["active"],
     )
-    _verify_saml_logout(opener, profile, metadata, sp_initiated)
+    if client.get("enableSingleLogout", True):
+        _verify_saml_logout(opener, profile, metadata, sp_initiated)
 
     idp_opener, idp_login_document = _open_login(
         context,
@@ -1166,11 +1210,16 @@ def _verify_saml(
         and "invalid" not in disabled_document.lower()
     ):
         raise VerificationError("Disabled SAML user did not remain on a controlled login error.")
+    logout_result = (
+        "signed single logout"
+        if client.get("enableSingleLogout", True)
+        else "configured local-only logout policy"
+    )
     print(
-        "[OK] SAML 2.0: metadata and signing keys, exact ACS rejection, signed response "
-        "and assertion, persistent NameID, audience/time/request binding, Northlake "
-        "attributes, SP/IdP-initiated POST login, signed single logout, unique IDs, "
-        "and disabled-user denial."
+        "[OK] Standard SAML: metadata and signing keys, exact ACS rejection, signed "
+        "response and assertion, configured subject binding, audience/time/request "
+        f"binding, allowlisted Northlake attributes, SP/IdP-initiated POST login, {logout_result}, "
+        "unique IDs, and disabled-user denial."
     )
 
 
@@ -1292,20 +1341,7 @@ def _verify_admin(
             or saml_attributes.get("saml_name_id_format") != "persistent"
         ):
             raise VerificationError("SAML client drifted from its signed baseline profile.")
-        expected_saml_mappers = {
-            "username",
-            "email",
-            "given_name",
-            "family_name",
-            "groups",
-            "synthetic_user_id",
-            "primary_company_id",
-            "title",
-            "synthetic_status",
-            "eem_company_ids",
-            "eem_permission_profiles",
-            "realm_roles",
-        }
+        expected_saml_mappers = set(saml_profile.get("allowedClaims", []))
         actual_saml_mappers = {
             mapper["name"] for mapper in saml.get("protocolMappers", [])
         }
@@ -1320,6 +1356,7 @@ def _verify_admin(
             saml2int.get("protocol") != "saml"
             or saml2int_profile.get("validationProfile") != "Saml2Int"
             or saml2int_attributes.get("saml.server.signature") != "true"
+            or saml2int_attributes.get("saml.assertion.signature") != "false"
             or saml2int_attributes.get("saml.signature.algorithm") != "RSA_SHA256"
             or saml2int_attributes.get("saml.force.post.binding") != "true"
             or saml2int_attributes.get("saml.client.signature") != "true"
@@ -1332,6 +1369,11 @@ def _verify_admin(
             raise VerificationError(
                 "SAML2Int client drifted from signed-request and encrypted-assertion settings."
             )
+        actual_saml2int_mappers = {
+            mapper["name"] for mapper in saml2int.get("protocolMappers", [])
+        }
+        if actual_saml2int_mappers != set(saml2int_profile.get("allowedClaims", [])):
+            raise VerificationError("SAML2Int client protocol-mapper set drifted.")
         print(
             "[OK] Admin API: SAML2Int requires signed requests and encrypted assertions "
             "with the configured EEM public certificate."

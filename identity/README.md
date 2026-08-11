@@ -94,6 +94,7 @@ Then open:
 - Northlake launchpad: `https://localhost:8443/`
 - Local provider configuration: `https://localhost:8443/configure`
 - OIDC profile configuration: `https://localhost:8443/configure/oidc`
+- SAML profile configuration: `https://localhost:8443/configure/saml`
 - Account/login: `https://localhost:8443/realms/northlake/account/`
 - Realm admin: `https://localhost:8443/admin/northlake/console/`
 - OIDC discovery: `https://localhost:8443/realms/northlake/.well-known/openid-configuration`
@@ -116,8 +117,8 @@ discarded. A public hostname or HTTPS port change is saved as pending and takes
 effect after the normal stop/start scripts recreate the edge container.
 
 The provider form deliberately covers only the common one-provider settings in
-Phase 1. Synthetic users, groups, and bounded OIDC profiles have the separate
-Phase 2, Phase 3, and Phase 4 surfaces below; multiple concurrent realms and a
+Phase 1. Synthetic users, groups, and bounded OIDC/SAML profiles have the separate
+Phase 2 through Phase 5 surfaces below; multiple concurrent realms and a
 bounded scenario JSON editor remain later ADR-002b phases. Do not expose the
 configuration service on a shared or production network merely because this
 localhost lab does not require an administrator login.
@@ -212,6 +213,42 @@ The Modern profile is the default and the recommendation for new providers.
 Historical Legacy exists only to reproduce already-existing implicit-flow
 registrations. Disabling it removes the Keycloak client and records a controlled
 skip in the focused verifier.
+
+## Bounded SAML profile configuration
+
+`https://localhost:8443/configure/saml` is the Phase 5 control surface for the
+named `Standard` and `Saml2Int` profiles. Each profile has an exact EnergyHippo
+provider key, SP entity ID, ACS/logout URL list, subject binding, claim allowlist,
+authentication-context allowlist, unsolicited-response policy, and SLO policy.
+Callbacks must end in `/saml/{providerKey}/acs` or
+`/saml/{providerKey}/logout`; wildcard and root-level legacy callbacks are
+rejected.
+
+The generated preview includes the exact Northlake IdP metadata/entity/endpoints
+and ready-to-copy EnergyHippo System Administration values, including derived SP
+metadata URLs. It does not contain certificate bytes or private material.
+`Standard` is enabled by default. Enabling `Saml2Int` requires uploading the
+current public half of an EnergyHippo RSA credential. The local service accepts
+PEM or DER X.509, validates RSA 2048+, rejects private-key text, and persists only
+DER public certificate data in ignored `identity/.runtime/certs` state.
+
+**Apply and verify** proves the Northlake provider contract. Standard exercises
+metadata, exact ACS rejection, SP/IdP-initiated login, signatures, bindings,
+allowlisted attributes, logout policy, unique IDs, and disabled-user denial.
+Saml2Int proves that unsigned AuthnRequests are rejected and that an
+IdP-initiated response is directly signed with exactly one AES-256-GCM assertion
+encrypted by RSA-OAEP-11/SHA-256/MGF1-SHA256 to the selected public certificate.
+Because Northlake never receives the private key, the page labels the installed
+EnergyHippo signed-request/decryption path as separate required evidence instead
+of claiming it passed.
+
+Local values are stored in ignored `identity/.runtime/saml.json` and
+`identity/.runtime/certs/saml2int-sp-public.cer`. Run the same provider-side proof
+from the host with:
+
+```powershell
+pwsh .\identity\scripts\Test-SamlIdentity.ps1
+```
 
 ## Northlake SSO launchpad
 
@@ -341,10 +378,11 @@ complete registrations under `clients.saml` (`Standard`) and, when enabled,
 
 The first Standard ACS and logout URLs are verifier callbacks. The generated
 clients also register EEMSuite's real dynamic-provider routes:
-`/Hippo/saml/{providerKey}/acs`, `/metadata`, and `/logout`. Override the named
-`EEMSUITE_SAML_STANDARD_*` or `EEMSUITE_SAML2INT_*` URL lists in the ignored
-`.env` when another installed application path is under test. Exact URLs are
-intentional; no wildcard SAML callbacks are registered.
+`/Hippo/saml/{providerKey}/acs`, `/metadata`, and `/logout`. Use
+`/configure/saml` to change these exact values. The named
+`EEMSUITE_SAML_STANDARD_*` or `EEMSUITE_SAML2INT_*` variables remain defaults
+when no ignored Phase 5 document exists. Exact URLs are intentional; no wildcard
+SAML callbacks are registered.
 
 The EEMSuite implementation should treat the following as mandatory validation,
 not merely claim parsing:
@@ -385,14 +423,10 @@ assertion client whose Response and assertion are both signed. The EEMSuite
 dual-signature shapes; this synthetic client deliberately uses the strongest
 dual-signature baseline.
 
-To exercise the pinned SAML2Int profile, first configure an EEMSuite RSA
+To exercise the pinned SAML2Int profile, first configure an EnergyHippo RSA
 service-provider credential that supports signing and encryption, export only
-its public X.509 certificate, and set:
-
-```text
-EEMSUITE_SAML_PROFILES=Standard;Saml2Int
-EEMSUITE_SAML2INT_SP_CERTIFICATE_FILE=C:\path\to\public-eem-sp.cer
-```
+its public X.509 certificate, then enable Saml2Int and upload that public file at
+`/configure/saml`.
 
 Realm generation then creates a separate `northlake-saml2int` client that
 requires signed AuthnRequests and emits encrypted assertions. Missing, malformed,
@@ -421,18 +455,18 @@ Run only the bounded OIDC profile matrix currently installed in the realm:
 pwsh .\identity\scripts\Test-OidcIdentity.ps1
 ```
 
-To work on the SAML consumer without being blocked by an unrelated OIDC
+To verify the Northlake SAML provider without being blocked by an unrelated OIDC
 regression, run the SAML suite independently:
 
 ```powershell
 pwsh .\identity\scripts\Test-SamlIdentity.ps1
 ```
 
-That focused command still performs the complete SAML proof: trusted metadata,
-response and assertion signatures, exact issuer/destination/recipient/audience,
-time conditions and `OneTimeUse`, persistent NameID, request correlation,
-attributes, SP- and IdP-initiated login, signed logout, replay-resistant IDs,
-invalid ACS rejection, and the disabled-user path.
+For Standard, that command performs the complete provider proof described above.
+When Saml2Int is enabled, it also proves public-certificate binding, secure
+encryption shape, and unsigned-request rejection. It deliberately records the
+installed EnergyHippo signed-request and private-key decryption proof as a gap;
+only the supported EnergyHippo runtime can supply that evidence.
 
 ## Future SCIM 2.0 test integration
 

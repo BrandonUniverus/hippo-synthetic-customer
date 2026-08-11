@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import base64
 import tempfile
 import threading
 import unittest
@@ -8,6 +9,7 @@ from pathlib import Path
 from urllib import error, request
 
 from identity.configuration.server import ConfigurationApplication, create_server
+from identity.tests.test_configuration_saml import create_public_certificate
 from identity.configuration.settings import ProviderSettings
 
 
@@ -58,6 +60,7 @@ class ConfigurationServerTests(unittest.TestCase):
         }
         self.keycloak = FakeKeycloakAdminClient()
         self.verifier_calls: list[tuple[Path, Path]] = []
+        self.saml_verifier_calls: list[tuple[Path, Path]] = []
         self.application = self._application(self.environment, self.keycloak)
         self.server = create_server(self.application, "127.0.0.1", 0)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
@@ -84,6 +87,15 @@ class ConfigurationServerTests(unittest.TestCase):
                 "output": "[OK] Focused OIDC verifier passed.",
             }
 
+        def verify_saml(connection_path: Path, ca_path: Path) -> dict:
+            self.saml_verifier_calls.append((connection_path, ca_path))
+            return {
+                "passed": True,
+                "exitCode": 0,
+                "classification": "provider-ready-eem-proof-required",
+                "output": "[OK] Focused SAML verifier passed.\n[GAP] Installed EEM proof required.",
+            }
+
         return ConfigurationApplication(
             environment=environment,
             runtime_directory=self.runtime_directory,
@@ -95,6 +107,7 @@ class ConfigurationServerTests(unittest.TestCase):
             ),
             keycloak_client=keycloak,
             oidc_verifier=verify_oidc,
+            saml_verifier=verify_saml,
         )
 
     def _json_request(
@@ -230,6 +243,85 @@ class ConfigurationServerTests(unittest.TestCase):
         self.assertEqual(200, save_status)
         self.assertFalse(saved["applied"])
         self.assertIsNone(after_save["lastVerification"])
+
+    def test_saml_form_and_secret_free_copy_values_are_available_without_authentication(self) -> None:
+        with request.urlopen(f"{self.base_url}/configure/saml", timeout=10) as response:
+            document = response.read().decode("utf-8")
+        status, payload = self._json_request("/configure/api/saml")
+
+        self.assertEqual(200, status)
+        self.assertIn("Configure Standard and Saml2Int", document)
+        self.assertTrue(payload["values"]["standardEnabled"])
+        self.assertFalse(payload["values"]["saml2IntEnabled"])
+        self.assertFalse(payload["certificate"]["configured"])
+        serialized = json.dumps(payload)
+        self.assertNotIn("BEGIN CERTIFICATE", serialized)
+        self.assertNotIn("BEGIN PRIVATE KEY", serialized)
+
+    def test_saml2int_requires_public_certificate_before_realm_mutation(self) -> None:
+        _, state = self._json_request("/configure/api/saml")
+        values = state["values"]
+        values["saml2IntEnabled"] = True
+
+        status, payload = self._json_request("/configure/api/saml/apply", values)
+
+        self.assertEqual(400, status)
+        self.assertIn("saml2IntCertificateBase64", payload["errors"])
+        self.assertEqual([], self.keycloak.replacements)
+        self.assertEqual([], self.saml_verifier_calls)
+
+    def test_saml_apply_installs_both_profiles_and_only_public_certificate(self) -> None:
+        certificate_der, _ = create_public_certificate()
+        _, state = self._json_request("/configure/api/saml")
+        values = state["values"]
+        values.update(
+            {
+                "saml2IntEnabled": True,
+                "saml2IntCertificateBase64": base64.b64encode(certificate_der).decode(
+                    "ascii"
+                ),
+                "saml2IntCertificateName": "eem-public.cer",
+            }
+        )
+
+        status, payload = self._json_request("/configure/api/saml/apply", values)
+        _, persisted = self._json_request("/configure/api/saml")
+
+        self.assertEqual(200, status)
+        self.assertTrue(payload["applied"])
+        self.assertTrue(payload["verification"]["passed"])
+        self.assertEqual(
+            "provider-ready-eem-proof-required",
+            payload["verification"]["classification"],
+        )
+        self.assertTrue(persisted["values"]["saml2IntEnabled"])
+        self.assertTrue(persisted["certificate"]["configured"])
+        self.assertEqual(certificate_der, self.application.saml2int_certificate_path.read_bytes())
+        self.assertEqual(1, len(self.keycloak.replacements))
+        self.assertEqual(1, len(self.saml_verifier_calls))
+        generated_realm = json.loads(
+            self.application.realm_output_path.read_text(encoding="utf-8")
+        )
+        saml_clients = [
+            client for client in generated_realm["clients"] if client["protocol"] == "saml"
+        ]
+        self.assertEqual(2, len(saml_clients))
+        saml2int = next(
+            client
+            for client in saml_clients
+            if client["attributes"]["saml.encrypt"] == "true"
+        )
+        expected_encryption_attributes = {
+            "saml.encryption.algorithm": "http://www.w3.org/2009/xmlenc11#aes256-gcm",
+            "saml.encryption.keyAlgorithm": "http://www.w3.org/2009/xmlenc11#rsa-oaep",
+            "saml.encryption.digestMethod": "http://www.w3.org/2001/04/xmlenc#sha256",
+            "saml.encryption.maskGenerationFunction": "http://www.w3.org/2009/xmlenc11#mgf1sha256",
+        }
+        for attribute, value in expected_encryption_attributes.items():
+            self.assertEqual(value, saml2int["attributes"][attribute])
+        serialized = json.dumps(persisted)
+        self.assertNotIn(base64.b64encode(certificate_der).decode("ascii"), serialized)
+        self.assertNotIn("PRIVATE KEY", serialized)
 
     def test_create_membership_rename_and_delete_group_regenerates_the_realm(self) -> None:
         _, users = self._json_request("/configure/api/users")

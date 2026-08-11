@@ -24,6 +24,17 @@ from identity.configuration.oidc import (
     load_oidc_settings_document,
     write_oidc_settings_document,
 )
+from identity.configuration.saml import (
+    CERTIFICATE_INPUT_KEYS,
+    SamlSettings,
+    SamlSettingsDocument,
+    SamlValidationError,
+    load_saml_settings_document,
+    parse_public_certificate_base64,
+    read_public_certificate,
+    write_public_certificate,
+    write_saml_settings_document,
+)
 from identity.configuration.settings import (
     FIELD_KEYS,
     ProviderSettings,
@@ -36,7 +47,7 @@ from identity.configuration.users import SyntheticUserStore, UserValidationError
 from identity.realm.generate_realm import generate_from_environment
 
 
-MAX_REQUEST_BYTES = 64 * 1024
+MAX_REQUEST_BYTES = 128 * 1024
 
 
 class KeycloakApplyError(RuntimeError):
@@ -169,6 +180,7 @@ class ConfigurationApplication:
         field_catalog_path: Path,
         keycloak_client: KeycloakAdminClient,
         oidc_verifier: Callable[[Path, Path], dict[str, Any]] | None = None,
+        saml_verifier: Callable[[Path, Path], dict[str, Any]] | None = None,
     ):
         self.environment = dict(environment)
         self.runtime_directory = runtime_directory
@@ -179,11 +191,17 @@ class ConfigurationApplication:
         self.group_overlay_path = runtime_directory / "groups.json"
         self.oidc_settings_path = runtime_directory / "oidc.json"
         self.oidc_verification_path = runtime_directory / "oidc-verification.json"
+        self.saml_settings_path = runtime_directory / "saml.json"
+        self.saml_verification_path = runtime_directory / "saml-verification.json"
+        self.saml2int_certificate_path = (
+            runtime_directory / "certs" / "saml2int-sp-public.cer"
+        )
         self.root_certificate_path = runtime_directory / "certs" / "caddy-local-root.crt"
         self.realm_output_path = runtime_directory / "import" / "northlake-realm.json"
         self.connection_output_path = runtime_directory / "connection.json"
         self.keycloak_client = keycloak_client
         self.oidc_verifier = oidc_verifier
+        self.saml_verifier = saml_verifier
         self.startup_settings = ProviderSettings.from_environment(self.environment)
         self.last_apply_error: str | None = None
         self._apply_lock = threading.Lock()
@@ -221,6 +239,7 @@ class ConfigurationApplication:
         self,
         settings: ProviderSettings,
         oidc_settings: OidcSettings | None = None,
+        saml_settings: SamlSettings | None = None,
     ) -> dict[str, Any]:
         effective_environment = dict(self.environment)
         effective_environment.update(settings.to_environment_overlay())
@@ -229,6 +248,15 @@ class ConfigurationApplication:
             effective_environment,
         ).settings
         effective_environment.update(selected_oidc_settings.to_environment_overlay())
+        selected_saml_settings = saml_settings or load_saml_settings_document(
+            self.saml_settings_path,
+            effective_environment,
+        ).settings
+        effective_environment.update(
+            selected_saml_settings.to_environment_overlay(
+                self.saml2int_certificate_path
+            )
+        )
         self.runtime_directory.mkdir(parents=True, exist_ok=True)
         with tempfile.TemporaryDirectory(
             prefix="northlake-config-",
@@ -389,6 +417,224 @@ class ConfigurationApplication:
                 ),
                 "values": oidc_settings.to_values(),
                 "preview": oidc_settings.preview(provider_document.settings),
+                "applied": True,
+                "verification": verification,
+            }
+
+    def _saml_document(self) -> SamlSettingsDocument:
+        provider = self._document().settings
+        effective_environment = dict(self.environment)
+        effective_environment.update(provider.to_environment_overlay())
+        return load_saml_settings_document(self.saml_settings_path, effective_environment)
+
+    def _saml_certificate(self) -> tuple[bytes, dict[str, Any]] | None:
+        return read_public_certificate(self.saml2int_certificate_path)
+
+    def _last_saml_verification(self) -> dict[str, Any] | None:
+        if not self.saml_verification_path.is_file():
+            return None
+        payload = json.loads(self.saml_verification_path.read_text(encoding="utf-8"))
+        return payload if isinstance(payload, dict) else None
+
+    def _clear_saml_verification(self) -> None:
+        self.saml_verification_path.unlink(missing_ok=True)
+
+    def _parse_saml_update(
+        self,
+        values: dict[str, Any],
+    ) -> tuple[SamlSettings, bytes | None, dict[str, Any] | None]:
+        settings_values = {
+            key: value for key, value in values.items() if key not in CERTIFICATE_INPUT_KEYS
+        }
+        settings = SamlSettings.from_values(settings_values)
+        certificate_value = values.get("saml2IntCertificateBase64")
+        uploaded_certificate: bytes | None = None
+        certificate_summary: dict[str, Any] | None = None
+        if certificate_value:
+            uploaded_certificate, certificate_summary = parse_public_certificate_base64(
+                certificate_value
+            )
+        else:
+            existing = self._saml_certificate()
+            if existing is not None:
+                _, certificate_summary = existing
+        if settings.saml2int.enabled and certificate_summary is None:
+            raise SamlValidationError(
+                {
+                    "saml2IntCertificateBase64": (
+                        "Enable Saml2Int only after choosing EEM's public RSA certificate."
+                    )
+                }
+            )
+        return settings, uploaded_certificate, certificate_summary
+
+    def saml_state(self) -> dict[str, Any]:
+        provider = self._document().settings
+        document = self._saml_document()
+        certificate = self._saml_certificate()
+        certificate_summary = certificate[1] if certificate is not None else None
+        return {
+            "values": document.settings.to_values(),
+            "preview": document.settings.preview(
+                public_base_url=provider.public_base_url,
+                realm_key=provider.realm_key,
+                provider_display_name=provider.provider_display_name,
+                certificate=certificate_summary,
+            ),
+            "certificate": certificate_summary or {"configured": False},
+            "updatedAtUtc": document.updated_at_utc,
+            "lastVerification": self._last_saml_verification(),
+        }
+
+    def preview_saml(self, values: dict[str, Any]) -> dict[str, Any]:
+        settings, _, certificate = self._parse_saml_update(values)
+        provider = self._document().settings
+        return {
+            "values": settings.to_values(),
+            "preview": settings.preview(
+                public_base_url=provider.public_base_url,
+                realm_key=provider.realm_key,
+                provider_display_name=provider.provider_display_name,
+                certificate=certificate,
+            ),
+            "certificate": certificate or {"configured": False},
+        }
+
+    def save_saml(self, values: dict[str, Any]) -> dict[str, Any]:
+        settings, uploaded_certificate, certificate = self._parse_saml_update(values)
+        if uploaded_certificate is not None:
+            write_public_certificate(self.saml2int_certificate_path, uploaded_certificate)
+        write_saml_settings_document(
+            self.saml_settings_path,
+            SamlSettingsDocument(settings=settings),
+        )
+        self._clear_saml_verification()
+        provider = self._document().settings
+        return {
+            "message": "SAML profiles saved locally. Apply to regenerate the disposable realm.",
+            "values": settings.to_values(),
+            "preview": settings.preview(
+                public_base_url=provider.public_base_url,
+                realm_key=provider.realm_key,
+                provider_display_name=provider.provider_display_name,
+                certificate=certificate,
+            ),
+            "certificate": certificate or {"configured": False},
+            "applied": False,
+        }
+
+    def _default_saml_verifier(self, connection_path: Path, ca_path: Path) -> dict[str, Any]:
+        verifier_path = Path(
+            os.environ.get(
+                "NORTHLAKE_SAML_VERIFIER_PATH",
+                "/app/identity/scripts/verify_saml_baseline.py",
+            )
+        )
+        command = [
+            sys.executable,
+            str(verifier_path),
+            "--connection",
+            str(connection_path),
+            "--ca-file",
+            str(ca_path),
+        ]
+        host_alias = os.environ.get("NORTHLAKE_VERIFIER_HOST_ALIAS", "").strip()
+        if host_alias:
+            command.extend(["--resolve-host", f"localhost={host_alias}"])
+        try:
+            completed = subprocess.run(
+                command,
+                capture_output=True,
+                check=False,
+                text=True,
+                timeout=120,
+            )
+        except (OSError, subprocess.TimeoutExpired) as failure:
+            return {
+                "passed": False,
+                "exitCode": None,
+                "classification": "verifier-error",
+                "output": str(failure),
+            }
+        output = "\n".join(
+            part.strip() for part in (completed.stdout, completed.stderr) if part.strip()
+        )
+        return {
+            "passed": completed.returncode == 0,
+            "exitCode": completed.returncode,
+            "classification": (
+                "provider-ready-eem-proof-required"
+                if completed.returncode == 0
+                else "provider-contract-break"
+            ),
+            "output": output[-24_000:],
+        }
+
+    def verify_saml(self) -> dict[str, Any]:
+        verifier = self.saml_verifier or self._default_saml_verifier
+        result = dict(verifier(self.connection_output_path, self.root_certificate_path))
+        result["checkedAtUtc"] = datetime.now(UTC).isoformat()
+        self.saml_verification_path.parent.mkdir(parents=True, exist_ok=True)
+        temporary_path = self.saml_verification_path.with_suffix(".json.tmp")
+        temporary_path.write_text(
+            json.dumps(result, indent=2, ensure_ascii=False) + os.linesep,
+            encoding="utf-8",
+        )
+        os.replace(temporary_path, self.saml_verification_path)
+        return result
+
+    def apply_saml(self, values: dict[str, Any]) -> tuple[int, dict[str, Any]]:
+        saml_settings, uploaded_certificate, certificate = self._parse_saml_update(values)
+        with self._apply_lock:
+            provider_document = self._document()
+            if uploaded_certificate is not None:
+                write_public_certificate(
+                    self.saml2int_certificate_path,
+                    uploaded_certificate,
+                )
+            write_saml_settings_document(
+                self.saml_settings_path,
+                SamlSettingsDocument(settings=saml_settings),
+            )
+            self._clear_saml_verification()
+            realm = self._generate(
+                provider_document.settings,
+                saml_settings=saml_settings,
+            )
+            preview = saml_settings.preview(
+                public_base_url=provider_document.settings.public_base_url,
+                realm_key=provider_document.settings.realm_key,
+                provider_display_name=provider_document.settings.provider_display_name,
+                certificate=certificate,
+            )
+            try:
+                self.keycloak_client.replace_realm(
+                    realm,
+                    provider_document.applied_realm_key,
+                )
+                self.keycloak_client.wait_until_healthy(provider_document.settings)
+            except KeycloakApplyError as failure:
+                return HTTPStatus.BAD_GATEWAY, {
+                    "message": (
+                        "SAML profiles were saved, but the disposable realm could not be applied."
+                    ),
+                    "values": saml_settings.to_values(),
+                    "preview": preview,
+                    "certificate": certificate or {"configured": False},
+                    "applied": False,
+                    "applyError": str(failure),
+                }
+            verification = self.verify_saml()
+            return HTTPStatus.OK, {
+                "message": (
+                    "SAML profiles applied and provider-side verification passed. "
+                    "Installed EnergyHippo proof remains separate."
+                    if verification.get("passed")
+                    else "SAML profiles applied; the focused verifier found a contract break."
+                ),
+                "values": saml_settings.to_values(),
+                "preview": preview,
+                "certificate": certificate or {"configured": False},
                 "applied": True,
                 "verification": verification,
             }
@@ -689,6 +935,10 @@ class ConfigurationRequestHandler(BaseHTTPRequestHandler):
                 self._static("oidc.html", "text/html; charset=utf-8")
             elif path == "/configure/oidc.js":
                 self._static("oidc.js", "text/javascript; charset=utf-8")
+            elif path == "/configure/saml":
+                self._static("saml.html", "text/html; charset=utf-8")
+            elif path == "/configure/saml.js":
+                self._static("saml.js", "text/javascript; charset=utf-8")
             elif path == "/configure/styles.css":
                 self._static("styles.css", "text/css; charset=utf-8")
             elif path == "/configure/api/state":
@@ -699,6 +949,8 @@ class ConfigurationRequestHandler(BaseHTTPRequestHandler):
                 self._json(HTTPStatus.OK, self.application.groups())
             elif path == "/configure/api/oidc":
                 self._json(HTTPStatus.OK, self.application.oidc_state())
+            elif path == "/configure/api/saml":
+                self._json(HTTPStatus.OK, self.application.saml_state())
             elif path == "/configure/api/groups/claims":
                 query = parse.parse_qs(parse.urlparse(self.path).query)
                 user_ids = query.get("userId", [])
@@ -714,6 +966,7 @@ class ConfigurationRequestHandler(BaseHTTPRequestHandler):
             OSError,
             SettingsValidationError,
             OidcValidationError,
+            SamlValidationError,
             UserValidationError,
             GroupValidationError,
             RuntimeError,
@@ -743,6 +996,41 @@ class ConfigurationRequestHandler(BaseHTTPRequestHandler):
             "/configure/api/oidc/apply",
             "/configure/api/oidc/verify",
         }
+        saml_routes = {
+            "/configure/api/saml/preview",
+            "/configure/api/saml/save",
+            "/configure/api/saml/apply",
+            "/configure/api/saml/verify",
+        }
+        if path in saml_routes:
+            try:
+                values = self._request_values()
+                if path == "/configure/api/saml/preview":
+                    self._json(HTTPStatus.OK, self.application.preview_saml(values))
+                elif path == "/configure/api/saml/save":
+                    self._json(HTTPStatus.OK, self.application.save_saml(values))
+                elif path == "/configure/api/saml/apply":
+                    status, payload = self.application.apply_saml(values)
+                    self._json(status, payload)
+                else:
+                    self._json(
+                        HTTPStatus.OK,
+                        {
+                            "message": "Focused SAML verification completed.",
+                            "verification": self.application.verify_saml(),
+                        },
+                    )
+            except SamlValidationError as failure:
+                self._json(
+                    HTTPStatus.BAD_REQUEST,
+                    {"message": "Check the highlighted SAML values.", "errors": failure.errors},
+                )
+            except (OSError, ValueError, RuntimeError) as failure:
+                self._json(
+                    HTTPStatus.INTERNAL_SERVER_ERROR,
+                    {"message": "The SAML configuration operation failed.", "detail": str(failure)},
+                )
+            return
         if path in oidc_routes:
             try:
                 values = self._request_values()

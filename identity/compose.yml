@@ -78,7 +78,7 @@ services:
       EEMSUITE_SAML2INT_ENTITY_ID: ${EEMSUITE_SAML2INT_ENTITY_ID:-urn:energyhippo:eemsuite-web:saml:saml2int}
       EEMSUITE_SAML2INT_ACS_URLS: ${EEMSUITE_SAML2INT_ACS_URLS:-https://localhost/Hippo/saml/northlake-saml2int/acs}
       EEMSUITE_SAML2INT_LOGOUT_URLS: ${EEMSUITE_SAML2INT_LOGOUT_URLS:-https://localhost/Hippo/saml/northlake-saml2int/logout}
-      EEMSUITE_SAML2INT_SP_CERTIFICATE_FILE: ${EEMSUITE_SAML2INT_SP_CERTIFICATE_FILE:-}
+      EEMSUITE_SAML2INT_SP_CERTIFICATE_FILE: /runtime/certs/saml2int-sp-public.cer
     depends_on:
       keycloak:
         condition: service_started
