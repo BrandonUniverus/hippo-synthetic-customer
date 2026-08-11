@@ -50,6 +50,10 @@ Identity Provider (IdP).
   security bindings, checks mapped attributes, exercises SP- and IdP-initiated
   login, performs signed single logout, proves the session ended, and rejects
   the disabled user.
+- Two additional disposable lab realms that run concurrently with the stable
+  `northlake` realm. Named scenarios vary issuer/subject relationships, bounded
+  claim shape, OIDC discovery/PAR settings, and exact provider-specific SAML
+  registrations without accepting arbitrary Keycloak JSON.
 
 The built-in Keycloak administration console is the initial admin page. This
 repository does not reimplement passwords, sessions, consent, or user storage.
@@ -95,6 +99,7 @@ Then open:
 - Local provider configuration: `https://localhost:8443/configure`
 - OIDC profile configuration: `https://localhost:8443/configure/oidc`
 - SAML profile configuration: `https://localhost:8443/configure/saml`
+- Concurrent provider scenarios: `https://localhost:8443/configure/scenarios`
 - Account/login: `https://localhost:8443/realms/northlake/account/`
 - Realm admin: `https://localhost:8443/admin/northlake/console/`
 - OIDC discovery: `https://localhost:8443/realms/northlake/.well-known/openid-configuration`
@@ -117,10 +122,9 @@ discarded. A public hostname or HTTPS port change is saved as pending and takes
 effect after the normal stop/start scripts recreate the edge container.
 
 The provider form deliberately covers only the common one-provider settings in
-Phase 1. Synthetic users, groups, and bounded OIDC/SAML profiles have the separate
-Phase 2 through Phase 5 surfaces below; multiple concurrent realms and a
-bounded scenario JSON editor remain later ADR-002b phases. Do not expose the
-configuration service on a shared or production network merely because this
+Phase 1. Synthetic users, groups, bounded OIDC/SAML profiles, and two-provider
+scenarios have the separate Phase 2 through Phase 6 surfaces below. Do not expose
+the configuration service on a shared or production network merely because this
 localhost lab does not require an administrator login.
 
 ## Synthetic user management
@@ -249,6 +253,47 @@ from the host with:
 ```powershell
 pwsh .\identity\scripts\Test-SamlIdentity.ps1
 ```
+
+## Concurrent provider scenarios
+
+`https://localhost:8443/configure/scenarios` is the Phase 6 control surface. It
+adds `northlake-lab-a` and `northlake-lab-b` to the same Keycloak deployment and
+leaves the stable `northlake` realm untouched. Each lab realm has a distinct
+OIDC issuer, SAML IdP entity ID and metadata endpoint, persisted signing keys,
+one Modern OIDC client, and one Standard SAML client.
+
+Start with one of three named presets:
+
+- **Issuer isolation** emits different external subjects under different
+  issuers and the complete Northlake claim set.
+- **Same subject, different issuers** deliberately emits the same OIDC `sub`
+  and persistent SAML NameID from both realms. This proves why an external
+  account key must include the issuer or IdP entity ID.
+- **Claim-shape drift** reduces the second provider to the bounded identity-only
+  claim shape while leaving its identity and callback registration distinct.
+
+The ordinary form can independently change each realm's provider/client keys,
+exact OIDC callbacks, discovery mode, PAR behavior, claim shape, SAML SP entity
+ID, and provider-specific ACS/logout callbacks. **Clone behavior** copies those
+behaviors while retaining the target realm's distinct identities and callbacks.
+**Reset realm** replaces only the selected disposable realm. The Advanced JSON
+panel accepts the same typed fields as the form; arbitrary clients, mappers,
+scripts, credentials, and raw Keycloak realm JSON are rejected server-side.
+
+**Apply both and verify** runs real code + PKCE OIDC login and the full Standard
+SAML suite against each realm, then compares discovery issuers, OIDC signing
+keys, SAML entity IDs/certificates, claim shape, and the expected equal-or-
+different subject relationship. The result and redacted scenario export are
+stored under ignored `identity/.runtime` state. Run the same proof from the host:
+
+```powershell
+pwsh .\identity\scripts\Test-IdentityScenarios.ps1
+```
+
+This is provider-side evidence only. Selecting both providers in a running
+EnergyHippo instance and proving that equal external subjects remain isolated is
+an explicit installed-EnergyHippo proof gap; Northlake does not write or seed
+EnergyHippo configuration or database rows.
 
 ## Northlake SSO launchpad
 

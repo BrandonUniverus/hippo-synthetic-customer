@@ -16,6 +16,7 @@ COPY identity/realm /app/identity/realm
 COPY identity/scripts/verify_identity.py /app/identity/scripts/verify_identity.py
 COPY identity/scripts/verify_oidc_baseline.py /app/identity/scripts/verify_oidc_baseline.py
 COPY identity/scripts/verify_saml_baseline.py /app/identity/scripts/verify_saml_baseline.py
+COPY identity/scripts/verify_scenarios.py /app/identity/scripts/verify_scenarios.py
 COPY security/northlake-eem-security-v1.yaml /app/security/northlake-eem-security-v1.yaml
 
 EXPOSE 8081

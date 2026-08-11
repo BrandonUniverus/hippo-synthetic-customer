@@ -77,6 +77,7 @@ Write-Host "Login/account: $issuer/account/"
 Write-Host "Admin:         $($environment.IDENTITY_PUBLIC_BASE_URL.TrimEnd('/'))/admin/$realmKey/console/"
 Write-Host "SAML metadata: $issuer/protocol/saml/descriptor"
 Write-Host "Configuration: $($environment.IDENTITY_PUBLIC_BASE_URL.TrimEnd('/'))/configure"
+Write-Host "Scenarios:     $($environment.IDENTITY_PUBLIC_BASE_URL.TrimEnd('/'))/configure/scenarios"
 Write-Host "Credentials:   $script:IdentityConnectionProfile"
 
 $certificate = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new(

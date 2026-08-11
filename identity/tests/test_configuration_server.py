@@ -61,6 +61,7 @@ class ConfigurationServerTests(unittest.TestCase):
         self.keycloak = FakeKeycloakAdminClient()
         self.verifier_calls: list[tuple[Path, Path]] = []
         self.saml_verifier_calls: list[tuple[Path, Path]] = []
+        self.scenario_verifier_calls: list[tuple[list[Path], Path]] = []
         self.application = self._application(self.environment, self.keycloak)
         self.server = create_server(self.application, "127.0.0.1", 0)
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
@@ -96,6 +97,15 @@ class ConfigurationServerTests(unittest.TestCase):
                 "output": "[OK] Focused SAML verifier passed.\n[GAP] Installed EEM proof required.",
             }
 
+        def verify_scenarios(connection_paths: list[Path], ca_path: Path) -> dict:
+            self.scenario_verifier_calls.append((connection_paths, ca_path))
+            return {
+                "passed": True,
+                "exitCode": 0,
+                "classification": "provider-ready-eem-proof-required",
+                "output": "[OK] Two provider realms passed.\n[GAP] Installed EEM proof required.",
+            }
+
         return ConfigurationApplication(
             environment=environment,
             runtime_directory=self.runtime_directory,
@@ -108,6 +118,7 @@ class ConfigurationServerTests(unittest.TestCase):
             keycloak_client=keycloak,
             oidc_verifier=verify_oidc,
             saml_verifier=verify_saml,
+            scenario_verifier=verify_scenarios,
         )
 
     def _json_request(
@@ -322,6 +333,82 @@ class ConfigurationServerTests(unittest.TestCase):
         serialized = json.dumps(persisted)
         self.assertNotIn(base64.b64encode(certificate_der).decode("ascii"), serialized)
         self.assertNotIn("PRIVATE KEY", serialized)
+
+    def test_scenario_form_and_redacted_presets_are_available_without_authentication(self) -> None:
+        with request.urlopen(f"{self.base_url}/configure/scenarios", timeout=10) as response:
+            document = response.read().decode("utf-8")
+        status, payload = self._json_request("/configure/api/scenarios")
+
+        self.assertEqual(200, status)
+        self.assertIn("Run two identity providers together", document)
+        self.assertEqual({"labA", "labB"}, set(payload["values"]["realms"]))
+        self.assertEqual(
+            {"IsolationBaseline", "SharedSubject", "ClaimDrift"},
+            set(payload["presets"]),
+        )
+        serialized = json.dumps(payload)
+        self.assertNotIn(self.environment["KEYCLOAK_ADMIN_PASSWORD"], serialized)
+        self.assertNotIn(self.environment["EEMSUITE_OIDC_CLIENT_SECRET"], serialized)
+        self.assertTrue(payload["export"]["redacted"])
+
+    def test_scenario_apply_clone_and_per_realm_reset_are_bounded(self) -> None:
+        _, state = self._json_request("/configure/api/scenarios")
+        values = state["values"]
+        values["realms"]["labB"]["claimShape"] = "Minimal"
+
+        clone_status, cloned = self._json_request(
+            "/configure/api/scenarios/clone/labA/labB",
+            values,
+        )
+        self.assertEqual(200, clone_status)
+        self.assertEqual("Full", cloned["values"]["realms"]["labB"]["claimShape"])
+        self.assertEqual(
+            "northlake-lab-b",
+            cloned["values"]["realms"]["labB"]["realmKey"],
+        )
+
+        apply_status, applied = self._json_request(
+            "/configure/api/scenarios/apply",
+            cloned["values"],
+        )
+        self.assertEqual(200, apply_status)
+        self.assertTrue(applied["applied"])
+        self.assertTrue(applied["verification"]["passed"])
+        self.assertEqual(
+            [("northlake-lab-a", None), ("northlake-lab-b", None)],
+            self.keycloak.replacements,
+        )
+        self.assertEqual(["northlake-lab-a", "northlake-lab-b"], self.keycloak.health_checks)
+        self.assertEqual(1, len(self.scenario_verifier_calls))
+        for connection_path in self.scenario_verifier_calls[0][0]:
+            self.assertTrue(connection_path.is_file())
+
+        reset_status, reset = self._json_request(
+            "/configure/api/scenarios/reset/labB",
+            applied["values"],
+        )
+        self.assertEqual(200, reset_status)
+        self.assertTrue(reset["applied"])
+        self.assertEqual(
+            ("northlake-lab-b", "northlake-lab-b"),
+            self.keycloak.replacements[-1],
+        )
+        self.assertEqual(2, len(self.scenario_verifier_calls))
+
+    def test_scenario_rejects_arbitrary_keycloak_json_before_realm_mutation(self) -> None:
+        _, state = self._json_request("/configure/api/scenarios")
+        values = state["values"]
+        values["rawKeycloakJson"] = {"clients": [{"publicClient": True}]}
+
+        status, payload = self._json_request(
+            "/configure/api/scenarios/apply",
+            values,
+        )
+
+        self.assertEqual(400, status)
+        self.assertIn("_form", payload["errors"])
+        self.assertEqual([], self.keycloak.replacements)
+        self.assertFalse(self.application.scenario_settings_path.exists())
 
     def test_create_membership_rename_and_delete_group_regenerates_the_realm(self) -> None:
         _, users = self._json_request("/configure/api/users")

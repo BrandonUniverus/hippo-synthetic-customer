@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="color-scheme" content="dark">
+  <title>Configure Northlake Identity Scenarios</title>
+  <link rel="stylesheet" href="/configure/styles.css">
+  <script src="/configure/scenarios.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Northlake Synthetic Identity home">
+      <span class="brand-mark" aria-hidden="true">NL</span>
+      <span><strong>Northlake</strong><small>Synthetic Identity Lab</small></span>
+    </a>
+    <nav class="utility-nav" aria-label="Configuration sections">
+      <a href="/configure">Provider</a>
+      <a href="/configure/oidc">OIDC</a>
+      <a href="/configure/saml">SAML</a>
+      <a href="/configure/scenarios" aria-current="page">Scenarios</a>
+      <a href="/configure/users">Users</a>
+      <a href="/configure/groups">Groups</a>
+      <span class="environment">Unauthenticated localhost tool</span>
+    </nav>
+  </header>
+
+  <main>
+    <section class="intro" aria-labelledby="page-title">
+      <p class="eyebrow">Phase 6 · concurrent providers</p>
+      <h1 id="page-title">Run two identity providers together.</h1>
+      <p>
+        Keep the stable <code>northlake</code> realm intact while two disposable lab realms
+        exercise issuer isolation, equal external subjects, and controlled claim drift.
+        This editor accepts only the bounded Northlake scenario document—not Keycloak JSON.
+      </p>
+    </section>
+
+    <div id="load-error" class="notice notice-error" role="alert" hidden></div>
+    <div class="workspace" id="workspace" hidden>
+      <form id="scenario-form" novalidate>
+        <div id="form-error" class="notice notice-error" role="alert" hidden></div>
+
+        <section class="field-group">
+          <div class="field-group-header">
+            <p class="card-kicker">Named bounded scenario</p>
+            <h2>Scenario controls</h2>
+            <p>Start from a preset, then adjust only the common realm and registration values.</p>
+          </div>
+          <div class="field-grid">
+            <div class="field"><label for="preset">Preset</label><select id="preset"><option value="IsolationBaseline">Issuer isolation</option><option value="SharedSubject">Same subject, different issuers</option><option value="ClaimDrift">Claim-shape drift</option></select><p class="field-error" id="error-preset" hidden></p></div>
+            <div class="field"><label for="scenarioName">Scenario name</label><input id="scenarioName" spellcheck="false"><p class="field-error" id="error-scenarioName" hidden></p></div>
+            <div class="field field-wide field-checkbox"><label class="checkbox-label" for="sharedExternalSubject"><input id="sharedExternalSubject" type="checkbox"> Emit the same OIDC subject and persistent SAML NameID from both realms</label><p class="field-error" id="error-sharedExternalSubject" hidden></p></div>
+            <div class="field field-wide"><label for="publicBaseUrl">Provider public base URL</label><input id="publicBaseUrl" spellcheck="false"><p class="field-error" id="error-publicBaseUrl" hidden></p></div>
+            <div class="field field-wide"><label for="applicationHomeUrl">EnergyHippo application home</label><input id="applicationHomeUrl" spellcheck="false"><p class="field-error" id="error-applicationHomeUrl" hidden></p></div>
+          </div>
+          <div class="actions"><button class="button button-secondary" type="button" id="use-preset-button">Use selected preset</button></div>
+        </section>
+
+        <div id="realm-editors" class="scenario-realm-grid">
+          <section class="field-group" data-slot="labA">
+            <div class="field-group-header"><p class="card-kicker">Provider A</p><h2>northlake-lab-a</h2><p>One Modern OIDC registration and one Standard SAML registration.</p></div>
+            <div class="field-grid realm-fields"></div>
+            <div class="actions"><button class="button button-secondary clone-button" type="button" data-source="labA" data-target="labB">Clone behavior to B</button><button class="button button-secondary reset-button" type="button" data-slot="labA">Reset realm A</button></div>
+          </section>
+          <section class="field-group legacy-profile" data-slot="labB">
+            <div class="field-group-header"><p class="card-kicker">Provider B</p><h2>northlake-lab-b</h2><p>Distinct issuer, keys, provider identities, and provider-specific SAML callbacks.</p></div>
+            <div class="field-grid realm-fields"></div>
+            <div class="actions"><button class="button button-secondary clone-button" type="button" data-source="labB" data-target="labA">Clone behavior to A</button><button class="button button-secondary reset-button" type="button" data-slot="labB">Reset realm B</button></div>
+          </section>
+        </div>
+
+        <details class="field-group advanced-editor">
+          <summary>Advanced bounded JSON</summary>
+          <p class="field-help">Only the documented scenario fields are accepted. Arbitrary clients, mappers, scripts, and Keycloak JSON are rejected server-side.</p>
+          <div class="field"><label for="advanced-json">Scenario values</label><textarea id="advanced-json" class="json-editor" spellcheck="false"></textarea><p class="field-error" id="error-advanced-json" hidden></p></div>
+          <div class="actions"><button class="button button-secondary" type="button" id="use-json-button">Load JSON into form</button></div>
+        </details>
+
+        <section class="apply-panel" aria-labelledby="apply-title">
+          <div><h2 id="apply-title">Save, compare, or replace both lab realms</h2><p>The stable <code>northlake</code> realm is never deleted by this operation.</p></div>
+          <div class="actions"><button class="button button-secondary" type="button" id="preview-button">Preview and diff</button><button class="button button-secondary" type="button" id="save-button">Save</button><button class="button button-primary" type="submit" id="apply-button">Apply both and verify</button></div>
+        </section>
+      </form>
+
+      <aside class="result-column" aria-label="Scenario result and verification">
+        <section class="result-card status-card" aria-labelledby="status-title">
+          <div class="card-heading"><div><p class="card-kicker">One Keycloak deployment</p><h2 id="status-title">Concurrent status</h2></div><span id="status-badge" class="status-badge">Loaded</span></div>
+          <p id="operation-status" class="operation-status" role="status">Ready to preview, save, or apply.</p>
+          <dl class="status-list">
+            <div><dt>Lab A issuer</dt><dd id="summary-labA">—</dd></div>
+            <div><dt>Lab B issuer</dt><dd id="summary-labB">—</dd></div>
+            <div><dt>Subject relationship</dt><dd id="summary-subject">—</dd></div>
+            <div><dt>Installed EEM proof</dt><dd>Required separately</dd></div>
+          </dl>
+        </section>
+        <section class="result-card" aria-labelledby="verification-title">
+          <div class="card-heading"><div><p class="card-kicker">Provider-side evidence</p><h2 id="verification-title">Isolation verifier</h2></div><button class="copy-button" type="button" id="verify-button">Run again</button></div>
+          <p id="verification-time" class="operation-status">Not run for these realms yet.</p>
+          <pre id="verification-output" tabindex="0">No verification result.</pre>
+        </section>
+        <section class="result-card" aria-labelledby="diff-title">
+          <div class="card-heading"><div><p class="card-kicker">Saved versus edited</p><h2 id="diff-title">Scenario diff</h2></div></div>
+          <div id="diff-output" class="diff-output">No unsaved differences.</div>
+        </section>
+        <section class="result-card" aria-labelledby="export-title">
+          <div class="card-heading"><div><p class="card-kicker">Secrets redacted</p><h2 id="export-title">Scenario export</h2></div><button class="copy-button" type="button" id="copy-button">Copy</button></div>
+          <pre id="export-output" tabindex="0"></pre>
+        </section>
+      </aside>
+    </div>
+  </main>
+  <footer><span>Development use only · two disposable lab realms · no EnergyHippo writes</span><span><a href="/configure">Provider configuration</a> · <a href="/">Identity launchpad</a></span></footer>
+</body>
+</html>

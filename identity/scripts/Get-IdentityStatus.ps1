@@ -55,6 +55,15 @@ else {
 }
 Write-Host "Profile:         $script:IdentityConnectionProfile"
 
+if (Test-Path -LiteralPath $script:IdentityScenarioSettings -PathType Leaf) {
+    $scenarioState = Get-Content -LiteralPath $script:IdentityScenarioSettings -Raw | ConvertFrom-Json
+    Write-Host ""
+    Write-Host "Scenario:        $($scenarioState.values.scenarioName)"
+    Write-Host "Lab A issuer:     $($profile.baseUrl)/realms/$($scenarioState.values.realms.labA.realmKey)"
+    Write-Host "Lab B issuer:     $($profile.baseUrl)/realms/$($scenarioState.values.realms.labB.realmKey)"
+    Write-Host "Subject mode:     $(if ($scenarioState.values.sharedExternalSubject) { 'equal subject, distinct issuer' } else { 'distinct subject, distinct issuer' })"
+}
+
 if ($ShowSecrets) {
     Write-Host ""
     Write-Warning "Displaying local development secrets."

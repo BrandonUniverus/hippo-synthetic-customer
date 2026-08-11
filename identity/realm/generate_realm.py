@@ -56,6 +56,15 @@ SAML_AES_256_GCM = "http://www.w3.org/2009/xmlenc11#aes256-gcm"
 SAML_RSA_OAEP_11 = "http://www.w3.org/2009/xmlenc11#rsa-oaep"
 SAML_SHA_256 = "http://www.w3.org/2001/04/xmlenc#sha256"
 SAML_MGF1_SHA_256 = "http://www.w3.org/2009/xmlenc11#mgf1sha256"
+NORTHLAKE_OIDC_CLAIMS = (
+    "groups",
+    "synthetic_user_id",
+    "primary_company_id",
+    "title",
+    "synthetic_status",
+    "eem_company_ids",
+    "eem_permission_profiles",
+)
 UUID_NAMESPACE = uuid.UUID("b275b995-9df7-5c6c-92d7-892302b2397e")
 REQUIRED_SECRET_KEYS = (
     "KEYCLOAK_ADMIN_PASSWORD",
@@ -160,6 +169,22 @@ def _environment_boolean(values: dict[str, str], key: str, default: bool) -> boo
     if normalized in {"false", "0", "no"}:
         return False
     raise RealmGenerationError(f"{key} must be true or false.")
+
+
+def _northlake_oidc_claims(environment: dict[str, str]) -> tuple[str, ...]:
+    raw_value = environment.get(
+        "NORTHLAKE_OIDC_ALLOWED_CLAIMS",
+        ";".join(NORTHLAKE_OIDC_CLAIMS),
+    )
+    claims = tuple(value.strip() for value in raw_value.split(";") if value.strip())
+    if len(claims) != len(set(claims)):
+        raise RealmGenerationError("NORTHLAKE_OIDC_ALLOWED_CLAIMS must not contain duplicates.")
+    unsupported = sorted(set(claims) - set(NORTHLAKE_OIDC_CLAIMS))
+    if unsupported:
+        raise RealmGenerationError(
+            f"NORTHLAKE_OIDC_ALLOWED_CLAIMS contains unsupported claim {unsupported[0]}."
+        )
+    return claims
 
 
 def _load_manifest(path: Path) -> dict[str, Any]:
@@ -325,6 +350,7 @@ def _standard_client_scopes(realm_name: str) -> list[dict[str, Any]]:
                 "display.on.consent.screen": "false",
             },
             "protocolMappers": [
+                _attribute_mapper("northlake_oidc_subject", "sub"),
                 {
                     "name": "auth_time",
                     "protocol": "openid-connect",
@@ -425,7 +451,40 @@ def _standard_client_scopes(realm_name: str) -> list[dict[str, Any]]:
     ]
 
 
-def _northlake_client_scope(realm_name: str) -> dict[str, Any]:
+def _northlake_client_scope(
+    realm_name: str,
+    allowed_claims: tuple[str, ...],
+) -> dict[str, Any]:
+    claim_mappers = {
+        "groups": {
+            "name": "groups",
+            "protocol": "openid-connect",
+            "protocolMapper": "oidc-group-membership-mapper",
+            "consentRequired": False,
+            "config": {
+                "full.path": "false",
+                "claim.name": "groups",
+                "id.token.claim": "true",
+                "access.token.claim": "true",
+                "userinfo.token.claim": "true",
+                "jsonType.label": "String",
+            },
+        },
+        "synthetic_user_id": _attribute_mapper("synthetic_user_id", "synthetic_user_id"),
+        "primary_company_id": _attribute_mapper("primary_company_id", "primary_company_id"),
+        "title": _attribute_mapper("title", "title"),
+        "synthetic_status": _attribute_mapper("synthetic_status", "synthetic_status"),
+        "eem_company_ids": _attribute_mapper(
+            "eem_company_ids",
+            "eem_company_ids",
+            multivalued=True,
+        ),
+        "eem_permission_profiles": _attribute_mapper(
+            "eem_permission_profiles",
+            "eem_permission_profiles",
+            multivalued=True,
+        ),
+    }
     return {
         "id": _stable_id(realm_name, "client-scope", "northlake"),
         "name": "northlake",
@@ -436,32 +495,7 @@ def _northlake_client_scope(realm_name: str) -> dict[str, Any]:
             "display.on.consent.screen": "true",
             "consent.screen.text": "Northlake synthetic customer identity",
         },
-        "protocolMappers": [
-            {
-                "name": "groups",
-                "protocol": "openid-connect",
-                "protocolMapper": "oidc-group-membership-mapper",
-                "consentRequired": False,
-                "config": {
-                    "full.path": "false",
-                    "claim.name": "groups",
-                    "id.token.claim": "true",
-                    "access.token.claim": "true",
-                    "userinfo.token.claim": "true",
-                    "jsonType.label": "String",
-                },
-            },
-            _attribute_mapper("synthetic_user_id", "synthetic_user_id"),
-            _attribute_mapper("primary_company_id", "primary_company_id"),
-            _attribute_mapper("title", "title"),
-            _attribute_mapper("synthetic_status", "synthetic_status"),
-            _attribute_mapper("eem_company_ids", "eem_company_ids", multivalued=True),
-            _attribute_mapper(
-                "eem_permission_profiles",
-                "eem_permission_profiles",
-                multivalued=True,
-            ),
-        ],
+        "protocolMappers": [claim_mappers[claim] for claim in allowed_claims],
     }
 
 
@@ -735,6 +769,14 @@ def build_realm(
         raise RealmGenerationError(
             "NORTHLAKE_REALM_KEY must be a non-master lowercase realm key."
         )
+    subject_namespace = environment.get(
+        "NORTHLAKE_SUBJECT_NAMESPACE",
+        realm_name,
+    ).strip()
+    if not REALM_KEY_PATTERN.fullmatch(subject_namespace) or subject_namespace == "master":
+        raise RealmGenerationError(
+            "NORTHLAKE_SUBJECT_NAMESPACE must be a non-master lowercase namespace."
+        )
     provider_display_name = environment.get(
         "NORTHLAKE_PROVIDER_DISPLAY_NAME",
         "Northlake Synthetic Identity",
@@ -750,6 +792,7 @@ def build_realm(
     if not enable_oidc and not enable_saml:
         raise RealmGenerationError("At least one of OIDC or SAML must be enabled.")
     oidc_settings = OidcSettings.from_environment(environment) if enable_oidc else None
+    oidc_allowed_claims = _northlake_oidc_claims(environment) if enable_oidc else ()
 
     application_home_url = environment.get(
         "EEMSUITE_APPLICATION_HOME_URL",
@@ -877,6 +920,9 @@ def build_realm(
         display_name = user["displayName"].strip()
         name_parts = display_name.split(maxsplit=1)
         attributes = {
+            "northlake_oidc_subject": [
+                _stable_id(subject_namespace, "user", user["id"])
+            ],
             "synthetic_user_id": [user["id"]],
             "primary_company_id": [user["primaryCompanyId"]],
             "title": [user.get("title", "")],
@@ -888,10 +934,10 @@ def build_realm(
             [standard_saml_entity_id] if "Standard" in configured_saml_profiles else []
         ) + ([saml2int_entity_id] if "Saml2Int" in configured_saml_profiles else []):
             attributes[f"saml.persistent.name.id.for.{entity_id}"] = [
-                _stable_id(realm_name, "saml-nameid", user["id"])
+                _stable_id(subject_namespace, "saml-nameid", user["id"])
             ]
             attributes[f"saml.subject.id.for.{entity_id}"] = [
-                f"{_stable_id(realm_name, 'saml-subject-id', user['id'])}@northlake.example"
+                f"{_stable_id(subject_namespace, 'saml-subject-id', user['id'])}@northlake.example"
             ]
         keycloak_users.append(
             {
@@ -1050,7 +1096,7 @@ def build_realm(
         "users": keycloak_users,
         "clientScopes": [
             *_standard_client_scopes(realm_name),
-            _northlake_client_scope(realm_name),
+            _northlake_client_scope(realm_name, oidc_allowed_claims),
         ],
         "clients": [*oidc_clients, *saml_clients],
         "eventsEnabled": True,
@@ -1140,6 +1186,10 @@ def build_realm(
     oidc_connection_profiles = (
         {
             "modern": {
+                "providerKey": environment.get(
+                    "NORTHLAKE_OIDC_PROVIDER_KEY",
+                    f"{realm_name}-oidc-modern",
+                ),
                 "clientId": oidc_settings.modern_client_id,
                 "clientSecret": environment["EEMSUITE_OIDC_CLIENT_SECRET"],
                 "responseType": "code",
@@ -1153,6 +1203,7 @@ def build_realm(
                 "parBehavior": oidc_settings.par_behavior,
                 "tokenEndpointAuthMethod": oidc_settings.token_endpoint_auth_method,
                 "consentRequired": oidc_settings.modern_consent_required,
+                "allowedClaims": list(oidc_allowed_claims),
             },
             **(
                 {
@@ -1232,6 +1283,7 @@ def build_realm(
     )
     connection_profile = {
         "realm": realm_name,
+        "subjectNamespace": subject_namespace,
         "realmSource": {
             "manifestId": manifest["id"],
             "manifestVersion": manifest["manifestVersion"],
@@ -1266,14 +1318,14 @@ def build_realm(
         "testUsers": {
             "active": {
                 "username": active_user["username"],
-                "subject": _stable_id(realm_name, "user", active_user["id"]),
+                "subject": _stable_id(subject_namespace, "user", active_user["id"]),
                 "samlNameId": _stable_id(
-                    realm_name,
+                    subject_namespace,
                     "saml-nameid",
                     active_user["id"],
                 ),
                 "expectedAttributes": _expected_identity_attributes(
-                    realm_name,
+                    subject_namespace,
                     active_user,
                     user_groups,
                     user_companies,
@@ -1282,14 +1334,14 @@ def build_realm(
             },
             "disabled": {
                 "username": disabled_user["username"],
-                "subject": _stable_id(realm_name, "user", disabled_user["id"]),
+                "subject": _stable_id(subject_namespace, "user", disabled_user["id"]),
                 "samlNameId": _stable_id(
-                    realm_name,
+                    subject_namespace,
                     "saml-nameid",
                     disabled_user["id"],
                 ),
                 "expectedAttributes": _expected_identity_attributes(
-                    realm_name,
+                    subject_namespace,
                     disabled_user,
                     user_groups,
                     user_companies,

@@ -58,9 +58,9 @@ through the apps and capture generated ids for validation.
 
 The repository also contains a runnable [synthetic identity provider](identity/README.md).
 It converts the Stage 1 security manifest into a resettable Keycloak realm with
-real login and administration pages, persistent sessions and keys, two OIDC
-clients, one SAML service-provider registration, and end-to-end protocol
-verification for both standards.
+real login and administration pages, persistent sessions and keys, configurable
+OIDC/SAML registrations, two concurrent disposable lab realms, and end-to-end
+protocol verification for both standards.
 
 ## Operating Rules
 

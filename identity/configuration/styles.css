@@ -838,6 +838,51 @@ pre {
   background: var(--danger-surface);
 }
 
+.scenario-realm-grid {
+  display: grid;
+  gap: 22px;
+  margin-bottom: 22px;
+}
+
+.advanced-editor {
+  margin-bottom: 22px;
+}
+
+.advanced-editor summary {
+  cursor: pointer;
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.advanced-editor[open] summary {
+  margin-bottom: 18px;
+}
+
+.json-editor {
+  min-height: 360px;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.diff-output {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.diff-output ul {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.diff-output code {
+  color: var(--accent);
+}
+
 footer {
   display: flex;
   min-height: 80px;

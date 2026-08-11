@@ -13,6 +13,9 @@ $script:IdentityOidcSettings = Join-Path $script:IdentityRuntimeDirectory "oidc.
 $script:IdentityOidcConfigurationModel = Join-Path $script:IdentityRoot "configuration\oidc.py"
 $script:IdentitySamlSettings = Join-Path $script:IdentityRuntimeDirectory "saml.json"
 $script:IdentitySamlConfigurationModel = Join-Path $script:IdentityRoot "configuration\saml.py"
+$script:IdentityScenarioSettings = Join-Path $script:IdentityRuntimeDirectory "scenarios.json"
+$script:IdentityScenarioModel = Join-Path $script:IdentityRoot "configuration\scenarios.py"
+$script:IdentityScenarioConnectionDirectory = Join-Path $script:IdentityRuntimeDirectory "scenarios"
 $script:IdentityUserOverlay = Join-Path $script:IdentityRuntimeDirectory "users.json"
 $script:IdentityGroupOverlay = Join-Path $script:IdentityRuntimeDirectory "groups.json"
 $script:IdentityCertificateDirectory = Join-Path $script:IdentityRuntimeDirectory "certs"
@@ -182,6 +185,25 @@ function New-IdentityRealm {
     & python $script:IdentityRealmGenerator @generatorArguments
     if ($LASTEXITCODE -ne 0) {
         throw "Northlake realm generation failed with exit code $LASTEXITCODE."
+    }
+    if (Test-Path -LiteralPath $script:IdentityScenarioSettings -PathType Leaf) {
+        $scenarioArguments = @(
+            "--settings-file", $script:IdentityScenarioSettings,
+            "--env-file", $script:IdentityEnvironmentFile,
+            "--manifest", $script:IdentityManifest,
+            "--realm-output-directory", $script:IdentityImportDirectory,
+            "--connection-output-directory", $script:IdentityScenarioConnectionDirectory
+        )
+        if (Test-Path -LiteralPath $script:IdentityUserOverlay -PathType Leaf) {
+            $scenarioArguments += @("--user-overlay", $script:IdentityUserOverlay)
+        }
+        if (Test-Path -LiteralPath $script:IdentityGroupOverlay -PathType Leaf) {
+            $scenarioArguments += @("--group-overlay", $script:IdentityGroupOverlay)
+        }
+        & python $script:IdentityScenarioModel @scenarioArguments
+        if ($LASTEXITCODE -ne 0) {
+            throw "Northlake two-realm scenario generation failed with exit code $LASTEXITCODE."
+        }
     }
 }
 

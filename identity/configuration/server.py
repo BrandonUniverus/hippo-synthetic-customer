@@ -35,6 +35,20 @@ from identity.configuration.saml import (
     write_public_certificate,
     write_saml_settings_document,
 )
+from identity.configuration.scenarios import (
+    SCENARIO_PRESETS,
+    SCENARIO_SLOTS,
+    ScenarioSettings,
+    ScenarioSettingsDocument,
+    ScenarioValidationError,
+    generate_scenario_realm,
+    load_scenario_document,
+    preset_settings,
+    scenario_connection_path,
+    scenario_diff,
+    scenario_realm_path,
+    write_scenario_document,
+)
 from identity.configuration.settings import (
     FIELD_KEYS,
     ProviderSettings,
@@ -181,6 +195,7 @@ class ConfigurationApplication:
         keycloak_client: KeycloakAdminClient,
         oidc_verifier: Callable[[Path, Path], dict[str, Any]] | None = None,
         saml_verifier: Callable[[Path, Path], dict[str, Any]] | None = None,
+        scenario_verifier: Callable[[list[Path], Path], dict[str, Any]] | None = None,
     ):
         self.environment = dict(environment)
         self.runtime_directory = runtime_directory
@@ -196,12 +211,16 @@ class ConfigurationApplication:
         self.saml2int_certificate_path = (
             runtime_directory / "certs" / "saml2int-sp-public.cer"
         )
+        self.scenario_settings_path = runtime_directory / "scenarios.json"
+        self.scenario_verification_path = runtime_directory / "scenario-verification.json"
+        self.scenario_connection_directory = runtime_directory / "scenarios"
         self.root_certificate_path = runtime_directory / "certs" / "caddy-local-root.crt"
         self.realm_output_path = runtime_directory / "import" / "northlake-realm.json"
         self.connection_output_path = runtime_directory / "connection.json"
         self.keycloak_client = keycloak_client
         self.oidc_verifier = oidc_verifier
         self.saml_verifier = saml_verifier
+        self.scenario_verifier = scenario_verifier
         self.startup_settings = ProviderSettings.from_environment(self.environment)
         self.last_apply_error: str | None = None
         self._apply_lock = threading.Lock()
@@ -639,6 +658,268 @@ class ConfigurationApplication:
                 "verification": verification,
             }
 
+    def _scenario_default_environment(self) -> dict[str, str]:
+        environment = dict(self.environment)
+        environment.update(self._document().settings.to_environment_overlay())
+        return environment
+
+    def _scenario_document(self) -> ScenarioSettingsDocument:
+        return load_scenario_document(
+            self.scenario_settings_path,
+            self._scenario_default_environment(),
+        )
+
+    def _last_scenario_verification(self) -> dict[str, Any] | None:
+        if not self.scenario_verification_path.is_file():
+            return None
+        payload = json.loads(
+            self.scenario_verification_path.read_text(encoding="utf-8")
+        )
+        return payload if isinstance(payload, dict) else None
+
+    def _clear_scenario_verification(self) -> None:
+        self.scenario_verification_path.unlink(missing_ok=True)
+
+    def _scenario_payload(
+        self,
+        settings: ScenarioSettings,
+        *,
+        before: ScenarioSettings | None = None,
+    ) -> dict[str, Any]:
+        return {
+            "values": settings.to_values(),
+            "preview": settings.preview(),
+            "export": settings.redacted_export(),
+            "diff": scenario_diff(before, settings) if before is not None else [],
+        }
+
+    def scenario_state(self) -> dict[str, Any]:
+        document = self._scenario_document()
+        return {
+            **self._scenario_payload(document.settings),
+            "presets": {
+                preset: preset_settings(
+                    preset,
+                    self._scenario_default_environment(),
+                ).to_values()
+                for preset in SCENARIO_PRESETS
+            },
+            "appliedRealmKeys": document.applied_realm_keys,
+            "updatedAtUtc": document.updated_at_utc,
+            "lastVerification": self._last_scenario_verification(),
+        }
+
+    def preview_scenarios(self, values: dict[str, Any]) -> dict[str, Any]:
+        settings = ScenarioSettings.from_values(values)
+        return self._scenario_payload(
+            settings,
+            before=self._scenario_document().settings,
+        )
+
+    def save_scenarios(self, values: dict[str, Any]) -> dict[str, Any]:
+        settings = ScenarioSettings.from_values(values)
+        current = self._scenario_document()
+        write_scenario_document(
+            self.scenario_settings_path,
+            ScenarioSettingsDocument(
+                settings=settings,
+                applied_realm_keys=current.applied_realm_keys,
+            ),
+        )
+        self._clear_scenario_verification()
+        return {
+            "message": "Two-realm scenario saved locally. Apply to replace the lab realms.",
+            **self._scenario_payload(settings, before=current.settings),
+            "appliedRealmKeys": current.applied_realm_keys,
+            "applied": False,
+        }
+
+    def clone_scenario(
+        self,
+        values: dict[str, Any],
+        source_slot: str,
+        target_slot: str,
+    ) -> dict[str, Any]:
+        settings = ScenarioSettings.from_values(values)
+        cloned = settings.clone(source_slot, target_slot)
+        return {
+            "message": (
+                f"Cloned {source_slot} behavior into {target_slot}; target provider identities "
+                "and SAML callbacks stayed distinct."
+            ),
+            **self._scenario_payload(cloned, before=settings),
+        }
+
+    def _generate_scenario(
+        self,
+        settings: ScenarioSettings,
+        slot: str,
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        self.runtime_directory.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(
+            prefix=f"northlake-{slot.lower()}-",
+            dir=self.runtime_directory,
+        ) as temporary_directory:
+            temporary_root = Path(temporary_directory)
+            temporary_realm = temporary_root / "realm.json"
+            temporary_connection = temporary_root / "connection.json"
+            realm, connection = generate_scenario_realm(
+                settings,
+                slot,
+                self.environment,
+                self.manifest_path,
+                temporary_realm,
+                temporary_connection,
+                self.user_overlay_path,
+                self.group_overlay_path,
+            )
+            realm_path = scenario_realm_path(self.realm_output_path.parent, slot)
+            connection_path = scenario_connection_path(
+                self.scenario_connection_directory,
+                slot,
+            )
+            realm_path.parent.mkdir(parents=True, exist_ok=True)
+            connection_path.parent.mkdir(parents=True, exist_ok=True)
+            os.replace(temporary_realm, realm_path)
+            os.replace(temporary_connection, connection_path)
+        return realm, connection
+
+    def _default_scenario_verifier(
+        self,
+        connection_paths: list[Path],
+        ca_path: Path,
+    ) -> dict[str, Any]:
+        verifier_path = Path(
+            os.environ.get(
+                "NORTHLAKE_SCENARIO_VERIFIER_PATH",
+                "/app/identity/scripts/verify_scenarios.py",
+            )
+        )
+        command = [sys.executable, str(verifier_path)]
+        for connection_path in connection_paths:
+            command.extend(["--connection", str(connection_path)])
+        command.extend(["--ca-file", str(ca_path)])
+        host_alias = os.environ.get("NORTHLAKE_VERIFIER_HOST_ALIAS", "").strip()
+        if host_alias:
+            command.extend(["--resolve-host", f"localhost={host_alias}"])
+        try:
+            completed = subprocess.run(
+                command,
+                capture_output=True,
+                check=False,
+                text=True,
+                timeout=240,
+            )
+        except (OSError, subprocess.TimeoutExpired) as failure:
+            return {
+                "passed": False,
+                "exitCode": None,
+                "classification": "verifier-error",
+                "output": str(failure),
+            }
+        output = "\n".join(
+            part.strip() for part in (completed.stdout, completed.stderr) if part.strip()
+        )
+        return {
+            "passed": completed.returncode == 0,
+            "exitCode": completed.returncode,
+            "classification": (
+                "provider-ready-eem-proof-required"
+                if completed.returncode == 0
+                else "provider-contract-break"
+            ),
+            "output": output[-32_000:],
+        }
+
+    def verify_scenarios(self) -> dict[str, Any]:
+        connection_paths = [
+            scenario_connection_path(self.scenario_connection_directory, slot)
+            for slot in SCENARIO_SLOTS
+        ]
+        if any(not path.is_file() for path in connection_paths):
+            raise RuntimeError("Apply both lab realms before running scenario verification.")
+        verifier = self.scenario_verifier or self._default_scenario_verifier
+        result = dict(verifier(connection_paths, self.root_certificate_path))
+        result["checkedAtUtc"] = datetime.now(UTC).isoformat()
+        self.scenario_verification_path.parent.mkdir(parents=True, exist_ok=True)
+        temporary_path = self.scenario_verification_path.with_suffix(".json.tmp")
+        temporary_path.write_text(
+            json.dumps(result, indent=2, ensure_ascii=False) + os.linesep,
+            encoding="utf-8",
+        )
+        os.replace(temporary_path, self.scenario_verification_path)
+        return result
+
+    def apply_scenarios(
+        self,
+        values: dict[str, Any],
+        slots: tuple[str, ...] = SCENARIO_SLOTS,
+    ) -> tuple[int, dict[str, Any]]:
+        if not slots or any(slot not in SCENARIO_SLOTS for slot in slots):
+            raise ScenarioValidationError({"_form": "Select labA, labB, or both realms."})
+        settings = ScenarioSettings.from_values(values)
+        with self._apply_lock:
+            current = self._scenario_document()
+            applied_keys = dict(current.applied_realm_keys)
+            write_scenario_document(
+                self.scenario_settings_path,
+                ScenarioSettingsDocument(
+                    settings=settings,
+                    applied_realm_keys=applied_keys,
+                ),
+            )
+            self._clear_scenario_verification()
+            for slot in slots:
+                realm, _ = self._generate_scenario(settings, slot)
+                provider_settings = ProviderSettings.from_environment(
+                    settings.environment_for(slot, self.environment)
+                )
+                try:
+                    self.keycloak_client.replace_realm(
+                        realm,
+                        applied_keys.get(slot),
+                    )
+                    self.keycloak_client.wait_until_healthy(provider_settings)
+                except KeycloakApplyError as failure:
+                    return HTTPStatus.BAD_GATEWAY, {
+                        "message": (
+                            f"Scenario saved, but {slot} could not be applied to Keycloak."
+                        ),
+                        **self._scenario_payload(settings, before=current.settings),
+                        "appliedRealmKeys": applied_keys,
+                        "applied": False,
+                        "applyError": str(failure),
+                    }
+                applied_keys[slot] = realm["realm"]
+                write_scenario_document(
+                    self.scenario_settings_path,
+                    ScenarioSettingsDocument(
+                        settings=settings,
+                        applied_realm_keys=applied_keys,
+                    ),
+                )
+            verification = (
+                self.verify_scenarios()
+                if all(applied_keys.get(slot) for slot in SCENARIO_SLOTS)
+                else None
+            )
+            return HTTPStatus.OK, {
+                "message": (
+                    "Both lab realms applied and provider-side isolation verification passed. "
+                    "Installed EnergyHippo proof remains separate."
+                    if verification and verification.get("passed")
+                    else (
+                        "Selected lab realm reset; apply both realms for full isolation verification."
+                        if verification is None
+                        else "Both lab realms applied; the verifier found a scenario contract break."
+                    )
+                ),
+                **self._scenario_payload(settings, before=current.settings),
+                "appliedRealmKeys": applied_keys,
+                "applied": True,
+                "verification": verification,
+            }
+
     def state(self) -> dict[str, Any]:
         document = self._document()
         return {
@@ -939,6 +1220,10 @@ class ConfigurationRequestHandler(BaseHTTPRequestHandler):
                 self._static("saml.html", "text/html; charset=utf-8")
             elif path == "/configure/saml.js":
                 self._static("saml.js", "text/javascript; charset=utf-8")
+            elif path == "/configure/scenarios":
+                self._static("scenarios.html", "text/html; charset=utf-8")
+            elif path == "/configure/scenarios.js":
+                self._static("scenarios.js", "text/javascript; charset=utf-8")
             elif path == "/configure/styles.css":
                 self._static("styles.css", "text/css; charset=utf-8")
             elif path == "/configure/api/state":
@@ -951,6 +1236,8 @@ class ConfigurationRequestHandler(BaseHTTPRequestHandler):
                 self._json(HTTPStatus.OK, self.application.oidc_state())
             elif path == "/configure/api/saml":
                 self._json(HTTPStatus.OK, self.application.saml_state())
+            elif path == "/configure/api/scenarios":
+                self._json(HTTPStatus.OK, self.application.scenario_state())
             elif path == "/configure/api/groups/claims":
                 query = parse.parse_qs(parse.urlparse(self.path).query)
                 user_ids = query.get("userId", [])
@@ -967,6 +1254,7 @@ class ConfigurationRequestHandler(BaseHTTPRequestHandler):
             SettingsValidationError,
             OidcValidationError,
             SamlValidationError,
+            ScenarioValidationError,
             UserValidationError,
             GroupValidationError,
             RuntimeError,
@@ -1002,6 +1290,68 @@ class ConfigurationRequestHandler(BaseHTTPRequestHandler):
             "/configure/api/saml/apply",
             "/configure/api/saml/verify",
         }
+        scenario_routes = {
+            "/configure/api/scenarios/preview",
+            "/configure/api/scenarios/save",
+            "/configure/api/scenarios/apply",
+            "/configure/api/scenarios/verify",
+            "/configure/api/scenarios/clone/labA/labB",
+            "/configure/api/scenarios/clone/labB/labA",
+            "/configure/api/scenarios/reset/labA",
+            "/configure/api/scenarios/reset/labB",
+        }
+        if path in scenario_routes:
+            try:
+                values = self._request_values()
+                if path == "/configure/api/scenarios/preview":
+                    self._json(HTTPStatus.OK, self.application.preview_scenarios(values))
+                elif path == "/configure/api/scenarios/save":
+                    self._json(HTTPStatus.OK, self.application.save_scenarios(values))
+                elif path == "/configure/api/scenarios/apply":
+                    status, payload = self.application.apply_scenarios(values)
+                    self._json(status, payload)
+                elif path == "/configure/api/scenarios/verify":
+                    self._json(
+                        HTTPStatus.OK,
+                        {
+                            "message": "Two-realm isolation verification completed.",
+                            "verification": self.application.verify_scenarios(),
+                        },
+                    )
+                elif "/clone/" in path:
+                    source_slot, target_slot = path.rsplit("/", 2)[-2:]
+                    self._json(
+                        HTTPStatus.OK,
+                        self.application.clone_scenario(
+                            values,
+                            source_slot,
+                            target_slot,
+                        ),
+                    )
+                else:
+                    slot = path.rsplit("/", 1)[-1]
+                    status, payload = self.application.apply_scenarios(
+                        values,
+                        (slot,),
+                    )
+                    self._json(status, payload)
+            except ScenarioValidationError as failure:
+                self._json(
+                    HTTPStatus.BAD_REQUEST,
+                    {
+                        "message": "Check the highlighted two-realm scenario values.",
+                        "errors": failure.errors,
+                    },
+                )
+            except (OSError, ValueError, RuntimeError) as failure:
+                self._json(
+                    HTTPStatus.INTERNAL_SERVER_ERROR,
+                    {
+                        "message": "The two-realm scenario operation failed.",
+                        "detail": str(failure),
+                    },
+                )
+            return
         if path in saml_routes:
             try:
                 values = self._request_values()
