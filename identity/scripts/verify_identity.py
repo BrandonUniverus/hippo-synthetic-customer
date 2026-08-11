@@ -1271,13 +1271,38 @@ def _verify_admin(
     if actual_saml_mappers != expected_saml_mappers:
         raise VerificationError("SAML client protocol-mapper set drifted.")
 
+    saml2int_profile = profile["clients"].get("saml2Int")
+    if saml2int_profile is not None:
+        saml2int = by_client_id[saml2int_profile["clientId"]]
+        saml2int_attributes = saml2int.get("attributes", {})
+        if (
+            saml2int.get("protocol") != "saml"
+            or saml2int_profile.get("validationProfile") != "Saml2Int"
+            or saml2int_attributes.get("saml.server.signature") != "true"
+            or saml2int_attributes.get("saml.signature.algorithm") != "RSA_SHA256"
+            or saml2int_attributes.get("saml.force.post.binding") != "true"
+            or saml2int_attributes.get("saml.client.signature") != "true"
+            or saml2int_attributes.get("saml.encrypt") != "true"
+            or not saml2int_attributes.get("saml.signing.certificate")
+            or not saml2int_attributes.get("saml.encryption.certificate")
+            or saml2int_attributes.get("saml.signing.certificate")
+            != saml2int_attributes.get("saml.encryption.certificate")
+        ):
+            raise VerificationError(
+                "SAML2Int client drifted from signed-request and encrypted-assertion settings."
+            )
+        print(
+            "[OK] Admin API: SAML2Int requires signed requests and encrypted assertions "
+            "with the configured EEM public certificate."
+        )
+
     disabled_username = profile["testUsers"]["disabled"]["username"]
     disabled = next((user for user in users if user["username"] == disabled_username), None)
     if disabled is None or disabled["enabled"]:
         raise VerificationError("Disabled-user regression identity was not disabled.")
     print(
-        "[OK] Admin API: 19 users, 18 enabled, 27 groups, and three exact "
-        "EEMSuite OIDC/SAML clients."
+        f"[OK] Admin API: 19 users, 18 enabled, 27 groups, and {len(profile['clients'])} "
+        "exact EEMSuite OIDC/SAML clients."
     )
 
 

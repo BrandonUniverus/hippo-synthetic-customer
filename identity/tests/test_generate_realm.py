@@ -1,10 +1,17 @@
 from __future__ import annotations
 
+import base64
 import importlib.util
 import json
 import tempfile
 import unittest
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec, rsa
+from cryptography.x509.oid import NameOID
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -33,14 +40,17 @@ class GenerateRealmTests(unittest.TestCase):
                 "https://localhost:7310/signin-oidc;"
                 "https://localdev.energyhippo.com/Hippo/signin-oidc"
             ),
-            "EEMSUITE_SAML_ENTITY_ID": "urn:energyhippo:eemsuite-web:saml",
-            "EEMSUITE_SAML_ACS_URLS": (
-                "https://localhost:7310/saml/acs;"
-                "https://localdev.energyhippo.com/Hippo/saml/acs"
+            "EEMSUITE_SAML_PROFILES": "Standard",
+            "EEMSUITE_SAML_STANDARD_ENTITY_ID": (
+                "urn:energyhippo:eemsuite-web:saml:standard"
             ),
-            "EEMSUITE_SAML_LOGOUT_URLS": (
-                "https://localhost:7310/saml/logout;"
-                "https://localdev.energyhippo.com/Hippo/saml/logout"
+            "EEMSUITE_SAML_STANDARD_ACS_URLS": (
+                "https://localhost:7310/saml/northlake-saml-standard/acs;"
+                "https://localdev.energyhippo.com/Hippo/saml/northlake-saml-standard/acs"
+            ),
+            "EEMSUITE_SAML_STANDARD_LOGOUT_URLS": (
+                "https://localhost:7310/saml/northlake-saml-standard/logout;"
+                "https://localdev.energyhippo.com/Hippo/saml/northlake-saml-standard/logout"
             ),
         }
 
@@ -130,7 +140,7 @@ class GenerateRealmTests(unittest.TestCase):
     def test_saml_client_is_signed_exact_and_maps_northlake_attributes(self) -> None:
         realm, connection = self._generate()
         clients = {client["clientId"]: client for client in realm["clients"]}
-        entity_id = "urn:energyhippo:eemsuite-web:saml"
+        entity_id = "urn:energyhippo:eemsuite-web:saml:standard"
         saml = clients[entity_id]
 
         self.assertEqual("saml", saml["protocol"])
@@ -140,8 +150,8 @@ class GenerateRealmTests(unittest.TestCase):
         )
         self.assertEqual(
             [
-                "https://localhost:7310/saml/acs",
-                "https://localdev.energyhippo.com/Hippo/saml/acs",
+                "https://localhost:7310/saml/northlake-saml-standard/acs",
+                "https://localdev.energyhippo.com/Hippo/saml/northlake-saml-standard/acs",
             ],
             saml["redirectUris"],
         )
@@ -174,6 +184,8 @@ class GenerateRealmTests(unittest.TestCase):
 
         profile = connection["clients"]["saml"]
         self.assertEqual(entity_id, profile["entityId"])
+        self.assertEqual("northlake-saml-standard", profile["providerKey"])
+        self.assertEqual("Standard", profile["validationProfile"])
         self.assertTrue(profile["wantResponseSigned"])
         self.assertTrue(profile["wantAssertionsSigned"])
         self.assertFalse(profile["wantAssertionsEncrypted"])
@@ -182,23 +194,125 @@ class GenerateRealmTests(unittest.TestCase):
             connection["samlMetadataEndpoint"],
         )
 
-    def test_saml_defaults_keep_existing_identity_environment_compatible(self) -> None:
-        self.environment.pop("EEMSUITE_SAML_ENTITY_ID")
-        self.environment.pop("EEMSUITE_SAML_ACS_URLS")
-        self.environment.pop("EEMSUITE_SAML_LOGOUT_URLS")
+    def test_saml_defaults_use_dynamic_provider_routes(self) -> None:
+        self.environment.pop("EEMSUITE_SAML_STANDARD_ENTITY_ID")
+        self.environment.pop("EEMSUITE_SAML_STANDARD_ACS_URLS")
+        self.environment.pop("EEMSUITE_SAML_STANDARD_LOGOUT_URLS")
 
         realm, connection = self._generate()
         saml = next(client for client in realm["clients"] if client["protocol"] == "saml")
 
-        self.assertEqual("urn:energyhippo:eemsuite-web:saml", saml["clientId"])
+        self.assertEqual("urn:energyhippo:eemsuite-web:saml:standard", saml["clientId"])
         self.assertEqual(
-            "https://localhost:7310/saml/acs",
+            "https://localhost:7310/saml/northlake-saml-standard/acs",
             connection["clients"]["saml"]["defaultAssertionConsumerServiceUrl"],
         )
         self.assertEqual(
-            "https://localhost:7310/saml/logout",
+            "https://localhost:7310/saml/northlake-saml-standard/logout",
             connection["clients"]["saml"]["defaultSingleLogoutServiceUrl"],
         )
+
+    def test_saml2int_requires_signed_requests_and_encrypted_assertions(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            certificate_path = Path(temporary_directory) / "saml2int-sp.cer"
+            private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+            now_utc = datetime.now(UTC)
+            subject = issuer = x509.Name(
+                [x509.NameAttribute(NameOID.COMMON_NAME, "EEMSuite SAML2Int test")]
+            )
+            certificate = (
+                x509.CertificateBuilder()
+                .subject_name(subject)
+                .issuer_name(issuer)
+                .public_key(private_key.public_key())
+                .serial_number(x509.random_serial_number())
+                .not_valid_before(now_utc - timedelta(minutes=1))
+                .not_valid_after(now_utc + timedelta(days=1))
+                .sign(private_key, hashes.SHA256())
+            )
+            certificate_path.write_bytes(
+                certificate.public_bytes(serialization.Encoding.DER)
+            )
+            self.environment["EEMSUITE_SAML_PROFILES"] = "Standard;Saml2Int"
+            self.environment["EEMSUITE_SAML2INT_SP_CERTIFICATE_FILE"] = str(
+                certificate_path
+            )
+
+            realm, connection = self._generate()
+
+        clients = {client["clientId"]: client for client in realm["clients"]}
+        saml2int = clients["urn:energyhippo:eemsuite-web:saml:saml2int"]
+        attributes = saml2int["attributes"]
+        expected_certificate = certificate.public_bytes(serialization.Encoding.DER)
+        self.assertEqual("true", attributes["saml.client.signature"])
+        self.assertEqual("true", attributes["saml.encrypt"])
+        self.assertEqual(
+            expected_certificate,
+            base64.b64decode(attributes["saml.signing.certificate"]),
+        )
+        self.assertEqual(
+            attributes["saml.signing.certificate"],
+            attributes["saml.encryption.certificate"],
+        )
+        profile = connection["clients"]["saml2Int"]
+        self.assertEqual("northlake-saml2int", profile["providerKey"])
+        self.assertEqual("Saml2Int", profile["validationProfile"])
+        self.assertTrue(profile["signAuthnRequests"])
+        self.assertTrue(profile["wantResponseSigned"])
+        self.assertFalse(profile["wantAssertionsSigned"])
+        self.assertTrue(profile["wantAssertionsEncrypted"])
+        self.assertEqual(
+            "/saml/northlake-saml2int/acs",
+            connection["eemsuiteConfiguration"]["samlProfiles"]["saml2Int"][
+                "CallbackPath"
+            ],
+        )
+
+    def test_saml2int_without_public_certificate_is_rejected(self) -> None:
+        self.environment["EEMSUITE_SAML_PROFILES"] = "Standard;Saml2Int"
+        with self.assertRaisesRegex(
+            generate_realm.RealmGenerationError,
+            "EEMSUITE_SAML2INT_SP_CERTIFICATE_FILE",
+        ):
+            self._generate()
+
+    def test_saml2int_non_rsa_public_certificate_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            certificate_path = Path(temporary_directory) / "saml2int-ec.cer"
+            private_key = ec.generate_private_key(ec.SECP256R1())
+            now_utc = datetime.now(UTC)
+            subject = issuer = x509.Name(
+                [x509.NameAttribute(NameOID.COMMON_NAME, "Invalid EC SAML certificate")]
+            )
+            certificate = (
+                x509.CertificateBuilder()
+                .subject_name(subject)
+                .issuer_name(issuer)
+                .public_key(private_key.public_key())
+                .serial_number(x509.random_serial_number())
+                .not_valid_before(now_utc - timedelta(minutes=1))
+                .not_valid_after(now_utc + timedelta(days=1))
+                .sign(private_key, hashes.SHA256())
+            )
+            certificate_path.write_bytes(
+                certificate.public_bytes(serialization.Encoding.DER)
+            )
+            self.environment["EEMSUITE_SAML_PROFILES"] = "Standard;Saml2Int"
+            self.environment["EEMSUITE_SAML2INT_SP_CERTIFICATE_FILE"] = str(
+                certificate_path
+            )
+            with self.assertRaisesRegex(
+                generate_realm.RealmGenerationError,
+                "RSA with at least 2048 bits",
+            ):
+                self._generate()
+
+    def test_unknown_or_duplicate_saml_profile_is_rejected(self) -> None:
+        for value in ("Standard;Standard", "Standard;Hybrid", ""):
+            with self.subTest(value=value):
+                self.environment["EEMSUITE_SAML_PROFILES"] = value
+                with self.assertRaises(generate_realm.RealmGenerationError):
+                    self._generate()
 
     def test_subjects_and_group_ids_are_deterministic(self) -> None:
         first, first_connection = self._generate()
@@ -213,7 +327,7 @@ class GenerateRealmTests(unittest.TestCase):
             [group["id"] for group in second["groups"]],
         )
         persistent_attribute = (
-            "saml.persistent.name.id.for.urn:energyhippo:eemsuite-web:saml"
+            "saml.persistent.name.id.for.urn:energyhippo:eemsuite-web:saml:standard"
         )
         first_name_ids = [
             user["attributes"][persistent_attribute]

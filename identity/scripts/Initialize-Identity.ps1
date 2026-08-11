@@ -48,9 +48,16 @@ $lines = @(
     "EEMSUITE_APPLICATION_HOME_URL=https://localdev.energyhippo.com/Hippo/",
     "EEMSUITE_OIDC_REDIRECT_URIS=https://localhost:7310/signin-oidc;https://localdev.energyhippo.com/Hippo/signin-oidc;https://localhost/Hippo/signin-oidc",
     "",
-    "EEMSUITE_SAML_ENTITY_ID=urn:energyhippo:eemsuite-web:saml",
-    "EEMSUITE_SAML_ACS_URLS=https://localhost:7310/saml/acs;https://localdev.energyhippo.com/Hippo/saml/acs;https://localhost/Hippo/saml/acs",
-    "EEMSUITE_SAML_LOGOUT_URLS=https://localhost:7310/saml/logout;https://localdev.energyhippo.com/Hippo/saml/logout;https://localhost/Hippo/saml/logout"
+    "EEMSUITE_SAML_PROFILES=Standard",
+    "EEMSUITE_SAML_STANDARD_ENTITY_ID=urn:energyhippo:eemsuite-web:saml:standard",
+    "EEMSUITE_SAML_STANDARD_ACS_URLS=https://localhost:7310/saml/northlake-saml-standard/acs;https://localdev.energyhippo.com/Hippo/saml/northlake-saml-standard/acs;https://localhost/Hippo/saml/northlake-saml-standard/acs",
+    "EEMSUITE_SAML_STANDARD_LOGOUT_URLS=https://localhost:7310/saml/northlake-saml-standard/logout;https://localdev.energyhippo.com/Hippo/saml/northlake-saml-standard/logout;https://localhost/Hippo/saml/northlake-saml-standard/logout",
+    "",
+    "# Add Saml2Int only after exporting EEMSuite's public service-provider certificate.",
+    "EEMSUITE_SAML2INT_ENTITY_ID=urn:energyhippo:eemsuite-web:saml:saml2int",
+    "EEMSUITE_SAML2INT_ACS_URLS=https://localdev.energyhippo.com/Hippo/saml/northlake-saml2int/acs;https://localhost/Hippo/saml/northlake-saml2int/acs",
+    "EEMSUITE_SAML2INT_LOGOUT_URLS=https://localdev.energyhippo.com/Hippo/saml/northlake-saml2int/logout;https://localhost/Hippo/saml/northlake-saml2int/logout",
+    "EEMSUITE_SAML2INT_SP_CERTIFICATE_FILE="
 )
 
 $lines | Set-Content -LiteralPath $script:IdentityEnvironmentFile -Encoding utf8NoBOM

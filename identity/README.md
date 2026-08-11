@@ -190,29 +190,30 @@ cannot safely replay the expired request.
 ## SAML service-provider contract
 
 `identity/.runtime/connection.json` contains the provider endpoints and the
-complete registration under `clients.saml`. These are the initial values for
-the future EEMSuite SAML relying party:
+complete registrations under `clients.saml` (`Standard`) and, when enabled,
+`clients.saml2Int`. The default registration is:
 
 ```json
 {
-  "entityId": "urn:energyhippo:eemsuite-web:saml",
+  "entityId": "urn:energyhippo:eemsuite-web:saml:standard",
+  "providerKey": "northlake-saml-standard",
+  "validationProfile": "Standard",
   "identityProviderMetadata": "https://localhost:8443/realms/northlake/protocol/saml/descriptor",
   "singleSignOnService": "https://localhost:8443/realms/northlake/protocol/saml",
   "singleLogoutService": "https://localhost:8443/realms/northlake/protocol/saml",
-  "assertionConsumerService": "https://localhost:7310/saml/acs",
-  "serviceProviderLogout": "https://localhost:7310/saml/logout",
+  "assertionConsumerService": "https://localhost:7310/saml/northlake-saml-standard/acs",
+  "serviceProviderLogout": "https://localhost:7310/saml/northlake-saml-standard/logout",
   "nameIdFormat": "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent",
   "responseBinding": "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
 }
 ```
 
-The first ACS and logout URLs are verifier callbacks. The generated client also
-registers the corresponding `/Hippo/saml/acs` and `/Hippo/saml/logout` paths
-for `localdev.energyhippo.com` and `localhost`. If the selected .NET SAML
-middleware uses different paths, change `EEMSUITE_SAML_ACS_URLS` and
-`EEMSUITE_SAML_LOGOUT_URLS` in the ignored `.env`, put the active environment's
-URL first, and reset the realm. Exact URLs are intentional; no wildcard SAML
-callbacks are registered.
+The first Standard ACS and logout URLs are verifier callbacks. The generated
+clients also register EEMSuite's real dynamic-provider routes:
+`/Hippo/saml/{providerKey}/acs`, `/metadata`, and `/logout`. Override the named
+`EEMSUITE_SAML_STANDARD_*` or `EEMSUITE_SAML2INT_*` URL lists in the ignored
+`.env` when another installed application path is under test. Exact URLs are
+intentional; no wildcard SAML callbacks are registered.
 
 The EEMSuite implementation should treat the following as mandatory validation,
 not merely claim parsing:
@@ -245,18 +246,28 @@ Keycloak's built-in admin console is the settings/user administration surface.
 It can be used to disable users, alter mappings, change signature behavior, or
 add negative-test clients without building a second identity application.
 
-### Deliberate bootstrap settings
+### Named interoperability profiles
 
-AuthnRequests are not yet required to be signed and assertions are not
-encrypted. Both stronger modes require the future EEMSuite service provider to
-own a private key and publish/import its public certificate. Once that exists,
-enable **Client signature required** and then **Encrypt assertions** in the
-SAML client's Keys tab, update the checked-in generator to make those settings
-deterministic, and extend the verifier. Artifact binding and ECP are disabled;
-the initial web implementation should use the normal browser POST profile.
+`EEMSUITE_SAML_PROFILES=Standard` is the safe default. It produces a plaintext
+assertion client whose Response and assertion are both signed. The EEMSuite
+`Standard` validator may accept its documented response-, assertion-, or
+dual-signature shapes; this synthetic client deliberately uses the strongest
+dual-signature baseline.
 
-The current provider still signs both the outer response and embedded assertion,
-so an unsigned or tampered IdP result is never part of the baseline.
+To exercise the pinned SAML2Int profile, first configure an EEMSuite RSA
+service-provider credential that supports signing and encryption, export only
+its public X.509 certificate, and set:
+
+```text
+EEMSUITE_SAML_PROFILES=Standard;Saml2Int
+EEMSUITE_SAML2INT_SP_CERTIFICATE_FILE=C:\path\to\public-eem-sp.cer
+```
+
+Realm generation then creates a separate `northlake-saml2int` client that
+requires signed AuthnRequests and emits encrypted assertions. Missing, malformed,
+or non-RSA certificates fail generation. The private key never leaves EEMSuite
+and is never written to this repository or the Keycloak connection profile.
+Artifact binding and ECP remain disabled; both profiles use HTTP-POST responses.
 
 ## Operations
 

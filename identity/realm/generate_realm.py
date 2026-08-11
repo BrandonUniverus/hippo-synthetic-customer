@@ -4,34 +4,51 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 import os
 import sys
 import uuid
 from collections import defaultdict
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
 import yaml
+from cryptography import x509
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 
 
 REALM_NAME = "northlake"
 MODERN_CLIENT_ID = "eemsuite-web"
 LEGACY_CLIENT_ID = "eemsuite-web-legacy"
 DEFAULT_EEMSUITE_APPLICATION_HOME_URL = "https://localdev.energyhippo.com/Hippo/"
-DEFAULT_SAML_ENTITY_ID = "urn:energyhippo:eemsuite-web:saml"
-DEFAULT_SAML_ACS_URLS = (
-    "https://localhost:7310/saml/acs",
-    "https://localdev.energyhippo.com/Hippo/saml/acs",
-    "https://localhost/Hippo/saml/acs",
+STANDARD_SAML_PROVIDER_KEY = "northlake-saml-standard"
+SAML2INT_PROVIDER_KEY = "northlake-saml2int"
+DEFAULT_STANDARD_SAML_ENTITY_ID = "urn:energyhippo:eemsuite-web:saml:standard"
+DEFAULT_SAML2INT_ENTITY_ID = "urn:energyhippo:eemsuite-web:saml:saml2int"
+DEFAULT_STANDARD_SAML_ACS_URLS = (
+    "https://localhost:7310/saml/northlake-saml-standard/acs",
+    "https://localdev.energyhippo.com/Hippo/saml/northlake-saml-standard/acs",
+    "https://localhost/Hippo/saml/northlake-saml-standard/acs",
 )
-DEFAULT_SAML_LOGOUT_URLS = (
-    "https://localhost:7310/saml/logout",
-    "https://localdev.energyhippo.com/Hippo/saml/logout",
-    "https://localhost/Hippo/saml/logout",
+DEFAULT_STANDARD_SAML_LOGOUT_URLS = (
+    "https://localhost:7310/saml/northlake-saml-standard/logout",
+    "https://localdev.energyhippo.com/Hippo/saml/northlake-saml-standard/logout",
+    "https://localhost/Hippo/saml/northlake-saml-standard/logout",
 )
-SAML_IDP_INITIATED_URL_NAME = "eemsuite-web-saml"
+DEFAULT_SAML2INT_ACS_URLS = (
+    "https://localdev.energyhippo.com/Hippo/saml/northlake-saml2int/acs",
+    "https://localhost/Hippo/saml/northlake-saml2int/acs",
+)
+DEFAULT_SAML2INT_LOGOUT_URLS = (
+    "https://localdev.energyhippo.com/Hippo/saml/northlake-saml2int/logout",
+    "https://localhost/Hippo/saml/northlake-saml2int/logout",
+)
+STANDARD_SAML_IDP_INITIATED_URL_NAME = "eemsuite-web-saml-standard"
+SAML2INT_IDP_INITIATED_URL_NAME = "eemsuite-web-saml2int"
 SAML_NAME_ID_FORMAT = "persistent"
 SAML_NAME_ID_FORMAT_URN = "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent"
 SAML_POST_BINDING_URN = "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
@@ -47,6 +64,40 @@ REQUIRED_SECRET_KEYS = (
 
 class RealmGenerationError(ValueError):
     """Raised when the source manifest or local environment is invalid."""
+
+
+def _load_rsa_public_certificate(path_value: str) -> str:
+    path = Path(path_value).expanduser().resolve()
+    if not path.is_file():
+        raise RealmGenerationError(
+            "EEMSUITE_SAML2INT_SP_CERTIFICATE_FILE must identify an existing public certificate."
+        )
+
+    document = path.read_bytes()
+    try:
+        certificate = (
+            x509.load_pem_x509_certificate(document)
+            if b"-----BEGIN CERTIFICATE-----" in document
+            else x509.load_der_x509_certificate(document)
+        )
+    except ValueError as error:
+        raise RealmGenerationError(
+            "EEMSUITE_SAML2INT_SP_CERTIFICATE_FILE did not contain an X.509 certificate."
+        ) from error
+
+    public_key = certificate.public_key()
+    if not isinstance(public_key, rsa.RSAPublicKey) or public_key.key_size < 2048:
+        raise RealmGenerationError(
+            "The SAML2Int service-provider certificate must use RSA with at least 2048 bits."
+        )
+    now_utc = datetime.now(UTC)
+    if certificate.not_valid_before_utc > now_utc or certificate.not_valid_after_utc <= now_utc:
+        raise RealmGenerationError(
+            "The SAML2Int service-provider certificate is not currently valid."
+        )
+    return base64.b64encode(
+        certificate.public_bytes(serialization.Encoding.DER)
+    ).decode("ascii")
 
 
 def _stable_id(kind: str, value: str) -> str:
@@ -499,14 +550,55 @@ def _saml_client(
     assertion_consumer_service_urls: list[str],
     single_logout_service_urls: list[str],
     application_home_url: str,
+    *,
+    validation_profile: str,
+    idp_initiated_url_name: str,
+    service_provider_certificate: str | None = None,
 ) -> dict[str, Any]:
+    saml2int = validation_profile == "Saml2Int"
+    if validation_profile not in {"Standard", "Saml2Int"}:
+        raise RealmGenerationError(f"Unsupported SAML validation profile: {validation_profile}.")
+    if saml2int and not service_provider_certificate:
+        raise RealmGenerationError(
+            "The SAML2Int profile requires EEMSUITE_SAML2INT_SP_CERTIFICATE_FILE."
+        )
+
+    attributes = {
+        "saml.assertion.signature": "true",
+        "saml.server.signature": "true",
+        "saml.signature.algorithm": "RSA_SHA256",
+        "saml_signature_canonicalization_method": (
+            "http://www.w3.org/2001/10/xml-exc-c14n#"
+        ),
+        "saml.server.signature.keyinfo.ext": "false",
+        "saml.server.signature.keyinfo.xmlSigKeyInfoKeyNameTransformer": "KEY_ID",
+        "saml.client.signature": str(saml2int).lower(),
+        "saml.encrypt": str(saml2int).lower(),
+        "saml.force.post.binding": "true",
+        "saml.authnstatement": "true",
+        "saml.onetimeuse.condition": "true",
+        "saml.assertion.lifespan": "300",
+        "saml_force_name_id_format": "true",
+        "saml_name_id_format": SAML_NAME_ID_FORMAT,
+        "saml.artifact.binding": "false",
+        "saml.allow.ecp.flow": "false",
+        "saml_assertion_consumer_url_post": assertion_consumer_service_urls[0],
+        "saml_single_logout_service_url_post": single_logout_service_urls[0],
+        "saml_single_logout_service_url_redirect": single_logout_service_urls[0],
+        "saml_idp_initiated_sso_url_name": idp_initiated_url_name,
+        "saml_idp_initiated_sso_relay_state": f"northlake-{validation_profile.lower()}",
+    }
+    if service_provider_certificate:
+        attributes["saml.signing.certificate"] = service_provider_certificate
+        attributes["saml.encryption.certificate"] = service_provider_certificate
+
     return {
         "id": _stable_id("client", entity_id),
         "clientId": entity_id,
-        "name": "EEMSuite Web - SAML 2.0",
+        "name": f"EEMSuite Web - SAML 2.0 {validation_profile}",
         "description": (
-            "Synthetic SAML service provider with signed responses and assertions, "
-            "persistent NameID, exact ACS validation, and mapped Northlake attributes."
+            f"Synthetic {validation_profile} SAML service provider with signed responses, "
+            "persistent NameID, exact dynamic-provider callbacks, and mapped Northlake attributes."
         ),
         "enabled": True,
         "consentRequired": False,
@@ -516,31 +608,7 @@ def _saml_client(
         "baseUrl": application_home_url,
         "frontchannelLogout": True,
         "protocol": "saml",
-        "attributes": {
-            "saml.assertion.signature": "true",
-            "saml.server.signature": "true",
-            "saml.signature.algorithm": "RSA_SHA256",
-            "saml_signature_canonicalization_method": (
-                "http://www.w3.org/2001/10/xml-exc-c14n#"
-            ),
-            "saml.server.signature.keyinfo.ext": "false",
-            "saml.server.signature.keyinfo.xmlSigKeyInfoKeyNameTransformer": "KEY_ID",
-            "saml.client.signature": "false",
-            "saml.encrypt": "false",
-            "saml.force.post.binding": "true",
-            "saml.authnstatement": "true",
-            "saml.onetimeuse.condition": "true",
-            "saml.assertion.lifespan": "300",
-            "saml_force_name_id_format": "true",
-            "saml_name_id_format": SAML_NAME_ID_FORMAT,
-            "saml.artifact.binding": "false",
-            "saml.allow.ecp.flow": "false",
-            "saml_assertion_consumer_url_post": assertion_consumer_service_urls[0],
-            "saml_single_logout_service_url_post": single_logout_service_urls[0],
-            "saml_single_logout_service_url_redirect": single_logout_service_urls[0],
-            "saml_idp_initiated_sso_url_name": SAML_IDP_INITIATED_URL_NAME,
-            "saml_idp_initiated_sso_relay_state": "northlake-idp-initiated",
-        },
+        "attributes": attributes,
         "fullScopeAllowed": True,
         "protocolMappers": [
             _saml_property_mapper("username", "username"),
@@ -623,24 +691,64 @@ def build_realm(
         raise RealmGenerationError(
             "EEMSUITE_APPLICATION_HOME_URL must be an absolute HTTPS URL."
         )
-    saml_entity_id = environment.get(
-        "EEMSUITE_SAML_ENTITY_ID",
-        DEFAULT_SAML_ENTITY_ID,
-    ).strip()
-    if not saml_entity_id or any(character.isspace() for character in saml_entity_id):
+    configured_saml_profiles = [
+        value.strip()
+        for value in environment.get("EEMSUITE_SAML_PROFILES", "Standard").split(";")
+        if value.strip()
+    ]
+    if (
+        not configured_saml_profiles
+        or len(configured_saml_profiles) != len(set(configured_saml_profiles))
+        or any(value not in {"Standard", "Saml2Int"} for value in configured_saml_profiles)
+    ):
         raise RealmGenerationError(
-            "EEMSUITE_SAML_ENTITY_ID must be a non-empty entity identifier without whitespace."
+            "EEMSUITE_SAML_PROFILES must contain unique Standard or Saml2Int values."
         )
-    saml_assertion_consumer_service_urls = _url_list(
+
+    standard_saml_entity_id = environment.get(
+        "EEMSUITE_SAML_STANDARD_ENTITY_ID",
+        DEFAULT_STANDARD_SAML_ENTITY_ID,
+    ).strip()
+    saml2int_entity_id = environment.get(
+        "EEMSUITE_SAML2INT_ENTITY_ID",
+        DEFAULT_SAML2INT_ENTITY_ID,
+    ).strip()
+    for variable_name, entity_id in (
+        ("EEMSUITE_SAML_STANDARD_ENTITY_ID", standard_saml_entity_id),
+        ("EEMSUITE_SAML2INT_ENTITY_ID", saml2int_entity_id),
+    ):
+        if not entity_id or any(character.isspace() for character in entity_id):
+            raise RealmGenerationError(
+                f"{variable_name} must be a non-empty entity identifier without whitespace."
+            )
+    if standard_saml_entity_id == saml2int_entity_id:
+        raise RealmGenerationError("Standard and Saml2Int require distinct entity identifiers.")
+
+    standard_saml_acs_urls = _url_list(
         environment,
-        "EEMSUITE_SAML_ACS_URLS",
-        default=DEFAULT_SAML_ACS_URLS,
+        "EEMSUITE_SAML_STANDARD_ACS_URLS",
+        default=DEFAULT_STANDARD_SAML_ACS_URLS,
     )
-    saml_single_logout_service_urls = _url_list(
+    standard_saml_logout_urls = _url_list(
         environment,
-        "EEMSUITE_SAML_LOGOUT_URLS",
-        default=DEFAULT_SAML_LOGOUT_URLS,
+        "EEMSUITE_SAML_STANDARD_LOGOUT_URLS",
+        default=DEFAULT_STANDARD_SAML_LOGOUT_URLS,
     )
+    saml2int_acs_urls = _url_list(
+        environment,
+        "EEMSUITE_SAML2INT_ACS_URLS",
+        default=DEFAULT_SAML2INT_ACS_URLS,
+    )
+    saml2int_logout_urls = _url_list(
+        environment,
+        "EEMSUITE_SAML2INT_LOGOUT_URLS",
+        default=DEFAULT_SAML2INT_LOGOUT_URLS,
+    )
+    saml2int_certificate = None
+    if "Saml2Int" in configured_saml_profiles:
+        saml2int_certificate = _load_rsa_public_certificate(
+            environment.get("EEMSUITE_SAML2INT_SP_CERTIFICATE_FILE", "")
+        )
 
     source_groups = _collect_groups(manifest)
     _validate_manifest(manifest, source_groups)
@@ -691,10 +799,13 @@ def build_realm(
             "synthetic_status": [user["status"]],
             "eem_company_ids": sorted(user_companies[user["id"]]),
             "eem_permission_profiles": sorted(user_profiles[user["id"]]),
-            f"saml.persistent.name.id.for.{saml_entity_id}": [
-                _stable_id("saml-nameid", user["id"])
-            ],
         }
+        for entity_id in (
+            [standard_saml_entity_id] if "Standard" in configured_saml_profiles else []
+        ) + ([saml2int_entity_id] if "Saml2Int" in configured_saml_profiles else []):
+            attributes[f"saml.persistent.name.id.for.{entity_id}"] = [
+                _stable_id("saml-nameid", user["id"])
+            ]
         keycloak_users.append(
             {
                 "id": _stable_id("user", user["id"]),
@@ -734,6 +845,31 @@ def build_realm(
     base_url = environment.get("IDENTITY_PUBLIC_BASE_URL", "https://localhost:8443").rstrip("/")
     issuer = f"{base_url}/realms/{REALM_NAME}"
     discovery = f"{issuer}/.well-known/openid-configuration"
+
+    saml_clients: list[dict[str, Any]] = []
+    if "Standard" in configured_saml_profiles:
+        saml_clients.append(
+            _saml_client(
+                standard_saml_entity_id,
+                standard_saml_acs_urls,
+                standard_saml_logout_urls,
+                application_home_url,
+                validation_profile="Standard",
+                idp_initiated_url_name=STANDARD_SAML_IDP_INITIATED_URL_NAME,
+            )
+        )
+    if "Saml2Int" in configured_saml_profiles:
+        saml_clients.append(
+            _saml_client(
+                saml2int_entity_id,
+                saml2int_acs_urls,
+                saml2int_logout_urls,
+                application_home_url,
+                validation_profile="Saml2Int",
+                idp_initiated_url_name=SAML2INT_IDP_INITIATED_URL_NAME,
+                service_provider_certificate=saml2int_certificate,
+            )
+        )
 
     realm = {
         "id": _stable_id("realm", REALM_NAME),
@@ -792,12 +928,7 @@ def build_realm(
                 implicit_enabled=True,
                 require_pkce=False,
             ),
-            _saml_client(
-                saml_entity_id,
-                saml_assertion_consumer_service_urls,
-                saml_single_logout_service_urls,
-                application_home_url,
-            ),
+            *saml_clients,
         ],
         "eventsEnabled": True,
         "eventsExpiration": 604800,
@@ -811,6 +942,53 @@ def build_realm(
 
     active_user = next(user for user in users if user["status"] == "active")
     disabled_user = next(user for user in users if user["status"] == "disabled")
+    saml_connection_profiles: dict[str, dict[str, Any]] = {}
+    if "Standard" in configured_saml_profiles:
+        saml_connection_profiles["saml"] = {
+            "clientId": standard_saml_entity_id,
+            "entityId": standard_saml_entity_id,
+            "providerKey": STANDARD_SAML_PROVIDER_KEY,
+            "validationProfile": "Standard",
+            "protocol": "saml",
+            "redirectUris": standard_saml_acs_urls,
+            "assertionConsumerServiceUrls": standard_saml_acs_urls,
+            "singleLogoutServiceUrls": standard_saml_logout_urls,
+            "defaultAssertionConsumerServiceUrl": standard_saml_acs_urls[0],
+            "defaultSingleLogoutServiceUrl": standard_saml_logout_urls[0],
+            "nameIdFormat": SAML_NAME_ID_FORMAT_URN,
+            "responseBinding": SAML_POST_BINDING_URN,
+            "signAuthnRequests": False,
+            "wantResponseSigned": True,
+            "wantAssertionsSigned": True,
+            "wantAssertionsEncrypted": False,
+            "idpInitiatedSsoUrl": (
+                f"{issuer}/protocol/saml/clients/{STANDARD_SAML_IDP_INITIATED_URL_NAME}"
+            ),
+            "idpInitiatedRelayState": "northlake-standard",
+        }
+    if "Saml2Int" in configured_saml_profiles:
+        saml_connection_profiles["saml2Int"] = {
+            "clientId": saml2int_entity_id,
+            "entityId": saml2int_entity_id,
+            "providerKey": SAML2INT_PROVIDER_KEY,
+            "validationProfile": "Saml2Int",
+            "protocol": "saml",
+            "redirectUris": saml2int_acs_urls,
+            "assertionConsumerServiceUrls": saml2int_acs_urls,
+            "singleLogoutServiceUrls": saml2int_logout_urls,
+            "defaultAssertionConsumerServiceUrl": saml2int_acs_urls[0],
+            "defaultSingleLogoutServiceUrl": saml2int_logout_urls[0],
+            "nameIdFormat": SAML_NAME_ID_FORMAT_URN,
+            "responseBinding": SAML_POST_BINDING_URN,
+            "signAuthnRequests": True,
+            "wantResponseSigned": True,
+            "wantAssertionsSigned": False,
+            "wantAssertionsEncrypted": True,
+            "idpInitiatedSsoUrl": (
+                f"{issuer}/protocol/saml/clients/{SAML2INT_IDP_INITIATED_URL_NAME}"
+            ),
+            "idpInitiatedRelayState": "northlake-saml2int",
+        }
     connection_profile = {
         "realm": REALM_NAME,
         "realmSource": {
@@ -848,28 +1026,7 @@ def build_realm(
                 "scope": "openid profile email northlake",
                 "redirectUris": redirect_uris,
             },
-            "saml": {
-                "clientId": saml_entity_id,
-                "entityId": saml_entity_id,
-                "protocol": "saml",
-                "redirectUris": saml_assertion_consumer_service_urls,
-                "assertionConsumerServiceUrls": saml_assertion_consumer_service_urls,
-                "singleLogoutServiceUrls": saml_single_logout_service_urls,
-                "defaultAssertionConsumerServiceUrl": (
-                    saml_assertion_consumer_service_urls[0]
-                ),
-                "defaultSingleLogoutServiceUrl": saml_single_logout_service_urls[0],
-                "nameIdFormat": SAML_NAME_ID_FORMAT_URN,
-                "responseBinding": SAML_POST_BINDING_URN,
-                "signAuthnRequests": False,
-                "wantResponseSigned": True,
-                "wantAssertionsSigned": True,
-                "wantAssertionsEncrypted": False,
-                "idpInitiatedSsoUrl": (
-                    f"{issuer}/protocol/saml/clients/{SAML_IDP_INITIATED_URL_NAME}"
-                ),
-                "idpInitiatedRelayState": "northlake-idp-initiated",
-            },
+            **saml_connection_profiles,
         },
         "testUsers": {
             "active": {
@@ -920,6 +1077,38 @@ def build_realm(
                     "Scope": "openid profile email northlake",
                     "DiscoveryEndpoint": discovery,
                 }
+            },
+            "samlProfiles": {
+                key: {
+                    "ProviderKey": value["providerKey"],
+                    "DisplayName": (
+                        "Northlake Synthetic Identity - SAML2Int"
+                        if value["validationProfile"] == "Saml2Int"
+                        else "Northlake Synthetic Identity - Standard SAML"
+                    ),
+                    "IdentityProviderMetadata": f"{issuer}/protocol/saml/descriptor",
+                    "ServiceProviderEntityID": value["entityId"],
+                    "ValidationProfile": value["validationProfile"],
+                    "SubjectBindingKind": "PersistentNameId",
+                    "AllowedClaims": [
+                        "username",
+                        "email",
+                        "given_name",
+                        "family_name",
+                        "groups",
+                    ],
+                    "EnableSingleLogout": True,
+                    "CallbackPath": (
+                        f"/saml/{value['providerKey']}/acs"
+                    ),
+                    "MetadataPath": (
+                        f"/saml/{value['providerKey']}/metadata"
+                    ),
+                    "LogoutPath": (
+                        f"/saml/{value['providerKey']}/logout"
+                    ),
+                }
+                for key, value in saml_connection_profiles.items()
             },
         },
     }
