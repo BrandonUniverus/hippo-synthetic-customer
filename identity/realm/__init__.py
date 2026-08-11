@@ -1,0 +1,1 @@
+"""Deterministic Keycloak realm generation."""

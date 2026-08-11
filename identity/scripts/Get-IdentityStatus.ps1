@@ -23,11 +23,21 @@ Write-Host "Account console: $($profile.accountConsole)"
 Write-Host "Admin console:   $($profile.adminConsole)"
 Write-Host "Active user:     $($profile.testUsers.active.username)"
 Write-Host "Disabled user:   $($profile.testUsers.disabled.username)"
-Write-Host "Modern client:   $($profile.clients.modern.clientId) (code + PKCE S256)"
-Write-Host "Legacy client:   $($profile.clients.legacy.clientId) (id_token token)"
-Write-Host "SAML entity ID:  $($profile.clients.saml.entityId)"
-Write-Host "SAML ACS:        $($profile.clients.saml.defaultAssertionConsumerServiceUrl)"
-Write-Host "SAML logout:     $($profile.clients.saml.defaultSingleLogoutServiceUrl)"
+if ($profile.clients.PSObject.Properties["modern"]) {
+    Write-Host "Modern client:   $($profile.clients.modern.clientId) (code + PKCE S256)"
+    Write-Host "Legacy client:   $($profile.clients.legacy.clientId) (id_token token)"
+}
+else {
+    Write-Host "OIDC clients:    disabled"
+}
+if ($profile.clients.PSObject.Properties["saml"]) {
+    Write-Host "SAML entity ID:  $($profile.clients.saml.entityId)"
+    Write-Host "SAML ACS:        $($profile.clients.saml.defaultAssertionConsumerServiceUrl)"
+    Write-Host "SAML logout:     $($profile.clients.saml.defaultSingleLogoutServiceUrl)"
+}
+else {
+    Write-Host "SAML client:     disabled"
+}
 Write-Host "Profile:         $script:IdentityConnectionProfile"
 
 if ($ShowSecrets) {
@@ -36,6 +46,8 @@ if ($ShowSecrets) {
     Write-Host "Test password:        $($profile.testUsers.password)"
     Write-Host "Admin username:       $($profile.admin.username)"
     Write-Host "Admin password:       $($profile.admin.password)"
-    Write-Host "Modern client secret: $($profile.clients.modern.clientSecret)"
-    Write-Host "Legacy client secret: $($profile.clients.legacy.clientSecret)"
+    if ($profile.clients.PSObject.Properties["modern"]) {
+        Write-Host "Modern client secret: $($profile.clients.modern.clientSecret)"
+        Write-Host "Legacy client secret: $($profile.clients.legacy.clientSecret)"
+    }
 }

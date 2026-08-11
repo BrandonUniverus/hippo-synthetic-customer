@@ -1,0 +1,118 @@
+{
+  "schemaVersion": 1,
+  "title": "Northlake provider configuration",
+  "description": "Common settings for the disposable localhost Keycloak provider.",
+  "groups": [
+    {
+      "key": "provider",
+      "title": "Provider",
+      "description": "The identity-provider name, realm, and public localhost address.",
+      "fields": [
+        {
+          "key": "providerDisplayName",
+          "label": "Provider display name",
+          "kind": "text",
+          "required": true,
+          "help": "Shown on the Keycloak login and account pages."
+        },
+        {
+          "key": "realmKey",
+          "label": "Realm key",
+          "kind": "text",
+          "required": true,
+          "help": "Lowercase localhost realm identifier, such as northlake."
+        },
+        {
+          "key": "publicBaseUrl",
+          "label": "Public provider base URL",
+          "kind": "url",
+          "required": true,
+          "help": "HTTPS origin used for issuer, discovery, metadata, and browser links."
+        },
+        {
+          "key": "httpsPort",
+          "label": "HTTPS port",
+          "kind": "number",
+          "required": true,
+          "help": "Loopback port published by Docker. A changed port takes effect after restarting the stack."
+        },
+        {
+          "key": "preset",
+          "label": "Configuration preset",
+          "kind": "select",
+          "required": true,
+          "choices": [
+            {
+              "value": "Default",
+              "label": "Default"
+            }
+          ],
+          "help": "Phase 1 intentionally provides one ordinary baseline."
+        }
+      ]
+    },
+    {
+      "key": "application",
+      "title": "Application",
+      "description": "Where Northlake returns users after the selected protocol flow.",
+      "fields": [
+        {
+          "key": "applicationHomeUrl",
+          "label": "EnergyHippo application home URL",
+          "kind": "url",
+          "required": true,
+          "help": "Used only as the registered application landing page and logout return."
+        }
+      ]
+    },
+    {
+      "key": "oidc",
+      "title": "OpenID Connect",
+      "description": "Enable the existing modern and retained legacy test clients.",
+      "fields": [
+        {
+          "key": "enableOidc",
+          "label": "Enable OIDC clients",
+          "kind": "checkbox",
+          "required": false,
+          "help": "Discovery remains a realm endpoint; this controls the EEMSuite client registrations."
+        },
+        {
+          "key": "oidcRedirectUris",
+          "label": "Exact OIDC redirect URIs",
+          "kind": "uri-list",
+          "required": true,
+          "help": "One absolute HTTPS callback per line. Wildcards are not accepted."
+        }
+      ]
+    },
+    {
+      "key": "saml",
+      "title": "SAML 2.0",
+      "description": "Enable the ordinary Standard SAML client used by the baseline lab.",
+      "fields": [
+        {
+          "key": "enableSaml",
+          "label": "Enable SAML client",
+          "kind": "checkbox",
+          "required": false,
+          "help": "Phase 1 configures only the Standard profile. Saml2Int remains available through the existing environment file until Phase 5."
+        },
+        {
+          "key": "samlAcsUrls",
+          "label": "Exact SAML ACS URLs",
+          "kind": "uri-list",
+          "required": true,
+          "help": "One absolute HTTPS assertion-consumer URL per line."
+        },
+        {
+          "key": "samlLogoutUrls",
+          "label": "Exact SAML logout URLs",
+          "kind": "uri-list",
+          "required": true,
+          "help": "One absolute HTTPS single-logout URL per line."
+        }
+      ]
+    }
+  ]
+}

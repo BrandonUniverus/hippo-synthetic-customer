@@ -1221,55 +1221,63 @@ def _verify_admin(
         ):
             raise VerificationError(f"Redirect URI drift detected for {client['clientId']}.")
 
-    modern = by_client_id[profile["clients"]["modern"]["clientId"]]
-    if (
-        modern.get("implicitFlowEnabled")
-        or not modern.get("standardFlowEnabled")
-        or not modern.get("consentRequired")
-        or modern.get("attributes", {}).get("pkce.code.challenge.method") != "S256"
-        or "offline_access" not in modern.get("optionalClientScopes", [])
-    ):
-        raise VerificationError(
-            "Modern client drifted from code + PKCE, consent, or offline-access settings."
-        )
-    legacy = by_client_id[profile["clients"]["legacy"]["clientId"]]
-    if not legacy.get("implicitFlowEnabled") or legacy.get("consentRequired"):
-        raise VerificationError("Legacy client drifted from its explicit compatibility settings.")
+    modern_profile = profile["clients"].get("modern")
+    legacy_profile = profile["clients"].get("legacy")
+    if (modern_profile is None) != (legacy_profile is None):
+        raise VerificationError("OIDC modern and legacy clients must be enabled together.")
+    if modern_profile is not None and legacy_profile is not None:
+        modern = by_client_id[modern_profile["clientId"]]
+        if (
+            modern.get("implicitFlowEnabled")
+            or not modern.get("standardFlowEnabled")
+            or not modern.get("consentRequired")
+            or modern.get("attributes", {}).get("pkce.code.challenge.method") != "S256"
+            or "offline_access" not in modern.get("optionalClientScopes", [])
+        ):
+            raise VerificationError(
+                "Modern client drifted from code + PKCE, consent, or offline-access settings."
+            )
+        legacy = by_client_id[legacy_profile["clientId"]]
+        if not legacy.get("implicitFlowEnabled") or legacy.get("consentRequired"):
+            raise VerificationError(
+                "Legacy client drifted from its explicit compatibility settings."
+            )
 
-    saml = by_client_id[profile["clients"]["saml"]["clientId"]]
-    saml_attributes = saml.get("attributes", {})
-    if (
-        saml.get("protocol") != "saml"
-        or saml_attributes.get("saml.server.signature") != "true"
-        or saml_attributes.get("saml.assertion.signature") != "true"
-        or saml_attributes.get("saml.signature.algorithm") != "RSA_SHA256"
-        or saml_attributes.get("saml.force.post.binding") != "true"
-        or saml_attributes.get("saml.client.signature") != "false"
-        or saml_attributes.get("saml.encrypt") != "false"
-        or saml_attributes.get("saml.onetimeuse.condition") != "true"
-        or saml_attributes.get("saml_name_id_format") != "persistent"
-    ):
-        raise VerificationError("SAML client drifted from its signed baseline profile.")
-    expected_saml_mappers = {
-        "username",
-        "email",
-        "given_name",
-        "family_name",
-        "groups",
-        "synthetic_user_id",
-        "primary_company_id",
-        "title",
-        "synthetic_status",
-        "eem_company_ids",
-        "eem_permission_profiles",
-        "realm_roles",
-    }
-    actual_saml_mappers = {
-        mapper["name"]
-        for mapper in saml.get("protocolMappers", [])
-    }
-    if actual_saml_mappers != expected_saml_mappers:
-        raise VerificationError("SAML client protocol-mapper set drifted.")
+    saml_profile = profile["clients"].get("saml")
+    if saml_profile is not None:
+        saml = by_client_id[saml_profile["clientId"]]
+        saml_attributes = saml.get("attributes", {})
+        if (
+            saml.get("protocol") != "saml"
+            or saml_attributes.get("saml.server.signature") != "true"
+            or saml_attributes.get("saml.assertion.signature") != "true"
+            or saml_attributes.get("saml.signature.algorithm") != "RSA_SHA256"
+            or saml_attributes.get("saml.force.post.binding") != "true"
+            or saml_attributes.get("saml.client.signature") != "false"
+            or saml_attributes.get("saml.encrypt") != "false"
+            or saml_attributes.get("saml.onetimeuse.condition") != "true"
+            or saml_attributes.get("saml_name_id_format") != "persistent"
+        ):
+            raise VerificationError("SAML client drifted from its signed baseline profile.")
+        expected_saml_mappers = {
+            "username",
+            "email",
+            "given_name",
+            "family_name",
+            "groups",
+            "synthetic_user_id",
+            "primary_company_id",
+            "title",
+            "synthetic_status",
+            "eem_company_ids",
+            "eem_permission_profiles",
+            "realm_roles",
+        }
+        actual_saml_mappers = {
+            mapper["name"] for mapper in saml.get("protocolMappers", [])
+        }
+        if actual_saml_mappers != expected_saml_mappers:
+            raise VerificationError("SAML client protocol-mapper set drifted.")
 
     saml2int_profile = profile["clients"].get("saml2Int")
     if saml2int_profile is not None:
@@ -1927,6 +1935,8 @@ def verify(connection_path: Path, ca_path: Path, suite: str = "all") -> None:
     context = ssl.create_default_context(cafile=str(ca_path))
 
     if suite == "saml":
+        if "saml" not in profile["clients"]:
+            raise VerificationError("The Standard SAML profile is disabled.")
         _verify_saml(profile, context)
         return
 
@@ -1968,11 +1978,17 @@ def verify(connection_path: Path, ca_path: Path, suite: str = "all") -> None:
     )
 
     _verify_admin(profile, context)
-    _verify_negative_protocol_cases(profile, context)
-    _verify_saml(profile, context)
-    _verify_modern_code_flow(profile, context, discovery, jwks)
-    _verify_disabled_user(profile, context)
-    _verify_legacy_implicit_flow(profile, context)
+    if "modern" in profile["clients"]:
+        _verify_negative_protocol_cases(profile, context)
+        _verify_modern_code_flow(profile, context, discovery, jwks)
+        _verify_disabled_user(profile, context)
+        _verify_legacy_implicit_flow(profile, context)
+    else:
+        print("[OK] OIDC client flows are disabled by the local provider configuration.")
+    if "saml" in profile["clients"]:
+        _verify_saml(profile, context)
+    else:
+        print("[OK] Standard SAML client flow is disabled by the local provider configuration.")
 
 
 def _parse_args() -> argparse.Namespace:

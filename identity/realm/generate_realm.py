@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import html
 import json
 import os
 import sys
@@ -20,8 +21,17 @@ from cryptography import x509
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-REALM_NAME = "northlake"
+from identity.configuration.settings import (
+    REALM_KEY_PATTERN,
+    SettingsValidationError,
+    load_settings_document,
+)
+
+
+DEFAULT_REALM_NAME = "northlake"
 MODERN_CLIENT_ID = "eemsuite-web"
 LEGACY_CLIENT_ID = "eemsuite-web-legacy"
 DEFAULT_EEMSUITE_APPLICATION_HOME_URL = "https://localdev.energyhippo.com/Hippo/"
@@ -100,8 +110,8 @@ def _load_rsa_public_certificate(path_value: str) -> str:
     ).decode("ascii")
 
 
-def _stable_id(kind: str, value: str) -> str:
-    return str(uuid.uuid5(UUID_NAMESPACE, f"{REALM_NAME}/{kind}/{value}"))
+def _stable_id(realm_name: str, kind: str, value: str) -> str:
+    return str(uuid.uuid5(UUID_NAMESPACE, f"{realm_name}/{kind}/{value}"))
 
 
 def _load_env(path: Path) -> dict[str, str]:
@@ -144,6 +154,18 @@ def _require_environment(values: dict[str, str]) -> None:
         raise RealmGenerationError(
             "IDENTITY_PUBLIC_BASE_URL must use IDENTITY_HOST and IDENTITY_HTTPS_PORT."
         )
+
+
+def _environment_boolean(values: dict[str, str], key: str, default: bool) -> bool:
+    raw_value = values.get(key)
+    if raw_value is None or not raw_value.strip():
+        return default
+    normalized = raw_value.strip().lower()
+    if normalized in {"true", "1", "yes"}:
+        return True
+    if normalized in {"false", "0", "no"}:
+        return False
+    raise RealmGenerationError(f"{key} must be true or false.")
 
 
 def _load_manifest(path: Path) -> dict[str, Any]:
@@ -293,14 +315,14 @@ def _saml_property_mapper(property_name: str, assertion_attribute: str) -> dict[
     }
 
 
-def _standard_client_scopes() -> list[dict[str, Any]]:
+def _standard_client_scopes(realm_name: str) -> list[dict[str, Any]]:
     common_attributes = {
         "include.in.token.scope": "true",
         "display.on.consent.screen": "true",
     }
     return [
         {
-            "id": _stable_id("client-scope", "basic"),
+            "id": _stable_id(realm_name, "client-scope", "basic"),
             "name": "basic",
             "description": "Core session claims used for OIDC validation.",
             "protocol": "openid-connect",
@@ -336,7 +358,7 @@ def _standard_client_scopes() -> list[dict[str, Any]]:
             ],
         },
         {
-            "id": _stable_id("client-scope", "profile"),
+            "id": _stable_id(realm_name, "client-scope", "profile"),
             "name": "profile",
             "description": "Standard OpenID Connect profile claims.",
             "protocol": "openid-connect",
@@ -362,7 +384,7 @@ def _standard_client_scopes() -> list[dict[str, Any]]:
             ],
         },
         {
-            "id": _stable_id("client-scope", "email"),
+            "id": _stable_id(realm_name, "client-scope", "email"),
             "name": "email",
             "description": "Standard OpenID Connect email claims.",
             "protocol": "openid-connect",
@@ -381,7 +403,7 @@ def _standard_client_scopes() -> list[dict[str, Any]]:
             ],
         },
         {
-            "id": _stable_id("client-scope", "roles"),
+            "id": _stable_id(realm_name, "client-scope", "roles"),
             "name": "roles",
             "description": "Synthetic EEM permission-profile intent as realm roles.",
             "protocol": "openid-connect",
@@ -409,9 +431,9 @@ def _standard_client_scopes() -> list[dict[str, Any]]:
     ]
 
 
-def _northlake_client_scope() -> dict[str, Any]:
+def _northlake_client_scope(realm_name: str) -> dict[str, Any]:
     return {
-        "id": _stable_id("client-scope", "northlake"),
+        "id": _stable_id(realm_name, "client-scope", "northlake"),
         "name": "northlake",
         "description": "Synthetic Northlake identity and authorization-shape claims.",
         "protocol": "openid-connect",
@@ -479,6 +501,7 @@ def _url_list(
 
 
 def _client(
+    realm_name: str,
     client_id: str,
     secret: str,
     redirect_uris: list[str],
@@ -503,7 +526,7 @@ def _client(
         attributes["pkce.code.challenge.method"] = "S256"
 
     return {
-        "id": _stable_id("client", client_id),
+        "id": _stable_id(realm_name, "client", client_id),
         "clientId": client_id,
         "name": (
             "EEMSuite Web - modern code and PKCE"
@@ -546,6 +569,7 @@ def _client(
 
 
 def _saml_client(
+    realm_name: str,
     entity_id: str,
     assertion_consumer_service_urls: list[str],
     single_logout_service_urls: list[str],
@@ -593,7 +617,7 @@ def _saml_client(
         attributes["saml.encryption.certificate"] = service_provider_certificate
 
     return {
-        "id": _stable_id("client", entity_id),
+        "id": _stable_id(realm_name, "client", entity_id),
         "clientId": entity_id,
         "name": f"EEMSuite Web - SAML 2.0 {validation_profile}",
         "description": (
@@ -679,6 +703,26 @@ def build_realm(
     """Build the Keycloak realm and local connection profile."""
 
     _require_environment(environment)
+    realm_name = environment.get("NORTHLAKE_REALM_KEY", DEFAULT_REALM_NAME).strip()
+    if not REALM_KEY_PATTERN.fullmatch(realm_name) or realm_name == "master":
+        raise RealmGenerationError(
+            "NORTHLAKE_REALM_KEY must be a non-master lowercase realm key."
+        )
+    provider_display_name = environment.get(
+        "NORTHLAKE_PROVIDER_DISPLAY_NAME",
+        "Northlake Synthetic Identity",
+    ).strip()
+    if not 3 <= len(provider_display_name) <= 80 or any(
+        ord(character) < 32 for character in provider_display_name
+    ):
+        raise RealmGenerationError(
+            "NORTHLAKE_PROVIDER_DISPLAY_NAME must contain 3-80 printable characters."
+        )
+    enable_oidc = _environment_boolean(environment, "NORTHLAKE_ENABLE_OIDC", True)
+    enable_saml = _environment_boolean(environment, "NORTHLAKE_ENABLE_SAML", True)
+    if not enable_oidc and not enable_saml:
+        raise RealmGenerationError("At least one of OIDC or SAML must be enabled.")
+
     application_home_url = environment.get(
         "EEMSUITE_APPLICATION_HOME_URL",
         DEFAULT_EEMSUITE_APPLICATION_HOME_URL,
@@ -691,12 +735,16 @@ def build_realm(
         raise RealmGenerationError(
             "EEMSUITE_APPLICATION_HOME_URL must be an absolute HTTPS URL."
         )
-    configured_saml_profiles = [
-        value.strip()
-        for value in environment.get("EEMSUITE_SAML_PROFILES", "Standard").split(";")
-        if value.strip()
-    ]
-    if (
+    configured_saml_profiles = (
+        [
+            value.strip()
+            for value in environment.get("EEMSUITE_SAML_PROFILES", "Standard").split(";")
+            if value.strip()
+        ]
+        if enable_saml
+        else []
+    )
+    if enable_saml and (
         not configured_saml_profiles
         or len(configured_saml_profiles) != len(set(configured_saml_profiles))
         or any(value not in {"Standard", "Saml2Int"} for value in configured_saml_profiles)
@@ -713,36 +761,55 @@ def build_realm(
         "EEMSUITE_SAML2INT_ENTITY_ID",
         DEFAULT_SAML2INT_ENTITY_ID,
     ).strip()
-    for variable_name, entity_id in (
-        ("EEMSUITE_SAML_STANDARD_ENTITY_ID", standard_saml_entity_id),
-        ("EEMSUITE_SAML2INT_ENTITY_ID", saml2int_entity_id),
-    ):
-        if not entity_id or any(character.isspace() for character in entity_id):
+    if enable_saml:
+        for variable_name, entity_id in (
+            ("EEMSUITE_SAML_STANDARD_ENTITY_ID", standard_saml_entity_id),
+            ("EEMSUITE_SAML2INT_ENTITY_ID", saml2int_entity_id),
+        ):
+            if not entity_id or any(character.isspace() for character in entity_id):
+                raise RealmGenerationError(
+                    f"{variable_name} must be a non-empty entity identifier without whitespace."
+                )
+        if standard_saml_entity_id == saml2int_entity_id:
             raise RealmGenerationError(
-                f"{variable_name} must be a non-empty entity identifier without whitespace."
+                "Standard and Saml2Int require distinct entity identifiers."
             )
-    if standard_saml_entity_id == saml2int_entity_id:
-        raise RealmGenerationError("Standard and Saml2Int require distinct entity identifiers.")
 
-    standard_saml_acs_urls = _url_list(
-        environment,
-        "EEMSUITE_SAML_STANDARD_ACS_URLS",
-        default=DEFAULT_STANDARD_SAML_ACS_URLS,
+    standard_saml_acs_urls = (
+        _url_list(
+            environment,
+            "EEMSUITE_SAML_STANDARD_ACS_URLS",
+            default=DEFAULT_STANDARD_SAML_ACS_URLS,
+        )
+        if "Standard" in configured_saml_profiles
+        else []
     )
-    standard_saml_logout_urls = _url_list(
-        environment,
-        "EEMSUITE_SAML_STANDARD_LOGOUT_URLS",
-        default=DEFAULT_STANDARD_SAML_LOGOUT_URLS,
+    standard_saml_logout_urls = (
+        _url_list(
+            environment,
+            "EEMSUITE_SAML_STANDARD_LOGOUT_URLS",
+            default=DEFAULT_STANDARD_SAML_LOGOUT_URLS,
+        )
+        if "Standard" in configured_saml_profiles
+        else []
     )
-    saml2int_acs_urls = _url_list(
-        environment,
-        "EEMSUITE_SAML2INT_ACS_URLS",
-        default=DEFAULT_SAML2INT_ACS_URLS,
+    saml2int_acs_urls = (
+        _url_list(
+            environment,
+            "EEMSUITE_SAML2INT_ACS_URLS",
+            default=DEFAULT_SAML2INT_ACS_URLS,
+        )
+        if "Saml2Int" in configured_saml_profiles
+        else []
     )
-    saml2int_logout_urls = _url_list(
-        environment,
-        "EEMSUITE_SAML2INT_LOGOUT_URLS",
-        default=DEFAULT_SAML2INT_LOGOUT_URLS,
+    saml2int_logout_urls = (
+        _url_list(
+            environment,
+            "EEMSUITE_SAML2INT_LOGOUT_URLS",
+            default=DEFAULT_SAML2INT_LOGOUT_URLS,
+        )
+        if "Saml2Int" in configured_saml_profiles
+        else []
     )
     saml2int_certificate = None
     if "Saml2Int" in configured_saml_profiles:
@@ -778,7 +845,7 @@ def build_realm(
 
         keycloak_groups.append(
             {
-                "id": _stable_id("group", group_id),
+                "id": _stable_id(realm_name, "group", group_id),
                 "name": group_id,
                 "path": f"/{group_id}",
                 "attributes": attributes,
@@ -804,11 +871,11 @@ def build_realm(
             [standard_saml_entity_id] if "Standard" in configured_saml_profiles else []
         ) + ([saml2int_entity_id] if "Saml2Int" in configured_saml_profiles else []):
             attributes[f"saml.persistent.name.id.for.{entity_id}"] = [
-                _stable_id("saml-nameid", user["id"])
+                _stable_id(realm_name, "saml-nameid", user["id"])
             ]
         keycloak_users.append(
             {
-                "id": _stable_id("user", user["id"]),
+                "id": _stable_id(realm_name, "user", user["id"]),
                 "username": user["username"],
                 "enabled": user["status"] == "active",
                 "emailVerified": True,
@@ -824,14 +891,14 @@ def build_realm(
                     }
                 ],
                 "requiredActions": [],
-                "realmRoles": [f"default-roles-{REALM_NAME}"],
+                "realmRoles": [f"default-roles-{realm_name}"],
                 "groups": sorted(user_groups[user["id"]]),
             }
         )
 
     role_definitions = [
         {
-            "id": _stable_id("role", profile["id"]),
+            "id": _stable_id(realm_name, "role", profile["id"]),
             "name": profile["id"],
             "description": profile.get("intent", profile["displayName"]),
             "composite": False,
@@ -840,16 +907,19 @@ def build_realm(
         for profile in manifest.get("permissionProfiles", [])
     ]
 
-    redirect_uris = _url_list(environment, "EEMSUITE_OIDC_REDIRECT_URIS")
+    redirect_uris = (
+        _url_list(environment, "EEMSUITE_OIDC_REDIRECT_URIS") if enable_oidc else []
+    )
 
     base_url = environment.get("IDENTITY_PUBLIC_BASE_URL", "https://localhost:8443").rstrip("/")
-    issuer = f"{base_url}/realms/{REALM_NAME}"
+    issuer = f"{base_url}/realms/{realm_name}"
     discovery = f"{issuer}/.well-known/openid-configuration"
 
     saml_clients: list[dict[str, Any]] = []
     if "Standard" in configured_saml_profiles:
         saml_clients.append(
             _saml_client(
+                realm_name,
                 standard_saml_entity_id,
                 standard_saml_acs_urls,
                 standard_saml_logout_urls,
@@ -861,6 +931,7 @@ def build_realm(
     if "Saml2Int" in configured_saml_profiles:
         saml_clients.append(
             _saml_client(
+                realm_name,
                 saml2int_entity_id,
                 saml2int_acs_urls,
                 saml2int_logout_urls,
@@ -871,11 +942,36 @@ def build_realm(
             )
         )
 
+    oidc_clients = (
+        [
+            _client(
+                realm_name,
+                MODERN_CLIENT_ID,
+                environment["EEMSUITE_OIDC_CLIENT_SECRET"],
+                redirect_uris,
+                application_home_url,
+                implicit_enabled=False,
+                require_pkce=True,
+            ),
+            _client(
+                realm_name,
+                LEGACY_CLIENT_ID,
+                environment["EEMSUITE_OIDC_LEGACY_CLIENT_SECRET"],
+                redirect_uris,
+                application_home_url,
+                implicit_enabled=True,
+                require_pkce=False,
+            ),
+        ]
+        if enable_oidc
+        else []
+    )
+
     realm = {
-        "id": _stable_id("realm", REALM_NAME),
-        "realm": REALM_NAME,
-        "displayName": "Northlake Synthetic Identity",
-        "displayNameHtml": "<strong>Northlake</strong> Synthetic Identity",
+        "id": _stable_id(realm_name, "realm", realm_name),
+        "realm": realm_name,
+        "displayName": provider_display_name,
+        "displayNameHtml": f"<strong>{html.escape(provider_display_name)}</strong>",
         "enabled": True,
         "notBefore": 0,
         "defaultSignatureAlgorithm": "RS256",
@@ -910,26 +1006,11 @@ def build_realm(
         "roles": {"realm": role_definitions},
         "groups": keycloak_groups,
         "users": keycloak_users,
-        "clientScopes": [*_standard_client_scopes(), _northlake_client_scope()],
-        "clients": [
-            _client(
-                MODERN_CLIENT_ID,
-                environment["EEMSUITE_OIDC_CLIENT_SECRET"],
-                redirect_uris,
-                application_home_url,
-                implicit_enabled=False,
-                require_pkce=True,
-            ),
-            _client(
-                LEGACY_CLIENT_ID,
-                environment["EEMSUITE_OIDC_LEGACY_CLIENT_SECRET"],
-                redirect_uris,
-                application_home_url,
-                implicit_enabled=True,
-                require_pkce=False,
-            ),
-            *saml_clients,
+        "clientScopes": [
+            *_standard_client_scopes(realm_name),
+            _northlake_client_scope(realm_name),
         ],
+        "clients": [*oidc_clients, *saml_clients],
         "eventsEnabled": True,
         "eventsExpiration": 604800,
         "eventsListeners": ["jboss-logging"],
@@ -989,8 +1070,54 @@ def build_realm(
             ),
             "idpInitiatedRelayState": "northlake-saml2int",
         }
+    oidc_connection_profiles = (
+        {
+            "modern": {
+                "clientId": MODERN_CLIENT_ID,
+                "clientSecret": environment["EEMSUITE_OIDC_CLIENT_SECRET"],
+                "responseType": "code",
+                "scope": "openid profile email northlake",
+                "redirectUris": redirect_uris,
+            },
+            "legacy": {
+                "clientId": LEGACY_CLIENT_ID,
+                "clientSecret": environment["EEMSUITE_OIDC_LEGACY_CLIENT_SECRET"],
+                "responseType": "id_token token",
+                "scope": "openid profile email northlake",
+                "redirectUris": redirect_uris,
+            },
+        }
+        if enable_oidc
+        else {}
+    )
+    oidc_eemsuite_configuration = (
+        {
+            "legacy": {
+                "OpenIDConnect": {
+                    "Description": f"{provider_display_name} - legacy",
+                    "ClientID": LEGACY_CLIENT_ID,
+                    "ClientSecret": environment["EEMSUITE_OIDC_LEGACY_CLIENT_SECRET"],
+                    "ResponseType": "id_token token",
+                    "Scope": "openid profile email northlake",
+                    "DiscoveryEndpoint": discovery,
+                }
+            },
+            "modern": {
+                "OpenIDConnect": {
+                    "Description": f"{provider_display_name} - modern",
+                    "ClientID": MODERN_CLIENT_ID,
+                    "ClientSecret": environment["EEMSUITE_OIDC_CLIENT_SECRET"],
+                    "ResponseType": "code",
+                    "Scope": "openid profile email northlake",
+                    "DiscoveryEndpoint": discovery,
+                }
+            },
+        }
+        if enable_oidc
+        else {}
+    )
     connection_profile = {
-        "realm": REALM_NAME,
+        "realm": realm_name,
         "realmSource": {
             "manifestId": manifest["id"],
             "manifestVersion": manifest["manifestVersion"],
@@ -1008,31 +1135,19 @@ def build_realm(
         "samlMetadataEndpoint": f"{issuer}/protocol/saml/descriptor",
         "samlSingleSignOnEndpoint": f"{issuer}/protocol/saml",
         "samlSingleLogoutEndpoint": f"{issuer}/protocol/saml",
-        "adminConsole": f"{base_url}/admin/{REALM_NAME}/console/",
+        "adminConsole": f"{base_url}/admin/{realm_name}/console/",
         "masterAdminConsole": f"{base_url}/admin/master/console/",
         "accountConsole": f"{issuer}/account/",
-        "clients": {
-            "modern": {
-                "clientId": MODERN_CLIENT_ID,
-                "clientSecret": environment["EEMSUITE_OIDC_CLIENT_SECRET"],
-                "responseType": "code",
-                "scope": "openid profile email northlake",
-                "redirectUris": redirect_uris,
-            },
-            "legacy": {
-                "clientId": LEGACY_CLIENT_ID,
-                "clientSecret": environment["EEMSUITE_OIDC_LEGACY_CLIENT_SECRET"],
-                "responseType": "id_token token",
-                "scope": "openid profile email northlake",
-                "redirectUris": redirect_uris,
-            },
-            **saml_connection_profiles,
-        },
+        "clients": {**oidc_connection_profiles, **saml_connection_profiles},
         "testUsers": {
             "active": {
                 "username": active_user["username"],
-                "subject": _stable_id("user", active_user["id"]),
-                "samlNameId": _stable_id("saml-nameid", active_user["id"]),
+                "subject": _stable_id(realm_name, "user", active_user["id"]),
+                "samlNameId": _stable_id(
+                    realm_name,
+                    "saml-nameid",
+                    active_user["id"],
+                ),
                 "expectedAttributes": _expected_identity_attributes(
                     active_user,
                     user_groups,
@@ -1042,8 +1157,12 @@ def build_realm(
             },
             "disabled": {
                 "username": disabled_user["username"],
-                "subject": _stable_id("user", disabled_user["id"]),
-                "samlNameId": _stable_id("saml-nameid", disabled_user["id"]),
+                "subject": _stable_id(realm_name, "user", disabled_user["id"]),
+                "samlNameId": _stable_id(
+                    realm_name,
+                    "saml-nameid",
+                    disabled_user["id"],
+                ),
                 "expectedAttributes": _expected_identity_attributes(
                     disabled_user,
                     user_groups,
@@ -1058,33 +1177,14 @@ def build_realm(
             "password": environment["KEYCLOAK_ADMIN_PASSWORD"],
         },
         "eemsuiteConfiguration": {
-            "legacy": {
-                "OpenIDConnect": {
-                    "Description": "Northlake Synthetic Identity - legacy",
-                    "ClientID": LEGACY_CLIENT_ID,
-                    "ClientSecret": environment["EEMSUITE_OIDC_LEGACY_CLIENT_SECRET"],
-                    "ResponseType": "id_token token",
-                    "Scope": "openid profile email northlake",
-                    "DiscoveryEndpoint": discovery,
-                }
-            },
-            "modern": {
-                "OpenIDConnect": {
-                    "Description": "Northlake Synthetic Identity - modern",
-                    "ClientID": MODERN_CLIENT_ID,
-                    "ClientSecret": environment["EEMSUITE_OIDC_CLIENT_SECRET"],
-                    "ResponseType": "code",
-                    "Scope": "openid profile email northlake",
-                    "DiscoveryEndpoint": discovery,
-                }
-            },
+            **oidc_eemsuite_configuration,
             "samlProfiles": {
                 key: {
                     "ProviderKey": value["providerKey"],
                     "DisplayName": (
-                        "Northlake Synthetic Identity - SAML2Int"
+                        f"{provider_display_name} - SAML2Int"
                         if value["validationProfile"] == "Saml2Int"
-                        else "Northlake Synthetic Identity - Standard SAML"
+                        else f"{provider_display_name} - Standard SAML"
                     ),
                     "IdentityProviderMetadata": f"{issuer}/protocol/saml/descriptor",
                     "ServiceProviderEntityID": value["entityId"],
@@ -1120,8 +1220,26 @@ def generate(
     env_path: Path,
     output_path: Path,
     connection_output_path: Path,
+    settings_path: Path | None = None,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     environment = _load_env(env_path)
+    if settings_path is not None and settings_path.is_file():
+        settings_document = load_settings_document(settings_path, environment)
+        environment.update(settings_document.settings.to_environment_overlay())
+    return generate_from_environment(
+        manifest_path,
+        environment,
+        output_path,
+        connection_output_path,
+    )
+
+
+def generate_from_environment(
+    manifest_path: Path,
+    environment: dict[str, str],
+    output_path: Path,
+    connection_output_path: Path,
+) -> tuple[dict[str, Any], dict[str, Any]]:
     manifest = _load_manifest(manifest_path)
     realm, connection_profile = build_realm(manifest, environment)
 
@@ -1144,6 +1262,7 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--manifest", required=True, type=Path)
     parser.add_argument("--env-file", required=True, type=Path)
+    parser.add_argument("--settings-file", type=Path)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--connection-output", required=True, type=Path)
     return parser.parse_args()
@@ -1157,8 +1276,9 @@ def main() -> int:
             args.env_file.resolve(),
             args.output.resolve(),
             args.connection_output.resolve(),
+            args.settings_file.resolve() if args.settings_file else None,
         )
-    except (OSError, RealmGenerationError, yaml.YAMLError) as error:
+    except (OSError, RealmGenerationError, SettingsValidationError, yaml.YAMLError) as error:
         print(f"[ERROR] {error}", file=sys.stderr)
         return 1
 

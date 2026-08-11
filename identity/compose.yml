@@ -46,6 +46,56 @@ services:
     networks:
       - identity-backend
 
+  configuration:
+    image: hippo-synthetic-identity-configuration:local
+    build:
+      context: ..
+      dockerfile: identity/configuration/Dockerfile
+    restart: unless-stopped
+    environment:
+      NORTHLAKE_RUNTIME_DIRECTORY: /runtime
+      NORTHLAKE_MANIFEST_PATH: /app/security/northlake-eem-security-v1.yaml
+      NORTHLAKE_KEYCLOAK_INTERNAL_URL: http://keycloak:8080
+      NORTHLAKE_PROVIDER_DISPLAY_NAME: ${NORTHLAKE_PROVIDER_DISPLAY_NAME:-Northlake Synthetic Identity}
+      NORTHLAKE_REALM_KEY: ${NORTHLAKE_REALM_KEY:-northlake}
+      NORTHLAKE_ENABLE_OIDC: ${NORTHLAKE_ENABLE_OIDC:-true}
+      NORTHLAKE_ENABLE_SAML: ${NORTHLAKE_ENABLE_SAML:-true}
+      IDENTITY_PUBLIC_BASE_URL: ${IDENTITY_PUBLIC_BASE_URL:-https://localhost:8443}
+      IDENTITY_HTTPS_PORT: ${IDENTITY_HTTPS_PORT:-8443}
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:?Run Initialize-Identity.ps1 first}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?Run Initialize-Identity.ps1 first}
+      KEYCLOAK_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?Run Initialize-Identity.ps1 first}
+      EEMSUITE_OIDC_CLIENT_SECRET: ${EEMSUITE_OIDC_CLIENT_SECRET:?Run Initialize-Identity.ps1 first}
+      EEMSUITE_OIDC_LEGACY_CLIENT_SECRET: ${EEMSUITE_OIDC_LEGACY_CLIENT_SECRET:?Run Initialize-Identity.ps1 first}
+      SYNTHETIC_USER_PASSWORD: ${SYNTHETIC_USER_PASSWORD:?Run Initialize-Identity.ps1 first}
+      EEMSUITE_APPLICATION_HOME_URL: ${EEMSUITE_APPLICATION_HOME_URL:-https://localdev.energyhippo.com/Hippo/}
+      EEMSUITE_OIDC_REDIRECT_URIS: ${EEMSUITE_OIDC_REDIRECT_URIS:-https://localhost:7310/signin-oidc}
+      EEMSUITE_SAML_PROFILES: ${EEMSUITE_SAML_PROFILES:-Standard}
+      EEMSUITE_SAML_STANDARD_ENTITY_ID: ${EEMSUITE_SAML_STANDARD_ENTITY_ID:-urn:energyhippo:eemsuite-web:saml:standard}
+      EEMSUITE_SAML_STANDARD_ACS_URLS: ${EEMSUITE_SAML_STANDARD_ACS_URLS:-https://localhost:7310/saml/northlake-saml-standard/acs}
+      EEMSUITE_SAML_STANDARD_LOGOUT_URLS: ${EEMSUITE_SAML_STANDARD_LOGOUT_URLS:-https://localhost:7310/saml/northlake-saml-standard/logout}
+      EEMSUITE_SAML2INT_ENTITY_ID: ${EEMSUITE_SAML2INT_ENTITY_ID:-urn:energyhippo:eemsuite-web:saml:saml2int}
+      EEMSUITE_SAML2INT_ACS_URLS: ${EEMSUITE_SAML2INT_ACS_URLS:-https://localhost/Hippo/saml/northlake-saml2int/acs}
+      EEMSUITE_SAML2INT_LOGOUT_URLS: ${EEMSUITE_SAML2INT_LOGOUT_URLS:-https://localhost/Hippo/saml/northlake-saml2int/logout}
+      EEMSUITE_SAML2INT_SP_CERTIFICATE_FILE: ${EEMSUITE_SAML2INT_SP_CERTIFICATE_FILE:-}
+    depends_on:
+      keycloak:
+        condition: service_started
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8081/configure/health', timeout=3)"
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+    volumes:
+      - ./.runtime:/runtime
+    networks:
+      - identity-backend
+
   caddy:
     image: caddy:2.11.4-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
     restart: unless-stopped
@@ -57,6 +107,8 @@ services:
     depends_on:
       keycloak:
         condition: service_started
+      configuration:
+        condition: service_healthy
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - ./portal:/srv/northlake-portal:ro

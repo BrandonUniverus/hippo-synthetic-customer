@@ -1,0 +1,10 @@
+*
+!identity/
+!identity/**
+!security/
+!security/northlake-eem-security-v1.yaml
+
+identity/.env
+identity/.runtime/
+identity/**/__pycache__/
+identity/**/*.pyc

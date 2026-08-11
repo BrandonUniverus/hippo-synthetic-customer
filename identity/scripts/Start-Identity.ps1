@@ -23,26 +23,21 @@ if (-not (Test-Path -LiteralPath $script:IdentityEnvironmentFile -PathType Leaf)
 Assert-IdentityPrerequisites
 New-IdentityRealm
 
-& docker compose `
-    --project-directory $script:IdentityRoot `
-    --env-file $script:IdentityEnvironmentFile `
-    --file $script:IdentityComposeFile `
-    config --quiet
-if ($LASTEXITCODE -ne 0) {
-    throw "Identity compose configuration is invalid."
-}
+Invoke-IdentityCompose config --quiet
 
 Invoke-IdentityCompose up --detach --remove-orphans
 
 $environment = Get-IdentityEnvironment
-$discoveryEndpoint = "$($environment.IDENTITY_PUBLIC_BASE_URL.TrimEnd('/'))/realms/northlake/.well-known/openid-configuration"
+$realmKey = $environment.NORTHLAKE_REALM_KEY
+$issuer = "$($environment.IDENTITY_PUBLIC_BASE_URL.TrimEnd('/'))/realms/$realmKey"
+$discoveryEndpoint = "$issuer/.well-known/openid-configuration"
 $deadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSeconds)
 $lastFailure = $null
 
 do {
     try {
         $response = Invoke-RestMethod -Uri $discoveryEndpoint -SkipCertificateCheck -TimeoutSec 5
-        if ($response.issuer -eq "$($environment.IDENTITY_PUBLIC_BASE_URL.TrimEnd('/'))/realms/northlake") {
+        if ($response.issuer -eq $issuer) {
             $lastFailure = $null
             break
         }
@@ -77,10 +72,11 @@ if (-not $SkipVerification) {
 
 Write-Host ""
 Write-Host "[OK] Northlake Synthetic Identity is ready."
-Write-Host "Issuer:        $($environment.IDENTITY_PUBLIC_BASE_URL.TrimEnd('/'))/realms/northlake"
-Write-Host "Login/account: $($environment.IDENTITY_PUBLIC_BASE_URL.TrimEnd('/'))/realms/northlake/account/"
-Write-Host "Admin:         $($environment.IDENTITY_PUBLIC_BASE_URL.TrimEnd('/'))/admin/northlake/console/"
-Write-Host "SAML metadata: $($environment.IDENTITY_PUBLIC_BASE_URL.TrimEnd('/'))/realms/northlake/protocol/saml/descriptor"
+Write-Host "Issuer:        $issuer"
+Write-Host "Login/account: $issuer/account/"
+Write-Host "Admin:         $($environment.IDENTITY_PUBLIC_BASE_URL.TrimEnd('/'))/admin/$realmKey/console/"
+Write-Host "SAML metadata: $issuer/protocol/saml/descriptor"
+Write-Host "Configuration: $($environment.IDENTITY_PUBLIC_BASE_URL.TrimEnd('/'))/configure"
 Write-Host "Credentials:   $script:IdentityConnectionProfile"
 
 $certificate = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new(

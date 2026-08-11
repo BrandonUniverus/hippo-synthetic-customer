@@ -7,6 +7,8 @@ $script:IdentityEnvironmentFile = Join-Path $script:IdentityRoot ".env"
 $script:IdentityRuntimeDirectory = Join-Path $script:IdentityRoot ".runtime"
 $script:IdentityImportDirectory = Join-Path $script:IdentityRuntimeDirectory "import"
 $script:IdentityConnectionProfile = Join-Path $script:IdentityRuntimeDirectory "connection.json"
+$script:IdentityConfigurationSettings = Join-Path $script:IdentityRuntimeDirectory "configuration.json"
+$script:IdentityConfigurationModel = Join-Path $script:IdentityRoot "configuration\settings.py"
 $script:IdentityCertificateDirectory = Join-Path $script:IdentityRuntimeDirectory "certs"
 $script:IdentityRootCertificate = Join-Path $script:IdentityCertificateDirectory "caddy-local-root.crt"
 $script:IdentityManifest = Join-Path $script:RepositoryRoot "security\northlake-eem-security-v1.yaml"
@@ -51,6 +53,31 @@ function Get-IdentityEnvironment {
 
         $values[$line.Substring(0, $separator).Trim()] = $line.Substring($separator + 1).Trim()
     }
+
+    $defaults = @{
+        NORTHLAKE_PROVIDER_DISPLAY_NAME = "Northlake Synthetic Identity"
+        NORTHLAKE_REALM_KEY = "northlake"
+        NORTHLAKE_ENABLE_OIDC = "true"
+        NORTHLAKE_ENABLE_SAML = "true"
+    }
+    foreach ($key in $defaults.Keys) {
+        if (-not $values.ContainsKey($key)) {
+            $values[$key] = $defaults[$key]
+        }
+    }
+
+    if (Test-Path -LiteralPath $script:IdentityConfigurationSettings -PathType Leaf) {
+        $overlayJson = & python $script:IdentityConfigurationModel `
+            --settings-file $script:IdentityConfigurationSettings `
+            --print-environment-overlay
+        if ($LASTEXITCODE -ne 0) {
+            throw "Saved provider configuration is invalid. Open /configure or remove the ignored settings document."
+        }
+        $overlay = $overlayJson | ConvertFrom-Json -AsHashtable
+        foreach ($key in $overlay.Keys) {
+            $values[$key] = [string] $overlay[$key]
+        }
+    }
     return $values
 }
 
@@ -60,13 +87,27 @@ function Invoke-IdentityCompose {
         [string[]] $ArgumentList
     )
 
-    & docker compose `
-        --project-directory $script:IdentityRoot `
-        --env-file $script:IdentityEnvironmentFile `
-        --file $script:IdentityComposeFile `
-        @ArgumentList
-    if ($LASTEXITCODE -ne 0) {
-        throw "docker compose failed with exit code $LASTEXITCODE."
+    $environment = Get-IdentityEnvironment
+    $previousValues = @{}
+    try {
+        foreach ($key in $environment.Keys) {
+            $previousValues[$key] = [Environment]::GetEnvironmentVariable($key, "Process")
+            [Environment]::SetEnvironmentVariable($key, $environment[$key], "Process")
+        }
+
+        & docker compose `
+            --project-directory $script:IdentityRoot `
+            --env-file $script:IdentityEnvironmentFile `
+            --file $script:IdentityComposeFile `
+            @ArgumentList
+        if ($LASTEXITCODE -ne 0) {
+            throw "docker compose failed with exit code $LASTEXITCODE."
+        }
+    }
+    finally {
+        foreach ($key in $previousValues.Keys) {
+            [Environment]::SetEnvironmentVariable($key, $previousValues[$key], "Process")
+        }
     }
 }
 
@@ -82,11 +123,16 @@ function New-IdentityRuntimeDirectories {
 
 function New-IdentityRealm {
     New-IdentityRuntimeDirectories
-    & python $script:IdentityRealmGenerator `
-        --manifest $script:IdentityManifest `
-        --env-file $script:IdentityEnvironmentFile `
-        --output $script:IdentityRealmOutput `
-        --connection-output $script:IdentityConnectionProfile
+    $generatorArguments = @(
+        "--manifest", $script:IdentityManifest,
+        "--env-file", $script:IdentityEnvironmentFile,
+        "--output", $script:IdentityRealmOutput,
+        "--connection-output", $script:IdentityConnectionProfile
+    )
+    if (Test-Path -LiteralPath $script:IdentityConfigurationSettings -PathType Leaf) {
+        $generatorArguments += @("--settings-file", $script:IdentityConfigurationSettings)
+    }
+    & python $script:IdentityRealmGenerator @generatorArguments
     if ($LASTEXITCODE -ne 0) {
         throw "Northlake realm generation failed with exit code $LASTEXITCODE."
     }
@@ -94,13 +140,29 @@ function New-IdentityRealm {
 
 function Copy-IdentityRootCertificate {
     New-IdentityRuntimeDirectories
-    & docker compose `
-        --project-directory $script:IdentityRoot `
-        --env-file $script:IdentityEnvironmentFile `
-        --file $script:IdentityComposeFile `
-        cp "caddy:/data/caddy/pki/authorities/local/root.crt" $script:IdentityRootCertificate *> $null
-    if ($LASTEXITCODE -ne 0) {
-        throw "Unable to copy Caddy's local root certificate from the running container."
+    $containerIds = @(& docker ps `
+        --filter "label=com.docker.compose.project=$script:IdentityComposeProject" `
+        --filter "label=com.docker.compose.service=caddy" `
+        --format "{{.ID}}")
+    if ($LASTEXITCODE -ne 0 -or $containerIds.Count -ne 1) {
+        throw "Unable to resolve the running Caddy container."
     }
-    return $script:IdentityRootCertificate
+    $containerId = $containerIds[0]
+
+    $labels = & docker inspect $containerId `
+        --format "{{index .Config.Labels `"com.docker.compose.project`"}}|{{index .Config.Labels `"com.docker.compose.service`"}}"
+    if ($LASTEXITCODE -ne 0 -or $labels -ne "$($script:IdentityComposeProject)|caddy") {
+        throw "Refusing to copy the root certificate because Caddy ownership labels did not match."
+    }
+
+    for ($attempt = 1; $attempt -le 15; $attempt++) {
+        & docker cp `
+            "${containerId}:/data/caddy/pki/authorities/local/root.crt" `
+            $script:IdentityRootCertificate *> $null
+        if ($LASTEXITCODE -eq 0) {
+            return $script:IdentityRootCertificate
+        }
+        Start-Sleep -Seconds 1
+    }
+    throw "Unable to copy Caddy's local root certificate from the running container."
 }

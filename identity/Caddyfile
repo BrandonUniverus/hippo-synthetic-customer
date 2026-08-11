@@ -35,6 +35,11 @@ https://{$IDENTITY_HOST:localhost}:8443 {
 		redir {$EEMSUITE_APPLICATION_HOME_URL:https://localdev.energyhippo.com/Hippo/} 302
 	}
 
+	@configuration path /configure /configure/*
+	handle @configuration {
+		reverse_proxy configuration:8081
+	}
+
 	handle {
 		reverse_proxy keycloak:8080
 	}

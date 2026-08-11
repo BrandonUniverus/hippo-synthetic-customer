@@ -13,6 +13,8 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec, rsa
 from cryptography.x509.oid import NameOID
 
+from identity.configuration.settings import ProviderSettings, SettingsDocument, write_settings_document
+
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 GENERATOR_PATH = REPOSITORY_ROOT / "identity" / "realm" / "generate_realm.py"
@@ -313,6 +315,67 @@ class GenerateRealmTests(unittest.TestCase):
                 self.environment["EEMSUITE_SAML_PROFILES"] = value
                 with self.assertRaises(generate_realm.RealmGenerationError):
                     self._generate()
+
+    def test_runtime_settings_override_the_default_realm_and_protocol_clients(self) -> None:
+        settings = ProviderSettings.from_environment(self.environment)
+        values = settings.to_values()
+        values.update(
+            {
+                "providerDisplayName": "Northlake Configured Identity",
+                "realmKey": "northlake-lab",
+                "enableOidc": False,
+                "enableSaml": True,
+            }
+        )
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            temporary = Path(temporary_directory)
+            env_path = temporary / ".env"
+            realm_path = temporary / "realm.json"
+            connection_path = temporary / "connection.json"
+            settings_path = temporary / "configuration.json"
+            env_path.write_text(
+                "\n".join(f"{key}={value}" for key, value in self.environment.items()),
+                encoding="utf-8",
+            )
+            write_settings_document(
+                settings_path,
+                SettingsDocument(settings=ProviderSettings.from_values(values)),
+            )
+
+            realm, connection = generate_realm.generate(
+                self.manifest,
+                env_path,
+                realm_path,
+                connection_path,
+                settings_path,
+            )
+
+        self.assertEqual("northlake-lab", realm["realm"])
+        self.assertEqual("Northlake Configured Identity", realm["displayName"])
+        self.assertEqual(["saml"], [client["protocol"] for client in realm["clients"]])
+        self.assertNotIn("modern", connection["clients"])
+        self.assertNotIn("legacy", connection["clients"])
+        self.assertIn("saml", connection["clients"])
+        self.assertEqual(
+            "https://localhost:8443/realms/northlake-lab",
+            connection["issuer"],
+        )
+
+    def test_saml_can_be_disabled_without_removing_oidc_clients(self) -> None:
+        environment = dict(self.environment)
+        environment["NORTHLAKE_ENABLE_SAML"] = "false"
+
+        realm, connection = generate_realm.build_realm(
+            generate_realm._load_manifest(self.manifest),
+            environment,
+        )
+
+        self.assertEqual(
+            ["openid-connect", "openid-connect"],
+            [client["protocol"] for client in realm["clients"]],
+        )
+        self.assertEqual({"modern", "legacy"}, set(connection["clients"]))
+        self.assertEqual({}, connection["eemsuiteConfiguration"]["samlProfiles"])
 
     def test_subjects_and_group_ids_are_deterministic(self) -> None:
         first, first_connection = self._generate()

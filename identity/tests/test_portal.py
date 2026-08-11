@@ -50,13 +50,13 @@ class PortalTests(unittest.TestCase):
             links_by_href,
         )
         self.assertIn(
-            "/realms/northlake/protocol/saml/clients/eemsuite-web-saml",
+            "/realms/northlake/protocol/saml/clients/eemsuite-web-saml-standard",
             links_by_href,
         )
         self.assertEqual(
             "_blank",
             links_by_href[
-                "/realms/northlake/protocol/saml/clients/eemsuite-web-saml"
+                "/realms/northlake/protocol/saml/clients/eemsuite-web-saml-standard"
             ].get("target"),
         )
 
@@ -65,7 +65,7 @@ class PortalTests(unittest.TestCase):
             encoding="utf-8"
         )
 
-        self.assertIn("urn:energyhippo:eemsuite-web:saml", document)
+        self.assertIn("urn:energyhippo:eemsuite-web:saml:standard", document)
         self.assertIn("(IdP entity ID, persistent NameID)", document)
         self.assertIn("Response + Assertion · RSA-SHA256", document)
         self.assertIn("HTTP-POST", document)
@@ -92,6 +92,10 @@ class PortalTests(unittest.TestCase):
         self.assertIn("lifetime 720h", caddyfile)
         self.assertIn("./portal:/srv/northlake-portal:ro", compose)
         self.assertIn("EEMSUITE_APPLICATION_HOME_URL:", compose)
+        self.assertIn("@configuration path /configure /configure/*", caddyfile)
+        self.assertIn("reverse_proxy configuration:8081", caddyfile)
+        self.assertIn("configuration:", compose)
+        self.assertIn('href="/configure"', (IDENTITY_ROOT / "portal" / "index.html").read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

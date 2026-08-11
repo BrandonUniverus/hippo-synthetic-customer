@@ -14,6 +14,9 @@ Identity Provider (IdP).
   survive an ordinary stop/start.
 - Caddy 2.11.4 terminating HTTPS at `https://localhost:8443`, with a
   30-day localhost certificate beneath a 180-day intermediate CA.
+- An unauthenticated, loopback-only configuration page for the ordinary
+  provider name, realm, public URL, application URLs, and baseline OIDC/SAML
+  registrations.
 - A small Northlake launchpad that establishes a provider session and directs
   the tester to EnergyHippo without handling passwords or tokens itself.
 - 19 Northlake identities: 18 active and one deliberately disabled.
@@ -60,7 +63,7 @@ The first run:
 
 1. creates `identity/.env` with cryptographically random local secrets;
 2. generates the runtime realm from the checked-in security manifest;
-3. starts PostgreSQL, Keycloak, and Caddy;
+3. starts PostgreSQL, Keycloak, the configuration service, and Caddy;
 4. waits for HTTPS discovery;
 5. copies the local CA certificate to `identity/.runtime/certs`;
 6. executes the complete OIDC, SAML, and administration verifier.
@@ -85,10 +88,33 @@ weakening certificate validation.
 Then open:
 
 - Northlake launchpad: `https://localhost:8443/`
+- Local provider configuration: `https://localhost:8443/configure`
 - Account/login: `https://localhost:8443/realms/northlake/account/`
 - Realm admin: `https://localhost:8443/admin/northlake/console/`
 - OIDC discovery: `https://localhost:8443/realms/northlake/.well-known/openid-configuration`
 - SAML IdP metadata: `https://localhost:8443/realms/northlake/protocol/saml/descriptor`
+
+## Local provider configuration
+
+`https://localhost:8443/configure` is an intentionally unauthenticated Phase 1
+tool for this loopback Docker environment. It renders its common fields from
+`configuration/fields.json`, while the Python service remains authoritative for
+typed validation and realm generation. The browser never receives Keycloak
+administrator credentials and the service never writes to EnergyHippo.
+
+Use **Refresh preview** to validate values and inspect a redacted provider
+contract without changing runtime state. **Save** writes the values to the
+ignored `identity/.runtime/configuration.json` file for the next ordinary
+start. **Apply and reset realm** saves the values and reimports the single
+disposable Keycloak realm, so current synthetic sessions and in-realm edits are
+discarded. A public hostname or HTTPS port change is saved as pending and takes
+effect after the normal stop/start scripts recreate the edge container.
+
+The form deliberately covers only the common one-provider settings in Phase 1.
+Users, groups, multiple concurrent realms, advanced protocol profiles, and a
+general JSON editor are added in later ADR-002b phases. Do not expose the
+configuration service on a shared or production network merely because this
+localhost lab does not require an administrator login.
 
 ## Northlake SSO launchpad
 
@@ -403,6 +429,9 @@ Checked-in sources:
 - `security/northlake-eem-security-v1.yaml`: users, enabled state, companies,
   groups, permission intent, and validation counts.
 - `realm/generate_realm.py`: protocol, client, claim, lifetime, and stable-ID rules.
+- `configuration/fields.json`: presentation metadata for the Phase 1 form.
+- `configuration/settings.py`: typed configuration validation and generated contract.
+- `configuration/server.py`: loopback configuration API and disposable-realm apply boundary.
 - `compose.yml`: immutable container versions and deployment boundary.
 - `Caddyfile`: HTTPS and proxy boundary.
 
@@ -411,6 +440,7 @@ Ignored generated state:
 - secrets;
 - import JSON containing those secrets and test credentials;
 - connection profiles;
+- the saved local provider configuration document;
 - copied development CA;
 - PostgreSQL and Caddy Docker volumes.
 
