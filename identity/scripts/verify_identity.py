@@ -1305,20 +1305,20 @@ def _verify_admin(
 
     modern_profile = profile["clients"].get("modern")
     legacy_profile = profile["clients"].get("legacy")
-    if (modern_profile is None) != (legacy_profile is None):
-        raise VerificationError("OIDC modern and legacy clients must be enabled together.")
-    if modern_profile is not None and legacy_profile is not None:
+    if modern_profile is not None:
         modern = by_client_id[modern_profile["clientId"]]
         if (
             modern.get("implicitFlowEnabled")
             or not modern.get("standardFlowEnabled")
-            or not modern.get("consentRequired")
+            or bool(modern.get("consentRequired"))
+            != bool(modern_profile.get("consentRequired"))
             or modern.get("attributes", {}).get("pkce.code.challenge.method") != "S256"
             or "offline_access" not in modern.get("optionalClientScopes", [])
         ):
             raise VerificationError(
                 "Modern client drifted from code + PKCE, consent, or offline-access settings."
             )
+    if legacy_profile is not None:
         legacy = by_client_id[legacy_profile["clientId"]]
         if not legacy.get("implicitFlowEnabled") or legacy.get("consentRequired"):
             raise VerificationError(
@@ -1462,25 +1462,25 @@ def _verify_modern_code_flow(
         profile["testUsers"]["password"],
         redirect_uri,
     )
-    if location:
-        raise VerificationError("Modern client did not stop for the required consent grant.")
-    consent_form = next(
-        (
-            form
-            for form in _forms(response_body)
-            if "login-actions/consent" in form.action
-        ),
-        None,
-    )
-    if status != 200 or consent_form is None:
-        raise VerificationError("Modern login did not present the Keycloak consent page.")
-
-    status, location = _submit_consent(
-        opener,
-        consent_form,
-        profile["baseUrl"],
-        redirect_uri,
-    )
+    if client.get("consentRequired"):
+        if location:
+            raise VerificationError("Modern client did not stop for the required consent grant.")
+        consent_form = next(
+            (
+                form
+                for form in _forms(response_body)
+                if "login-actions/consent" in form.action
+            ),
+            None,
+        )
+        if status != 200 or consent_form is None:
+            raise VerificationError("Modern login did not present the Keycloak consent page.")
+        status, location = _submit_consent(
+            opener,
+            consent_form,
+            profile["baseUrl"],
+            redirect_uri,
+        )
     if status not in {301, 302, 303, 307, 308} or not location:
         raise VerificationError("Modern login did not redirect with an authorization code.")
 
@@ -1546,72 +1546,73 @@ def _verify_modern_code_flow(
         if required_claim not in userinfo:
             raise VerificationError(f"UserInfo omitted required claim {required_claim}.")
 
-    session_client = profile["clients"]["legacy"]
-    if session_client["redirectUris"][0] != redirect_uri:
-        raise VerificationError("Session prompt test requires a shared registered callback URI.")
-    silent_state = _base64url(secrets.token_bytes(12))
-    silent_url = _authorization_url(
-        profile,
-        session_client,
-        redirect_uri,
-        response_type="code",
-        state=silent_state,
-        nonce=_base64url(secrets.token_bytes(12)),
-        prompt="none",
-    )
-    try:
-        opener.open(
-            Request(silent_url, headers={"User-Agent": VERIFIER_USER_AGENT}),
-            timeout=20,
+    session_client = profile["clients"].get("legacy")
+    if session_client is not None:
+        if session_client["redirectUris"][0] != redirect_uri:
+            raise VerificationError("Session prompt test requires a shared registered callback URI.")
+        silent_state = _base64url(secrets.token_bytes(12))
+        silent_url = _authorization_url(
+            profile,
+            session_client,
+            redirect_uri,
+            response_type="code",
+            state=silent_state,
+            nonce=_base64url(secrets.token_bytes(12)),
+            prompt="none",
         )
-        raise VerificationError("prompt=none did not return an authorization response.")
-    except HTTPError as error:
-        silent_location = error.headers.get("Location", "")
-        if error.code not in {301, 302, 303, 307, 308} or not silent_location.startswith(
-            redirect_uri
-        ):
-            raise
-        silent_parameters = parse_qs(urlparse(silent_location).query)
-        if (
-            silent_parameters.get("state") != [silent_state]
-            or "code" not in silent_parameters
-            or "error" in silent_parameters
-        ):
-            raise VerificationError(
-                "prompt=none did not reuse the active provider session "
-                f"(callback={silent_parameters!r})."
+        try:
+            opener.open(
+                Request(silent_url, headers={"User-Agent": VERIFIER_USER_AGENT}),
+                timeout=20,
             )
+            raise VerificationError("prompt=none did not return an authorization response.")
+        except HTTPError as error:
+            silent_location = error.headers.get("Location", "")
+            if error.code not in {301, 302, 303, 307, 308} or not silent_location.startswith(
+                redirect_uri
+            ):
+                raise
+            silent_parameters = parse_qs(urlparse(silent_location).query)
+            if (
+                silent_parameters.get("state") != [silent_state]
+                or "code" not in silent_parameters
+                or "error" in silent_parameters
+            ):
+                raise VerificationError(
+                    "prompt=none did not reuse the active provider session "
+                    f"(callback={silent_parameters!r})."
+                )
 
-    time.sleep(1.1)
-    stale_state = _base64url(secrets.token_bytes(12))
-    stale_url = _authorization_url(
-        profile,
-        session_client,
-        redirect_uri,
-        response_type="code",
-        state=stale_state,
-        nonce=_base64url(secrets.token_bytes(12)),
-        prompt="none",
-        max_age=0,
-    )
-    try:
-        opener.open(
-            Request(stale_url, headers={"User-Agent": VERIFIER_USER_AGENT}),
-            timeout=20,
+        time.sleep(1.1)
+        stale_state = _base64url(secrets.token_bytes(12))
+        stale_url = _authorization_url(
+            profile,
+            session_client,
+            redirect_uri,
+            response_type="code",
+            state=stale_state,
+            nonce=_base64url(secrets.token_bytes(12)),
+            prompt="none",
+            max_age=0,
         )
-        raise VerificationError("max_age=0 with prompt=none did not require authentication.")
-    except HTTPError as error:
-        stale_location = error.headers.get("Location", "")
-        if error.code not in {301, 302, 303, 307, 308} or not stale_location.startswith(
-            redirect_uri
-        ):
-            raise
-        stale_parameters = parse_qs(urlparse(stale_location).query)
-        if (
-            stale_parameters.get("state") != [stale_state]
-            or stale_parameters.get("error") != ["login_required"]
-        ):
-            raise VerificationError("max_age=0 did not produce the expected login_required error.")
+        try:
+            opener.open(
+                Request(stale_url, headers={"User-Agent": VERIFIER_USER_AGENT}),
+                timeout=20,
+            )
+            raise VerificationError("max_age=0 with prompt=none did not require authentication.")
+        except HTTPError as error:
+            stale_location = error.headers.get("Location", "")
+            if error.code not in {301, 302, 303, 307, 308} or not stale_location.startswith(
+                redirect_uri
+            ):
+                raise
+            stale_parameters = parse_qs(urlparse(stale_location).query)
+            if (
+                stale_parameters.get("state") != [stale_state]
+                or stale_parameters.get("error") != ["login_required"]
+            ):
+                raise VerificationError("max_age=0 did not produce the expected login_required error.")
 
     offline_verifier = _base64url(secrets.token_bytes(48))
     offline_challenge = _base64url(
@@ -1672,6 +1673,7 @@ def _verify_modern_code_flow(
         status = error.code
         response_body = error.read()
     offline_forms = _forms(response_body)
+    offline_password_used = False
     offline_consent_form = next(
         (
             form
@@ -1680,18 +1682,42 @@ def _verify_modern_code_flow(
         ),
         None,
     )
-    if status != 200 or location or offline_consent_form is None:
+    if (
+        status == 200
+        and not location
+        and offline_consent_form is None
+        and any("login-actions/authenticate" in form.action for form in offline_forms)
+    ):
+        status, location, response_body = _submit_login(
+            opener,
+            response_body,
+            profile["testUsers"]["active"]["username"],
+            profile["testUsers"]["password"],
+            redirect_uri,
+        )
+        offline_password_used = True
+        offline_forms = _forms(response_body)
+        offline_consent_form = next(
+            (
+                form
+                for form in offline_forms
+                if "login-actions/consent" in form.action
+            ),
+            None,
+        )
+    if status == 200 and not location and offline_consent_form is not None:
+        status, location = _submit_consent(
+            opener,
+            offline_consent_form,
+            profile["baseUrl"],
+            redirect_uri,
+        )
+    elif status not in {301, 302, 303, 307, 308} or not location:
         raise VerificationError(
-            "Offline-access authorization did not reuse SSO and present consent without a "
-            f"password (status={status}, location={location!r}, "
+            "Offline-access authorization did not reach consent or its callback "
+            f"(status={status}, location={location!r}, "
             f"forms={[form.action for form in offline_forms]!r})."
         )
-    status, location = _submit_consent(
-        opener,
-        offline_consent_form,
-        profile["baseUrl"],
-        redirect_uri,
-    )
     if status not in {301, 302, 303, 307, 308} or not location:
         raise VerificationError(
             "Offline-access consent did not redirect with an authorization code."
@@ -1736,39 +1762,40 @@ def _verify_modern_code_flow(
     if offline_claims.get("sub") != profile["testUsers"]["active"]["subject"]:
         raise VerificationError("Offline ID token changed the stable synthetic subject.")
 
-    converted_state = _base64url(secrets.token_bytes(12))
-    converted_url = _authorization_url(
-        profile,
-        session_client,
-        redirect_uri,
-        response_type="code",
-        state=converted_state,
-        nonce=_base64url(secrets.token_bytes(12)),
-        prompt="none",
-    )
-    try:
-        opener.open(
-            Request(converted_url, headers={"User-Agent": VERIFIER_USER_AGENT}),
-            timeout=20,
+    if session_client is not None:
+        converted_state = _base64url(secrets.token_bytes(12))
+        converted_url = _authorization_url(
+            profile,
+            session_client,
+            redirect_uri,
+            response_type="code",
+            state=converted_state,
+            nonce=_base64url(secrets.token_bytes(12)),
+            prompt="none",
         )
-        raise VerificationError(
-            "Offline token exchange did not return an authorization response."
-        )
-    except HTTPError as error:
-        converted_location = error.headers.get("Location", "")
-        if error.code not in {301, 302, 303, 307, 308} or not converted_location.startswith(
-            redirect_uri
-        ):
-            raise
-        converted_parameters = parse_qs(urlparse(converted_location).query)
-        if (
-            converted_parameters.get("state") != [converted_state]
-            or converted_parameters.get("error") != ["login_required"]
-        ):
-            raise VerificationError(
-                "Offline token exchange did not remove the online provider session "
-                f"(callback={converted_parameters!r})."
+        try:
+            opener.open(
+                Request(converted_url, headers={"User-Agent": VERIFIER_USER_AGENT}),
+                timeout=20,
             )
+            raise VerificationError(
+                "Offline token exchange did not return an authorization response."
+            )
+        except HTTPError as error:
+            converted_location = error.headers.get("Location", "")
+            if error.code not in {301, 302, 303, 307, 308} or not converted_location.startswith(
+                redirect_uri
+            ):
+                raise
+            converted_parameters = parse_qs(urlparse(converted_location).query)
+            if (
+                converted_parameters.get("state") != [converted_state]
+                or converted_parameters.get("error") != ["login_required"]
+            ):
+                raise VerificationError(
+                    "Offline token exchange did not remove the online provider session "
+                    f"(callback={converted_parameters!r})."
+                )
 
     rotated_tokens = _json_request(
         profile["tokenEndpoint"],
@@ -1856,10 +1883,15 @@ def _verify_modern_code_flow(
         if parse_qs(urlparse(location).query).get("state") != [logout_state]:
             raise VerificationError("RP-initiated logout did not preserve state.")
 
+    session_evidence = (
+        "cross-client prompt/max_age and session conversion, "
+        if session_client is not None
+        else "single-client stable profile, "
+    )
     print(
-        "[OK] Modern client: PAR, invalid-credential retry, login + consent, code + "
-        "PKCE S256, signed ID token, UserInfo, prompt/max_age online-session checks, "
-        "passwordless offline-access grant + session conversion, refresh "
+        "[OK] Modern client: PAR, invalid-credential retry, configured consent, code + "
+        f"PKCE S256, signed ID token, UserInfo, {session_evidence}"
+        f"{'reauthenticated' if offline_password_used else 'passwordless'} offline-access grant, refresh "
         "rotation/revocation, and RP logout."
     )
 
@@ -2059,9 +2091,12 @@ def verify(connection_path: Path, ca_path: Path, suite: str = "all") -> None:
         _verify_negative_protocol_cases(profile, context)
         _verify_modern_code_flow(profile, context, discovery, jwks)
         _verify_disabled_user(profile, context)
+    else:
+        print("[OK] Modern OIDC client flow is disabled by the local provider configuration.")
+    if "legacy" in profile["clients"]:
         _verify_legacy_implicit_flow(profile, context)
     else:
-        print("[OK] OIDC client flows are disabled by the local provider configuration.")
+        print("[OK] Historical Legacy OIDC client flow is disabled by the bounded profile.")
     if "saml" in profile["clients"]:
         _verify_saml(profile, context)
     else:

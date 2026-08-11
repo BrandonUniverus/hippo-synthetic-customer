@@ -1,0 +1,715 @@
+{
+  "schemaVersion": 1,
+  "scenarioVersion": "adr-002b-phase-9-v1",
+  "classifications": [
+    "forbidden-security-downgrade",
+    "future-capability",
+    "supported-controlled-failure",
+    "supported-pass",
+    "unsupported-clean-rejection"
+  ],
+  "checkpointRequirements": {
+    "ADR-021": [
+      "ACCT-00",
+      "ACCT-01",
+      "ACCT-02",
+      "ACCT-03",
+      "ACCT-04",
+      "ACCT-05",
+      "ACCT-06",
+      "ACCT-07",
+      "ACCT-08",
+      "SEC-00",
+      "SEC-01",
+      "SEC-02",
+      "SEC-03",
+      "SEC-04",
+      "SEC-05",
+      "SEC-06"
+    ],
+    "ADR-022": [
+      "FID-00",
+      "FID-01",
+      "FID-02",
+      "FID-03",
+      "FID-04",
+      "FID-05",
+      "FID-06",
+      "FID-07",
+      "FID-08",
+      "FID-09",
+      "FID-10",
+      "FID-11"
+    ],
+    "ADR-026": [
+      "IDENT-00",
+      "IDENT-01A",
+      "IDENT-01B",
+      "SAML-00",
+      "SAML-01",
+      "SAML-02",
+      "SAML-03",
+      "SAML-04",
+      "SAML-05",
+      "SCIM-00",
+      "SCIM-01",
+      "SCIM-02",
+      "SCIM-03",
+      "SCIM-04",
+      "IDENT-02",
+      "IDENT-03",
+      "CONFIG-00",
+      "OPS-00"
+    ],
+    "ADR-027": [
+      "IID-00",
+      "IID-01",
+      "IID-02",
+      "EDU-00",
+      "CORR-00",
+      "GROUP-00",
+      "IID-03",
+      "FED-00",
+      "VENDOR-00",
+      "VENDOR-01",
+      "VENDOR-02",
+      "PRIV-00",
+      "LINK-00",
+      "IID-OPS-00",
+      "CUST-00"
+    ]
+  },
+  "stableEnvironment": {
+    "realmKey": "northlake",
+    "oidcProfile": "Modern",
+    "samlProfile": "Standard",
+    "faultControlsPermitted": false,
+    "destructiveScenarioRealms": [
+      "northlake-lab-a",
+      "northlake-lab-b"
+    ]
+  },
+  "sources": {
+    "openidRpTesting": "https://openid.net/certification/connect_rp_testing/",
+    "openidLogoutTesting": "https://openid.net/certification/connect_rp_logout_testing/",
+    "openidConformanceSuite": "https://openid.net/certification/about-conformance-suite/"
+  },
+  "scenarios": [
+    {
+      "id": "northlake-field-contracts-and-pairwise-settings",
+      "title": "Typed field contracts, pairwise ordinary settings, and selected security combinations",
+      "expectedClassification": "supported-pass",
+      "environment": "lab",
+      "localRequired": true,
+      "adrMappings": [
+        {"adr": "ADR-026", "checkpoints": ["CONFIG-00"]},
+        {"adr": "ADR-027", "checkpoints": ["IID-00"]}
+      ],
+      "capabilities": ["typed configuration", "unknown-field rejection", "pairwise OIDC", "pairwise SAML"],
+      "evidence": [
+        {"kind": "command", "reference": "unit-tests", "sourcePath": "identity/tests/test_identity_evidence.py"}
+      ]
+    },
+    {
+      "id": "stable-realm-normal-oidc-and-saml-promotion",
+      "title": "One persistent stable realm with normal OIDC and SAML registrations",
+      "expectedClassification": "supported-pass",
+      "environment": "stable",
+      "localRequired": true,
+      "adrMappings": [
+        {"adr": "ADR-021", "checkpoints": ["SEC-05"]},
+        {"adr": "ADR-022", "checkpoints": ["FID-05", "FID-07", "FID-10"]},
+        {"adr": "ADR-026", "checkpoints": ["IDENT-00", "IDENT-01A"]}
+      ],
+      "capabilities": ["persistent issuer", "Modern OIDC", "Standard SAML", "fault-free stable realm"],
+      "evidence": [
+        {"kind": "command", "reference": "stable-promotion", "sourcePath": "identity/scripts/Promote-IdentityStableRealm.ps1"},
+        {"kind": "artifact", "reference": "stable-promotion"}
+      ],
+      "proofGap": {
+        "code": "eem-provider-administration-acceptance",
+        "reason": "Northlake promotion does not replace supported EnergyHippo System Administration creation and activation evidence."
+      }
+    },
+    {
+      "id": "modern-oidc-code-pkce-userinfo-refresh-logout",
+      "title": "Modern OIDC discovery, code plus PKCE, UserInfo, refresh, and logout",
+      "expectedClassification": "supported-pass",
+      "environment": "stable",
+      "localRequired": true,
+      "adrMappings": [
+        {"adr": "ADR-021", "checkpoints": ["ACCT-04"]},
+        {"adr": "ADR-022", "checkpoints": ["FID-00", "FID-06", "FID-08"]}
+      ],
+      "capabilities": ["discovery", "authorization code", "PKCE S256", "nonce", "UserInfo", "refresh", "RP logout"],
+      "evidence": [
+        {"kind": "command", "reference": "oidc-baseline", "sourcePath": "identity/scripts/Test-OidcIdentity.ps1"},
+        {"kind": "command", "reference": "full-provider", "sourcePath": "identity/scripts/Test-Identity.ps1"},
+        {"kind": "artifact", "reference": "oidc-verification"}
+      ]
+    },
+    {
+      "id": "standard-saml-response-assertion-subject-validation",
+      "title": "Standard SAML response, assertion, subject, audience, time, and request validation",
+      "expectedClassification": "supported-pass",
+      "environment": "stable",
+      "localRequired": true,
+      "adrMappings": [
+        {"adr": "ADR-021", "checkpoints": ["ACCT-04"]},
+        {"adr": "ADR-026", "checkpoints": ["SAML-00", "SAML-01"]}
+      ],
+      "capabilities": ["signed response", "signed assertion", "persistent NameID", "audience", "recipient", "authentication context"],
+      "evidence": [
+        {"kind": "command", "reference": "saml-baseline", "sourcePath": "identity/scripts/Test-SamlIdentity.ps1"},
+        {"kind": "artifact", "reference": "saml-verification"}
+      ],
+      "proofGap": {
+        "code": "installed-eem-saml-handler",
+        "reason": "Provider-side validation cannot prove EnergyHippo's installed ACS and dynamic handler decisions."
+      }
+    },
+    {
+      "id": "saml-and-oidc-signing-key-rollover",
+      "title": "Signing-key rollover retains old and new verification material",
+      "expectedClassification": "supported-pass",
+      "environment": "stable",
+      "localRequired": true,
+      "adrMappings": [
+        {"adr": "ADR-026", "checkpoints": ["SAML-02"]},
+        {"adr": "ADR-022", "checkpoints": ["FID-00"]}
+      ],
+      "capabilities": ["active signing key", "passive signing key", "JWKS overlap", "SAML metadata fingerprint"],
+      "evidence": [
+        {"kind": "artifact", "reference": "key-rotation", "sourcePath": "identity/scripts/Rotate-IdentitySigningKey.ps1"}
+      ],
+      "proofGap": {
+        "code": "installed-eem-trust-rollover",
+        "reason": "Northlake rollover does not prove EnergyHippo refreshes trust without dropping in-flight sessions."
+      }
+    },
+    {
+      "id": "two-realm-oidc-and-saml-isolation",
+      "title": "Two simultaneous realms isolate issuers, subjects, clients, and sessions",
+      "expectedClassification": "supported-pass",
+      "environment": "lab",
+      "localRequired": true,
+      "adrMappings": [
+        {"adr": "ADR-022", "checkpoints": ["FID-07"]},
+        {"adr": "ADR-026", "checkpoints": ["SAML-03"]}
+      ],
+      "capabilities": ["two OIDC providers", "two SAML providers", "issuer isolation", "equal-subject adversarial mode"],
+      "evidence": [
+        {"kind": "command", "reference": "scenarios", "sourcePath": "identity/scripts/Test-IdentityScenarios.ps1"},
+        {"kind": "artifact", "reference": "scenario-verification"}
+      ],
+      "proofGap": {
+        "code": "installed-eem-two-provider-login",
+        "reason": "The two provider realms are live, but installed EnergyHippo callback and linking isolation still require browser acceptance."
+      }
+    },
+    {
+      "id": "saml-continuation-and-logout-lifecycle",
+      "title": "SAML continuation, deep link, local logout, SP logout, and IdP logout",
+      "expectedClassification": "supported-pass",
+      "environment": "lab",
+      "localRequired": true,
+      "adrMappings": [
+        {"adr": "ADR-021", "checkpoints": ["ACCT-02", "ACCT-05"]},
+        {"adr": "ADR-026", "checkpoints": ["SAML-04"]}
+      ],
+      "capabilities": ["RelayState", "SP-initiated logout", "IdP-initiated login", "single logout"],
+      "evidence": [
+        {"kind": "command", "reference": "saml-baseline", "sourcePath": "identity/scripts/Test-SamlIdentity.ps1"},
+        {"kind": "command", "reference": "full-provider", "sourcePath": "identity/scripts/Test-Identity.ps1"}
+      ],
+      "proofGap": {
+        "code": "installed-eem-continuation-and-slo",
+        "reason": "Provider success does not prove EnergyHippo's protected continuation store or installed SLO session invalidation."
+      }
+    },
+    {
+      "id": "saml-independent-vendor-interoperability",
+      "title": "Independent SAML interoperability with a non-Keycloak implementation",
+      "expectedClassification": "supported-pass",
+      "environment": "external-vendor",
+      "localRequired": false,
+      "adrMappings": [
+        {"adr": "ADR-026", "checkpoints": ["SAML-05"]}
+      ],
+      "capabilities": ["independent implementation", "metadata exchange", "negative matrix"],
+      "evidence": [],
+      "proofGap": {
+        "code": "independent-saml-implementation-unavailable",
+        "reason": "Keycloak is the Northlake implementation and cannot count as independent Shibboleth or other vendor acceptance."
+      }
+    },
+    {
+      "id": "scim-discovery-user-and-sanctioned-group-lifecycle",
+      "title": "SCIM discovery, User lifecycle, sanctioned Group membership, and redaction",
+      "expectedClassification": "supported-pass",
+      "environment": "installed-eem",
+      "localRequired": true,
+      "adrMappings": [
+        {"adr": "ADR-026", "checkpoints": ["IDENT-01B", "SCIM-00", "SCIM-01", "SCIM-02", "SCIM-03"]}
+      ],
+      "capabilities": ["ServiceProviderConfig", "Users", "Groups", "ETag", "deactivate", "reactivate"],
+      "evidence": [
+        {"kind": "command", "reference": "unit-tests", "sourcePath": "identity/tests/test_configuration_scim.py"}
+      ],
+      "proofGap": {
+        "code": "installed-eem-scim-connection-unavailable",
+        "reason": "The deterministic client is verified, but the installed EEM endpoint is unhealthy and no supported administration credential is configured."
+      }
+    },
+    {
+      "id": "scim-retry-concurrency-scale-and-audit",
+      "title": "SCIM retry, optimistic concurrency, scale, rate limit, and audit behavior",
+      "expectedClassification": "future-capability",
+      "environment": "installed-eem",
+      "localRequired": false,
+      "adrMappings": [
+        {"adr": "ADR-026", "checkpoints": ["SCIM-04"]}
+      ],
+      "capabilities": ["429", "5xx", "stale ETag", "concurrent membership", "scale"],
+      "evidence": [],
+      "proofGap": {
+        "code": "scim-scale-matrix-not-run",
+        "reason": "ADR-002b Phase 8 deliberately implemented the bounded lifecycle before the scale and concurrency matrix."
+      }
+    },
+    {
+      "id": "cross-protocol-durable-correlation",
+      "title": "SCIM provisioning and OIDC or SAML authentication resolve one durable user",
+      "expectedClassification": "supported-pass",
+      "environment": "installed-eem",
+      "localRequired": false,
+      "adrMappings": [
+        {"adr": "ADR-026", "checkpoints": ["IDENT-02"]},
+        {"adr": "ADR-027", "checkpoints": ["CORR-00"]}
+      ],
+      "capabilities": ["configured durable identifier", "no email fallback", "one EEM user"],
+      "evidence": [],
+      "proofGap": {
+        "code": "installed-eem-correlation-not-run",
+        "reason": "The required SCIM connection and installed dynamic OIDC or SAML provider are not simultaneously available."
+      }
+    },
+    {
+      "id": "scim-deactivation-invalidates-federated-access",
+      "title": "SCIM deactivation denies the next valid federated authentication decision",
+      "expectedClassification": "supported-pass",
+      "environment": "installed-eem",
+      "localRequired": false,
+      "adrMappings": [
+        {"adr": "ADR-026", "checkpoints": ["IDENT-03"]},
+        {"adr": "ADR-027", "checkpoints": ["GROUP-00"]}
+      ],
+      "capabilities": ["active false", "session denial", "stale membership denial"],
+      "evidence": [],
+      "proofGap": {
+        "code": "installed-eem-security-state-handoff-not-run",
+        "reason": "Northlake can stage the lifecycle, but only EEM can prove its local session and authorization decision after deactivation."
+      }
+    },
+    {
+      "id": "account-route-service-and-module-contract",
+      "title": "Account routes remain stable across controller and service boundaries",
+      "expectedClassification": "supported-pass",
+      "environment": "installed-eem",
+      "localRequired": false,
+      "adrMappings": [
+        {"adr": "ADR-021", "checkpoints": ["ACCT-00", "ACCT-01", "ACCT-03", "ACCT-06", "ACCT-07"]}
+      ],
+      "capabilities": ["route inventory", "password recovery", "settings", "protocol-neutral services"],
+      "evidence": [],
+      "proofGap": {
+        "code": "eem-account-contract-outside-provider",
+        "reason": "Northlake cannot prove EnergyHippo controller placement or local account service boundaries."
+      }
+    },
+    {
+      "id": "local-password-login-and-fallback-boundary",
+      "title": "Local login remains available without automatic legacy or federated fallback",
+      "expectedClassification": "supported-pass",
+      "environment": "installed-eem",
+      "localRequired": false,
+      "adrMappings": [
+        {"adr": "ADR-021", "checkpoints": ["ACCT-02"]},
+        {"adr": "ADR-022", "checkpoints": ["FID-08"]}
+      ],
+      "capabilities": ["local password login", "no automatic legacy fallback", "provider outage fallback boundary"],
+      "evidence": [],
+      "proofGap": {
+        "code": "installed-eem-local-login-not-run",
+        "reason": "Provider outage is testable locally, but local EnergyHippo password sign-in requires an installed EEM session."
+      }
+    },
+    {
+      "id": "security-administration-policy-audit-and-targeted-mutations",
+      "title": "Fresh administrator policy, audit, shell, policies, and targeted user connections",
+      "expectedClassification": "supported-pass",
+      "environment": "installed-eem",
+      "localRequired": false,
+      "adrMappings": [
+        {"adr": "ADR-021", "checkpoints": ["SEC-00", "SEC-01", "SEC-02", "SEC-03", "SEC-04"]}
+      ],
+      "capabilities": ["fresh authorization", "append-only audit", "secure shell", "targeted link and unlink"],
+      "evidence": [],
+      "proofGap": {
+        "code": "installed-eem-security-administration-not-run",
+        "reason": "These are EnergyHippo administration responsibilities and are not simulated by Northlake's localhost form."
+      }
+    },
+    {
+      "id": "security-administration-rendered-accessibility",
+      "title": "Rendered and accessibility acceptance for Security Administration",
+      "expectedClassification": "supported-pass",
+      "environment": "installed-eem",
+      "localRequired": false,
+      "adrMappings": [
+        {"adr": "ADR-021", "checkpoints": ["SEC-06"]}
+      ],
+      "capabilities": ["browser rendering", "keyboard", "accessibility", "fresh data"],
+      "evidence": [],
+      "proofGap": {
+        "code": "installed-eem-rendered-acceptance-not-run",
+        "reason": "The current EnergyHippo site is unhealthy and this phase does not modify or launch EEM."
+      }
+    },
+    {
+      "id": "federated-registry-schema-migration-and-cutover",
+      "title": "Registry schema, backfill, targeted APIs, shadow parity, and legacy adapter removal",
+      "expectedClassification": "supported-pass",
+      "environment": "installed-eem",
+      "localRequired": false,
+      "adrMappings": [
+        {"adr": "ADR-022", "checkpoints": ["FID-01", "FID-02", "FID-03", "FID-04", "FID-09"]}
+      ],
+      "capabilities": ["fresh schema", "upgrade", "backfill", "targeted mutation", "no legacy runtime adapter"],
+      "evidence": [],
+      "proofGap": {
+        "code": "eem-registry-build-and-database-evidence-not-collected",
+        "reason": "The no-EEM-code boundary also excludes rebuilding or mutating the active dirty EnergyHippo checkout."
+      }
+    },
+    {
+      "id": "openid-foundation-rp-core-and-logout-plans",
+      "title": "Applicable OpenID Foundation RP Core, RP-Initiated, and Front-Channel plans",
+      "expectedClassification": "supported-pass",
+      "environment": "external-conformance",
+      "localRequired": false,
+      "adrMappings": [
+        {"adr": "ADR-021", "checkpoints": ["ACCT-08"]},
+        {"adr": "ADR-022", "checkpoints": ["FID-11"]}
+      ],
+      "capabilities": ["Basic RP", "response_type code", "RP-Initiated Logout RP", "Front-Channel Logout RP"],
+      "evidence": [],
+      "proofGap": {
+        "code": "openid-conformance-plan-not-run",
+        "reason": "The OpenID Foundation suite must target EnergyHippo as the RP independently of Keycloak; the installed EEM endpoint is unavailable."
+      }
+    },
+    {
+      "id": "backchannel-and-session-management-cleanly-unclaimed",
+      "title": "Back-Channel Logout and check_session_iframe remain unclaimed",
+      "expectedClassification": "unsupported-clean-rejection",
+      "environment": "lab",
+      "localRequired": true,
+      "adrMappings": [
+        {"adr": "ADR-022", "checkpoints": ["FID-11"]}
+      ],
+      "capabilities": ["backchannel logout absent", "session iframe unavailable", "no false metadata claim"],
+      "evidence": [
+        {"kind": "command", "reference": "browser-lab", "sourcePath": "identity/scripts/Test-IdentityBrowserLab.ps1"},
+        {"kind": "artifact", "reference": "browser-evidence"}
+      ]
+    },
+    {
+      "id": "oidc-deterministic-fault-recipes",
+      "title": "OIDC malformed, tampered, replayed, unavailable, stale, and oversized recipes",
+      "expectedClassification": "supported-controlled-failure",
+      "environment": "lab",
+      "localRequired": true,
+      "adrMappings": [
+        {"adr": "ADR-022", "checkpoints": ["FID-00", "FID-11"]}
+      ],
+      "capabilities": ["malformed", "tampered", "replayed", "unavailable", "stale", "oversized"],
+      "evidence": [
+        {"kind": "command", "reference": "catalog-validation", "sourcePath": "identity/evidence/fault-fixtures.json"}
+      ],
+      "proofGap": {
+        "code": "installed-eem-oidc-fault-injection-not-run",
+        "reason": "Recipes are deterministic and lab-only; installed callback injection remains an EEM acceptance step."
+      }
+    },
+    {
+      "id": "saml-deterministic-fault-recipes",
+      "title": "SAML malformed, tampered, replayed, unavailable, stale, and oversized recipes",
+      "expectedClassification": "supported-controlled-failure",
+      "environment": "lab",
+      "localRequired": true,
+      "adrMappings": [
+        {"adr": "ADR-026", "checkpoints": ["SAML-01", "SAML-05"]}
+      ],
+      "capabilities": ["malformed", "tampered", "replayed", "unavailable", "stale", "oversized"],
+      "evidence": [
+        {"kind": "command", "reference": "catalog-validation", "sourcePath": "identity/evidence/fault-fixtures.json"}
+      ],
+      "proofGap": {
+        "code": "installed-eem-saml-fault-injection-not-run",
+        "reason": "Recipes are deterministic and lab-only; installed ACS injection remains an EEM acceptance step."
+      }
+    },
+    {
+      "id": "security-ceilings-cannot-be-overridden",
+      "title": "Definitions cannot disable TLS, signatures, issuer, audience, recipient, replay, or size ceilings",
+      "expectedClassification": "forbidden-security-downgrade",
+      "environment": "lab",
+      "localRequired": true,
+      "adrMappings": [
+        {"adr": "ADR-026", "checkpoints": ["CONFIG-00"]},
+        {"adr": "ADR-027", "checkpoints": ["IID-00"]}
+      ],
+      "capabilities": ["TLS required", "signature required", "exact destination", "bounded response", "no credential URL"],
+      "evidence": [
+        {"kind": "command", "reference": "unit-tests", "sourcePath": "identity/tests/test_identity_evidence.py"}
+      ]
+    },
+    {
+      "id": "provider-outage-recovery-and-full-stack-restart-stability",
+      "title": "Provider outage, recovery, and full-stack restart preserve stable identity",
+      "expectedClassification": "supported-pass",
+      "environment": "stable",
+      "localRequired": true,
+      "adrMappings": [
+        {"adr": "ADR-022", "checkpoints": ["FID-00", "FID-07"]},
+        {"adr": "ADR-026", "checkpoints": ["OPS-00"]}
+      ],
+      "capabilities": ["outage observed", "recovery", "issuer unchanged", "subjects unchanged", "keys unchanged", "configuration unchanged"],
+      "evidence": [
+        {"kind": "command", "reference": "restart-stability", "sourcePath": "identity/scripts/Test-IdentityRestartStability.ps1"},
+        {"kind": "restart", "reference": "restart-stability"}
+      ]
+    },
+    {
+      "id": "installed-non-root-two-web-process-and-local-fallback",
+      "title": "Installed non-root paths, two Web processes, and local-login fallback",
+      "expectedClassification": "supported-pass",
+      "environment": "installed-eem",
+      "localRequired": false,
+      "adrMappings": [
+        {"adr": "ADR-026", "checkpoints": ["OPS-00"]}
+      ],
+      "capabilities": ["/Hippo path base", "two Web processes", "provider outage", "local login"],
+      "evidence": [],
+      "proofGap": {
+        "code": "installed-eem-multiprocess-acceptance-not-run",
+        "reason": "This requires a healthy installed EnergyHippo deployment and cannot be simulated inside Northlake."
+      }
+    },
+    {
+      "id": "identity-integration-foundation-composition-and-readiness",
+      "title": "Versioned definition persistence, composition, validation, and readiness",
+      "expectedClassification": "supported-pass",
+      "environment": "installed-eem",
+      "localRequired": false,
+      "adrMappings": [
+        {"adr": "ADR-027", "checkpoints": ["IID-01", "IID-02"]}
+      ],
+      "capabilities": ["versioned definitions", "deterministic precedence", "readiness", "restart persistence"],
+      "evidence": [],
+      "proofGap": {
+        "code": "eem-definition-runtime-not-executed",
+        "reason": "Northlake supplies fixtures but does not own EnergyHippo's definition persistence and composition runtime."
+      }
+    },
+    {
+      "id": "education-claims-and-modern-identifiers",
+      "title": "eduPerson-style attributes and modern subject identifiers",
+      "expectedClassification": "supported-pass",
+      "environment": "lab",
+      "localRequired": true,
+      "adrMappings": [
+        {"adr": "ADR-027", "checkpoints": ["EDU-00"]}
+      ],
+      "capabilities": ["subject-id", "group claims", "attribute allowlist", "release variation"],
+      "evidence": [
+        {"kind": "command", "reference": "group-claims", "sourcePath": "identity/scripts/Test-IdentityGroupClaims.ps1"}
+      ],
+      "proofGap": {
+        "code": "installed-eem-education-definition-binding",
+        "reason": "Northlake proves emitted shapes; EnergyHippo definition selection and canonical binding still need installed acceptance."
+      }
+    },
+    {
+      "id": "predeclared-group-source-isolation",
+      "title": "OIDC, SAML, and SCIM membership resolve only predeclared EEM groups with one authority",
+      "expectedClassification": "supported-pass",
+      "environment": "installed-eem",
+      "localRequired": true,
+      "adrMappings": [
+        {"adr": "ADR-027", "checkpoints": ["GROUP-00"]}
+      ],
+      "capabilities": ["source isolation", "predeclared groups", "single authority", "no direct permission creation"],
+      "evidence": [
+        {"kind": "command", "reference": "group-claims", "sourcePath": "identity/scripts/Test-IdentityGroupClaims.ps1"},
+        {"kind": "command", "reference": "unit-tests", "sourcePath": "identity/tests/test_configuration_scim.py"}
+      ],
+      "proofGap": {
+        "code": "installed-eem-group-authority-not-run",
+        "reason": "Provider claims and SCIM requests are proven, but EEM's local group authority decision is not."
+      }
+    },
+    {
+      "id": "definition-preview-publish-transition-and-rollback",
+      "title": "Definition preview, publish, version transition, and rollback administration",
+      "expectedClassification": "supported-pass",
+      "environment": "installed-eem",
+      "localRequired": false,
+      "adrMappings": [
+        {"adr": "ADR-027", "checkpoints": ["IID-03"]}
+      ],
+      "capabilities": ["preview", "publish", "diff", "rollback", "audit"],
+      "evidence": [],
+      "proofGap": {
+        "code": "eem-definition-administration-not-run",
+        "reason": "The Northlake localhost editor is not and must not be treated as EnergyHippo production administration."
+      }
+    },
+    {
+      "id": "incommon-federation-definition",
+      "title": "InCommon federation metadata, discovery, trust, and rollover",
+      "expectedClassification": "future-capability",
+      "environment": "external-vendor",
+      "localRequired": false,
+      "adrMappings": [
+        {"adr": "ADR-027", "checkpoints": ["FED-00"]}
+      ],
+      "capabilities": ["aggregate metadata", "discovery", "last-known-good", "rollover"],
+      "evidence": [],
+      "proofGap": {
+        "code": "incommon-integration-not-available",
+        "reason": "Keycloak realm metadata is not labelled or accepted as InCommon federation evidence."
+      }
+    },
+    {
+      "id": "shibboleth-vendor-definition",
+      "title": "Representative Shibboleth request, metadata, and attribute-release acceptance",
+      "expectedClassification": "future-capability",
+      "environment": "external-vendor",
+      "localRequired": false,
+      "adrMappings": [
+        {"adr": "ADR-027", "checkpoints": ["VENDOR-00"]}
+      ],
+      "capabilities": ["Shibboleth metadata", "request signing", "attribute release"],
+      "evidence": [],
+      "proofGap": {
+        "code": "shibboleth-deployment-unavailable",
+        "reason": "No supported Shibboleth deployment is available; Keycloak is never relabelled as Shibboleth."
+      }
+    },
+    {
+      "id": "okta-vendor-definitions",
+      "title": "Independent Okta OIDC, SAML, and SCIM acceptance",
+      "expectedClassification": "future-capability",
+      "environment": "external-vendor",
+      "localRequired": false,
+      "adrMappings": [
+        {"adr": "ADR-027", "checkpoints": ["VENDOR-01"]}
+      ],
+      "capabilities": ["Okta OIDC", "Okta SAML", "Okta SCIM"],
+      "evidence": [],
+      "proofGap": {
+        "code": "okta-tenant-unavailable",
+        "reason": "No supported Okta test tenant is available; Northlake remains generic protocol evidence only."
+      }
+    },
+    {
+      "id": "entra-vendor-definitions",
+      "title": "Independent Microsoft Entra OIDC, SAML, and SCIM acceptance",
+      "expectedClassification": "future-capability",
+      "environment": "external-vendor",
+      "localRequired": false,
+      "adrMappings": [
+        {"adr": "ADR-027", "checkpoints": ["VENDOR-02"]}
+      ],
+      "capabilities": ["Entra OIDC", "Entra SAML", "Entra provisioning"],
+      "evidence": [],
+      "proofGap": {
+        "code": "entra-tenant-unavailable",
+        "reason": "No supported Entra tenant and gallery provisioning configuration is available; Keycloak is never relabelled as Entra."
+      }
+    },
+    {
+      "id": "privacy-policy-and-inventoried-surfaces",
+      "title": "Generic privacy state and data-handling policy across inventoried surfaces",
+      "expectedClassification": "future-capability",
+      "environment": "installed-eem",
+      "localRequired": false,
+      "adrMappings": [
+        {"adr": "ADR-027", "checkpoints": ["PRIV-00"]}
+      ],
+      "capabilities": ["subject privacy", "administrator access", "audit", "exports"],
+      "evidence": [],
+      "proofGap": {
+        "code": "eem-privacy-surface-acceptance-not-run",
+        "reason": "Northlake emits synthetic claims but cannot establish EnergyHippo surface authorization or privacy presentation."
+      }
+    },
+    {
+      "id": "protected-named-destination-and-deep-link-policy",
+      "title": "Named destination and deep-link policy rejects arbitrary external URLs",
+      "expectedClassification": "supported-pass",
+      "environment": "lab",
+      "localRequired": true,
+      "adrMappings": [
+        {"adr": "ADR-027", "checkpoints": ["LINK-00"]}
+      ],
+      "capabilities": ["same-origin path", "double-decode rejection", "dot-segment rejection", "state binding"],
+      "evidence": [
+        {"kind": "command", "reference": "browser-lab", "sourcePath": "identity/scripts/Test-IdentityBrowserLab.ps1"},
+        {"kind": "artifact", "reference": "browser-evidence"}
+      ],
+      "proofGap": {
+        "code": "installed-eem-named-destination-not-run",
+        "reason": "The customer RP proves the policy shape, while EnergyHippo's protected continuation implementation remains separate."
+      }
+    },
+    {
+      "id": "identity-operations-onboarding-and-evidence-export",
+      "title": "Operations, onboarding, rollback contacts, and revisioned evidence export",
+      "expectedClassification": "supported-pass",
+      "environment": "installed-eem",
+      "localRequired": true,
+      "adrMappings": [
+        {"adr": "ADR-026", "checkpoints": ["OPS-00"]},
+        {"adr": "ADR-027", "checkpoints": ["IID-OPS-00"]}
+      ],
+      "capabilities": ["revisions", "image digest", "configuration hash", "proof gaps", "restart evidence"],
+      "evidence": [
+        {"kind": "command", "reference": "catalog-validation", "sourcePath": "identity/scripts/identity_evidence.py"},
+        {"kind": "restart", "reference": "restart-stability"}
+      ],
+      "proofGap": {
+        "code": "shared-development-host-not-authorized",
+        "reason": "The stable local profile is promotion-ready, but deployment to a shared machine needs its hostname, custody, and operator approval."
+      }
+    },
+    {
+      "id": "wisconsin-configuration-only-acceptance",
+      "title": "Wisconsin acceptance changes configuration only and records customer proof gaps",
+      "expectedClassification": "future-capability",
+      "environment": "customer-acceptance",
+      "localRequired": false,
+      "adrMappings": [
+        {"adr": "ADR-027", "checkpoints": ["CUST-00"]}
+      ],
+      "capabilities": ["customer metadata", "approved identifiers", "group namespace", "privacy decisions"],
+      "evidence": [],
+      "proofGap": {
+        "code": "wisconsin-customer-inputs-unavailable",
+        "reason": "Northlake provides reusable protocol fixtures only; no Wisconsin-specific values or acceptance are invented."
+      }
+    }
+  ]
+}

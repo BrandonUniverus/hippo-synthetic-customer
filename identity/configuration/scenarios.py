@@ -779,8 +779,10 @@ def scenario_diff(
     return differences
 
 
-def scenario_realm_path(output_directory: Path, slot: str) -> Path:
-    return output_directory / f"northlake-{slot.lower()}-realm.json"
+def scenario_realm_path(output_directory: Path, realm_key: str) -> Path:
+    if not REALM_KEY_PATTERN.fullmatch(realm_key) or realm_key == "master":
+        raise ScenarioValidationError({"realmKey": "Use a non-master lowercase realm key."})
+    return output_directory / f"{realm_key}-realm.json"
 
 
 def scenario_connection_path(output_directory: Path, slot: str) -> Path:
@@ -846,13 +848,16 @@ def main() -> int:
     try:
         environment = _load_env(args.env_file.resolve())
         document = load_scenario_document(args.settings_file.resolve(), environment)
+        realm_output_directory = args.realm_output_directory.resolve()
         for slot in SCENARIO_SLOTS:
+            realm_key = document.settings.realms[slot].realm_key
+            realm_output_path = scenario_realm_path(realm_output_directory, realm_key)
             generate_scenario_realm(
                 document.settings,
                 slot,
                 environment,
                 args.manifest.resolve(),
-                scenario_realm_path(args.realm_output_directory.resolve(), slot),
+                realm_output_path,
                 scenario_connection_path(
                     args.connection_output_directory.resolve(),
                     slot,
@@ -860,6 +865,12 @@ def main() -> int:
                 args.user_overlay.resolve() if args.user_overlay else None,
                 args.group_overlay.resolve() if args.group_overlay else None,
             )
+            legacy_realm_path = realm_output_directory / f"northlake-{slot.lower()}-realm.json"
+            if legacy_realm_path != realm_output_path:
+                legacy_realm_path.unlink(missing_ok=True)
+            previous_realm_key = document.applied_realm_keys.get(slot)
+            if previous_realm_key and previous_realm_key != realm_key:
+                scenario_realm_path(realm_output_directory, previous_realm_key).unlink(missing_ok=True)
     except (OSError, ScenarioValidationError, ValueError) as error:
         detail = error.errors if isinstance(error, ScenarioValidationError) else str(error)
         print(json.dumps({"errors": detail}), file=os.sys.stderr)

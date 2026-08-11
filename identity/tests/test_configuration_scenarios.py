@@ -212,6 +212,16 @@ class ScenarioSettingsTests(unittest.TestCase):
                 "\n".join(f"{key}={value}" for key, value in self.environment.items()) + "\n",
                 encoding="utf-8",
             )
+            import_directory = temporary / "import"
+            import_directory.mkdir()
+            for legacy_name, realm_key in (
+                ("northlake-laba-realm.json", "northlake-lab-a"),
+                ("northlake-labb-realm.json", "northlake-lab-b"),
+            ):
+                (import_directory / legacy_name).write_text(
+                    json.dumps({"realm": realm_key}),
+                    encoding="utf-8",
+                )
 
             result = subprocess.run(
                 [
@@ -235,8 +245,20 @@ class ScenarioSettingsTests(unittest.TestCase):
             )
 
             self.assertEqual(0, result.returncode, result.stderr)
-            self.assertTrue((temporary / "import" / "northlake-laba-realm.json").is_file())
-            self.assertTrue((temporary / "import" / "northlake-labb-realm.json").is_file())
+            lab_a_path = temporary / "import" / "northlake-lab-a-realm.json"
+            lab_b_path = temporary / "import" / "northlake-lab-b-realm.json"
+            self.assertTrue(lab_a_path.is_file())
+            self.assertTrue(lab_b_path.is_file())
+            self.assertFalse((import_directory / "northlake-laba-realm.json").exists())
+            self.assertFalse((import_directory / "northlake-labb-realm.json").exists())
+            self.assertEqual(
+                lab_a_path.stem.removesuffix("-realm"),
+                json.loads(lab_a_path.read_text(encoding="utf-8"))["realm"],
+            )
+            self.assertEqual(
+                lab_b_path.stem.removesuffix("-realm"),
+                json.loads(lab_b_path.read_text(encoding="utf-8"))["realm"],
+            )
             self.assertTrue((temporary / "connections" / "labA" / "connection.json").is_file())
             self.assertTrue((temporary / "connections" / "labB" / "connection.json").is_file())
 

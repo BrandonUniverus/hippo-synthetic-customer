@@ -628,6 +628,36 @@ Keycloak authentication are independent decisions:
 The detailed boundary and negative matrix are in
 [SCIM-2.0-TESTING.md](SCIM-2.0-TESTING.md).
 
+## ADR coverage and redacted evidence
+
+Phase 9 adds a checked-in coverage catalog for every declared checkpoint in
+ADR-021, ADR-022, ADR-026, and ADR-027. It separates stable provider proof,
+disposable lab and fault proof, installed EnergyHippo acceptance, external
+conformance, and real-vendor evidence instead of treating a Keycloak pass as a
+pass for all of them.
+
+Promote the persistent realm to the one-OIDC/one-SAML baseline, then run the
+complete acceptance harness:
+
+```powershell
+pwsh .\identity\scripts\Promote-IdentityStableRealm.ps1
+pwsh .\identity\scripts\Test-IdentityEvidence.ps1
+```
+
+The harness validates the catalog and deterministic OIDC/SAML fault recipes,
+runs the automated and live provider checks, observes an explicit outage,
+restarts the full Compose project, verifies stable issuer/subject/key/config
+identity, and exports an ignored redacted manifest to
+`identity/.runtime/evidence/identity-evidence.json`. The restart gate is always
+part of the harness so an abbreviated run cannot be mistaken for Phase 9
+acceptance.
+
+Key rotation is intentionally not part of the routine harness because each run
+creates a new key. The rotation command below records the latest rollover proof,
+which the evidence exporter consumes. The full coverage model, classifications,
+evidence fields, and explicit external gaps are documented in
+[evidence/README.md](evidence/README.md).
+
 ### Stop and restart without changing state
 
 ```powershell
@@ -733,8 +763,14 @@ Checked-in sources:
 - `configuration/groups.py`: typed fictional-group and membership overlay storage.
 - `configuration/scim.py`: typed multi-connection SCIM client, strict HTTPS
   transport, discovery validation, lifecycle runner, and redacted evidence boundary.
+- `evidence/coverage-catalog.json`: complete ADR checkpoint-to-scenario mapping,
+  expected classifications, environment boundaries, and explicit proof gaps.
+- `evidence/fault-fixtures.json`: deterministic secret-free OIDC and SAML
+  malformed/tampered/replayed/unavailable/stale/oversized fixture recipes.
 - `configuration/server.py`: loopback configuration API and disposable-realm apply boundary.
 - `scripts/verify_oidc_baseline.py`: focused Modern and Historical Legacy live proof.
+- `scripts/identity_evidence.py`: catalog validation, stable snapshot comparison,
+  and redacted manifest export.
 - `compose.yml`: immutable container versions and deployment boundary.
 - `Caddyfile`: HTTPS and proxy boundary.
 
@@ -747,6 +783,8 @@ Ignored generated state:
 - the saved local OIDC profile document and focused verification result;
 - the saved SCIM connection document, separate bearer credential store, and
   redacted discovery/lifecycle evidence;
+- stable promotion, key-rollover, restart-stability, command-result, and final
+  redacted Phase 9 evidence;
 - local synthetic-user overrides and their generated development passwords;
 - local synthetic-group additions and checked-in-group membership overrides;
 - copied development CA;

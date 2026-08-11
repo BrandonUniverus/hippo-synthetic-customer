@@ -1,0 +1,95 @@
+{
+  "schemaVersion": 1,
+  "fixtureVersion": "northlake-fault-recipes-v1",
+  "description": "Deterministic lab-only mutation recipes. They describe how a runner derives a bad response from a fresh valid transaction; no reusable token, assertion, password, or private key is checked in.",
+  "protocols": {
+    "oidc": [
+      {
+        "id": "oidc-malformed-compact-token",
+        "faultClass": "malformed",
+        "environment": "lab-only",
+        "expectedClassification": "supported-controlled-failure",
+        "recipe": {"source": "fresh-id-token", "operation": "truncate-compact-segment", "segment": 2}
+      },
+      {
+        "id": "oidc-tampered-signature",
+        "faultClass": "tampered",
+        "environment": "lab-only",
+        "expectedClassification": "supported-controlled-failure",
+        "recipe": {"source": "fresh-id-token", "operation": "xor-signature-byte", "offsetFromEnd": 1, "xorMask": 1}
+      },
+      {
+        "id": "oidc-replayed-authorization-code",
+        "faultClass": "replayed",
+        "environment": "lab-only",
+        "expectedClassification": "supported-controlled-failure",
+        "recipe": {"source": "fresh-code-callback", "operation": "repeat-token-exchange", "attempts": 2}
+      },
+      {
+        "id": "oidc-unavailable-discovery",
+        "faultClass": "unavailable",
+        "environment": "lab-only",
+        "expectedClassification": "supported-controlled-failure",
+        "recipe": {"source": "discovery", "operation": "return-http-status", "status": 503, "retryAfterSeconds": 1}
+      },
+      {
+        "id": "oidc-stale-id-token",
+        "faultClass": "stale",
+        "environment": "lab-only",
+        "expectedClassification": "supported-controlled-failure",
+        "recipe": {"source": "fresh-id-token", "operation": "resign-with-expired-times", "issuedAtOffsetSeconds": -7200, "expiresAtOffsetSeconds": -3600}
+      },
+      {
+        "id": "oidc-oversized-id-token",
+        "faultClass": "oversized",
+        "environment": "lab-only",
+        "expectedClassification": "supported-controlled-failure",
+        "recipe": {"source": "fresh-id-token", "operation": "pad-string-claim-and-resign", "targetBytes": 2097153}
+      }
+    ],
+    "saml": [
+      {
+        "id": "saml-malformed-xml-response",
+        "faultClass": "malformed",
+        "environment": "lab-only",
+        "expectedClassification": "supported-controlled-failure",
+        "recipe": {"source": "fresh-saml-response", "operation": "truncate-xml", "bytesFromEnd": 17}
+      },
+      {
+        "id": "saml-tampered-signed-assertion",
+        "faultClass": "tampered",
+        "environment": "lab-only",
+        "expectedClassification": "supported-controlled-failure",
+        "recipe": {"source": "fresh-saml-response", "operation": "replace-signed-nameid-after-signing", "replacement": "tampered-subject"}
+      },
+      {
+        "id": "saml-replayed-response-id",
+        "faultClass": "replayed",
+        "environment": "lab-only",
+        "expectedClassification": "supported-controlled-failure",
+        "recipe": {"source": "fresh-saml-callback", "operation": "repeat-identical-response", "attempts": 2}
+      },
+      {
+        "id": "saml-unavailable-metadata",
+        "faultClass": "unavailable",
+        "environment": "lab-only",
+        "expectedClassification": "supported-controlled-failure",
+        "recipe": {"source": "metadata", "operation": "return-http-status", "status": 503, "retryAfterSeconds": 1}
+      },
+      {
+        "id": "saml-stale-conditions",
+        "faultClass": "stale",
+        "environment": "lab-only",
+        "expectedClassification": "supported-controlled-failure",
+        "recipe": {"source": "fresh-saml-response", "operation": "resign-with-expired-conditions", "notOnOrAfterOffsetSeconds": -3600}
+      },
+      {
+        "id": "saml-oversized-response",
+        "faultClass": "oversized",
+        "environment": "lab-only",
+        "expectedClassification": "supported-controlled-failure",
+        "recipe": {"source": "fresh-saml-response", "operation": "add-signed-padding-attribute", "targetBytes": 2097153}
+      }
+    ]
+  }
+}

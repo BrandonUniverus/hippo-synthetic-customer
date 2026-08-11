@@ -392,6 +392,16 @@ class ConfigurationServerTests(unittest.TestCase):
         self.assertEqual(1, len(self.scenario_verifier_calls))
         for connection_path in self.scenario_verifier_calls[0][0]:
             self.assertTrue(connection_path.is_file())
+        import_directory = self.application.runtime_directory / "import"
+        for realm_key in ("northlake-lab-a", "northlake-lab-b"):
+            realm_path = import_directory / f"{realm_key}-realm.json"
+            self.assertTrue(realm_path.is_file())
+            self.assertEqual(
+                realm_key,
+                json.loads(realm_path.read_text(encoding="utf-8"))["realm"],
+            )
+        self.assertFalse((import_directory / "northlake-laba-realm.json").exists())
+        self.assertFalse((import_directory / "northlake-labb-realm.json").exists())
 
         reset_status, reset = self._json_request(
             "/configure/api/scenarios/reset/labB",

@@ -865,7 +865,10 @@ class ConfigurationApplication:
                 self.user_overlay_path,
                 self.group_overlay_path,
             )
-            realm_path = scenario_realm_path(self.realm_output_path.parent, slot)
+            realm_path = scenario_realm_path(
+                self.realm_output_path.parent,
+                settings.realms[slot].realm_key,
+            )
             connection_path = scenario_connection_path(
                 self.scenario_connection_directory,
                 slot,
@@ -874,6 +877,9 @@ class ConfigurationApplication:
             connection_path.parent.mkdir(parents=True, exist_ok=True)
             os.replace(temporary_realm, realm_path)
             os.replace(temporary_connection, connection_path)
+            legacy_realm_path = self.realm_output_path.parent / f"northlake-{slot.lower()}-realm.json"
+            if legacy_realm_path != realm_path:
+                legacy_realm_path.unlink(missing_ok=True)
         return realm, connection
 
     def _default_scenario_verifier(
@@ -997,6 +1003,7 @@ class ConfigurationApplication:
             )
             self._clear_scenario_verification()
             for slot in slots:
+                previous_realm_key = applied_keys.get(slot)
                 realm, _ = self._generate_scenario(settings, slot)
                 provider_settings = ProviderSettings.from_environment(
                     settings.environment_for(slot, self.environment)
@@ -1017,6 +1024,12 @@ class ConfigurationApplication:
                         "applied": False,
                         "applyError": str(failure),
                     }
+                if previous_realm_key and previous_realm_key != realm["realm"]:
+                    previous_realm_path = scenario_realm_path(
+                        self.realm_output_path.parent,
+                        previous_realm_key,
+                    )
+                    previous_realm_path.unlink(missing_ok=True)
                 applied_keys[slot] = realm["realm"]
                 write_scenario_document(
                     self.scenario_settings_path,

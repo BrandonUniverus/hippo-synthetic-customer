@@ -88,7 +88,7 @@ def _verify_oidc_groups(
         state=state,
         nonce=nonce,
         code_challenge=code_challenge,
-        prompt="login consent",
+        prompt="login consent" if client["consentRequired"] else "login",
         acr_values="1",
     )
     pushed_request = identity_verifier._json_request(
@@ -117,28 +117,29 @@ def _verify_oidc_groups(
         user["credentials"][0]["value"],
         redirect_uri,
     )
-    if location:
-        raise identity_verifier.VerificationError(
-            "Modern group-claim login did not stop for consent."
+    if client["consentRequired"]:
+        if location:
+            raise identity_verifier.VerificationError(
+                "Modern group-claim login skipped its configured provider consent."
+            )
+        consent_form = next(
+            (
+                form
+                for form in identity_verifier._forms(response_body)
+                if "login-actions/consent" in form.action
+            ),
+            None,
         )
-    consent_form = next(
-        (
-            form
-            for form in identity_verifier._forms(response_body)
-            if "login-actions/consent" in form.action
-        ),
-        None,
-    )
-    if status != 200 or consent_form is None:
-        raise identity_verifier.VerificationError(
-            "Modern group-claim login did not present consent."
+        if status != 200 or consent_form is None:
+            raise identity_verifier.VerificationError(
+                "Modern group-claim login did not present its configured provider consent."
+            )
+        status, location = identity_verifier._submit_consent(
+            opener,
+            consent_form,
+            profile["baseUrl"],
+            redirect_uri,
         )
-    status, location = identity_verifier._submit_consent(
-        opener,
-        consent_form,
-        profile["baseUrl"],
-        redirect_uri,
-    )
     if status not in {301, 302, 303, 307, 308} or not location:
         raise identity_verifier.VerificationError(
             "Modern group-claim login did not return an authorization code."
@@ -232,6 +233,17 @@ def _verify_saml_groups(
         raise identity_verifier.VerificationError(
             "Generated user did not contain one Standard SAML persistent NameID."
         )
+    expected_attributes: dict[str, Any] = {
+        "username": user["username"],
+        "email": user["email"],
+        "given_name": user["firstName"],
+        "family_name": user["lastName"],
+        "groups": expected_groups,
+    }
+    generated_attributes = user.get("attributes", {})
+    for claim in client.get("allowedClaims", []):
+        if claim not in expected_attributes and claim != "realm_roles":
+            expected_attributes[claim] = generated_attributes.get(claim, [])
     result = identity_verifier._validate_saml_response(
         response_document,
         profile,
@@ -240,13 +252,7 @@ def _verify_saml_groups(
         request_id=request_id,
         expected_user={
             "samlNameId": name_id_values[0],
-            "expectedAttributes": {
-                "groups": expected_groups,
-                "eem_permission_profiles": user.get("attributes", {}).get(
-                    "eem_permission_profiles",
-                    [],
-                ),
-            },
+            "expectedAttributes": expected_attributes,
         },
     )
     if _group_values(result.attributes.get("groups"), "SAML groups") != expected_groups:
