@@ -11,6 +11,7 @@ purpose: >
   before Stage 2 gateway/task configuration and Stage 3 fake consumption.
 
 sourceReferences:
+  onboardingDecisions: scenarios/northlake-onboarding-v1.yaml
   stage1CompanySetup: eem/northlake-eem-stage1-setup-v1.yaml
   sourceScenarioManifest: scenarios/demo-university-v1.yaml
   securityManifest: security/northlake-eem-security-v1.yaml
@@ -146,13 +147,13 @@ canonicalLocationNames:
   cedar_row_apartments:
     - {sourceBuildingId: cedar_row_a, eemName: Cedar Row A, aliases: []}
     - {sourceBuildingId: cedar_row_b, eemName: Cedar Row B, aliases: []}
-    - {syntheticLocationId: cedar_row_common_house, eemName: Cedar Row Common House, sourceStatus: planned_location_only}
+    - {syntheticLocationId: cedar_row_common_house, eemName: Cedar Row Common House, sourceStatus: documented_location_only}
   northlake_thermal_plant:
     - {sourceBuildingId: science_center, eemName: Applied Science Center, aliases: [Science Center]}
     - {sourceBuildingId: admin_hall, eemName: Admin Hall, aliases: []}
     - {sourceBuildingId: student_center, eemName: Student Center, aliases: []}
     - {sourceBuildingId: library, eemName: Main Library, aliases: [Library]}
-    - {syntheticLocationId: northlake_central_plant, eemName: Northlake Central Plant, sourceStatus: planned_location_only}
+    - {syntheticLocationId: northlake_central_plant, eemName: Northlake Central Plant, sourceStatus: documented_support_location}
 
 utilityProviderTargets:
   - id: valley_electric_district
@@ -693,10 +694,9 @@ billImageCoverage:
 
 sourceGapsToResolveBeforeStage2:
   - Confirm PointTypes rows and measure type/unit ids in the restored EEMSuite seed database.
-  - Expand handheld source/gateway binding to explicitly model register-reading points for Neptune and MVRS.
-  - Decide whether Cedar Row Common House remains location-only or gets its own common-area meters.
-  - Decide whether Student Center has chilled-water service; current source only models Student Center steam from the thermal plant.
-  - Decide final weather reference owner if Northlake University should not own public station meters.
+  - Capture the register and automatically related usage point ids from UI setup for Neptune and MVRS; symbolic reading-point references are in the source gateway bindings.
+  - Create and verify source-format fixtures for gateways beyond the supplied AcquiSuite onboarding sample.
+  - Provide an input path for the chiller digital status and the later Student Center activity index.
   - Add expected aggregate totals and baseline values once generated interval data exists.
 
 validationChecklist:

@@ -46,15 +46,28 @@ identity/
   README.md                    Runnable synthetic OIDC and SAML identity provider.
   compose.yml                  Pinned Keycloak, PostgreSQL, and HTTPS proxy stack.
 generators/
-  README.md                    Generator expectations and future command shape.
+  README.md                    Reproducible customer packet and first AcquiSuite sample.
 ```
 
 ## Current Status
 
-This repo currently contains the starting contract for the synthetic customer,
-including provider/gateway coverage, the Stage 1 EEM security manifest, and the
-DBAdmin-facing Stage 1 setup manifest. The next step is to drive those manifests
-through the apps and capture generated ids for validation.
+Start with the [Northlake onboarding packet](customer-provided/northlake-university/README.md)
+and [first UI implementation checklist](eem/northlake-onboarding-ui-checklist.md).
+Use the single [Data Collection workbook](outputs/northlake-university/data-collection-workbook.xlsx)
+for inventory, contacts, source systems and later-phase requirements. Contacts
+and Organization Units include the implementation people and department owners
+for all three Northlake companies.
+Packet 0.2 reconciles the existing source and EEM setup manifests into a complete
+listed inventory: 21 accounts, 29 meter/reference groups and 52 explicitly
+defined points, with nine related-measurement relationships and four aggregates.
+It supplies a deterministic Student Center AcquiSuite normal-day, gap and
+backfill sample. The gateway list covers 13 profiles / 19 format cases plus the
+handheld-event publisher; only AcquiSuite has a generated intake sample so far.
+
+UI setup, installed ingestion acceptance and baseline backup/restore are the
+next steps. A source specification or generated sample is not an installed test
+result. The broader rate, bill, AP/GL, tenant, security and reporting plans remain
+available under `eem/` and `docs/dream-customer/` for incremental implementation.
 
 The repository also contains a runnable [synthetic identity provider](identity/README.md).
 It converts the Stage 1 security manifest into a resettable Keycloak realm with
@@ -64,7 +77,7 @@ protocol verification for both standards.
 
 ## Operating Rules
 
-- The synthetic source model is the source of truth.
+- Versioned source manifests own the customer facts; see [field ownership and generation](generators/README.md). Workbooks are generated views, not a second source of truth.
 - Generated files are outputs, not hand-edited fixtures.
 - Generation must be deterministic from checked-in manifests and seed values.
 - Every scenario should define expected downstream assertions.

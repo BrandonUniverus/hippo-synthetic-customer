@@ -1,10 +1,17 @@
-# Data Collection Workbook — New Tabs
+# Data Collection Workbook — Later-Phase Requirements
 
-Provided by: Northlake Facilities & Finance. Synthetic/illustrative. These are the
-**additional tabs** to fold into the existing Data Collection Workbook (which
-already has Organization Units, Sites, Buildings, Utility Services, Accounts &
-Agreements, Meters, Measured Points, Data Sources, Known Events, Contacts, Open
-Items). Presented as tables for the design team to render into the workbook.
+Provided by: Northlake Facilities & Finance. Synthetic/illustrative. These
+requirements are already represented in the Data Collection Workbook. Packet
+0.2 expands the workbook to 23 tabs with complete meter and measurement
+inventories, related measurements, rollup members, weather assignments, numeric
+base tariff components and source mappings. Contacts and Organization Units
+contain the complete implementation directory and department ownership. The
+later-phase requirements below retain their earlier content in the same workbook.
+
+This document retains the later-phase requirement tables. Current structured
+inventory and tariff values are generated from the
+[versioned sources](../../generators/README.md); installed setup and acceptance
+are recorded separately.
 
 ## Tab: Rate Schedules
 

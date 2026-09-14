@@ -13,6 +13,14 @@ production code at `energyhippo/EEMSuite`, the live `EEMSuite` database, and the
 current synthetic dataset in this repo (see the dated discovery in the session
 that created these docs).
 
+**Current starting point (2026-09-14):** use the expanded
+[customer packet](../../customer-provided/northlake-university/README.md) and
+[Student Center UI checklist](../../eem/northlake-onboarding-ui-checklist.md).
+Build one gateway path with the existing setup account before expanding across
+the inventory. The broader plans below remain the coverage backlog; their
+product/report counts and permission details need checking when each phase is
+implemented.
+
 | Doc | What it is |
 | --- | --- |
 | `README.md` (this file) | Goal, current state, coverage scorecard, roadmap summary, open decisions |
@@ -75,25 +83,34 @@ that created these docs).
   **7 bill-allocation methods + 3 point-allocation methods**, **7+ AP/GL export
   file formats**, and **6 task types**. Northlake today touches a fraction of each.
 
-## Where Northlake stands today (current state)
+## Current onboarding packet
 
-The current dataset (`scenarios/demo-university-v1.yaml` + `providers/` +
-`security/` + `eem/`) is a strong **Stage-1 design**: 2 sites / 6 buildings,
-5 providers, 25 accounts, ~38 meters, ~65 channels, 13 gateways, 9 rate
-schedules (as metadata), 3 EEM companies, 19 users, 27 groups, 4 aggregates,
-3 baseline shells, 2 weather stations, and 19 scenario events. It is excellent
-for **ingestion, gateways, interval/bill data, and ENERGY STAR property
-mapping**.
+The generated packet contains **2 sites, 8 building/support locations, 5
+providers, 21 accounts/agreements, 29 meter/reference groups, 52 explicit point
+definitions, 9 measurement relationships, 4 aggregates and 9 base tariffs**.
+Six buildings retain their existing benchmarking areas; the plant and Common
+House are supporting locations outside those boundaries. Gateway mappings cover
+13 profiles and 19 format cases, plus one HMR event publisher. The UI-ID capture
+template also includes the degree-day, baseline and aggregate outputs, for 63
+point records in total.
 
-It is **not yet** a loaded, report-exercising customer: there is no built
-generate→load pipeline populating an EEMSuite DB, and entire subsystems
-(tenant rebilling, AP/GL, GHG, rating responses, regression results, projects,
-alarms, audit, MFR delivery, EnergyAI) have **no data at all**.
+The first source delivery is executable: the Student Center AcquiSuite files
+contain a complete day, a missing-block case and its backfill, with independent
+totals and checksums. The workbook, register and coverage list are regenerated
+from the [owned source fields](../../generators/README.md).
+
+**Installed UI setup and ingestion acceptance have not been recorded.** The
+remaining gateways need source fixtures or services. Rate calculations, bills,
+AP/GL, permissions, tenants and the other subsystems remain later implementation
+and acceptance work. A database backup becomes the reference customer only
+after UI entry, normal product ingestion, visible checks and a restore check.
 
 ## Coverage scorecard
 
-Status = how close the *current Northlake data design* is to exercising the
-subsystem's reports/outputs. (Detail and "what to add" in
+This is the earlier broad **design** scorecard, not an installed acceptance
+record. Green means a modeled requirement; it does not mean a gateway or report
+has passed. Use the current packet's gateway coverage for the first milestone.
+(Detail and "what to add" in
 [`subsystem-gap-analysis.md`](subsystem-gap-analysis.md).)
 
 | Subsystem | EEMSuite reports/outputs | Status |
@@ -127,20 +144,16 @@ subsystem's reports/outputs. (Detail and "what to add" in
 
 Detail + acceptance criteria in [`roadmap.md`](roadmap.md).
 
-> **Status (2026-06-26):** all phase specs (0–6) are authored **and re-framed for
-> UI entry** ([entry-path-and-gaps.md](entry-path-and-gaps.md)), and **all Track A
-> phases are materialized** as UI-entry plans in `eem/` (`northlake-rates-v1`,
-> `-bill-entry-v1`, `-ap-gl-v1`, `-town-center-v1`, `-sustainability-v1`,
-> `-operations-v1`, plus the Phase 0 `-company-calendar-v1` / `-eem-permissions-v1`).
-> Each names the screen, the values, and flags any **Track B** gap. Remaining work:
-> (1) enter the Track A plans into a full EEM instance + run the assertions; (2) the
-> **Track B product features** in [product-gap-backlog.md](product-gap-backlog.md)
-> (owner chose to build/connect all of them). The synthetic-data design side is
-> complete.
+> Phase specs 0–6 and their `eem/` UI-entry plans are authored. They still require
+> current-product review, source samples and installed acceptance. Packet 0.2
+> starts with company/hierarchy/provider/account/meter/point entry, then the
+> AcquiSuite normal, replay, gap and backfill checks. Complete permission testing
+> follows later. Expand the source model whenever a later requirement needs
+> additional customer facts or expected results.
 
 | Phase | Theme | Unlocks |
 | --- | --- | --- |
-| **0** | **Foundation & load pipeline** | Substrate loads into a blank EEMSuite seed; substrate reports return data |
+| **0** | **Foundation through the UI** | Required hierarchy and measurement setup exist; first gateway acceptance can run |
 | **1** | **Consumption & cost core** (bills w/ charge lines, intervals, units) | Use Analysis (15) + Bill Processing/Tracking core |
 | **2** | **Rate engine completeness** (10 schedules → all 9 determinant kinds) | Rate Analysis (9) |
 | **3** | **AP / GL & financial interface** (GL coding, 7 export formats, validation, accruals) | AP + accrual + validation reports; real AP interface files |
@@ -148,15 +161,15 @@ Detail + acceptance criteria in [`roadmap.md`](roadmap.md).
 | **5** | **Sustainability & analytics** (GHG, ENERGY STAR ratings, regression, benchmarks) | GHG (3) + ES Rating (3) + regression + benchmark |
 | **6** | **Operations & engagement** (projects, alarms, audit, tasks, MFR delivery to 100+, EnergyAI, importers) | Remaining System Manager / Project / My Reports + scheduled delivery |
 
-## Decisions (resolved 2026-06-25)
+## Sequencing and source decisions
 
-1. **Sequencing.** ✅ Start with **Foundation (0) + Consumption & cost core (1)**.
-   Subsystem order after that to be picked when we get there.
-2. **Output approach.** ✅ **Specs / manifests only** — this repo authors the data
-   *designs* (YAML/markdown specs in the repo style, EEMSuite-aware). Loading into
-   EEMSuite is handled externally by the owner's tooling. *No generate→load
-   pipeline is built here.* "Status: not loaded" in the scorecard means the spec is
-   authored and ready to load, not that a loader exists.
+1. **Sequencing (updated 2026-09-14).** Start with the minimal foundation and one
+   AcquiSuite path using the setup account. Expand to the other gateways,
+   relationships and aggregates, then the broader business and user scenarios.
+2. **Output approach.** Versioned source facts generate customer-facing
+   workbooks, registers and source files. EEMSuite setup happens through the UI;
+   data enters through supported gateways/importers. This repository does not
+   insert customer configuration or readings directly into the EEM database.
 3. **Tenant-rebilling vehicle.** ✅ **Both** — a new mixed-use **Northlake Town
    Center** (commercial allocation) *and* sub-metered **Cedar Row** (residential
    allocation). Built in Phase 4.

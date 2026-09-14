@@ -1,7 +1,8 @@
 # Northlake University Facilities And Utility Overview
 
 Prepared by: Northlake University Facilities, Housing, Sustainability, and Finance  
-Packet version: Draft 0.1  
+Packet version: 0.2
+
 Coverage period requested: January 1, 2024 through December 31, 2025
 
 ## Purpose
@@ -148,19 +149,25 @@ intentionally:
 - Valley Electric District rate schedule change beginning January 2025
 - One negative-test utility file with unsupported units, excluded from normal loads
 
-## Open Items For Northlake
+## Current Decisions And Open Items
 
-- Confirm final building ownership and operating contacts.
-- Confirm billing contact names and email aliases.
-- Confirm whether stormwater applies to Cedar Row buildings.
-- Confirm central plant allocation rules for steam-only buildings.
-- Confirm whether weather station KSAC or KSMF is preferred for each property.
-- Confirm which solar attributes are retained by Northlake under the PPA.
-- Confirm data source owners and delivery cadence for each source system.
+Packet 0.2 records the company boundaries, building areas, source owners and
+delivery cadence in the Facilities and Meter Register and Source System
+Inventory. Cedar Row has water and sewer without stormwater. Student Center
+receives steam without chilled water. KSAC supplies the shared observation
+reference, with KSMF retained for secondary weather and forecasts. Northlake
+retains the solar RECs.
+
+The remaining work is to confirm installed configuration through the UI,
+supply and test the other gateway formats, reconcile illustrated bills with
+tariffs, and specify the new account number for Cedar Row A's renewal event.
+Rate calculations, permissions, bill validations and reporting have their own
+later acceptance steps. The workbook's Open Items tab records these boundaries.
 
 ## Appendix: Provided Inventory Workbook
 
-The accompanying workbook contains the initial structured inventory tabs:
+The accompanying workbook includes these core inventory tabs, plus the expanded
+relationship, source mapping, rate and later-phase requirements tabs:
 
 - Organization Units
 - Sites
@@ -174,8 +181,10 @@ The accompanying workbook contains the initial structured inventory tabs:
 - Contacts
 - Open Items
 
-The filled workbook is the synthetic seed source of truth for this customer
-packet. It uses fictional but complete customer-facing values and should remain
-understandable to Facilities, Housing, Finance, Sustainability, and vendor
-contacts. Open items represent intentional data-quality or implementation
-scenarios rather than missing seed structure.
+The current [Facilities and Meter Register](facilities-and-meter-register.md)
+and generated Data Collection Workbook provide the expanded inventory, including
+relationships, rollups, weather assignments and source measurement mappings.
+Their structured facts come from the [versioned source manifests](../../generators/README.md).
+They supersede conflicting inventory values in older workbooks and the Draft
+0.1 PDF overview. Fixture availability and installed acceptance remain separate
+from whether a requirement has been documented.

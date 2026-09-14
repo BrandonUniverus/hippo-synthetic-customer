@@ -12,6 +12,15 @@ sources; polished Word/PDF/Excel are generated from them. They translate the
 internal specs (`eem/`, `providers/`, `security/`, `docs/dream-customer/`) back
 into the business facts a real customer would actually send.
 
+**Start here:** [Facilities and Meter Register](facilities-and-meter-register.md)
+and [Data Collection](../../outputs/northlake-university/data-collection-workbook.xlsx),
+the single customer workbook. Use **Contacts** for people, email and phone, and
+**Organization Units** for department ownership and primary contacts.
+Packet **0.2** expands the earlier eight-meter inventory to the complete listed
+Stage 1B inventory. The [Student Center AcquiSuite handover](sample-data/acquisuite/README.md)
+supplies the first source files and expected values. Installed acceptance is
+still pending; follow the [UI checklist](../../eem/northlake-onboarding-ui-checklist.md).
+
 - `00-cover-letter.md` — transmittal letter from Northlake, with enclosures + contacts.
 - `01-discovery-questionnaire.md` — completed discovery questionnaire (goals, scope, systems, success criteria).
 - `northlake-facilities-and-utility-overview.md` — narrative facilities & utility overview.
@@ -21,7 +30,9 @@ into the business facts a real customer would actually send.
 - `tenant-and-lease-roster.md` — Property Mgmt/Housing: Town Center + Cedar Row sub-metering and how costs are split.
 - `sustainability-requirements.md` — Sustainability: ENERGY STAR, GHG scopes, targets, REC handling.
 - `source-system-inventory.md` — IT/Facilities: data feeds, formats, cadence, owners.
-- `data-collection-workbook-additions.md` — new workbook tabs (Rate Schedules, Chart of Accounts, Users & Access, Tenants & Leases, Sustainability, Projects).
+- `facilities-and-meter-register.md` — complete building/account/meter/point inventory, related measurements, rollup members and weather assignments.
+- `sample-data/acquisuite/` — one deterministic day, a missing-block delivery, its backfill and expected results.
+- `data-collection-workbook-additions.md` — retained later-phase workbook requirements (rates, GL, users, tenants, sustainability and projects).
 
 EEM application branding (customer-provided customization for the EEM portal):
 
@@ -37,13 +48,25 @@ relates to the vendor-produced solution/integration documents.
 Generated files are built from these sources and written outside this directory:
 
 - `output/pdf/northlake-facilities-overview-redone.pdf`
-- `outputs/northlake-university/northlake-organization-inventory.xlsx`
-- `outputs/northlake-university/northlake-organization-inventory-filled.xlsx`
+- `outputs/northlake-university/data-collection-workbook.xlsx` — the single implementation intake workbook, including contacts, source systems and tenants/leases.
 
-The filled workbook is the synthetic seed source of truth. It uses fictional but
-complete addresses, contacts, account numbers, meter tags, source paths, and
-event dates. Open items represent intentional data-quality or implementation
-scenarios rather than missing seed structure.
+The [versioned source manifests](../../generators/README.md) own the structured
+facts, including the complete contact and department registers. The duplicate
+inventory, source-system and tenant workbooks are retired; maintain the one
+Data Collection workbook.
+The older PDF overview and illustrated bills remain Draft 0.1 examples; the
+current register supersedes conflicting inventory values. Bill examples still
+need reconciliation before financial acceptance.
+
+New workbook tabs include Related Measurements, Rollup Members, Weather
+Assignments, Source Measurements and Rate Components. Known Events and Open
+Items distinguish supplied samples from later scenarios whose fixtures or
+product acceptance are pending.
+
+Contacts includes all eight implementation contacts named in the cover letter
+and four external utility representatives. Cedar Row and Thermal Plant contacts
+are assigned to their own companies. The contact register describes who to
+reach; Users & Access remains the separate list of login and permission needs.
 
 ## Customer Language Rules
 

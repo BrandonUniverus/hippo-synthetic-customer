@@ -974,6 +974,9 @@ accounts:
             pointType: kWh
 
 gatewayBindings:
+  # Numeric gateway, node, point and timezone IDs below are illustrative model
+  # values, not installation inputs. Create objects through the UI and capture
+  # actual IDs using eem/northlake-instance-mapping.template.csv.
   timeZone:
     sourceName: America/Los_Angeles
     gatewayTimeZoneId: 13
@@ -1472,6 +1475,7 @@ gatewayBindings:
             points:
               - ptId: 1600101
                 channelId: ch_rcu_cedar_row_b_water_kgal_monthly
+                relatedReadingPoint: eem_rcu_cedar_row_b_water_register_reading
                 ptType: 1
                 timeZoneId: 13
                 interval: 43200
@@ -1508,6 +1512,7 @@ gatewayBindings:
             points:
               - ptId: 1600201
                 channelId: ch_sgu_student_center_therms_monthly
+                relatedReadingPoint: eem_sgu_student_center_gas_register_reading
                 ptType: 1
                 timeZoneId: 13
                 interval: 43200

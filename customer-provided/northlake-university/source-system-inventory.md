@@ -1,35 +1,55 @@
-# Source System Inventory (Data Feeds)
+# Northlake Source System Inventory
 
-Provided by: Northlake University IT & Facilities. Synthetic/illustrative. This
-lists the systems and vendors that produce our utility and operational data, so
-you can plan how each feed is collected. We've described these as **our** systems,
-not as your import mechanics.
+Packet 0.2 | Issued 2026-09-14 | Facilities, IT and Finance
 
-| Source system / vendor | Provides | Format | Cadence | Owner | Property |
-| --- | --- | --- | --- | --- | --- |
-| Valley Electric billing files | Monthly electric bills | CSV/billing file | Monthly | Finance | All electric |
-| River City billing files | Bundled water/sewer/stormwater bills | CSV/billing file | Monthly | Finance | Campus + Cedar Row |
-| Sierra Gas statements | Gas bills (therms) | PDF statement | Monthly | Finance | Campus |
-| Helios PPA invoices + REC statement | Solar generation invoice, RECs, avoided CO2e | PDF/CSV | Monthly | Finance/Sustainability | Science, Student, Cedar Row A |
-| Meter-data service (MV90) | Electric & solar interval files | MV90 files | Daily/Monthly | Facilities | Science Center, solar arrays |
-| AcquiSuite logger | Student Center electric 15-min interval | AcquiSuite log | Continuous | Facilities | Student Center |
-| Central plant BACnet | Chilled-water ton-hours & tons | BACnet present values | Hourly | Thermal Plant | Science Center |
-| Plant Modbus controller | Chiller power (kW) | Modbus register | 5-min | Thermal Plant | Thermal Plant |
-| Wireless sensors (Spinwave) | Lab temperature/humidity | Sensor CSV | 15-min | Facilities | Science Center |
-| FIG-family provider files | Cedar Row water reads | FIG family formats | Monthly | Facilities | Cedar Row A |
-| SQL historian extract | Library electric interval | Database extract | 15-min | IT | Library |
-| NOAA weather (KSAC) | Outdoor temp, humidity, wind | Public observations | Hourly | Facilities | Sacramento area |
-| Aeris weather (KSMF) | Observed + forecast temperature | Weather service | Hourly | Facilities | Sacramento area |
-| Neptune handheld | Cedar Row B water route reads | Handheld upload | Monthly | Facilities | Cedar Row B |
-| MVRS handheld | Student Center gas route reads | Handheld upload | Monthly | Facilities | Student Center |
-| Handheld reading events | Route read events | Event file | Monthly | Facilities | Cedar Row, Student Center |
+Match each delivered measurement to the register. Only the AcquiSuite sample is supplied in this release; the remaining feeds require files, fixtures or services.
 
-## Notes
+| Source Name | Source Type | Service Category | Owner / Vendor | Delivery Method | Expected Cadence | File / System Reference | Credential Owner | Review Status | Notes |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Student Center AcquiSuite logger | File delivery | AcquiSuite log | Facilities Operations | File delivery | Every 15 minutes | Student Center | Facilities Operations | Documented | UTC; interval-start timestamps for the onboarding sample. Supplied: AcquiSuite complete, gap and backfill. |
+| Valley Electric meter-data service | File delivery | MV90 MDEF | Valley Electric District | File delivery | Daily | Applied Science Center | Valley Electric District | Documented | Local timestamps; timezone and DST behavior require acceptance. Sample / service not yet supplied. |
+| Helios solar meter-data service | File delivery | MV90 MV9 | Helios Onsite Solar | File delivery | Daily | Applied Science Center, Student Center, Cedar Row A | Helios Onsite Solar | Documented | Local timestamps; timezone and DST behavior require acceptance. Sample / service not yet supplied. |
+| Central plant building automation | Device polling | BACnet | Thermal Plant | Device polling | Hourly | Chilled Water / Applied Science Center | Thermal Plant | Documented | Poll time; historical replay is a separate input path. Sample / service not yet supplied. |
+| KSAC weather observations | Weather service | NOAA | Facilities Operations | Weather service | Hourly | Sacramento Weather Reference | Facilities Operations | Documented | Source observation time. Sample / service not yet supplied. |
+| KSMF observations and forecast | Weather service | Aeris | Sustainability | Weather service | Hourly | Sacramento Weather Reference | Sustainability | Documented | Observation and forecast valid times remain separate. Sample / service not yet supplied. |
+| Applied Science laboratory sensors | File delivery | Spinwave CSV | Facilities Operations | File delivery | Every 15 minutes | Applied Science Center | Facilities Operations | Documented | Source timestamp. Sample / service not yet supplied. |
+| Cedar Row A water export | File delivery | FIG family | River City Utilities | File delivery | Hourly | Cedar Row A | River City Utilities | Documented | Source timestamp with configured offset. Sample / service not yet supplied. |
+| Central plant chiller controller | Device polling | Modbus TCP | Thermal Plant | Device polling | Every 5 minutes | Plant Electric / Northlake Central Plant | Thermal Plant | Documented | Poll time. Sample / service not yet supplied. |
+| Main Library historian | Database query | ODBC | IT | Database query | Every 15 minutes | Main Library | IT | Documented | Source timestamp and cursor. Sample / service not yet supplied. |
+| Student Center commissioning test signal | Test signal | EEM Fake | Facilities Operations | Test signal | Every 15 minutes | Student Center | Facilities Operations | Documented | Generated time; excluded from customer consumption totals. Sample / service not yet supplied. |
+| Cedar Row B water route | Handheld upload | Neptune | River City Utilities | Handheld upload | Monthly route | Cedar Row B | River City Utilities | Documented | Actual reading timestamp; monthly is a cadence rather than a fixed 30-day period. Sample / service not yet supplied. |
+| Student Center gas route | Handheld upload | MVRS | Sierra Gas Utility | Handheld upload | Monthly route | Student Center | Sierra Gas Utility | Documented | Actual reading timestamp; monthly is a cadence rather than a fixed 30-day period. Sample / service not yet supplied. |
+| Handheld reading exceptions | Reading event upload | HMR events | Facilities Operations | Reading event upload | With each route | Neptune and MVRS reading events | Facilities Operations | Documented | Event timestamp. Sample / service not yet supplied. |
+| Helios Onsite Solar billing | Billing statement | Monthly utility / allocation / PPA statement | Finance | Statement and supported bill-import file | Monthly | HOS | Finance | Documented | Existing illustrated bills are examples; reconcile their values before rate or bill acceptance. |
+| Northlake Thermal Plant billing | Billing statement | Monthly utility / allocation / PPA statement | Finance | Statement and supported bill-import file | Monthly | NTP | Finance | Documented | Existing illustrated bills are examples; reconcile their values before rate or bill acceptance. |
+| River City Utilities billing | Billing statement | Monthly utility / allocation / PPA statement | Finance | Statement and supported bill-import file | Monthly | RCU | Finance | Documented | Existing illustrated bills are examples; reconcile their values before rate or bill acceptance. |
+| Sierra Gas Utility billing | Billing statement | Monthly utility / allocation / PPA statement | Finance | Statement and supported bill-import file | Monthly | SGU | Finance | Documented | Existing illustrated bills are examples; reconcile their values before rate or bill acceptance. |
+| Valley Electric District billing | Billing statement | Monthly utility / allocation / PPA statement | Finance | Statement and supported bill-import file | Monthly | VED | Finance | Documented | Existing illustrated bills are examples; reconcile their values before rate or bill acceptance. |
 
-- Some feeds are **files we send you**; some are **systems you connect to**
-  (BACnet, Modbus, the SQL historian, weather services). Please confirm which
-  collection method you'll use for each.
-- We can also provide **interval data via a standard interval feed** (e.g. a
-  GreenButton-style export) for one building if that's easier — to discuss.
-- **Open:** confirm the delivery owner, cadence, and destination for each feed,
-  and the weather station preference per property (KSAC vs KSMF).
+## Measurement mapping
+
+| Source System | Meter | Measurement | Device / Station | Channel / Source Fields | Unit | Timestamp Convention |
+| --- | --- | --- | --- | --- | --- | --- |
+| Student Center AcquiSuite logger | Student Center Electric Interval | Delivered kWh 15m | ASQVED01 | DeviceID=STUDENT; Row Number=1; PointType=kWh | kWh | UTC; interval-start timestamps for the onboarding sample |
+| Student Center AcquiSuite logger | Student Center Electric Interval | Demand kW 15m | ASQVED01 | DeviceID=STUDENT; Row Number=2; PointType=kW | kW | UTC; interval-start timestamps for the onboarding sample |
+| Valley Electric meter-data service | Applied Science Electric Interval | Delivered kWh 15m | MV90-MDEF-VED-SCIENCE | RecorderID=VEDSCIENCE01; Channel=1; PointType=kWh | kWh | Local timestamps; timezone and DST behavior require acceptance |
+| Valley Electric meter-data service | Applied Science Electric Interval | Billing Demand kW 15m | MV90-MDEF-VED-SCIENCE | RecorderID=VEDSCIENCE01; Channel=2; PointType=kW | kW | Local timestamps; timezone and DST behavior require acceptance |
+| Helios solar meter-data service | Applied Science PV Array | PV Generated kWh 15m | MV90-MV9-HELIOS | RecorderID=HOSSCIENCE01; Channel=1; PointType=kWh | kWh | Local timestamps; timezone and DST behavior require acceptance |
+| Helios solar meter-data service | Applied Science PV Array | PV Exported kWh 15m | MV90-MV9-HELIOS | RecorderID=HOSSCIENCE01; Channel=2; PointType=kWh | kWh | Local timestamps; timezone and DST behavior require acceptance |
+| Helios solar meter-data service | Student Center PV Array | PV Generated kWh 15m | MV90-MV9-HELIOS | RecorderID=HOSSTUDENT01; Channel=1; PointType=kWh | kWh | Local timestamps; timezone and DST behavior require acceptance |
+| Helios solar meter-data service | Cedar Row A Solar Carport | PV Generated kWh 15m | MV90-MV9-HELIOS | RecorderID=HOSCEDARA01; Channel=1; PointType=kWh | kWh | Local timestamps; timezone and DST behavior require acceptance |
+| Central plant building automation | Applied Science Chilled Water BTU Meter | Chilled Water Ton-Hours | NTP-BACNET-SCIENCE-CHW | DeviceID=5301001; ObjectID=1001; Object Type=2; Array Index=0; PointType=ton_hours | ton_hours | Poll time; historical replay is a separate input path |
+| Central plant building automation | Applied Science Chilled Water BTU Meter | Chilled Water Tons | NTP-BACNET-SCIENCE-CHW | DeviceID=5301001; ObjectID=1002; Object Type=2; Array Index=0; PointType=tons | tons | Poll time; historical replay is a separate input path |
+| KSAC weather observations | KSAC Sacramento Executive Airport | KSAC Outside Air Temperature | NOAA-KSAC | WeatherTypeName=tempi; PointType=temp_f | degF | Source observation time |
+| KSAC weather observations | KSAC Sacramento Executive Airport | KSAC Relative Humidity | NOAA-KSAC | WeatherTypeName=hum; PointType=relative_humidity | pct | Source observation time |
+| KSAC weather observations | KSAC Sacramento Executive Airport | KSAC Wind Speed | NOAA-KSAC | WeatherTypeName=wspdi; PointType=wind_mph | mph | Source observation time |
+| KSMF observations and forecast | KSMF Sacramento International Airport | KSMF Outside Air Temperature | AERIS-KSMF-OBS | WeatherTypeName=tempF; PointType=tempF | degF | Observation and forecast valid times remain separate |
+| KSMF observations and forecast | KSMF Sacramento International Airport | KSMF Forecast Temperature | AERIS-KSMF-FORECAST | WeatherTypeName=tempF; PointType=tempF | degF | Observation and forecast valid times remain separate |
+| Applied Science laboratory sensors | Applied Science Environmental Sensors | Lab Air Temperature | SPINWAVE-SCIENCE-LAB | Device Address=SW-SCI-LAB-01; Channel Number=1; PointType=temp_f | degF | Source timestamp |
+| Applied Science laboratory sensors | Applied Science Environmental Sensors | Lab Relative Humidity | SPINWAVE-SCIENCE-LAB | Device Address=SW-SCI-LAB-01; Channel Number=2; PointType=relative_humidity | pct | Source timestamp |
+| Cedar Row A water export | Cedar Row A Municipal Water | FIG Water Interval | FIG-CEDAR-ROW | Point Alias=FIG_CEDAR_ROW_A_WATER; Channel=01; UOM=kgal; Multiplier=1; OffsetTimeMinutes=0; PointType=kgal | kgal | Source timestamp with configured offset |
+| Central plant chiller controller | Central Plant Chiller Controller | Chiller Demand kW 5m | NTP-MODBUS-CHILLER | Register Type=Floating Point MSR First; Register Address=40001; Multiplier=1; Offset=0; PointType=kW | kW | Poll time |
+| Main Library historian | Main Library Electric Historian | Historian Delivered kWh 15m | ODBC-LIBRARY-HISTORIAN | SourceTable=SyntheticIntervalReadings; PointType=kWh | kWh | Source timestamp and cursor |
+| Student Center commissioning test signal | Student Center Fake Gateway Smoke | Fake Gateway Smoke kWh 15m | FAKE-SMOKE | GenerationMode=sinusoidal; MinValue=12; MaxValue=36; PeriodMinutes=1440; Seed=104729; PointType=kWh | kWh | Generated time; excluded from customer consumption totals |
+| Cedar Row B water route | Cedar Row B Municipal Water | Potable Water Usage | NEPTUNE-RCU-CEDAR-B | TextPrompt=KGAL; MeterConstant=1; LastReadingValue=1200; PointType=kgal | kgal | Actual reading timestamp; monthly is a cadence rather than a fixed 30-day period |
+| Student Center gas route | Student Center Gas Meter | Gas Therms Usage | MVRS-SGU-STUDENT-CENTER | TextPrompt=THRM; UN_Units=CurRead; MeterConstant=1; LastReadingValue=800; PointType=therms | therms | Actual reading timestamp; monthly is a cadence rather than a fixed 30-day period |

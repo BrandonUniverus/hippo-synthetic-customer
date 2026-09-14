@@ -35,10 +35,13 @@ All under: `customer-provided/northlake-university/`
 - `tenant-and-lease-roster.md`
 - `sustainability-requirements.md`
 - `source-system-inventory.md`
-- `data-collection-workbook-additions.md` — new tabs to add to the workbook
+- `data-collection-workbook-additions.md` — later-phase requirements already included in the workbook
 
 Existing workbook to extend (do not recreate from scratch):
-`outputs/northlake-university/northlake-organization-inventory-filled.xlsx`
+`outputs/northlake-university/data-collection-workbook.xlsx`
+
+This is the single customer workbook. Preserve its existing tabs and reuse the
+source-system and tenant/lease tabs; do not generate separate inventory workbooks.
 
 ## Produce
 
@@ -50,10 +53,10 @@ Existing workbook to extend (do not recreate from scratch):
 | 4 | Rate Tariff Sheets (5) | rate-tariff-sheets/*.md | one PDF each, utility-rate-sheet style |
 | 5 | Chart of Accounts & GL Coding Guide | chart-of-accounts-and-gl-guide.md | PDF |
 | 6 | User Access Request & Role Matrix | user-access-request.md | PDF |
-| 7 | Tenant & Lease Roster | tenant-and-lease-roster.md | Excel (+ 1-page PDF summary) |
+| 7 | Tenant & Lease Roster | tenant-and-lease-roster.md | Tenants & Leases tab in Data Collection (+ optional PDF summary) |
 | 8 | Sustainability Reporting Requirements | sustainability-requirements.md | PDF |
-| 9 | Source System Inventory | source-system-inventory.md | Excel (+ PDF) |
-| 10 | Data Collection Workbook | the existing .xlsx + data-collection-workbook-additions.md | Excel — add tabs: Rate Schedules, Chart of Accounts, Users & Access, Tenants & Leases, Sustainability, Projects |
+| 9 | Source System Inventory | source-system-inventory.md | Data Sources and Source Measurements tabs in Data Collection (+ optional PDF) |
+| 10 | Data Collection Workbook | the existing .xlsx and its versioned sources | One Excel workbook; preserve the existing 23 tabs, including Contacts and Organization Units |
 | 11 | Combined Intake Package | all of the above | one bundled PDF "binder" with a cover page + table of contents |
 
 ## Brand & styling

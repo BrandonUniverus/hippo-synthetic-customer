@@ -6,9 +6,13 @@ gateway's **real intake path** — so we exercise the actual gateway components 
 honor the "no direct DB seed; feed EEM through real ingestion paths" principle for
 all time-series/interval/handheld data.
 
-Status: **plan / design** (build is a later phase). Grounds: the 13 gateway
-profiles in `scenarios/demo-university-v1.yaml`, the `generators/` scaffold (which
-already intends deterministic MDEF/BIF/interval generation), EEM's gateway
+Status: **first AcquiSuite file emitter implemented; remaining emulators and
+control UI planned**. Start with the [generator instructions](../generators/README.md)
+and [UI acceptance checklist](../eem/northlake-onboarding-ui-checklist.md).
+The supplied normal, gap and backfill files have deterministic expected values;
+installed ingestion acceptance remains pending.
+
+Grounds: the 13 gateway profiles in `scenarios/demo-university-v1.yaml`, EEM's gateway
 components at `EEMSuite/src/Tasks/EEMSuite.Tasks.Gateways`, and its gateway test
 fixtures (e.g. real `.MDE` samples under `EEMSuite/tests/.../Gateways/TestData`).
 

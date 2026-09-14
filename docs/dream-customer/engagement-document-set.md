@@ -4,6 +4,14 @@ How to turn the internal specs/YAMLs into the documents a **real implementation
 engagement** actually exchanges — so Northlake reads like a genuine customer, with
 the paperwork a corporate onboarding would have.
 
+**Packet 0.2 is available:** the [customer packet](../../customer-provided/northlake-university/README.md)
+now includes the expanded 23-tab workbook, complete facilities/meter register,
+source measurement mapping and first AcquiSuite files. The matching
+[UI implementation checklist](../../eem/northlake-onboarding-ui-checklist.md)
+and [gateway coverage](../../eem/northlake-gateway-coverage.md) are our response.
+The document catalog below describes the larger engagement; it is not a list
+of new prerequisites before starting the first gateway.
+
 ## The key idea: it's two "binders," not one document type
 
 What you're describing ("integration docs? ADRs? system design docs?") isn't a
@@ -49,7 +57,7 @@ that would own it. (Voice + allowed vocabulary per
 | --- | --- | --- | --- | --- |
 | Org & scope | Discovery questionnaire (completed) + cover letter | Project sponsor | Word/PDF | new |
 | Facilities/hierarchy | Facilities & Utility Overview | Facilities | PDF | ✅ have |
-| Everything structured | **Data Collection Workbook** (sites, buildings, accounts, meters, points, data sources, events, contacts) | Facilities/Finance | Excel | ✅ have (expand) |
+| Everything structured | **Data Collection Workbook** (inventory, rates, measurement relationships, source mapping, events and later requirements) | Facilities/Finance | Excel | Expanded, packet 0.2 |
 | Utility accounts | Utility account inventory (tab) + sample bills | Finance | Excel + PDF | ✅ have |
 | **Rates** | **Rate tariff sheets** per provider | Finance / utility | PDF | new |
 | **AP/GL** | **Chart of Accounts + GL coding guide**; AP vendor setup | Finance/AP | PDF/Excel | new |
@@ -57,12 +65,16 @@ that would own it. (Voice + allowed vocabulary per
 | **Tenant rebilling** | **Tenant & lease roster** + allocation-method memo | Housing/Property Mgmt | Excel/PDF | new |
 | Sustainability | Reporting requirements (ENERGY STAR, GHG scopes, targets) | Sustainability | PDF | partial (in overview) |
 | Projects | Capital/energy project list | Facilities/Sustainability | Excel | new |
-| Data feeds | Source-system inventory + delivery cadence + sample files | IT/Facilities | Excel/PDF | partial (in overview) |
+| Data feeds | Source-system inventory + delivery cadence + sample files | IT/Facilities | Excel/Markdown/files | Complete mapping; AcquiSuite samples supplied; other fixtures pending |
 
-The Data Collection Workbook is the spine: today's tabs (Organization Units,
-Sites, Buildings, Utility Services, Accounts & Agreements, Meters, Measured
-Points, Data Sources, Known Events, Contacts, Open Items) gain **Rate Schedules,
-Chart of Accounts, Users & Access, Tenants & Leases, Sustainability, Projects**.
+The Data Collection Workbook is the structured handover. It now includes the
+expanded inventory plus **Rate Components, Related Measurements, Rollup Members,
+Weather Assignments and Source Measurements**. Contacts and Organization Units
+provide the complete implementation directory and company ownership; later-phase
+tabs are retained in the same workbook. Separate inventory, source-system and
+tenant workbooks are retired. The
+[generator ownership table](../../generators/README.md) identifies the versioned
+source for each field so the workbooks and Markdown registers stay consistent.
 
 ---
 

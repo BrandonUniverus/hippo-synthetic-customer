@@ -2,11 +2,16 @@
 
 This matrix tracks what the synthetic customer must eventually prove. It starts as a planning document and should become more concrete as generators and validations are added.
 
+Packet 0.2 supplies the first deterministic AcquiSuite deliveries and the
+[gateway/format acceptance list](../eem/northlake-gateway-coverage.md).
+All installed UI setup and ingestion acceptance remain **Not run**. Local
+generator checks establish file contents, not downstream EEMSuite behavior.
+
 | Area | Data needed | V1 target | Status |
 | --- | --- | --- | --- |
 | Monthly bill ingestion | Accounts, meters, bills, charges, units, provider metadata | Electric, gas, water, sewer, stormwater, chilled water, steam, solar PPA | Planned |
 | Interval ingestion | Channels, readings, units, timestamps, time zone rules | Electric and solar 15-minute, chilled water hourly | Planned |
-| AcquiSuite gateway | Runtime nodes/points, serial/device/row mappings, AcquiSuite log files | Student Center electric 15-minute kWh and kW | Planned |
+| AcquiSuite gateway | Runtime nodes/points, serial/device/row mappings, AcquiSuite log files | Student Center electric 15-minute kWh and kW; complete, gap and backfill deliveries | Generated; installed acceptance pending |
 | NOAA gateway | Runtime station nodes/points, NOAA XML observations, weather type mappings | KSAC temperature, humidity, and wind observations | Planned |
 | Aeris Weather gateway | Runtime station nodes/points, Aeris credentials, forecast/history state | KSMF observed and forecast temperature | Planned |
 | MV90 MDEF gateway | Runtime nodes/points, recorder/channel mappings, `.mde` files | Science Center electric 15-minute kWh and kW | Planned |

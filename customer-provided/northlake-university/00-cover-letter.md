@@ -2,9 +2,10 @@
 
 **To:** Energy & Utility Management Implementation Team
 **From:** Samantha Ireland, Director of Campus Operations, Northlake University
-**Date:** Draft 0.1 — engagement kickoff
+**Date:** September 14, 2026 — onboarding packet 0.2
 **Re:** Facilities, utility, and reporting data package for new energy management system setup
-**Coverage period provided:** January 1, 2024 – December 31, 2025
+**Planned coverage period:** January 1, 2024 – December 31, 2025
+**First interval delivery:** January 15, 2024 — Student Center electricity
 
 ---
 
@@ -26,14 +27,15 @@ of the design phase and confirm the mapping back to us.
 | --- | --- | --- | --- |
 | 1 | Facilities & Utility Overview | Facilities | Narrative of how we're organized |
 | 2 | Discovery Questionnaire (completed) | Campus Operations | Goals, scope, systems, success criteria |
-| 3 | Data Collection Workbook (+ additions) | Facilities / Finance | Structured inventory of everything |
+| 3 | Data Collection Workbook (23 tabs) + Facilities and Meter Register | Facilities / Finance | Current inventory, measurement relationships, rollups and source mapping |
 | 4 | Rate Tariff Sheets (5 providers) | Finance | Our utility rate schedules |
 | 5 | Chart of Accounts & GL Coding Guide | Finance / AP | How we want utility costs coded |
 | 6 | User Access Request | HR / IT | Who needs access and to what |
 | 7 | Tenant & Lease Roster | Housing / Property Mgmt | Sub-metered/allocated tenant spaces |
 | 8 | Sustainability Reporting Requirements | Sustainability Office | ENERGY STAR, emissions, targets |
 | 9 | Source System Inventory | IT / Facilities | Data feeds, formats, delivery cadence |
-| — | Sample utility bills, thermal allocations, solar invoices | Finance | Real examples of each statement |
+| 10 | Student Center AcquiSuite delivery files | Facilities | Complete day, missing block and replacement readings with expected totals |
+| — | Illustrated utility bills, thermal allocations, solar invoices | Finance | Earlier examples; values require reconciliation before billing acceptance |
 
 ## How we're organized (quick orientation)
 
@@ -42,7 +44,7 @@ of the design phase and confirm the mapping back to us.
   solar.
 - **Cedar Row Apartments** — nearby student housing (Cedar Row A and B), with a
   shared common area and a solar carport.
-- **Northlake Town Center** — our newer mixed-use property (retail, an office
+- **Northlake Town Center** — a later implementation phase for our mixed-use property (retail, an office
   tower, a campus annex, and shared infrastructure) where we sub-meter and
   rebill tenants.
 
@@ -58,6 +60,11 @@ of the design phase and confirm the mapping back to us.
 | Thermal plant | Devon Brooks | Thermal Plant Manager |
 | Sustainability | Leo Martinez | Sustainability Analyst |
 
+The **Contacts** tab in the Data Collection Workbook contains the full directory
+with email addresses, phone numbers, company ownership and utility-provider
+representatives. **Organization Units** identifies each department's primary
+contact. Source-system and tenant/lease inventories are tabs in that same workbook.
+
 ## A few things to know up front
 
 - Identifiers in this package (account numbers, meter tags, addresses) are our
@@ -67,6 +74,9 @@ of the design phase and confirm the mapping back to us.
   handled intentionally during loading rather than treated as errors.
 - Several items are still marked **open** for our teams to confirm; see the Open
   Items list in the overview and workbook.
+- Start with Student Center electricity, then expand across the supplied
+  inventory. Other source-format samples and the full historical dataset will
+  follow; a documented feed does not mean its files have been delivered yet.
 
 We look forward to the design review. Please direct questions to me or the area
 contacts above.

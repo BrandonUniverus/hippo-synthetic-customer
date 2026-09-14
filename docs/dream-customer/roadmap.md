@@ -5,18 +5,40 @@ Phased plan to make Northlake the dream synthetic customer. Each phase lists the
 **acceptance criteria** (the EEMSuite reports/outputs that must render non-empty
 with a *known expected value*).
 
-Phases are dependency-ordered. Within a phase, work is independent and can be
-parallelized. Phase 0 is a hard prerequisite for everything.
+Phases express the eventual coverage backlog. Their prerequisites apply to the
+capability being exercised; the full user/permission matrix is not a blocker for
+the first gateway.
+
+## Current milestone — UI foundation and one gateway
+
+Use the [packet 0.2 customer inventory](../../customer-provided/northlake-university/README.md)
+and [Student Center UI checklist](../../eem/northlake-onboarding-ui-checklist.md):
+
+1. With the existing setup account, create the missing Northlake company,
+   location, provider, account, meter and two interval points through the UI.
+2. Configure the AcquiSuite gateway and its normal workflow/task path through
+   the UI. Capture actual instance IDs; scenario numeric IDs are illustrative.
+3. Run the supplied complete-day, replay, gap and backfill cases. Confirm stored
+   values and visible results, including 96 readings per point and 2,020 kWh.
+4. Extend to the MDEF electric feed, aggregates, weather relationships and
+   handheld register/usage pairs, then the remaining format cases.
+5. Promote a database backup only after the applicable checks pass, retaining
+   configuration, source fixtures, evidence and a successful restore check.
+
+Source files and the customer packet are generated. UI entry and installed
+acceptance are still pending. Full rate modeling, bills, calendars, GL and user
+scenarios follow when their respective prerequisites are needed.
 
 ---
 
 ## Phase 0 — Foundation specs  *(enabling)*
 
-**Why first.** Every report rests on a loaded substrate (hierarchy + permissioned
-users + units + fiscal calendar + meters↔accounts). Per the owner's output
-decision, this repo authors the *specs* for that substrate; loading into EEMSuite
-is handled externally. So Phase 0 is "complete the foundation specs," not "build a
-loader."
+**Why first.** Reports need hierarchy, appropriate access, units and
+meters↔accounts; billing also needs company calendars. This repo supplies the
+customer facts and UI-entry instructions. The first gateway uses the existing
+setup account; the complete permission exercise below is a later acceptance
+step. Review older permission specifications against the installed product
+before applying them.
 
 **Deliverables (specs / manifests)**
 - Source-model extensions (`schemas/synthetic-source-model.md`) for the substrate
@@ -29,7 +51,7 @@ loader."
 - A 2024–2025 monthly `CompanyCalendar` spec per company, with 1–2 months
   deliberately omitted for the import-rejection scenario.
 
-**Acceptance (verified once the owner loads the specs)**
+**Acceptance (verified after UI implementation)**
 - Substrate reports render: `rp_BuildingList`, `rp_PointsList`,
   `rp_HierarchyDetailsEditor`, `rp_IndexList`, and the config screens.
 - A non-admin user sees only their permitted nodes; an AccessLevel-1 user cannot
@@ -163,10 +185,11 @@ allocation) *and* sub-metered **Cedar Row** (residential allocation).
 - **GHG**: emission factor source (eGRID region + EPA stationary combustion),
   factor members with effective dates, meter→category mapping (electric Scope 2,
   gas/steam Scope 1), per-company scope config.
-- **ENERGY STAR ratings**: seed `ESResponseFacility` scores + request/log rows
-  for the 8 mapped properties across several periods.
-- **Weather regression**: produce/seed `FF_wnRegressionBestResults` for metered
-  buildings from existing interval + weather data (realistic R²/CV-RMSE).
+- **ENERGY STAR ratings**: obtain responses through the supported sandbox
+  integration for the 8 mapped properties across several periods; retain
+  request/response evidence.
+- **Weather regression**: run the supported calculation workflow for metered
+  buildings from interval + weather data and verify the resulting fit statistics.
 - **Benchmarks**: EUI + cost-intensity benchmark definitions over the building
   peer set.
 

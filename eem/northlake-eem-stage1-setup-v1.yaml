@@ -9,7 +9,7 @@ purpose: >
   are configured.
 
 sourceReferences:
-  customerInventoryWorkbook: outputs/northlake-university/northlake-organization-inventory-filled.xlsx
+  customerInventoryWorkbook: outputs/northlake-university/data-collection-workbook.xlsx
   sourceScenarioManifest: scenarios/demo-university-v1.yaml
   securityManifest: security/northlake-eem-security-v1.yaml
 

@@ -1,0 +1,33 @@
+{
+  "profile": "gw_acquisuite_student_electric",
+  "timestampConvention": "interval_start",
+  "localDate": "2024-01-15",
+  "localTimeZone": "America/Los_Angeles",
+  "installedAcceptance": "Not run",
+  "cases": {
+    "complete": {
+      "filename": "ASQVED01_STUDENT.log",
+      "sha256": "df945a50250552a78882a2a3d1948072dd052159c6f91d5de401821ec62884bc",
+      "intervalsPerPoint": 96,
+      "readings": 192,
+      "energyKWh": 2020,
+      "peakKW": 120
+    },
+    "gap": {
+      "filename": "ASQVED01_STUDENT.log",
+      "sha256": "11ee7c567a2c1dc5b63c8425a54789eea2896c323a3afdd84ec587fa9f350f6b",
+      "intervalsPerPoint": 88,
+      "readings": 176,
+      "energyKWh": 1780,
+      "peakKW": 120
+    },
+    "backfill": {
+      "filename": "ASQVED01_STUDENT.log",
+      "sha256": "023673308c393a1cfe145be1c7fa059b760f01cda54f98a783b4557539aa392c",
+      "intervalsPerPoint": 8,
+      "readings": 16,
+      "energyKWh": 240,
+      "peakKW": 120
+    }
+  }
+}
