@@ -1,0 +1,264 @@
+/* Northlake University overrides for the Keycloak account console (keycloak.v3)
+   and administration console (keycloak.v2). Both are PatternFly 5 React apps;
+   brand.css supplies the tokens. Square corners throughout. */
+
+:root {
+  --pf-v5-global--FontFamily--text: var(--nl-font);
+  --pf-v5-global--FontFamily--heading: var(--nl-font);
+  --pf-v5-global--FontFamily--monospace: var(--nl-font-mono);
+  --pf-v5-global--primary-color--100: var(--nl-navy);
+  --pf-v5-global--primary-color--200: var(--nl-navy-hover);
+  --pf-v5-global--primary-color--dark-100: var(--nl-navy);
+  --pf-v5-global--primary-color--light-100: var(--nl-gold);
+  --pf-v5-global--active-color--100: var(--nl-navy);
+  --pf-v5-global--active-color--400: var(--nl-tint);
+  --pf-v5-global--link--Color: var(--nl-navy);
+  --pf-v5-global--link--Color--hover: var(--nl-navy-hover);
+  --pf-v5-global--link--Color--light: var(--nl-gold);
+  --pf-v5-global--link--Color--light--hover: var(--nl-gold-hover);
+  --pf-v5-global--BackgroundColor--200: var(--nl-canvas);
+  --pf-v5-global--BackgroundColor--light-300: var(--nl-canvas);
+  --pf-v5-global--BorderColor--100: var(--nl-line);
+  --pf-v5-global--Color--100: var(--nl-ink);
+  --pf-v5-global--Color--200: var(--nl-slate);
+  --pf-v5-global--Color--dark-100: var(--nl-ink);
+  --pf-v5-global--Color--dark-200: var(--nl-slate);
+  --pf-v5-global--danger-color--100: var(--nl-danger);
+  --pf-v5-global--danger-color--200: var(--nl-danger);
+  --pf-v5-global--success-color--100: var(--nl-success);
+  --pf-v5-global--success-color--200: var(--nl-success);
+  --pf-v5-global--warning-color--100: var(--nl-gold);
+  --pf-v5-global--warning-color--200: var(--nl-gold-ink);
+  --pf-v5-global--info-color--100: var(--nl-navy);
+  --pf-v5-global--info-color--200: var(--nl-navy);
+  --pf-v5-global--BorderRadius--sm: 0;
+  --pf-v5-global--BorderRadius--lg: 0;
+  --pf-v5-global--BoxShadow--sm: 0 2px 6px rgba(31, 58, 95, 0.08);
+  --pf-v5-global--BoxShadow--md: 0 6px 16px rgba(31, 58, 95, 0.08);
+  --pf-v5-global--BoxShadow--lg: var(--nl-shadow);
+  --pf-v5-global--BoxShadow--xl: var(--nl-shadow);
+}
+
+/* Masthead: navy with the gold rule, reversed lockup as the brand. */
+.pf-v5-c-page__header,
+.pf-v5-c-masthead {
+  --pf-v5-c-masthead--BackgroundColor: var(--nl-navy);
+  --pf-v5-c-masthead--PaddingLeft: 20px;
+  --pf-v5-c-masthead--PaddingRight: 20px;
+  background: var(--nl-navy);
+  border-bottom: 3px solid var(--nl-gold);
+}
+
+.pf-v5-c-masthead .pf-v5-c-toolbar {
+  background: var(--nl-navy);
+}
+
+.pf-v5-c-masthead__brand,
+.pf-v5-c-page__header-brand-link {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 0;
+}
+
+.pf-v5-c-masthead__brand:focus-visible,
+.pf-v5-c-page__header-brand-link:focus-visible,
+.pf-v5-c-masthead .pf-v5-c-button:focus-visible {
+  outline: 3px solid var(--nl-gold);
+  outline-offset: 2px;
+}
+
+.pf-v5-c-page__header .pf-v5-c-brand,
+.pf-v5-c-masthead .pf-v5-c-brand {
+  width: auto;
+  height: 40px;
+  max-height: 40px;
+}
+
+.pf-v5-c-masthead .pf-v5-c-menu-toggle {
+  --pf-v5-c-menu-toggle--BorderRadius: 0;
+  color: var(--nl-white);
+}
+
+/* Sidebar navigation: navy, gold current marker. */
+.pf-v5-c-page__sidebar {
+  --pf-v5-c-page__sidebar--BackgroundColor: var(--nl-navy);
+  --pf-v5-c-page__sidebar--BoxShadow: none;
+  background: var(--nl-navy);
+}
+
+.pf-v5-c-nav {
+  --pf-v5-c-nav__link--Color: rgba(255, 255, 255, 0.86);
+  --pf-v5-c-nav__link--hover--Color: var(--nl-white);
+  --pf-v5-c-nav__link--active--Color: var(--nl-white);
+  --pf-v5-c-nav__link--m-current--Color: var(--nl-white);
+  --pf-v5-c-nav__link--hover--BackgroundColor: var(--nl-navy-hover);
+  --pf-v5-c-nav__link--active--BackgroundColor: var(--nl-navy-hover);
+  --pf-v5-c-nav__link--m-current--BackgroundColor: var(--nl-navy-hover);
+  --pf-v5-c-nav__link--before--BorderColor: rgba(255, 255, 255, 0.12);
+  --pf-v5-c-nav__link--after--BorderColor: transparent;
+  --pf-v5-c-nav__link--m-current--after--BorderColor: var(--nl-gold);
+  --pf-v5-c-nav__link--after--BorderWidth: 4px;
+  --pf-v5-c-nav__link--FontWeight: 600;
+  --pf-v5-c-nav__section-title--Color: rgba(255, 255, 255, 0.62);
+}
+
+.pf-v5-c-nav__link:focus-visible {
+  outline: 3px solid var(--nl-gold);
+  outline-offset: -3px;
+}
+
+/* Content area. */
+.pf-v5-c-page__main-section {
+  --pf-v5-c-page__main-section--BackgroundColor: var(--nl-canvas);
+}
+
+.pf-v5-c-page__main-section.pf-m-light {
+  --pf-v5-c-page__main-section--BackgroundColor: var(--nl-white);
+}
+
+.pf-v5-c-title,
+.pf-v5-c-content h1,
+.pf-v5-c-content h2,
+.pf-v5-c-content h3 {
+  color: var(--nl-navy);
+  font-family: var(--nl-font);
+}
+
+.pf-v5-c-card,
+.pf-v5-c-panel {
+  --pf-v5-c-card--BorderRadius: 0;
+  --pf-v5-c-card--BoxShadow: var(--nl-shadow);
+  border: 1px solid var(--nl-line);
+}
+
+.pf-v5-c-button {
+  --pf-v5-c-button--BorderRadius: 0;
+  --pf-v5-c-button--FontWeight: 600;
+}
+
+.pf-v5-c-button.pf-m-primary {
+  --pf-v5-c-button--m-primary--BackgroundColor: var(--nl-navy);
+  --pf-v5-c-button--m-primary--hover--BackgroundColor: var(--nl-navy-hover);
+  --pf-v5-c-button--m-primary--focus--BackgroundColor: var(--nl-navy-hover);
+  --pf-v5-c-button--m-primary--active--BackgroundColor: var(--nl-navy-deep);
+  --pf-v5-c-button--FontWeight: 700;
+}
+
+.pf-v5-c-button.pf-m-primary:focus-visible {
+  outline: 3px solid var(--nl-gold);
+  outline-offset: 2px;
+}
+
+.pf-v5-c-button.pf-m-secondary {
+  --pf-v5-c-button--m-secondary--Color: var(--nl-navy);
+  --pf-v5-c-button--m-secondary--BorderColor: var(--nl-navy);
+  --pf-v5-c-button--m-secondary--hover--Color: var(--nl-navy-hover);
+  --pf-v5-c-button--m-secondary--hover--BorderColor: var(--nl-navy-hover);
+}
+
+.pf-v5-c-form-control {
+  --pf-v5-c-form-control--BorderRadius: 0;
+  --pf-v5-c-form-control--focus--after--BorderBottomColor: var(--nl-navy);
+}
+
+.pf-v5-c-form__label-text {
+  color: var(--nl-navy);
+}
+
+.pf-v5-c-check__input,
+.pf-v5-c-radio__input {
+  accent-color: var(--nl-navy);
+}
+
+.pf-v5-c-switch {
+  --pf-v5-c-switch__input--checked__toggle--BackgroundColor: var(--nl-navy);
+  --pf-v5-c-switch__input--focus__toggle--OutlineColor: var(--nl-navy);
+}
+
+.pf-v5-c-tabs {
+  --pf-v5-c-tabs__link--after--BorderColor: var(--nl-line);
+  --pf-v5-c-tabs__item--m-current__link--after--BorderColor: var(--nl-gold);
+  --pf-v5-c-tabs__item--m-current__link--Color: var(--nl-navy);
+  --pf-v5-c-tabs__link--hover--after--BorderColor: var(--nl-navy);
+}
+
+.pf-v5-c-jump-links__link.pf-m-current {
+  --pf-v5-c-jump-links__link--m-current--before--BorderColor: var(--nl-gold);
+}
+
+.pf-v5-c-alert {
+  --pf-v5-c-alert--BorderTopWidth: 0;
+  border-left: 4px solid var(--pf-v5-c-alert--BorderTopColor, var(--nl-navy));
+}
+
+.pf-v5-c-alert.pf-m-danger {
+  border-left-color: var(--nl-danger);
+}
+
+.pf-v5-c-alert.pf-m-warning {
+  border-left-color: var(--nl-gold);
+}
+
+.pf-v5-c-alert.pf-m-success {
+  border-left-color: var(--nl-success);
+}
+
+.pf-v5-c-label,
+.pf-v5-c-chip,
+.pf-v5-c-badge {
+  --pf-v5-c-label--BorderRadius: 0;
+  --pf-v5-c-chip--BorderRadius: 0;
+  --pf-v5-c-badge--BorderRadius: 0;
+}
+
+.pf-v5-c-data-list__item.pf-m-selected,
+.pf-v5-c-table tr.pf-m-selected {
+  --pf-v5-c-data-list__item--m-selected--BorderColor: var(--nl-gold);
+}
+
+.pf-v5-c-modal-box,
+.pf-v5-c-dropdown__menu,
+.pf-v5-c-menu {
+  --pf-v5-c-modal-box--BorderRadius: 0;
+  --pf-v5-c-dropdown__menu--BorderRadius: 0;
+  --pf-v5-c-menu--BorderRadius: 0;
+}
+
+/* The realm welcome page repeats the reversed brand image on a white surface;
+   give it its navy ground back. The masthead keeps the plain image. */
+img[src*="northlake-logo-reversed"] {
+  width: auto;
+  height: 64px;
+  padding: 12px 16px;
+  background: var(--nl-navy);
+}
+
+.pf-v5-c-masthead img[src*="northlake-logo-reversed"],
+.pf-v5-c-page__header img[src*="northlake-logo-reversed"] {
+  height: 40px;
+  padding: 0;
+  background: none;
+}
+
+/* Loading screen shown before the React app mounts. */
+.keycloak__loading-container {
+  color: var(--nl-navy);
+  background: var(--nl-canvas);
+  font-family: var(--nl-font);
+}
+
+.pf-v5-c-spinner {
+  --pf-v5-c-spinner--Color: var(--nl-navy);
+}
+
+/* Realm administration console specifics. */
+.keycloak__page_nav .pf-v5-c-nav__link.pf-m-current::after {
+  border-color: var(--nl-gold);
+}
+
+.pf-v5-c-page__sidebar .pf-v5-c-context-selector__toggle,
+.pf-v5-c-page__sidebar .pf-v5-c-menu-toggle {
+  --pf-v5-c-menu-toggle--BorderRadius: 0;
+  color: var(--nl-white);
+  background: var(--nl-navy-hover);
+}

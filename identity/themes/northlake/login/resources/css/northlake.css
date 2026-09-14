@@ -1,0 +1,857 @@
+/* Northlake University sign-in pages.
+   Keycloak login theme, parent keycloak.v2 (PatternFly 5). Tokens come from
+   ../branding/brand.css. Square corners throughout. */
+
+/* 1. Hand the brand to PatternFly ------------------------------------------ */
+:root,
+.login-pf {
+  --pf-v5-global--FontFamily--text: var(--nl-font);
+  --pf-v5-global--FontFamily--heading: var(--nl-font);
+  --pf-v5-global--FontFamily--monospace: var(--nl-font-mono);
+  --pf-v5-global--Color--100: var(--nl-ink);
+  --pf-v5-global--Color--200: var(--nl-slate);
+  --pf-v5-global--Color--dark-100: var(--nl-ink);
+  --pf-v5-global--Color--dark-200: var(--nl-slate);
+  --pf-v5-global--BackgroundColor--100: var(--nl-white);
+  --pf-v5-global--BackgroundColor--150: var(--nl-tint);
+  --pf-v5-global--BackgroundColor--200: var(--nl-canvas);
+  --pf-v5-global--BackgroundColor--light-100: var(--nl-white);
+  --pf-v5-global--BackgroundColor--light-200: var(--nl-tint);
+  --pf-v5-global--BackgroundColor--light-300: var(--nl-canvas);
+  --pf-v5-global--BorderColor--100: var(--nl-line);
+  --pf-v5-global--BorderColor--200: var(--nl-line-strong);
+  --pf-v5-global--BorderColor--300: var(--nl-line-strong);
+  --pf-v5-global--BorderColor--dark-100: var(--nl-line);
+  --pf-v5-global--primary-color--100: var(--nl-navy);
+  --pf-v5-global--primary-color--200: var(--nl-navy-hover);
+  --pf-v5-global--primary-color--dark-100: var(--nl-navy);
+  --pf-v5-global--primary-color--light-100: var(--nl-gold);
+  --pf-v5-global--link--Color: var(--nl-navy);
+  --pf-v5-global--link--Color--hover: var(--nl-navy-hover);
+  --pf-v5-global--link--Color--dark: var(--nl-navy);
+  --pf-v5-global--link--Color--dark--hover: var(--nl-navy-hover);
+  --pf-v5-global--link--Color--light: var(--nl-gold);
+  --pf-v5-global--link--Color--light--hover: var(--nl-gold-hover);
+  --pf-v5-global--danger-color--100: var(--nl-danger);
+  --pf-v5-global--danger-color--200: var(--nl-danger);
+  --pf-v5-global--danger-color--300: var(--nl-danger);
+  --pf-v5-global--success-color--100: var(--nl-success);
+  --pf-v5-global--success-color--200: var(--nl-success);
+  --pf-v5-global--warning-color--100: var(--nl-gold);
+  --pf-v5-global--warning-color--200: var(--nl-gold-ink);
+  --pf-v5-global--info-color--100: var(--nl-navy);
+  --pf-v5-global--info-color--200: var(--nl-navy);
+  --pf-v5-global--active-color--100: var(--nl-navy);
+  --pf-v5-global--active-color--400: var(--nl-tint);
+  --pf-v5-global--BorderRadius--sm: 0;
+  --pf-v5-global--BorderRadius--lg: 0;
+  --pf-v5-global--BoxShadow--sm: 0 2px 6px rgba(31, 58, 95, 0.08);
+  --pf-v5-global--BoxShadow--md: 0 6px 16px rgba(31, 58, 95, 0.08);
+  --pf-v5-global--BoxShadow--lg: var(--nl-shadow);
+  --pf-v5-global--BoxShadow--xl: var(--nl-shadow);
+  --pf-v5-global--FontWeight--bold: 700;
+  --pf-v5-global--FontWeight--semi-bold: 600;
+  --keycloak-bg-logo-url: none;
+  --keycloak-card-top-color: transparent;
+}
+
+/* 2. Page --------------------------------------------------------------------- */
+html.login-pf {
+  height: 100%;
+  background: var(--nl-canvas);
+  font-size: 16px;
+}
+
+.login-pf body {
+  min-height: 100%;
+  margin: 0;
+  color: var(--nl-ink);
+  font-family: var(--nl-font);
+  background: var(--nl-canvas);
+  -webkit-font-smoothing: antialiased;
+}
+
+.nl-page {
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+}
+
+/* 3. Masthead ------------------------------------------------------------------ */
+.nl-masthead {
+  flex: 0 0 auto;
+  color: var(--nl-white);
+  background: var(--nl-navy);
+  border-bottom: 3px solid var(--nl-gold);
+}
+
+.nl-masthead__inner {
+  display: flex;
+  min-height: 68px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  width: min(1180px, 100% - 48px);
+  margin: 0 auto;
+}
+
+.nl-lockup {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 0;
+}
+
+.nl-lockup:focus-visible {
+  outline-color: var(--nl-gold);
+  outline-offset: 4px;
+}
+
+.nl-lockup__image {
+  display: block;
+  width: auto;
+  height: 40px;
+}
+
+.nl-masthead__service {
+  margin: 0;
+  color: var(--nl-on-navy);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-align: right;
+}
+
+/* 4. Card ---------------------------------------------------------------------- */
+.pf-v5-c-login.nl-login {
+  flex: 1 0 auto;
+  align-items: flex-start;
+  min-height: 0;
+  padding: clamp(28px, 6vh, 64px) 24px 48px;
+}
+
+.nl-login .pf-v5-c-login__container {
+  display: block;
+  width: 100%;
+  max-width: 460px;
+  padding: 0;
+}
+
+.nl-body--login-config-totp .pf-v5-c-login__container,
+.nl-body--login-recovery-authn-code-config .pf-v5-c-login__container,
+.nl-body--login-recovery-authn-code-input .pf-v5-c-login__container,
+.nl-body--login-oauth-grant .pf-v5-c-login__container,
+.nl-body--login-update-profile .pf-v5-c-login__container,
+.nl-body--idp-review-user-profile .pf-v5-c-login__container,
+.nl-body--select-authenticator .pf-v5-c-login__container,
+.nl-body--terms .pf-v5-c-login__container,
+.nl-body--webauthn-register .pf-v5-c-login__container,
+.nl-body--webauthn-authenticate .pf-v5-c-login__container,
+.nl-body--register .pf-v5-c-login__container {
+  max-width: 580px;
+}
+
+.nl-login .pf-v5-c-login__main {
+  margin: 0;
+  background: var(--nl-white);
+  border: 1px solid var(--nl-line);
+  box-shadow: var(--nl-shadow);
+}
+
+.nl-login .pf-v5-c-login__main-header {
+  display: block;
+  padding: 32px 32px 0;
+  border-top: 0;
+}
+
+#kc-page-title.pf-v5-c-title {
+  margin: 0;
+  color: var(--nl-navy);
+  font-family: var(--nl-font);
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+
+#kc-page-title p {
+  margin: 0;
+  font: inherit;
+}
+
+#kc-page-title img {
+  display: block;
+  max-height: 48px;
+  margin-bottom: 12px;
+}
+
+.nl-lead {
+  margin: 8px 0 0;
+  color: var(--nl-slate);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.nl-login .pf-v5-c-login__main-header-utilities {
+  margin-top: 16px;
+}
+
+.nl-login .pf-v5-c-login__main-body {
+  padding: 24px 32px 32px;
+}
+
+/* 5. Forms ------------------------------------------------------------------ */
+.nl-login .pf-v5-c-form {
+  --pf-v5-c-form--GridGap: 18px;
+}
+
+.nl-login .pf-v5-c-form__group-label {
+  padding-bottom: 6px;
+}
+
+.nl-login .pf-v5-c-form__label {
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.nl-login .pf-v5-c-form__label-text {
+  color: var(--nl-navy);
+  font-weight: 600;
+}
+
+.nl-login .pf-v5-c-form__label-required {
+  color: var(--nl-danger);
+}
+
+.nl-login .subtitle {
+  margin-bottom: 12px;
+  color: var(--nl-slate);
+  font-size: 13px;
+}
+
+.nl-login .pf-v5-c-form__helper-text {
+  margin-top: 8px;
+}
+
+.nl-login .pf-v5-c-form__helper-text .pf-v5-c-helper-text {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.nl-login .pf-v5-c-helper-text__item-text {
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.nl-login .pf-v5-c-helper-text__item.pf-m-error .pf-v5-c-helper-text__item-text {
+  color: var(--nl-danger);
+  font-weight: 600;
+}
+
+.nl-login .pf-v5-c-form-control {
+  --pf-v5-c-form-control--PaddingTop: 10px;
+  --pf-v5-c-form-control--PaddingBottom: 10px;
+  --pf-v5-c-form-control--PaddingLeft: 12px;
+  --pf-v5-c-form-control--PaddingRight: 12px;
+  --pf-v5-c-form-control--FontSize: 15px;
+  --pf-v5-c-form-control--LineHeight: 1.5;
+  --pf-v5-c-form-control--Color: var(--nl-ink);
+  --pf-v5-c-form-control--BackgroundColor: var(--nl-white);
+  --pf-v5-c-form-control--m-readonly--BackgroundColor: var(--nl-tint);
+  min-height: 44px;
+  border: 1px solid var(--nl-line-strong);
+  background: var(--nl-white);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.nl-login .pf-v5-c-form-control::before,
+.nl-login .pf-v5-c-form-control::after {
+  display: none;
+}
+
+.nl-login .pf-v5-c-form-control:hover {
+  border-color: #7d8ca1;
+}
+
+.nl-login .pf-v5-c-form-control:focus-within {
+  border-color: var(--nl-navy);
+  box-shadow: var(--nl-focus-ring);
+}
+
+.nl-login .pf-v5-c-form-control > :is(input, select, textarea) {
+  font-family: var(--nl-font);
+  font-size: 15px;
+}
+
+.nl-login .pf-v5-c-form-control > :is(input, select, textarea):focus {
+  outline: none;
+}
+
+.nl-login .pf-v5-c-form-control > input:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 1000px var(--nl-white) inset;
+  -webkit-text-fill-color: var(--nl-ink);
+}
+
+.nl-login .pf-v5-c-form-control.pf-m-error {
+  border-color: var(--nl-danger);
+}
+
+.nl-login .pf-v5-c-form-control.pf-m-error:focus-within {
+  box-shadow: 0 0 0 3px rgba(165, 42, 50, 0.16);
+}
+
+.nl-login .pf-v5-c-form-control.pf-m-readonly {
+  background: var(--nl-tint);
+  border-color: var(--nl-line);
+}
+
+.nl-login .pf-v5-c-form-control__icon.pf-m-status {
+  color: var(--nl-danger);
+}
+
+.nl-login .pf-v5-c-input-group {
+  align-items: stretch;
+}
+
+.nl-login .pf-v5-c-input-group__item {
+  background: transparent;
+  border: 0;
+}
+
+.nl-login .pf-v5-c-input-group__item:not(:first-child) {
+  margin-inline-start: -1px;
+}
+
+.nl-login .pf-v5-c-input-group .pf-v5-c-form-control:focus-within {
+  position: relative;
+  z-index: 1;
+}
+
+.nl-login .pf-v5-c-check {
+  --pf-v5-c-check--GridGap: 0 8px;
+  align-items: center;
+}
+
+.nl-login .pf-v5-c-check__input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  transform: none;
+  accent-color: var(--nl-navy);
+}
+
+.nl-login .pf-v5-c-check__label {
+  color: var(--nl-ink);
+  font-size: 13px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+/* 6. Buttons and links ----------------------------------------------------- */
+.nl-login .pf-v5-c-button {
+  --pf-v5-c-button--BorderRadius: 0;
+  --pf-v5-c-button--PaddingTop: 11px;
+  --pf-v5-c-button--PaddingBottom: 11px;
+  --pf-v5-c-button--PaddingLeft: 18px;
+  --pf-v5-c-button--PaddingRight: 18px;
+  --pf-v5-c-button--FontWeight: 700;
+  --pf-v5-c-button--FontSize: 15px;
+  --pf-v5-c-button--LineHeight: 1.5;
+  min-height: 46px;
+  font-family: var(--nl-font);
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+.nl-login .pf-v5-c-button.pf-m-primary {
+  --pf-v5-c-button--m-primary--Color: var(--nl-white);
+  --pf-v5-c-button--m-primary--BackgroundColor: var(--nl-navy);
+  --pf-v5-c-button--m-primary--hover--BackgroundColor: var(--nl-navy-hover);
+  --pf-v5-c-button--m-primary--focus--BackgroundColor: var(--nl-navy-hover);
+  --pf-v5-c-button--m-primary--active--BackgroundColor: var(--nl-navy-deep);
+}
+
+.nl-login .pf-v5-c-button.pf-m-primary:focus-visible {
+  outline-color: var(--nl-gold);
+}
+
+.nl-login .pf-v5-c-button.pf-m-secondary {
+  --pf-v5-c-button--m-secondary--Color: var(--nl-navy);
+  --pf-v5-c-button--m-secondary--BorderColor: var(--nl-navy);
+  --pf-v5-c-button--m-secondary--hover--Color: var(--nl-navy-hover);
+  --pf-v5-c-button--m-secondary--hover--BorderColor: var(--nl-navy-hover);
+  --pf-v5-c-button--m-secondary--focus--Color: var(--nl-navy-hover);
+  --pf-v5-c-button--m-secondary--focus--BorderColor: var(--nl-navy-hover);
+  --pf-v5-c-button--m-secondary--active--Color: var(--nl-navy-deep);
+  --pf-v5-c-button--m-secondary--active--BorderColor: var(--nl-navy-deep);
+  background: var(--nl-white);
+  text-decoration: none;
+}
+
+.nl-login .pf-v5-c-button.pf-m-secondary:hover {
+  background: var(--nl-tint);
+}
+
+.nl-login .pf-v5-c-button.pf-m-link {
+  --pf-v5-c-button--m-link--Color: var(--nl-navy);
+  --pf-v5-c-button--m-link--hover--Color: var(--nl-navy-hover);
+  min-height: 0;
+  padding-right: 0;
+  padding-left: 0;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.nl-login .pf-v5-c-button.pf-m-control {
+  --pf-v5-c-button--m-control--Color: var(--nl-navy);
+  --pf-v5-c-button--m-control--BackgroundColor: var(--nl-tint);
+  --pf-v5-c-button--m-control--hover--Color: var(--nl-navy-hover);
+  --pf-v5-c-button--m-control--hover--BackgroundColor: var(--nl-line);
+  --pf-v5-c-button--m-control--active--Color: var(--nl-navy-hover);
+  --pf-v5-c-button--m-control--active--BackgroundColor: var(--nl-line);
+  min-width: 46px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--nl-line-strong);
+  font-size: 15px;
+}
+
+.nl-login .pf-v5-c-button.pf-m-control::after {
+  display: none;
+}
+
+.nl-login .pf-v5-c-button.pf-m-control:focus-visible {
+  position: relative;
+  z-index: 1;
+}
+
+.nl-login .pf-v5-c-button:disabled,
+.nl-login .pf-v5-c-button.pf-m-disabled,
+.nl-login .pf-v5-c-button.pf-m-aria-disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+.nl-login .pf-v5-c-form__actions {
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.nl-login a {
+  color: var(--nl-navy);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.nl-login a:hover {
+  color: var(--nl-navy-hover);
+  text-decoration-thickness: 2px;
+}
+
+.nl-login a.pf-v5-c-button {
+  text-decoration: none;
+}
+
+.nl-login #try-another-way,
+.nl-login #switch-organization {
+  margin-top: 12px;
+}
+
+/* 7. Messages ---------------------------------------------------------------- */
+.nl-login .pf-v5-c-alert {
+  --pf-v5-c-alert--BorderTopWidth: 0;
+  --pf-v5-c-alert--PaddingTop: 12px;
+  --pf-v5-c-alert--PaddingRight: 14px;
+  --pf-v5-c-alert--PaddingBottom: 12px;
+  --pf-v5-c-alert--PaddingLeft: 14px;
+  --pf-v5-c-alert--GridTemplateColumns: max-content 1fr;
+  --pf-v5-c-alert--BoxShadow: none;
+  border: 1px solid var(--nl-line);
+  border-left-width: 4px;
+  background: var(--nl-tint);
+}
+
+.nl-login .pf-v5-c-alert__icon {
+  margin-top: 1px;
+  color: var(--nl-navy);
+  font-size: 16px;
+}
+
+.nl-login .pf-v5-c-alert__title {
+  color: var(--nl-ink);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.nl-login .pf-v5-c-alert.pf-m-danger {
+  border-color: var(--nl-danger);
+  background: var(--nl-danger-tint);
+}
+
+.nl-login .pf-v5-c-alert.pf-m-danger .pf-v5-c-alert__icon,
+.nl-login .pf-v5-c-alert.pf-m-danger .pf-v5-c-alert__title {
+  color: var(--nl-danger);
+}
+
+.nl-login .pf-v5-c-alert.pf-m-warning {
+  border-color: var(--nl-gold);
+  background: var(--nl-gold-tint);
+}
+
+.nl-login .pf-v5-c-alert.pf-m-warning .pf-v5-c-alert__icon,
+.nl-login .pf-v5-c-alert.pf-m-warning .pf-v5-c-alert__title {
+  color: var(--nl-gold-ink);
+}
+
+.nl-login .pf-v5-c-alert.pf-m-success {
+  border-color: var(--nl-success);
+  background: var(--nl-success-tint);
+}
+
+.nl-login .pf-v5-c-alert.pf-m-success .pf-v5-c-alert__icon,
+.nl-login .pf-v5-c-alert.pf-m-success .pf-v5-c-alert__title {
+  color: var(--nl-success);
+}
+
+.nl-login .pf-v5-c-alert.pf-m-info {
+  border-color: var(--nl-navy);
+  background: var(--nl-tint);
+}
+
+.nl-login .nl-info {
+  color: var(--nl-slate);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.nl-login .nl-info--above {
+  margin: 0 0 20px;
+}
+
+.nl-login .pf-v5-c-login__main-footer-band.nl-info {
+  margin-top: 20px;
+  padding: 18px 0 0;
+  border-top: 1px solid var(--nl-line);
+  text-align: left;
+}
+
+.nl-login .nl-info .pf-v5-u-font-size-sm {
+  font-size: 14px !important;
+}
+
+.nl-login .nl-info .pf-v5-u-color-200 {
+  color: var(--nl-slate) !important;
+}
+
+.nl-login #kc-registration {
+  color: var(--nl-slate);
+  font-size: 14px;
+}
+
+/* 8. Card footer and page footer ------------------------------------------- */
+.nl-login .nl-card-footer {
+  display: block;
+  margin: 0;
+  padding: 16px 32px;
+  border-top: 1px solid var(--nl-line);
+  color: var(--nl-slate);
+  background: var(--nl-tint);
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.nl-card-footer__help {
+  margin: 0;
+}
+
+.nl-page-footer {
+  flex: 0 0 auto;
+  padding: 0 24px 28px;
+  color: var(--nl-slate);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.nl-page-footer__inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 24px;
+  width: min(1180px, 100%);
+  margin: 0 auto;
+  padding-top: 16px;
+  border-top: 1px solid var(--nl-line);
+}
+
+.nl-page-footer__legal {
+  margin: 0;
+}
+
+.nl-page-footer__link {
+  color: var(--nl-navy);
+  font-weight: 600;
+  text-underline-offset: 3px;
+}
+
+/* 9. Content pages: errors, info, logout, consent ---------------------------- */
+.nl-login p.instruction,
+.nl-login #kc-error-message p,
+.nl-login #kc-info-message p,
+.nl-login #kc-logout-confirm p,
+.nl-login #kc-oauth p,
+.nl-login .nl-body--frontchannel-logout p,
+.nl-login .nl-body--saml-post-form p {
+  margin: 0 0 16px;
+  color: var(--nl-ink);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.nl-login #kc-error-message p:last-child,
+.nl-login #kc-info-message p:last-child {
+  margin-bottom: 0;
+}
+
+.nl-login #kc-oauth h3 {
+  margin: 0 0 8px;
+  color: var(--nl-navy);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.nl-login .pf-v5-c-list {
+  padding-left: 20px;
+  color: var(--nl-ink);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.nl-login .pf-v5-c-list li + li {
+  margin-top: 6px;
+}
+
+.nl-login #kc-oauth ul {
+  margin: 0 0 20px;
+}
+
+.nl-login hr {
+  margin: 16px 0;
+  border: 0;
+  border-top: 1px solid var(--nl-line);
+}
+
+/* 10. Attempted username, one-time codes, passkeys, recovery codes ----------- */
+.nl-login #kc-attempted-username {
+  font-weight: 600;
+}
+
+.nl-login .kc-login-tooltip .kc-tooltip-text {
+  top: calc(100% + 6px);
+  right: 0;
+  left: auto;
+  min-width: 0;
+  padding: 6px 10px;
+  border-radius: 0;
+  color: var(--nl-white);
+  background: var(--nl-navy);
+  box-shadow: var(--nl-shadow);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.nl-login .kc-login-tooltip .kc-tooltip-text::after {
+  display: none;
+}
+
+.nl-login .kc-login-tooltip:hover .kc-tooltip-text,
+.nl-login .kc-login-tooltip:focus-visible .kc-tooltip-text {
+  opacity: 1;
+}
+
+.nl-login #kc-totp-settings {
+  margin: 0 0 20px;
+  padding-left: 20px;
+  color: var(--nl-ink);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.nl-login #kc-totp-settings > li {
+  margin-bottom: 14px;
+}
+
+.nl-login #kc-totp-settings p {
+  margin: 0 0 8px;
+}
+
+.nl-login #kc-totp-secret-qr-code {
+  display: block;
+  width: 180px;
+  height: 180px;
+  margin: 8px 0;
+  border: 1px solid var(--nl-line);
+  background: var(--nl-white);
+}
+
+.nl-login #kc-totp-secret-key {
+  display: inline-block;
+  padding: 6px 10px;
+  border: 1px solid var(--nl-line);
+  background: var(--nl-tint);
+  font-family: var(--nl-font-mono);
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  overflow-wrap: anywhere;
+}
+
+.nl-login .pf-v5-c-tile {
+  --pf-v5-c-tile--BorderRadius: 0;
+  --pf-v5-c-tile--after--BorderColor: var(--nl-line);
+  --pf-v5-c-tile--hover--after--BorderColor: var(--nl-navy);
+  --pf-v5-c-tile--m-selected--after--BorderColor: var(--nl-navy);
+  --pf-v5-c-tile--m-selected--BackgroundColor: var(--nl-tint);
+  --pf-v5-c-tile__icon--Color: var(--nl-navy);
+  --pf-v5-c-tile__title--Color: var(--nl-navy);
+  margin: 0 8px 8px 0;
+  cursor: pointer;
+}
+
+.nl-login .pf-v5-c-panel.pf-m-raised {
+  border: 1px solid var(--nl-line);
+  box-shadow: none;
+}
+
+.nl-login #kc-recovery-codes-list {
+  columns: 2;
+  margin: 0;
+  padding: 0 0 0 20px;
+  font-family: var(--nl-font-mono);
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.nl-login .kc-recovery-codes-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 12px 0;
+}
+
+.nl-login .pf-v5-c-data-list {
+  --pf-v5-c-data-list--BorderTopColor: var(--nl-line);
+  --pf-v5-c-data-list__item--BorderBottomColor: var(--nl-line);
+  --pf-v5-c-data-list__item--m-clickable--hover--BackgroundColor: var(--nl-tint);
+}
+
+.nl-login .select-auth-box-parent {
+  cursor: pointer;
+}
+
+.nl-login .select-auth-box-parent:focus-visible {
+  outline-offset: -3px;
+}
+
+.nl-login .select-auth-box-headline {
+  margin: 0;
+  color: var(--nl-navy);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.nl-login .select-auth-box-desc {
+  color: var(--nl-slate);
+}
+
+.nl-login .pf-v5-c-data-list__cell.pf-m-icon i,
+.nl-login .select-auth-box-arrow i {
+  color: var(--nl-navy);
+  font-size: 20px;
+}
+
+/* 11. Small screens ---------------------------------------------------------- */
+@media (max-width: 600px) {
+  .nl-masthead__inner {
+    min-height: 60px;
+    width: calc(100% - 32px);
+  }
+
+  .nl-lockup__image {
+    height: 34px;
+  }
+
+  .nl-masthead__service {
+    font-size: 12px;
+  }
+
+  .pf-v5-c-login.nl-login {
+    padding: 20px 16px 36px;
+  }
+
+  .nl-login .pf-v5-c-login__main-header {
+    padding: 24px 20px 0;
+  }
+
+  .nl-login .pf-v5-c-login__main-body {
+    padding: 20px 20px 24px;
+  }
+
+  .nl-login .nl-card-footer {
+    padding: 14px 20px;
+  }
+
+  #kc-page-title.pf-v5-c-title {
+    font-size: 22px;
+  }
+
+  .nl-page-footer {
+    padding: 0 16px 24px;
+  }
+
+  .nl-page-footer__inner {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .nl-login #kc-recovery-codes-list {
+    columns: 1;
+  }
+}
+
+@media (max-width: 420px) {
+  .nl-masthead__service {
+    display: none;
+  }
+}
+
+/* 12. Preferences ------------------------------------------------------------ */
+@media (prefers-reduced-motion: reduce) {
+  .nl-login *,
+  .nl-login *::before,
+  .nl-login *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .nl-masthead {
+    border-bottom: 3px solid CanvasText;
+  }
+
+  .nl-login .pf-v5-c-form-control:focus-within {
+    outline: 3px solid CanvasText;
+    outline-offset: 2px;
+  }
+
+  .nl-login .pf-v5-c-button {
+    border: 1px solid ButtonText;
+  }
+}

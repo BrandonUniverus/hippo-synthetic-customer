@@ -4,21 +4,26 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow">
-  <meta name="color-scheme" content="dark">
+  <meta name="color-scheme" content="light">
   <title>Configure Northlake OIDC Profiles</title>
+  <meta name="theme-color" content="#1F3A5F">
+  <link rel="icon" href="/branding/northlake-mark.svg" type="image/svg+xml">
+  <link rel="icon" href="/branding/favicon-32.png" type="image/png">
+  <link rel="stylesheet" href="/branding/brand.css">
+  <link rel="stylesheet" href="/branding/site.css">
   <link rel="stylesheet" href="/configure/styles.css">
   <script src="/configure/oidc.js" defer></script>
 </head>
 <body>
-  <header class="topbar">
-    <a class="brand" href="/" aria-label="Northlake Synthetic Identity home">
-      <span class="brand-mark" aria-hidden="true">NL</span>
-      <span>
-        <strong>Northlake</strong>
-        <small>Synthetic Identity Lab</small>
-      </span>
-    </a>
-    <nav class="utility-nav" aria-label="Configuration sections">
+  <header class="nl-masthead">
+    <div class="nl-masthead__inner">
+      <div class="nl-masthead__brand">
+        <a class="nl-lockup" href="/">
+          <img class="nl-lockup__image" src="/branding/northlake-logo-reversed.svg" alt="Northlake University" width="237" height="64">
+        </a>
+        <span class="nl-masthead__title">Identity configuration</span>
+      </div>
+      <nav class="nl-masthead__nav" aria-label="Configuration sections">
       <a href="/configure">Provider</a>
       <a href="/configure/oidc" aria-current="page">OIDC</a>
       <a href="/configure/saml">SAML</a>
@@ -26,11 +31,12 @@
       <a href="/configure/scim">SCIM</a>
       <a href="/configure/users">Users</a>
       <a href="/configure/groups">Groups</a>
-      <span class="environment">Unauthenticated localhost tool</span>
-    </nav>
+      </nav>
+      <span class="nl-masthead__chip">Unauthenticated localhost tool</span>
+    </div>
   </header>
 
-  <main>
+  <main class="nl-main">
     <section class="intro" aria-labelledby="page-title">
       <p class="eyebrow">Phase 4 · OIDC baseline profiles</p>
       <h1 id="page-title">Configure bounded OIDC profiles.</h1>
@@ -224,9 +230,11 @@
     </div>
   </main>
 
-  <footer>
+  <footer class="nl-page-footer">
+    <div class="nl-page-footer__inner">
     <span>Development use only · no EnergyHippo writes</span>
     <span><a href="/configure">Provider configuration</a> · <a href="/">Identity launchpad</a></span>
+  </div>
   </footer>
 </body>
 </html>

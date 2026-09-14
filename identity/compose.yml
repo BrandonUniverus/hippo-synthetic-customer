@@ -38,11 +38,22 @@ services:
       KC_HEALTH_ENABLED: "true"
       KC_METRICS_ENABLED: "true"
       KC_CACHE: local
+      # Theme development: read bind-mounted templates and styles on every request
+      # instead of caching them, and let Caddy (not Keycloak) compress responses so
+      # edited CSS is never served from a stale gzip cache.
+      KC_SPI_THEME_CACHE_THEMES: "false"
+      KC_SPI_THEME_CACHE_TEMPLATES: "false"
+      KC_SPI_THEME_STATIC_MAX_AGE: "-1"
+      KC_SPI_RESOURCE_ENCODING_GZIP_ENABLED: "false"
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
       - ./.runtime/import:/opt/keycloak/data/import:ro
+      - ./themes/northlake:/opt/keycloak/themes/northlake:ro
+      - ./branding:/opt/keycloak/themes/northlake/login/resources/branding:ro
+      - ./branding:/opt/keycloak/themes/northlake/account/resources/branding:ro
+      - ./branding:/opt/keycloak/themes/northlake/admin/resources/branding:ro
     networks:
       - identity-backend
 
@@ -160,6 +171,7 @@ services:
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - ./portal:/srv/northlake-portal:ro
+      - ./branding:/srv/northlake-branding:ro
       - caddy-data:/data
       - caddy-config:/config
     networks:

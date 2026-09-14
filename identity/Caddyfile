@@ -9,6 +9,15 @@
 	}
 }
 
+(northlake_branding) {
+	handle_path /branding/* {
+		root * /srv/northlake-branding
+		# Shared brand assets are edited in place; make browsers revalidate them.
+		header Cache-Control "no-cache"
+		file_server
+	}
+}
+
 https://{$IDENTITY_HOST:localhost}:8443 {
 	tls {
 		issuer internal {
@@ -17,6 +26,7 @@ https://{$IDENTITY_HOST:localhost}:8443 {
 		}
 	}
 	encode zstd gzip
+	import northlake_branding
 
 	header {
 		Strict-Transport-Security "max-age=0"
@@ -53,6 +63,7 @@ https://{$NORTHLAKE_CUSTOMER_HOST:customer.localtest.me}:8443 {
 		}
 	}
 	encode zstd gzip
+	import northlake_branding
 
 	header {
 		Strict-Transport-Security "max-age=0"

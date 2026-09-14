@@ -106,9 +106,9 @@ to `https://energy.northlake.example.edu` (per the spec).
 
 ## Notes
 
-- **Fonts in SVG.** The vector wordmarks use live Open Sans text (self-loaded via
-  a Google Fonts `@import`, matching the ecosystem convention). Open them where the
-  web is available, or convert text → outlines for a fully portable file.
+- **Fonts in SVG.** The vector wordmarks are outlined (no live text), so they render
+  identically in `<img>` tags, favicons and email clients without Open Sans being
+  installed. Regenerate them with `python generators/outline_brand_lockups.py`.
 - **PNGs** are flattened with the wordmark baked in, so they need no font.
 - **`previews/`** holds fully-assembled email samples (sample token values) used by
   the Brand Assets page — they are for review only, not for upload to EEM.

@@ -59,6 +59,10 @@ Identity Provider (IdP).
   in each disposable realm. Its different hostname creates a real cross-site
   boundary for browser session, silent-auth, and Front-Channel Logout evidence.
 
+- Northlake University branding on every page a tester sees: the Keycloak
+  sign-in flows, the account and administration consoles, the launchpad, the
+  configuration pages and the customer lab (see `identity/branding/README.md`).
+
 The built-in Keycloak administration console is the initial admin page. This
 repository does not reimplement passwords, sessions, consent, or user storage.
 
@@ -385,6 +389,18 @@ Secrets are stored only in ignored files:
 - `identity/.runtime/connection.json`
 - `identity/.runtime/import/northlake-realm.json`
 
+## Northlake branding
+
+Every page a tester sees carries the Northlake University identity: the
+Keycloak sign-in pages (including password reset, forced password update,
+authenticator setup, one-time codes, passkeys, recovery codes, consent, error
+and expired pages), the account and realm administration consoles, the
+launchpad, the configuration pages and the customer browser lab. The shared
+tokens, lockups, fonts and page chrome live in `identity/branding/`; the three
+Keycloak themes live in `identity/themes/northlake/` and are assigned to every
+generated realm. See [identity/branding/README.md](branding/README.md) for the
+file map, the theme layout, the cache rules and the screenshot gallery script.
+
 ## OIDC connection profiles
 
 `identity/.runtime/connection.json` contains ready-to-copy sectioned settings
@@ -528,6 +544,24 @@ To exercise the pinned SAML2Int profile, first configure an EnergyHippo RSA
 service-provider credential that supports signing and encryption, export only
 its public X.509 certificate, then enable Saml2Int and upload that public file at
 `/configure/saml`.
+
+When no EnergyHippo credential is available, mint a local stand-in instead:
+
+```powershell
+pwsh .\identity\scripts\New-IdentitySaml2IntDevCertificate.ps1
+```
+
+That writes a 365-day self-signed public certificate to
+`identity/.runtime/certs/saml2int-sp-public.cer` and discards its private key, so
+the lab keeps the invariant that no private-key material is ever stored. Pass
+`-Days` for a different lifetime. It refuses to replace a stored certificate that
+is still currently valid unless you pass `-Force`, so it cannot silently discard a
+real EnergyHippo certificate. A stand-in proves provider-side configuration and
+binding only; decryption still requires the installed EnergyHippo path.
+
+If the stored certificate expires, `/configure/saml` still loads and shows a
+re-upload notice. Standard keeps working; only enabling Saml2Int is blocked until
+the certificate is replaced.
 
 Realm generation then creates a separate `northlake-saml2int` client that
 requires signed AuthnRequests and emits encrypted assertions. Missing, malformed,
