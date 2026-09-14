@@ -41,6 +41,8 @@ class PortalTests(unittest.TestCase):
             any(link.get("target") == "_blank" for link in account_links),
         )
         self.assertIn("/open-energyhippo", links_by_href)
+        self.assertIn("/configure", links_by_href)
+        self.assertIn("Configure Northlake", document)
         self.assertIn("/configure/users", links_by_href)
         self.assertIn("/configure/groups", links_by_href)
         self.assertIn("https://customer.localtest.me:8443/customer/", links_by_href)

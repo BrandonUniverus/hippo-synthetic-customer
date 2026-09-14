@@ -108,6 +108,37 @@ class GenerateRealmTests(unittest.TestCase):
             connection["userInventory"],
         )
 
+    def test_builtin_account_console_receives_client_role_claims(self) -> None:
+        realm, _ = self._generate()
+
+        self.assertEqual(["roles"], realm["defaultDefaultClientScopes"])
+        self.assertEqual([], realm["defaultOptionalClientScopes"])
+        roles_scope = next(
+            scope for scope in realm["clientScopes"] if scope["name"] == "roles"
+        )
+        client_roles = next(
+            mapper
+            for mapper in roles_scope["protocolMappers"]
+            if mapper["name"] == "client roles"
+        )
+        self.assertEqual(
+            "resource_access.${client_id}.roles",
+            client_roles["config"]["claim.name"],
+        )
+        self.assertEqual("true", client_roles["config"]["access.token.claim"])
+        account_console_scope = next(
+            scope
+            for scope in realm["clientScopes"]
+            if scope["name"] == "northlake-account-console"
+        )
+        self.assertEqual(
+            ["oidc-sub-mapper"],
+            [
+                mapper["protocolMapper"]
+                for mapper in account_console_scope["protocolMappers"]
+            ],
+        )
+
     def test_clients_separate_modern_and_legacy_behavior(self) -> None:
         realm, connection = self._generate()
         clients = {client["clientId"]: client for client in realm["clients"]}

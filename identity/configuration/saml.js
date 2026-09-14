@@ -8,6 +8,7 @@ const statusBadge = document.querySelector("#status-badge");
 const verificationOutput = document.querySelector("#verification-output");
 const verificationTime = document.querySelector("#verification-time");
 const certificateInput = document.querySelector("#saml2IntCertificate");
+const certificateNotice = document.querySelector("#certificate-notice");
 const previewButton = document.querySelector("#preview-button");
 const saveButton = document.querySelector("#save-button");
 const applyButton = document.querySelector("#apply-button");
@@ -115,13 +116,27 @@ function showErrors(errors) {
   }
 }
 
+function renderCertificate(certificate) {
+  const summary = document.querySelector("#summary-certificate");
+  if (!certificate?.configured) {
+    summary.textContent = "Not configured";
+  } else if (certificate.sha256Thumbprint) {
+    summary.textContent = `${certificate.keyType} ${certificate.keySize} · ${certificate.sha256Thumbprint.slice(0, 12)}…${certificate.valid ? "" : " · not usable"}`;
+  } else {
+    summary.textContent = "Stored file unreadable";
+  }
+  const unusable = Boolean(certificate?.configured) && !certificate.valid;
+  certificateNotice.textContent = unusable
+    ? `${certificate.reason} Upload EnergyHippo's current public RSA certificate, then save or apply. Saml2Int cannot be enabled until it is replaced.`
+    : "";
+  certificateNotice.hidden = !unusable;
+}
+
 function renderPreview(preview, certificate) {
   jsonPreview.textContent = JSON.stringify(preview, null, 2);
   document.querySelector("#summary-standard").textContent = preview.profiles.standard ? "Enabled" : "Disabled";
   document.querySelector("#summary-saml2int").textContent = preview.profiles.saml2Int ? "Enabled" : "Disabled";
-  document.querySelector("#summary-certificate").textContent = certificate?.configured
-    ? `${certificate.keyType} ${certificate.keySize} · ${certificate.sha256Thumbprint.slice(0, 12)}…`
-    : "Not configured";
+  renderCertificate(certificate);
 }
 
 function renderVerification(verification) {

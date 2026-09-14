@@ -1929,6 +1929,79 @@ def _verify_disabled_user(
     print("[OK] Disabled user: authentication denied without an authorization response.")
 
 
+def _verify_account_console(
+    profile: dict[str, Any],
+    context: ssl.SSLContext,
+) -> None:
+    client = {"clientId": "account-console", "scope": "openid"}
+    redirect_uri = f"{profile['issuer']}/account/"
+    verifier = _base64url(secrets.token_bytes(48))
+    challenge = _base64url(hashlib.sha256(verifier.encode("ascii")).digest())
+    state = _base64url(secrets.token_bytes(18))
+    authorization_url = _authorization_url(
+        profile,
+        client,
+        redirect_uri,
+        response_type="code",
+        state=state,
+        nonce=_base64url(secrets.token_bytes(18)),
+        code_challenge=challenge,
+        scope="openid",
+    )
+    opener, login_document = _open_login(context, authorization_url, redirect_uri)
+    status, location, _ = _submit_login(
+        opener,
+        login_document,
+        profile["testUsers"]["active"]["username"],
+        profile["testUsers"]["password"],
+        redirect_uri,
+    )
+    if status not in {301, 302, 303, 307, 308} or not location:
+        raise VerificationError("Account Console login did not return an authorization code.")
+
+    parameters = parse_qs(urlparse(location).query)
+    if parameters.get("state") != [state] or "code" not in parameters:
+        raise VerificationError("Account Console callback did not preserve state and code.")
+    tokens = _json_request(
+        profile["tokenEndpoint"],
+        context,
+        data={
+            "grant_type": "authorization_code",
+            "client_id": client["clientId"],
+            "code": parameters["code"][0],
+            "redirect_uri": redirect_uri,
+            "code_verifier": verifier,
+        },
+    )
+    access_token = tokens.get("access_token")
+    if not access_token:
+        raise VerificationError("Account Console token response omitted the access token.")
+    _, access_claims, _, _ = _decode_jwt(access_token)
+    account_roles = set(
+        access_claims.get("resource_access", {}).get("account", {}).get("roles", [])
+    )
+    if "manage-account" not in account_roles:
+        raise VerificationError("Account Console token omitted effective account client roles.")
+    if not isinstance(access_claims.get("sub"), str) or not access_claims["sub"]:
+        raise VerificationError("Account Console token omitted its internal Keycloak subject.")
+    audience = access_claims.get("aud", [])
+    audience_values = [audience] if isinstance(audience, str) else audience
+    if "account" not in audience_values:
+        raise VerificationError("Account Console token omitted the account API audience.")
+
+    account = _json_request(
+        f"{profile['issuer']}/account/?userProfileMetadata=true",
+        context,
+        bearer=access_token,
+    )
+    if account.get("username") != profile["testUsers"]["active"]["username"]:
+        raise VerificationError("Account Console API returned the wrong synthetic user.")
+    print(
+        "[OK] Account Console: code + PKCE login, effective account roles, audience, "
+        "and profile API access."
+    )
+
+
 def _verify_legacy_implicit_flow(
     profile: dict[str, Any],
     context: ssl.SSLContext,
@@ -2087,6 +2160,7 @@ def verify(connection_path: Path, ca_path: Path, suite: str = "all") -> None:
     )
 
     _verify_admin(profile, context)
+    _verify_account_console(profile, context)
     if "modern" in profile["clients"]:
         _verify_negative_protocol_cases(profile, context)
         _verify_modern_code_flow(profile, context, discovery, jwks)

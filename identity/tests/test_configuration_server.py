@@ -10,7 +10,10 @@ from urllib import error, request
 
 from identity.configuration.server import ConfigurationApplication, create_server
 from identity.configuration.scenarios import ScenarioValidationError
-from identity.tests.test_configuration_saml import create_public_certificate
+from identity.tests.test_configuration_saml import (
+    create_expired_public_certificate,
+    create_public_certificate,
+)
 from identity.configuration.settings import ProviderSettings
 
 
@@ -22,12 +25,16 @@ class FakeKeycloakAdminClient:
         self.replacements: list[tuple[str, str | None]] = []
         self.health_checks: list[str] = []
         self.impersonations: list[tuple[str, str]] = []
+        self.account_console_checks: list[str] = []
 
     def replace_realm(self, realm: dict, previous_realm_key: str | None) -> None:
         self.replacements.append((realm["realm"], previous_realm_key))
 
     def wait_until_healthy(self, settings: ProviderSettings) -> None:
         self.health_checks.append(settings.realm_key)
+
+    def ensure_account_console_access(self, realm_key: str) -> None:
+        self.account_console_checks.append(realm_key)
 
     def impersonate(self, realm_key: str, username: str) -> list[str]:
         self.impersonations.append((realm_key, username))
@@ -344,6 +351,105 @@ class ConfigurationServerTests(unittest.TestCase):
         self.assertNotIn(base64.b64encode(certificate_der).decode("ascii"), serialized)
         self.assertNotIn("PRIVATE KEY", serialized)
 
+    def _store_expired_saml_certificate(self) -> bytes:
+        expired_der, _ = create_expired_public_certificate()
+        certificate_path = self.application.saml2int_certificate_path
+        certificate_path.parent.mkdir(parents=True, exist_ok=True)
+        certificate_path.write_bytes(expired_der)
+        return expired_der
+
+    def test_saml_page_still_loads_when_the_stored_certificate_expired(self) -> None:
+        expired_der = self._store_expired_saml_certificate()
+
+        with request.urlopen(f"{self.base_url}/configure/saml", timeout=10) as response:
+            document = response.read().decode("utf-8")
+        status, payload = self._json_request("/configure/api/saml")
+        preview_status, preview = self._json_request(
+            "/configure/api/saml/preview",
+            payload["values"],
+        )
+
+        self.assertEqual(200, status)
+        self.assertEqual(200, preview_status)
+        self.assertIn("certificate-notice", document)
+        self.assertFalse(payload["values"]["saml2IntEnabled"])
+        self.assertTrue(payload["values"]["standardEnabled"])
+        certificate = payload["certificate"]
+        self.assertTrue(certificate["configured"])
+        self.assertFalse(certificate["valid"])
+        self.assertIn("expired on", certificate["reason"])
+        self.assertFalse(preview["certificate"]["valid"])
+        serialized = json.dumps(payload)
+        self.assertNotIn(base64.b64encode(expired_der).decode("ascii"), serialized)
+        self.assertNotIn("PRIVATE KEY", serialized)
+
+    def test_expired_stored_certificate_still_blocks_enabling_saml2int(self) -> None:
+        self._store_expired_saml_certificate()
+        _, state = self._json_request("/configure/api/saml")
+        values = state["values"]
+        values["saml2IntEnabled"] = True
+
+        status, payload = self._json_request("/configure/api/saml/apply", values)
+
+        self.assertEqual(400, status)
+        self.assertIn("expired on", payload["errors"]["saml2IntCertificateBase64"])
+        self.assertEqual([], self.keycloak.replacements)
+        self.assertEqual([], self.saml_verifier_calls)
+
+    def test_expired_certificate_upload_is_rejected_even_when_saml2int_stays_disabled(self) -> None:
+        expired_der, _ = create_expired_public_certificate()
+        _, state = self._json_request("/configure/api/saml")
+        values = state["values"]
+        values["saml2IntCertificateBase64"] = base64.b64encode(expired_der).decode("ascii")
+        values["saml2IntCertificateName"] = "eem-expired.cer"
+
+        status, payload = self._json_request("/configure/api/saml/save", values)
+
+        self.assertEqual(400, status)
+        self.assertIn("saml2IntCertificateBase64", payload["errors"])
+        self.assertFalse(self.application.saml2int_certificate_path.is_file())
+
+    def test_saml_recovers_by_disabling_saml2int_or_uploading_a_current_certificate(self) -> None:
+        self._store_expired_saml_certificate()
+        _, state = self._json_request("/configure/api/saml")
+        values = state["values"]
+
+        disabled_status, disabled = self._json_request("/configure/api/saml/apply", values)
+        generated_realm = json.loads(
+            self.application.realm_output_path.read_text(encoding="utf-8")
+        )
+
+        self.assertEqual(200, disabled_status)
+        self.assertTrue(disabled["applied"])
+        self.assertFalse(disabled["certificate"]["valid"])
+        self.assertEqual(
+            1,
+            len([
+                client
+                for client in generated_realm["clients"]
+                if client["protocol"] == "saml"
+            ]),
+        )
+
+        current_der, _ = create_public_certificate()
+        values.update(
+            {
+                "saml2IntEnabled": True,
+                "saml2IntCertificateBase64": base64.b64encode(current_der).decode("ascii"),
+                "saml2IntCertificateName": "eem-public.cer",
+            }
+        )
+        replaced_status, replaced = self._json_request("/configure/api/saml/apply", values)
+        _, persisted = self._json_request("/configure/api/saml")
+
+        self.assertEqual(200, replaced_status)
+        self.assertTrue(replaced["applied"])
+        self.assertTrue(persisted["certificate"]["valid"])
+        self.assertEqual(
+            current_der,
+            self.application.saml2int_certificate_path.read_bytes(),
+        )
+
     def test_scenario_form_and_redacted_presets_are_available_without_authentication(self) -> None:
         with request.urlopen(f"{self.base_url}/configure/scenarios", timeout=10) as response:
             document = response.read().decode("utf-8")
@@ -652,6 +758,23 @@ class ConfigurationServerTests(unittest.TestCase):
 
         self.assertEqual([("northlake", "northlake")], restarted_keycloak.replacements)
         self.assertFalse(restarted_application._document().pending_apply)
+        self.assertTrue(restarted_application.startup_reconciled)
+
+    def test_startup_reconciliation_prepares_the_account_console(self) -> None:
+        scenario_document = self.application._scenario_document()
+        for slot in ("labA", "labB"):
+            realm_key = scenario_document.settings.realms[slot].realm_key
+            realm_path = self.application.realm_output_path.parent / f"{realm_key}-realm.json"
+            realm_path.parent.mkdir(parents=True, exist_ok=True)
+            realm_path.write_text("{}", encoding="utf-8")
+
+        self.application.reconcile_pending()
+
+        self.assertEqual(
+            ["northlake", "northlake-lab-a", "northlake-lab-b"],
+            self.keycloak.account_console_checks,
+        )
+        self.assertTrue(self.application.startup_reconciled)
 
 
 if __name__ == "__main__":

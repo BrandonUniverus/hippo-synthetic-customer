@@ -671,7 +671,9 @@ def parse_public_certificate_base64(value: Any) -> tuple[bytes, dict[str, Any]]:
     return validate_public_certificate(document)
 
 
-def validate_public_certificate(document: bytes) -> tuple[bytes, dict[str, Any]]:
+def _load_public_certificate(
+    document: bytes,
+) -> tuple[x509.Certificate, rsa.RSAPublicKey]:
     if not document or len(document) > 65_536:
         raise SamlValidationError(
             {"saml2IntCertificateBase64": "The certificate must be 1-65,536 bytes."}
@@ -695,14 +697,32 @@ def validate_public_certificate(document: bytes) -> tuple[bytes, dict[str, Any]]
         raise SamlValidationError(
             {"saml2IntCertificateBase64": "Use an RSA certificate with a key of at least 2048 bits."}
         )
+    return certificate, public_key
+
+
+def _validity_gap(certificate: x509.Certificate) -> str | None:
     now_utc = datetime.now(UTC)
-    if certificate.not_valid_before_utc > now_utc or certificate.not_valid_after_utc <= now_utc:
-        raise SamlValidationError(
-            {"saml2IntCertificateBase64": "The public certificate is not currently valid."}
+    if certificate.not_valid_after_utc <= now_utc:
+        return (
+            "The stored public certificate expired on "
+            f"{certificate.not_valid_after_utc.isoformat()}."
         )
+    if certificate.not_valid_before_utc > now_utc:
+        return (
+            "The stored public certificate is not valid until "
+            f"{certificate.not_valid_before_utc.isoformat()}."
+        )
+    return None
+
+
+def _public_certificate_summary(
+    certificate: x509.Certificate,
+    public_key: rsa.RSAPublicKey,
+) -> tuple[bytes, dict[str, Any]]:
     der = certificate.public_bytes(serialization.Encoding.DER)
     summary = {
         "configured": True,
+        "valid": True,
         "sha256Thumbprint": hashlib.sha256(der).hexdigest().upper(),
         "subject": certificate.subject.rfc4514_string(),
         "notBeforeUtc": certificate.not_valid_before_utc.isoformat(),
@@ -713,10 +733,54 @@ def validate_public_certificate(document: bytes) -> tuple[bytes, dict[str, Any]]
     return der, summary
 
 
+def validate_public_certificate(document: bytes) -> tuple[bytes, dict[str, Any]]:
+    certificate, public_key = _load_public_certificate(document)
+    if _validity_gap(certificate) is not None:
+        raise SamlValidationError(
+            {"saml2IntCertificateBase64": "The public certificate is not currently valid."}
+        )
+    return _public_certificate_summary(certificate, public_key)
+
+
+def describe_public_certificate(document: bytes) -> dict[str, Any]:
+    """Summarize stored certificate bytes for display without rejecting unusable material."""
+    try:
+        certificate, public_key = _load_public_certificate(document)
+    except SamlValidationError:
+        return {
+            "configured": True,
+            "valid": False,
+            "reason": (
+                "The stored file is not a usable public RSA certificate. "
+                "Upload EnergyHippo's current public certificate again."
+            ),
+        }
+    _, summary = _public_certificate_summary(certificate, public_key)
+    gap = _validity_gap(certificate)
+    if gap is None:
+        return summary
+    return {**summary, "valid": False, "reason": gap}
+
+
 def read_public_certificate(path: Path) -> tuple[bytes, dict[str, Any]] | None:
     if not path.is_file():
         return None
     return validate_public_certificate(path.read_bytes())
+
+
+def read_public_certificate_summary(path: Path) -> dict[str, Any] | None:
+    """Describe the stored certificate for display; None when none is stored."""
+    if not path.is_file():
+        return None
+    try:
+        document = path.read_bytes()
+    except OSError as error:
+        return {
+            "configured": True,
+            "valid": False,
+            "reason": f"The stored public certificate could not be read: {error}.",
+        }
+    return describe_public_certificate(document)
 
 
 def write_public_certificate(path: Path, der: bytes) -> None:

@@ -31,7 +31,7 @@ from identity.configuration.saml import (
     SamlValidationError,
     load_saml_settings_document,
     parse_public_certificate_base64,
-    read_public_certificate,
+    read_public_certificate_summary,
     write_public_certificate,
     write_saml_settings_document,
 )
@@ -146,6 +146,93 @@ class KeycloakAdminClient:
             )
         return status
 
+    def _admin_json(self, token: str, path: str) -> Any:
+        admin_request = request.Request(
+            f"{self.base_url}{path}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        try:
+            with request.urlopen(admin_request, timeout=20) as response:
+                return json.load(response)
+        except (
+            error.HTTPError,
+            error.URLError,
+            TimeoutError,
+            json.JSONDecodeError,
+        ) as failure:
+            raise KeycloakApplyError("Keycloak administration is unavailable.") from failure
+
+    def _attach_account_console_scopes(self, token: str, realm_key: str) -> None:
+        escaped_realm = parse.quote(realm_key, safe="")
+        client_query = parse.urlencode({"clientId": "account-console"})
+        clients = self._admin_json(
+            token,
+            f"/admin/realms/{escaped_realm}/clients?{client_query}",
+        )
+        matching_clients = (
+            [
+                client
+                for client in clients
+                if isinstance(client, dict) and client.get("clientId") == "account-console"
+            ]
+            if isinstance(clients, list)
+            else []
+        )
+        if len(matching_clients) != 1 or not isinstance(matching_clients[0].get("id"), str):
+            raise KeycloakApplyError("Keycloak Account Console client lookup was not exact.")
+
+        client_scopes = self._admin_json(
+            token,
+            f"/admin/realms/{escaped_realm}/client-scopes",
+        )
+        required_scope_names = {"roles", "northlake-account-console"}
+        matching_scopes = (
+            {
+                scope.get("name"): scope
+                for scope in client_scopes
+                if isinstance(scope, dict)
+                and scope.get("name") in required_scope_names
+                and isinstance(scope.get("id"), str)
+            }
+            if isinstance(client_scopes, list)
+            else {}
+        )
+        if set(matching_scopes) != required_scope_names:
+            raise KeycloakApplyError("Keycloak Account Console scope lookup was incomplete.")
+
+        client_id = parse.quote(matching_clients[0]["id"], safe="")
+        for scope in matching_scopes.values():
+            scope_id = parse.quote(scope["id"], safe="")
+            self._admin_request(
+                token,
+                "PUT",
+                (
+                    f"/admin/realms/{escaped_realm}/clients/{client_id}"
+                    f"/default-client-scopes/{scope_id}"
+                ),
+            )
+        attached_scopes = self._admin_json(
+            token,
+            f"/admin/realms/{escaped_realm}/clients/{client_id}/default-client-scopes",
+        )
+        attached_scope_ids = (
+            {
+                scope.get("id")
+                for scope in attached_scopes
+                if isinstance(scope, dict) and isinstance(scope.get("id"), str)
+            }
+            if isinstance(attached_scopes, list)
+            else set()
+        )
+        required_scope_ids = {scope["id"] for scope in matching_scopes.values()}
+        if not required_scope_ids.issubset(attached_scope_ids):
+            raise KeycloakApplyError("Keycloak did not attach the Account Console scopes.")
+
+    def ensure_account_console_access(self, realm_key: str) -> None:
+        if not realm_key or realm_key == "master" or "/" in realm_key:
+            raise KeycloakApplyError("Account Console realm key is unsafe.")
+        self._attach_account_console_scopes(self._token(), realm_key)
+
     def replace_realm(
         self,
         realm: dict[str, Any],
@@ -172,6 +259,7 @@ class KeycloakAdminClient:
             payload=realm,
             expected_statuses=(HTTPStatus.CREATED,),
         )
+        self._attach_account_console_scopes(token, realm_key)
 
     def impersonate(self, realm_key: str, username: str) -> list[str]:
         if not realm_key or realm_key == "master" or "/" in realm_key:
@@ -315,6 +403,7 @@ class ConfigurationApplication:
         self.scim_client_factory = scim_client_factory or create_scim_client
         self.startup_settings = ProviderSettings.from_environment(self.environment)
         self.last_apply_error: str | None = None
+        self._startup_reconciled = threading.Event()
         self._apply_lock = threading.Lock()
         self.field_catalog = self._load_field_catalog()
         self.user_store = SyntheticUserStore(
@@ -538,8 +627,8 @@ class ConfigurationApplication:
         effective_environment.update(provider.to_environment_overlay())
         return load_saml_settings_document(self.saml_settings_path, effective_environment)
 
-    def _saml_certificate(self) -> tuple[bytes, dict[str, Any]] | None:
-        return read_public_certificate(self.saml2int_certificate_path)
+    def _saml_certificate_summary(self) -> dict[str, Any] | None:
+        return read_public_certificate_summary(self.saml2int_certificate_path)
 
     def _last_saml_verification(self) -> dict[str, Any] | None:
         if not self.saml_verification_path.is_file():
@@ -566,24 +655,31 @@ class ConfigurationApplication:
                 certificate_value
             )
         else:
-            existing = self._saml_certificate()
-            if existing is not None:
-                _, certificate_summary = existing
-        if settings.saml2int.enabled and certificate_summary is None:
-            raise SamlValidationError(
-                {
-                    "saml2IntCertificateBase64": (
-                        "Enable Saml2Int only after choosing EEM's public RSA certificate."
-                    )
-                }
-            )
+            certificate_summary = self._saml_certificate_summary()
+        if settings.saml2int.enabled:
+            if certificate_summary is None:
+                raise SamlValidationError(
+                    {
+                        "saml2IntCertificateBase64": (
+                            "Enable Saml2Int only after choosing EEM's public RSA certificate."
+                        )
+                    }
+                )
+            if not certificate_summary["valid"]:
+                raise SamlValidationError(
+                    {
+                        "saml2IntCertificateBase64": (
+                            f"{certificate_summary['reason']} "
+                            "Upload a current certificate before enabling Saml2Int."
+                        )
+                    }
+                )
         return settings, uploaded_certificate, certificate_summary
 
     def saml_state(self) -> dict[str, Any]:
         provider = self._document().settings
         document = self._saml_document()
-        certificate = self._saml_certificate()
-        certificate_summary = certificate[1] if certificate is not None else None
+        certificate_summary = self._saml_certificate_summary()
         return {
             "values": document.settings.to_values(),
             "preview": document.settings.preview(
@@ -1432,25 +1528,49 @@ class ConfigurationApplication:
             with self._apply_lock:
                 document = self._document()
                 if not document.pending_apply:
-                    return
-                try:
-                    realm = self._generate(document.settings)
-                    self.keycloak_client.replace_realm(realm, document.applied_realm_key)
-                    self.keycloak_client.wait_until_healthy(document.settings)
-                except (KeycloakApplyError, OSError, ValueError) as failure:
-                    self.last_apply_error = str(failure)
+                    try:
+                        realm_keys = [document.settings.realm_key]
+                        scenario_document = self._scenario_document()
+                        for slot in SCENARIO_SLOTS:
+                            realm_key = scenario_document.settings.realms[slot].realm_key
+                            realm_path = scenario_realm_path(
+                                self.realm_output_path.parent,
+                                realm_key,
+                            )
+                            if realm_path.is_file():
+                                realm_keys.append(realm_key)
+                        for realm_key in dict.fromkeys(realm_keys):
+                            self.keycloak_client.ensure_account_console_access(realm_key)
+                    except KeycloakApplyError as failure:
+                        self.last_apply_error = str(failure)
+                    else:
+                        self.last_apply_error = None
+                        self._startup_reconciled.set()
+                        return
                 else:
-                    write_settings_document(
-                        self.settings_path,
-                        SettingsDocument(
-                            settings=document.settings,
-                            applied_realm_key=document.settings.realm_key,
-                            pending_apply=False,
-                        ),
-                    )
-                    self.last_apply_error = None
-                    return
+                    try:
+                        realm = self._generate(document.settings)
+                        self.keycloak_client.replace_realm(realm, document.applied_realm_key)
+                        self.keycloak_client.wait_until_healthy(document.settings)
+                    except (KeycloakApplyError, OSError, ValueError) as failure:
+                        self.last_apply_error = str(failure)
+                    else:
+                        write_settings_document(
+                            self.settings_path,
+                            SettingsDocument(
+                                settings=document.settings,
+                                applied_realm_key=document.settings.realm_key,
+                                pending_apply=False,
+                            ),
+                        )
+                        self.last_apply_error = None
+                        self._startup_reconciled.set()
+                        return
             time.sleep(2)
+
+    @property
+    def startup_reconciled(self) -> bool:
+        return self._startup_reconciled.is_set()
 
     def users(self) -> dict[str, Any]:
         users = self.user_store.public_users()
@@ -1697,7 +1817,13 @@ reading or exposing the generated password and is not counted as password-authen
                 else:
                     self._json(HTTPStatus.OK, self.application.group_claims(user_ids[0]))
             elif path == "/configure/health":
-                self._json(HTTPStatus.OK, {"status": "ok"})
+                if self.application.startup_reconciled:
+                    self._json(HTTPStatus.OK, {"status": "ok"})
+                else:
+                    self._json(
+                        HTTPStatus.SERVICE_UNAVAILABLE,
+                        {"status": "starting"},
+                    )
             else:
                 self._json(HTTPStatus.NOT_FOUND, {"message": "Not found."})
         except (

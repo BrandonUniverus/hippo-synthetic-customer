@@ -18,8 +18,10 @@ from identity.configuration.saml import (
     SamlSettings,
     SamlSettingsDocument,
     SamlValidationError,
+    describe_public_certificate,
     load_saml_settings_document,
     parse_public_certificate_base64,
+    read_public_certificate_summary,
     validate_public_certificate,
     write_saml_settings_document,
 )
@@ -29,7 +31,11 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 SAML_MODEL_PATH = REPOSITORY_ROOT / "identity" / "configuration" / "saml.py"
 
 
-def create_public_certificate() -> tuple[bytes, bytes]:
+def create_public_certificate(
+    *,
+    not_valid_before: datetime | None = None,
+    not_valid_after: datetime | None = None,
+) -> tuple[bytes, bytes]:
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     now = datetime.now(UTC)
     subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "Northlake Test SP")])
@@ -39,8 +45,8 @@ def create_public_certificate() -> tuple[bytes, bytes]:
         .issuer_name(subject)
         .public_key(private_key.public_key())
         .serial_number(x509.random_serial_number())
-        .not_valid_before(now - timedelta(minutes=1))
-        .not_valid_after(now + timedelta(days=30))
+        .not_valid_before(not_valid_before or now - timedelta(minutes=1))
+        .not_valid_after(not_valid_after or now + timedelta(days=30))
         .sign(private_key, hashes.SHA256())
     )
     return (
@@ -50,6 +56,14 @@ def create_public_certificate() -> tuple[bytes, bytes]:
             serialization.PrivateFormat.PKCS8,
             serialization.NoEncryption(),
         ),
+    )
+
+
+def create_expired_public_certificate() -> tuple[bytes, bytes]:
+    now = datetime.now(UTC)
+    return create_public_certificate(
+        not_valid_before=now - timedelta(days=400),
+        not_valid_after=now - timedelta(days=35),
     )
 
 
@@ -156,9 +170,54 @@ class SamlSettingsTests(unittest.TestCase):
 
         self.assertEqual(certificate_der, parsed_der)
         self.assertTrue(summary["configured"])
+        self.assertTrue(summary["valid"])
         self.assertEqual("RSA", summary["keyType"])
         with self.assertRaises(SamlValidationError):
             validate_public_certificate(private_key)
+
+    def test_expired_stored_certificate_is_described_instead_of_rejected(self) -> None:
+        expired_der, _ = create_expired_public_certificate()
+
+        summary = describe_public_certificate(expired_der)
+
+        self.assertTrue(summary["configured"])
+        self.assertFalse(summary["valid"])
+        self.assertIn("expired on", summary["reason"])
+        self.assertIn(summary["notAfterUtc"], summary["reason"])
+        self.assertIn("Northlake Test SP", summary["subject"])
+        self.assertEqual(2048, summary["keySize"])
+        with self.assertRaises(SamlValidationError):
+            validate_public_certificate(expired_der)
+
+    def test_unreadable_stored_certificate_is_described_without_leaking_material(self) -> None:
+        _, private_key = create_public_certificate()
+
+        corrupt = describe_public_certificate(b"not an X.509 certificate")
+        stored_private_key = describe_public_certificate(private_key)
+
+        for summary in (corrupt, stored_private_key):
+            self.assertTrue(summary["configured"])
+            self.assertFalse(summary["valid"])
+            self.assertNotIn("sha256Thumbprint", summary)
+            self.assertIn("Upload EnergyHippo's current public certificate", summary["reason"])
+        self.assertNotIn("BEGIN PRIVATE KEY", stored_private_key["reason"])
+
+    def test_stored_certificate_summary_reads_the_saved_file_or_reports_none(self) -> None:
+        current_der, _ = create_public_certificate()
+        expired_der, _ = create_expired_public_certificate()
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            certificate_path = Path(temporary_directory) / "certs" / "saml2int-sp-public.cer"
+            missing = read_public_certificate_summary(certificate_path)
+            certificate_path.parent.mkdir(parents=True)
+            certificate_path.write_bytes(current_der)
+            current = read_public_certificate_summary(certificate_path)
+            certificate_path.write_bytes(expired_der)
+            expired = read_public_certificate_summary(certificate_path)
+
+        self.assertIsNone(missing)
+        self.assertTrue(current["valid"])
+        self.assertNotIn("reason", current)
+        self.assertFalse(expired["valid"])
 
     def test_preview_exposes_exact_eem_values_without_certificate_material(self) -> None:
         values = SamlSettings.from_environment(self.environment).to_values()
