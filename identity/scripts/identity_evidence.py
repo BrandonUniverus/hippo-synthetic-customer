@@ -362,7 +362,7 @@ def _stable_configuration_hash(profile: Mapping[str, Any], identity_root: Path) 
     }
     source_hashes = {}
     for relative_path in (
-        "../security/northlake-eem-security-v1.yaml",
+        "../data/security/northlake-eem-security-v1.yaml",
         "realm/generate_realm.py",
         ".runtime/configuration.json",
         ".runtime/oidc.json",

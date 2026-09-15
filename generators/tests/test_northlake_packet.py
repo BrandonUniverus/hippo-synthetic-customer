@@ -10,83 +10,173 @@ import unittest
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from generators.northlake_packet import ROOT, CUSTOMER, build_packet, sample_files
+import openpyxl
+
+from generators.northlake_packet import GENERATED_DOCUMENTS, ROOT, SAMPLES, build_packet, render_generated_document, sample_files
+from generators.update_workbook import TARGET, update_workbook
+
+
+def packet_from_edited_sources(edit_file, old, new):
+    """Rebuild the packet from copied sources with one text change applied."""
+    with tempfile.TemporaryDirectory(prefix="northlake-source-test-") as folder:
+        root = Path(folder)
+        shutil.copytree(ROOT / "data", root / "data")
+        file = root / edit_file
+        text = file.read_text(encoding="utf-8")
+        assert text.count(old) == 1, old
+        file.write_text(text.replace(old, new), encoding="utf-8")
+        return build_packet(root)
 
 
 class NorthlakePacketTests(unittest.TestCase):
-    def test_complete_inventory_has_consistent_tables_and_student_center_feed(self):
-        packet = build_packet()
-        self.assertEqual(21, packet["counts"]["accounts"])
-        self.assertEqual(29, packet["counts"]["meters"])
-        self.assertEqual(52, packet["counts"]["points"])
-        for name, sheet in packet["sheets"].items():
+    @classmethod
+    def setUpClass(cls):
+        cls.packet = build_packet()
+        cls.sheets = cls.packet["sheets"]
+
+    def test_counts_and_table_shapes_come_from_one_join(self):
+        expected = {"companies": 3, "sites": 3, "buildings": 13, "providers": 5, "accounts": 49, "utilityMeters": 55, "ownedMeters": 265, "weatherStations": 2,
+                    "meters": 322, "points": 431, "apartments": 124, "relatedMeasurements": 139, "aggregates": 7, "gatewayProfiles": 15, "gatewayFormats": 21,
+                    "eventPublishers": 1, "baseRates": 14, "contacts": 12, "organizationUnits": 6}
+        self.assertEqual(expected, self.packet["counts"])
+        for name, sheet in self.sheets.items():
             for row in sheet["rows"]:
                 self.assertEqual(len(sheet["headers"]), len(row), (name, row))
-        student = [row for row in packet["sheets"]["Meters"]["rows"] if row[0] == "Student Center Electric Interval"]
-        self.assertEqual(1, len(student))
-        self.assertEqual("SYN-VED-M-0040004", student[0][1])
-        mapping = [row for row in packet["sheets"]["Source Measurements"]["rows"] if row[0] == "Student Center AcquiSuite logger"]
-        self.assertEqual({"kWh", "kW"}, {row[5] for row in mapping})
-        self.assertTrue(all(row[3] == "ASQVED01" and "DeviceID=STUDENT" in row[4] for row in mapping))
+        text = json.dumps(self.packet, default=str)
+        for stale in ["Applied Science", "Main Library", "Organization Units", "Portfolio", "Service Area", "Served Building", "supportLocations"]:
+            self.assertNotIn(stale, text)
 
-    def test_relationships_and_format_cases_are_explicit_without_fake_rollups(self):
-        packet = build_packet()
-        relationships = packet["sheets"]["Related Measurements"]["rows"]
-        self.assertEqual(2, sum(row[4] == "Usage from register difference" for row in relationships))
+    def test_each_building_appears_once_in_the_company_that_owns_its_site(self):
+        rows = self.sheets["Hierarchy"]["rows"]
+        hierarchy = {f"{row[5]} / {row[1]}": row for row in rows}
+        self.assertEqual(len(rows), len(hierarchy))
+        self.assertEqual(3, sum(row[4] == "Company" for row in rows))
+        self.assertEqual({"Northlake Main Campus", "Weather Reference", "Cedar Row Apartments", "Northlake Central Plant"}, {row[1] for row in rows if row[4] == "Site"})
+        buildings = [row for row in rows if row[4] == "Location"]
+        self.assertEqual(13, len(buildings))
+        self.assertEqual(13, len({row[1] for row in buildings}))
+        self.assertTrue(all(row[3] == "Building" for row in buildings))
+        self.assertEqual(["Central Plant"], [row[1] for row in buildings if row[0] == "Northlake Thermal Plant"])
+        self.assertTrue({"Science Center", "Library"} <= {row[1] for row in buildings})
+        for path, row in hierarchy.items():
+            self.assertTrue(row[5] == "System" or row[5] in hierarchy, path)
+        meters = {row[0]: row for row in self.sheets["Meters"]["rows"]}
+        self.assertEqual(self.packet["counts"]["meters"], len(meters))
+        for row in meters.values():
+            self.assertIn(row[-1], hierarchy)
+            self.assertEqual(row[7], hierarchy[row[-1]][0])
+        served = [row for row in meters.values() if row[4] == "Science Center" and row[2] == "Chilled Water"]
+        self.assertEqual(1, len(served))
+        self.assertEqual(["Northlake Thermal Plant", "Utility meter", "Northlake University"], served[0][5:8])
+        self.assertEqual("System / Northlake University / Northlake Main Campus / Science Center", served[0][-1])
+        plant = [row for row in meters.values() if row[7] == "Northlake Thermal Plant"]
+        self.assertEqual(8, len(plant))
+        self.assertTrue(all(row[4] == "Central Plant" for row in plant))
+        self.assertEqual({"Utility meter", "Production meter", "Plant controller", "Sewer-deduct submeter"}, {row[6] for row in plant})
+        self.assertTrue(all(row[1] in meters for row in self.sheets["Measured Points"]["rows"]))
+
+    def test_bill_only_meters_have_no_points(self):
+        points = {}
+        for row in self.sheets["Measured Points"]["rows"]:
+            points.setdefault(row[1], []).append(row[0])
+        meters = {row[0]: row for row in self.sheets["Meters"]["rows"]}
+        self.assertNotIn("Admin Hall Electric Main", points)
+        self.assertEqual("Bill / allocation statement", meters["Admin Hall Electric Main"][8])
+        self.assertEqual(["Delivered kWh 15m", "Demand kW 15m"], points["Student Center Electric Main"])
+        steam = [name for name, row in meters.items() if row[2] == "Steam" and row[7] == "Northlake University"]
+        self.assertEqual(6, len(steam))
+        self.assertFalse(set(steam) & set(points))
+        self.assertIn("Central Plant Steam Production", points)
+        self.assertEqual(sum(len(names) for names in points.values()), self.packet["counts"]["points"])
+
+    def test_cedar_row_is_master_metered_with_owned_unit_submeters(self):
+        units = self.sheets["Units and Submeters"]["rows"]
+        self.assertEqual(124, len(units))
+        by_building = {}
+        for row in units:
+            by_building.setdefault(row[0], []).append(row)
+        self.assertEqual([60, 64], [len(by_building["Cedar Row A"]), len(by_building["Cedar Row B"])])
+        self.assertEqual(["101", "320", "416"], [by_building["Cedar Row A"][0][1], by_building["Cedar Row A"][-1][1], by_building["Cedar Row B"][-1][1]])
+        for row in units:
+            letter = row[0][-1]
+            self.assertEqual([f"SYN-SUB-E-{letter}{row[1]}", "Submeter kWh 60m", f"SYN-SUB-W-{letter}{row[1]}", "Register Reading", "Route Usage kgal"], row[3:8])
+        meters = {row[0]: row for row in self.sheets["Meters"]["rows"]}
+        unit_meter = meters["Cedar Row A Unit 214 Electric"]
+        self.assertEqual(["Apartment submeter", "Cedar Row Apartments"], unit_meter[6:8])
+        self.assertIn("Behind Cedar Row A Electric Master", unit_meter[10])
+        self.assertIn("No billing account", unit_meter[10])
+        rollups = {}
+        for row in self.sheets["Rollup Members"]["rows"]:
+            rollups.setdefault(row[0], []).append(row)
+        self.assertEqual(7, len(rollups))
+        self.assertEqual([61, 65], [len(rollups["Cedar Row A Submetered kWh Total"]), len(rollups["Cedar Row B Submetered kWh Total"])])
+        sources = self.sheets["Source Measurements"]["rows"]
+        self.assertEqual(128, sum(row[0] == "Fixed-network electric submeters" for row in sources))
+        self.assertEqual(126, sum(row[0] == "Cedar Row apartment water submeter route" for row in sources))
+        self.assertEqual(len(sources), len({(row[0], row[3], row[4]) for row in sources}))
+
+    def test_relationships_and_format_cases_are_explicit(self):
+        relationships = self.sheets["Related Measurements"]["rows"]
+        self.assertEqual(132, sum(row[4] == "Usage from register difference" for row in relationships))
         self.assertEqual(4, sum("degree days" in row[4] for row in relationships))
         self.assertEqual(3, sum(row[4] == "Measured versus baseline" for row in relationships))
-        self.assertEqual(4, len({row[0] for row in packet["sheets"]["Rollup Members"]["rows"]}))
-        self.assertNotIn("Fake", json.dumps(packet["sheets"]["Rollup Members"]))
-        formats = {row[1] for row in packet["coverage"]["rows"]}
-        self.assertTrue({"MDEF", "MV9", "FIG", "SIEMANSREPORT", "MEDIATOR", "EATON", "XML", "FIXEDNETWORKS", "CMEP", "HMR_EVENTS"} <= formats)
-        self.assertTrue(all(row[-2:] == ["Not run", "Not run"] for row in packet["coverage"]["rows"]))
-        records = packet["instanceMapping"]["rows"]
-        self.assertEqual(63, len(records))  # 52 explicit + 4 degree-day + 3 baseline + 4 aggregate points.
-        self.assertEqual(63, len({row[1] for row in records}))
+        assignments = self.sheets["Weather Assignments"]["rows"]
+        self.assertEqual(13, len(assignments))
+        self.assertTrue(all(row[2] == "KSAC" for row in assignments))
+        coverage = self.packet["coverage"]["rows"]
+        formats = {row[1] for row in coverage}
+        self.assertTrue({"ACQUISUITE", "MDEF", "MV9", "BACNET", "MODBUS", "FIG", "SIEMANSREPORT", "MEDIATOR", "EATON", "XML", "FIXEDNETWORKS", "CMEP", "NEPTUNE", "MVRS", "HMR_EVENTS"} <= formats)
+        self.assertTrue(all(row[-2:] == ["Not run", "Not run"] for row in coverage))
+        self.assertEqual(["Generated"], [row[4] for row in coverage if row[0] == "gw_acquisuite_student_electric"])
+        records = self.packet["instanceMapping"]["rows"]
+        self.assertEqual(431 + 4 + 3 + 7, len(records))  # points + degree-day + baseline + aggregate points.
+        self.assertEqual(len(records), len({row[1] for row in records}))
         self.assertTrue(all(row[8:12] == ["", "", "", ""] for row in records))
-        self.assertTrue(all(len(row) == len(packet["instanceMapping"]["headers"]) for row in records))
 
     def test_tariff_and_area_values_come_from_existing_sources(self):
-        packet = build_packet()
-        buildings = {row[0]: row for row in packet["sheets"]["Buildings"]["rows"]}
-        self.assertEqual(95000, buildings["Student Center"][5])
-        self.assertEqual(58000, buildings["Cedar Row A"][5])
-        schedules = {row[1] for row in packet["sheets"]["Rate Schedules"]["rows"]}
-        self.assertIn("VED-TOU-GS", schedules)
-        self.assertNotIn("VED TOU-GS-3", json.dumps(packet["sheets"]["Utility Services"]))
-        charges = packet["sheets"]["Rate Components"]["rows"]
-        peak = next(row for row in charges if row[1] == "VED-TOU-GS" and row[2] == "energy / peak")
+        buildings = {row[0]: row for row in self.sheets["Buildings"]["rows"]}
+        self.assertEqual([95000, 58000, 110000, ""], [buildings["Student Center"][5], buildings["Cedar Row A"][5], buildings["Lakeview Residence Hall"][5], buildings["Campus Grounds"][5]])
+        schedules = {row[1] for row in self.sheets["Rate Schedules"]["rows"]}
+        self.assertTrue({"VED-TOU-GS", "VED-TOU-GS-FY25", "VED-TOU-PRI", "VED-AL-1", "SGU-GL-1", "RCU-IRR", "RCU-FIRE", "NTP-ALLOC-CHW"} <= schedules)
+        charges = self.sheets["Rate Components"]["rows"]
+        peak = next(row for row in charges if row[1] == "VED-TOU-GS" and row[2] == "Energy / peak")
         self.assertEqual(0.241, peak[3])
         self.assertTrue(all(isinstance(row[3], (int, float)) for row in charges))
+        accounts = self.sheets["Accounts And Agreements"]["rows"]
+        self.assertEqual(49, len({row[3] for row in accounts}))
+        self.assertEqual({"External utility account", "Internal cost center", "PPA agreement"}, {row[2] for row in accounts})
 
-    def test_drifted_account_identifier_is_rejected(self):
-        with tempfile.TemporaryDirectory(prefix="northlake-source-test-") as folder:
-            root = Path(folder)
-            for directory in ["providers", "scenarios", "eem", "security"]:
-                shutil.copytree(ROOT / directory, root / directory)
-            file = root / "scenarios/demo-university-v1.yaml"
-            file.write_text(file.read_text(encoding="utf-8").replace("SYN-VED-A-0010004", "WRONG-ACCOUNT"), encoding="utf-8")
-            with self.assertRaisesRegex(AssertionError, "Account identifier drift: ved_student_center"):
-                build_packet(root)
+    def test_drifted_identifiers_and_ownership_are_rejected(self):
+        with self.assertRaisesRegex(AssertionError, "Account identifier drift: ved_student_center"):
+            packet_from_edited_sources("data/scenarios/demo-university-v1.yaml", "SYN-VED-A-0010004", "WRONG-ACCOUNT")
+        with self.assertRaisesRegex(AssertionError, "Stage 1 sites differ from scenario ownership: northlake_thermal_plant"):
+            packet_from_edited_sources("data/eem/northlake-eem-stage1-setup-v1.yaml", "hierarchySitesFromScenario: [northlake_central_plant]", "hierarchySitesFromScenario: [northlake_central_plant, northlake_main_campus]")
+        with self.assertRaisesRegex(AssertionError, "Aggregate parent is not a hierarchy node: agg_nlu_science_net_electric_kwh_15m"):
+            packet_from_edited_sources("data/eem/northlake-eem-metaworld-stage1b-v1.yaml", "parentPath: System / Northlake University / Northlake Main Campus / Science Center", "parentPath: System / Northlake University / Northlake Main Campus / Applied Science Center")
+        with self.assertRaisesRegex(AssertionError, "Duplicate building path"):
+            packet_from_edited_sources("data/scenarios/demo-university-v1.yaml", "        displayName: Library\n", "        displayName: Science Center\n")
+        with self.assertRaisesRegex(AssertionError, "Security scope buildings differ from scenario ownership: northlake_thermal_plant"):
+            packet_from_edited_sources("data/security/northlake-eem-security-v1.yaml", "      buildings: [central_plant]", "      buildings: [central_plant, science_center]")
 
     def test_company_contacts_cover_the_handover_and_department_ownership(self):
-        packet = build_packet()
-        contacts = {row[1]: row for row in packet["sheets"]["Contacts"]["rows"]}
+        contacts = {row[1]: row for row in self.sheets["Contacts"]["rows"]}
         self.assertEqual(12, len(contacts))
         self.assertTrue({"Samantha Ireland", "Jordan Hale", "Priya Nandakumar", "Iris Morales", "Nora Chen", "Leo Martinez", "Maya Chen", "Devon Brooks"} <= contacts.keys())
         self.assertEqual("samantha.ireland@northlake.example.edu", contacts["Samantha Ireland"][3])
-        self.assertEqual("devon.brooks@northlake.example.edu", contacts["Devon Brooks"][3])
         self.assertEqual("Cedar Row Apartments", contacts["Maya Chen"][0])
         self.assertEqual("Northlake Thermal Plant", contacts["Devon Brooks"][0])
         self.assertEqual("facilities.ops@northlake.example.edu", contacts["Jordan Hale"][3])
         self.assertTrue(all(row[3] and row[4] and "TBD" not in row for row in contacts.values()))
         self.assertTrue({"Valley Electric District", "Sierra Gas Utility", "River City Utilities", "Helios Onsite Solar", "Northlake Thermal Plant"} <= {row[0] for row in contacts.values()})
-        units = packet["sheets"]["Organization Units"]["rows"]
+        units = self.sheets["Departments & Responsibilities"]["rows"]
         self.assertEqual(6, len(units))
-        self.assertEqual({"Northlake University", "Cedar Row Apartments", "Northlake Thermal Plant"}, {row[7] for row in units})
+        self.assertEqual({"Northlake University", "Cedar Row Apartments", "Northlake Thermal Plant"}, {row[0] for row in units})
         for row in units:
-            contact = contacts[row[2]]
-            self.assertEqual([contact[0], contact[3], contact[4]], [row[7], row[3], row[4]])
+            contact = contacts[row[3]]
+            self.assertEqual([contact[0], contact[3], contact[4]], [row[0], row[4], row[5]])
+        departments = {row[1] for row in units}
+        self.assertTrue(all(row[6] in departments for row in self.sheets["Sites"]["rows"]))
+        self.assertTrue(all(row[3] in departments for row in self.sheets["Buildings"]["rows"]))
 
     def test_acquisuite_golden_delivery_has_exact_time_and_energy_contract(self):
         files = sample_files()
@@ -113,14 +203,38 @@ class NorthlakePacketTests(unittest.TestCase):
         self.assertTrue(backfill[0].startswith("'2024-01-15 20:00:00'"))
         self.assertTrue(backfill[-1].startswith("'2024-01-15 21:45:00'"))
 
+    def test_checked_in_documents_match_regeneration(self):
+        for pdf in GENERATED_DOCUMENTS:
+            rendered = io.BytesIO()
+            render_generated_document(self.packet, pdf, rendered)
+            self.assertTrue((ROOT / pdf).read_bytes() == rendered.getvalue(), f"{pdf} is stale; run python generators/northlake_packet.py")
+
     def test_checked_in_deliveries_and_hashes_match_regeneration(self):
-        directory = ROOT / CUSTOMER / "sample-data/acquisuite"
+        directory = ROOT / SAMPLES
         expected = json.loads((directory / "expected-results.json").read_text(encoding="utf-8"))
         self.assertEqual("Not run", expected["installedAcceptance"])
         for case, sample in sample_files().items():
             actual = (directory / case / sample["filename"]).read_bytes()
             self.assertEqual(sample["content"].encode(), actual)
             self.assertEqual(expected["cases"][case]["sha256"], hashlib.sha256(actual).hexdigest())
+
+    def test_workbook_updater_rewrites_generated_sheets_and_preserves_the_rest(self):
+        with tempfile.TemporaryDirectory(prefix="northlake-workbook-test-") as folder:
+            copy = Path(folder) / "workbook.xlsx"
+            shutil.copyfile(TARGET, copy)
+            update_workbook(target=copy, packet=self.packet)
+            self.assertEqual([], update_workbook(target=copy, packet=self.packet))
+            wb = openpyxl.load_workbook(copy)
+            self.assertEqual(["Instructions", "Hierarchy"], wb.sheetnames[:2])
+            self.assertTrue({"Service Profiles", "Units and Submeters", "Chart of Accounts", "Users & Access", "Tenants & Leases", "Sustainability", "Projects"} <= set(wb.sheetnames))
+            self.assertNotIn("Organization Units", wb.sheetnames)
+            self.assertEqual(len(self.sheets) + 5, len(wb.sheetnames))
+            meters = wb["Meters"]
+            self.assertEqual("Meter Name", meters["A4"].value)
+            self.assertEqual(self.packet["counts"]["meters"] + 4, meters.max_row)
+            self.assertEqual("B5", meters.freeze_panes)
+            self.assertEqual(f"A4:L{meters.max_row}", meters.tables["MetersTable"].ref)
+            self.assertEqual("Town Center", wb["Tenants & Leases"]["A5"].value)
 
 
 if __name__ == "__main__":

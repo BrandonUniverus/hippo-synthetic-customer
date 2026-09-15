@@ -1,6 +1,6 @@
 """Outline the Northlake University lockups into font-independent SVG files.
 
-The wordmark SVGs in ``output/branding/images/custom`` originally used live
+The wordmark SVGs in ``documents/brand/images/custom`` originally used live
 ``<text>`` elements, which only render correctly where Open Sans is installed
 or can be fetched. Browsers never load fonts for an SVG referenced through an
 ``<img>`` tag, a favicon or an email client, so this script converts the two
@@ -11,7 +11,7 @@ Run from the repository root::
 
     python generators/outline_brand_lockups.py
 
-The geometry follows ``output/branding/Brand Assets.dc.html``: the mark on the
+The geometry follows ``documents/brand/Brand Assets.dc.html``: the mark on the
 left, "Northlake" in Open Sans ExtraBold with a slight negative tracking, and
 "UNIVERSITY" in Open Sans Semibold with wide tracking beneath it.
 """
@@ -27,7 +27,7 @@ from fontTools.ttLib import TTFont
 ROOT = Path(__file__).resolve().parents[1]
 FONTS = ROOT / "identity" / "branding" / "fonts"
 OUTPUTS = (
-    ROOT / "output" / "branding" / "images" / "custom",
+    ROOT / "documents" / "brand" / "images" / "custom",
     ROOT / "identity" / "branding",
 )
 

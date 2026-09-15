@@ -127,7 +127,7 @@ class ConfigurationServerTests(unittest.TestCase):
             environment=environment,
             runtime_directory=self.runtime_directory,
             manifest_path=(
-                REPOSITORY_ROOT / "security" / "northlake-eem-security-v1.yaml"
+                REPOSITORY_ROOT / "data" / "security" / "northlake-eem-security-v1.yaml"
             ),
             field_catalog_path=(
                 REPOSITORY_ROOT / "identity" / "configuration" / "fields.json"

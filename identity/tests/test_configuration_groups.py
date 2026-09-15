@@ -19,7 +19,7 @@ class SyntheticGroupStoreTests(unittest.TestCase):
         self.user_overlay_path = temporary_root / "users.json"
         self.group_overlay_path = temporary_root / "groups.json"
         self.manifest_path = (
-            REPOSITORY_ROOT / "security" / "northlake-eem-security-v1.yaml"
+            REPOSITORY_ROOT / "data" / "security" / "northlake-eem-security-v1.yaml"
         )
         self.user_store = SyntheticUserStore(
             self.manifest_path,
