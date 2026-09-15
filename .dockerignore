@@ -1,8 +1,8 @@
 *
 !identity/
 !identity/**
-!security/
-!security/northlake-eem-security-v1.yaml
+!data/security/
+!data/security/northlake-eem-security-v1.yaml
 
 identity/.env
 identity/.runtime/

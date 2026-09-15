@@ -16,7 +16,7 @@ class SyntheticUserStoreTests(unittest.TestCase):
         self.temporary_directory = tempfile.TemporaryDirectory()
         self.overlay_path = Path(self.temporary_directory.name) / "users.json"
         self.store = SyntheticUserStore(
-            REPOSITORY_ROOT / "security" / "northlake-eem-security-v1.yaml",
+            REPOSITORY_ROOT / "data" / "security" / "northlake-eem-security-v1.yaml",
             self.overlay_path,
             "A1!shared-synthetic-password",
         )

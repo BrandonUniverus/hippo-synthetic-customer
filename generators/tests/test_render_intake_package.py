@@ -7,7 +7,7 @@ from html.parser import HTMLParser
 
 import yaml
 
-from generators.render_intake_package import CUSTOMER, ONBOARDING, ROOT, SECTIONS, TARGET, parse_blocks, render_package
+from generators.render_intake_package import ONBOARDING, ROOT, SECTIONS, TARGET, parse_blocks, read_source, render_package
 
 
 class VisibleText(HTMLParser):
@@ -82,14 +82,14 @@ class IntakePackageTests(unittest.TestCase):
         for section in SECTIONS:
             expected = []
             for source in section["sources"]:
-                expected += source_words((ROOT / CUSTOMER / source).read_text(encoding="utf-8"))
+                expected += source_words(read_source(source))
             rendered = self.sections[section["key"]]
             missing = first_missing(expected, rendered)
             context = " ".join(expected[max(0, (missing or 0) - 6):(missing or 0) + 6])
             self.assertIsNone(missing, f"{section['key']}: source text not rendered near '{context}'")
 
     def test_every_table_row_is_rendered(self):
-        tables = [block for section in SECTIONS for source in section["sources"] for block in parse_blocks((ROOT / CUSTOMER / source).read_text(encoding="utf-8")) if block["kind"] == "table"]
+        tables = [block for section in SECTIONS for source in section["sources"] for block in parse_blocks(read_source(source)) if block["kind"] == "table"]
         self.assertEqual(self.html.count("<tr>"), sum(len(table["rows"]) + 1 for table in tables))
 
     def test_packet_version_and_issue_date_come_from_the_onboarding_manifest(self):

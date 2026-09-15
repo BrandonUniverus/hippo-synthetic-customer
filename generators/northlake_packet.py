@@ -3,8 +3,9 @@
 The scenario manifest owns the physical inventory (companies, sites, buildings,
 accounts, meters, channels); the Stage 1 and Stage 1B manifests own the EEM
 level names and mapping rules; the onboarding manifest owns decisions, contacts
-and source descriptions. This module joins them into the register, the
-workbook tables, the gateway coverage and the instance-mapping template.
+and source descriptions. This module joins them into the register and
+source-system inventory PDFs, the workbook tables, the gateway coverage PDF and
+the instance-mapping template.
 """
 
 import argparse
@@ -13,14 +14,20 @@ import csv
 import hashlib
 import json
 import re
+import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import yaml
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from generators.documents.build_documents import defaults_for  # noqa: E402
+from generators.documents.render_northlake_pdf import render_markdown  # noqa: E402
+
 
 ROOT = Path(__file__).resolve().parents[1]
-CUSTOMER = Path("customer-provided/northlake-university")
+INTAKE = Path("documents/intake-package")
+SAMPLES = INTAKE / "sample-data/acquisuite"
 KIND_LABELS = {
     "utility": "Utility meter",
     "unit_submeter": "Apartment submeter",
@@ -140,14 +147,14 @@ def point_name(channel, rules):
 
 
 def build_packet(root=ROOT):
-    scenario = read_yaml(root, "scenarios/demo-university-v1.yaml")
-    setup = read_yaml(root, "eem/northlake-eem-stage1-setup-v1.yaml")
-    model = read_yaml(root, "eem/northlake-eem-metaworld-stage1b-v1.yaml")
-    onboarding = read_yaml(root, "scenarios/northlake-onboarding-v1.yaml")
-    security = read_yaml(root, "security/northlake-eem-security-v1.yaml")
+    scenario = read_yaml(root, "data/scenarios/demo-university-v1.yaml")
+    setup = read_yaml(root, "data/eem/northlake-eem-stage1-setup-v1.yaml")
+    model = read_yaml(root, "data/eem/northlake-eem-metaworld-stage1b-v1.yaml")
+    onboarding = read_yaml(root, "data/scenarios/northlake-onboarding-v1.yaml")
+    security = read_yaml(root, "data/security/northlake-eem-security-v1.yaml")
     people = {p["id"]: p for p in security["users"]}
-    providers = {p["id"]: p for p in (read_yaml(root, f.relative_to(root)) for f in sorted((root / "providers").glob("*.yaml")))}
-    assert {p["id"] for p in scenario["providers"]} == set(providers), "Scenario providers differ from providers/*.yaml"
+    providers = {p["id"]: p for p in (read_yaml(root, f.relative_to(root)) for f in sorted((root / "data/providers").glob("*.yaml")))}
+    assert {p["id"] for p in scenario["providers"]} == set(providers), "Scenario providers differ from data/providers/*.yaml"
     rules = model["pointRules"]
     measure_types = model["measureTypes"]
 
@@ -472,9 +479,9 @@ def build_packet(root=ROOT):
 
 
 def sample_files(root=ROOT):
-    onboarding = read_yaml(root, "scenarios/northlake-onboarding-v1.yaml")
+    onboarding = read_yaml(root, "data/scenarios/northlake-onboarding-v1.yaml")
     spec = onboarding["acquiSuiteSample"]
-    scenario = read_yaml(root, "scenarios/demo-university-v1.yaml")
+    scenario = read_yaml(root, "data/scenarios/demo-university-v1.yaml")
     profile = next(p for p in scenario["gatewayBindings"]["profiles"] if p["id"] == spec["profileId"])
     node = profile["runtime"]["nodes"][0]
     filename = f"{node['values']['Serial Number']}_{node['points'][0]['values']['DeviceID']}.log"
@@ -496,43 +503,68 @@ def sample_files(root=ROOT):
     return result
 
 
-def write_packet(root=ROOT):
-    packet = build_packet(root)
-    output = root / "out/northlake-onboarding"
-    output.mkdir(parents=True, exist_ok=True)
-    (output / "packet.json").write_text(json.dumps(packet, indent=2, default=str) + "\n", encoding="utf-8", newline="\n")
+def register_markdown(packet):
     register_sheets = ["Hierarchy", "Departments & Responsibilities", "Contacts", "Sites", "Buildings", "Service Profiles", "Accounts And Agreements", "Meters", "Units and Submeters", "Measured Points", "Related Measurements", "Rollup Members", "Weather Assignments"]
     register = ["# Northlake Facilities and Meter Register", "", f"Packet {packet['version']} | Issued {packet['issuedOn']} | Fictional customer", "", "This register describes the requested setup. Every building appears once, under the company that owns its site, and lists every meter that serves it. Installation and ingestion acceptance are pending.", "", "## Customer decisions", ""]
     register += [f"- **{name}:** {text}" for name, text in packet["decisions"]]
     for name in register_sheets:
         register += ["", f"## {name}", "", packet["sheets"][name]["description"], "", markdown_table(packet["sheets"][name])]
-    (root / CUSTOMER / "facilities-and-meter-register.md").write_text("\n".join(register) + "\n", encoding="utf-8", newline="\n")
+    return "\n".join(register) + "\n"
+
+
+def source_inventory_markdown(packet):
     sources = ["# Northlake Source System Inventory", "", f"Packet {packet['version']} | Issued {packet['issuedOn']} | Facilities, IT and Finance", "", "Match each delivered measurement to the register. Only the AcquiSuite sample is supplied in this release; the remaining feeds require files, fixtures or services.", "", markdown_table(packet["sheets"]["Data Sources"]), "", "## Measurement mapping", "", markdown_table(packet["sheets"]["Source Measurements"])]
-    (root / CUSTOMER / "source-system-inventory.md").write_text("\n".join(sources) + "\n", encoding="utf-8", newline="\n")
+    return "\n".join(sources) + "\n"
+
+
+def gateway_coverage_markdown(packet):
     coverage = ["# Northlake Gateway Setup Coverage", "", "Generated from the scenario profiles. Each format is a separate acceptance case. No installed setup or ingestion result has been recorded.", "", markdown_table(packet["coverage"]), "", "FIG variants reuse one point in separate restored runs. HMR publishes reading events rather than interval measurements. Catalog entries without a represented runnable component remain outside this list and must be reconciled against the installed product before claiming complete gateway coverage."]
-    (root / "eem/northlake-gateway-coverage.md").write_text("\n".join(coverage) + "\n", encoding="utf-8", newline="\n")
-    with (root / "eem/northlake-instance-mapping.template.csv").open("w", newline="", encoding="utf-8") as file:
+    return "\n".join(coverage) + "\n"
+
+
+# Documents rendered straight from the packet, with no Markdown source: PDF path -> (masthead, Markdown).
+GENERATED_DOCUMENTS = {
+    "documents/intake-package/facilities-and-meter-register.pdf": ({"department": "Facilities Operations"}, register_markdown),
+    "documents/intake-package/source-system-inventory.pdf": ({"department": "Facilities Operations"}, source_inventory_markdown),
+    "implementation/northlake-gateway-coverage.pdf": ({}, gateway_coverage_markdown),
+}
+
+
+def render_generated_document(packet, pdf, output, root=ROOT):
+    masthead, markdown = GENERATED_DOCUMENTS[pdf]
+    render_markdown(markdown(packet), output, defaults={**defaults_for(pdf, root), **masthead})
+
+
+def write_packet(root=ROOT, dump_json=None):
+    packet = build_packet(root)
+    if dump_json:
+        dump_json.parent.mkdir(parents=True, exist_ok=True)
+        dump_json.write_text(json.dumps(packet, indent=2, default=str) + "\n", encoding="utf-8", newline="\n")
+    for pdf in GENERATED_DOCUMENTS:
+        render_generated_document(packet, pdf, root / pdf, root)
+    with (root / "data/eem/northlake-instance-mapping.template.csv").open("w", newline="", encoding="utf-8") as file:
         writer = csv.writer(file)
         writer.writerow(packet["instanceMapping"]["headers"])
         writer.writerows(packet["instanceMapping"]["rows"])
     samples = sample_files(root)
     for case, sample in samples.items():
-        directory = root / CUSTOMER / "sample-data/acquisuite" / case
+        directory = root / SAMPLES / case
         directory.mkdir(parents=True, exist_ok=True)
         (directory / sample["filename"]).write_bytes(sample["content"].encode())
-    spec = read_yaml(root, "scenarios/northlake-onboarding-v1.yaml")["acquiSuiteSample"]
+    spec = read_yaml(root, "data/scenarios/northlake-onboarding-v1.yaml")["acquiSuiteSample"]
     expected = {"profile": spec["profileId"], "timestampConvention": spec["timestampConvention"], "localDate": spec["localDate"], "localTimeZone": "America/Los_Angeles", "installedAcceptance": "Not run", "cases": {case: {k: v for k, v in data.items() if k != "content"} for case, data in samples.items()}}
-    (root / CUSTOMER / "sample-data/acquisuite/expected-results.json").write_text(json.dumps(expected, indent=2) + "\n", encoding="utf-8", newline="\n")
+    (root / SAMPLES / "expected-results.json").write_text(json.dumps(expected, indent=2) + "\n", encoding="utf-8", newline="\n")
     print(json.dumps(packet["counts"], indent=2))
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--check", action="store_true", help="Validate sources and sample expectations without writing files")
+    parser.add_argument("--dump-json", type=Path, metavar="PATH", help="Also write the joined packet as JSON for inspection")
     args = parser.parse_args()
     if args.check:
         packet = build_packet()
         sample_files()
         print(json.dumps(packet["counts"], indent=2))
     else:
-        write_packet()
+        write_packet(dump_json=args.dump_json)

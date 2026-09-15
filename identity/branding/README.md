@@ -5,9 +5,9 @@ the launchpad, the configuration pages and the customer browser lab all wear
 the same Northlake University identity. Northlake is a fictional university in
 a local development environment.
 
-Brand sources: `output/branding/Brand Assets.dc.html`,
-`output/branding/Login Mockup.dc.html` and
-`customer-provided/northlake-university/eem-application-branding.md`.
+Brand sources: `documents/brand/Brand Assets.dc.html`,
+`documents/brand/Login Mockup.dc.html` and
+`documents/brand/eem-application-branding.pdf`.
 
 ## Files
 
@@ -24,7 +24,7 @@ Brand sources: `output/branding/Brand Assets.dc.html`,
 
 Regenerate the outlined lockups after changing the wordmark geometry with
 `python generators/outline_brand_lockups.py` (needs `fonttools` and `brotli`).
-It writes the same two files to `output/branding/images/custom/` and here.
+It writes the same two files to `documents/brand/images/custom/` and here.
 
 ## Palette
 

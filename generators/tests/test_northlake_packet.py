@@ -12,7 +12,7 @@ from pathlib import Path
 
 import openpyxl
 
-from generators.northlake_packet import ROOT, CUSTOMER, build_packet, sample_files
+from generators.northlake_packet import GENERATED_DOCUMENTS, ROOT, SAMPLES, build_packet, render_generated_document, sample_files
 from generators.update_workbook import TARGET, update_workbook
 
 
@@ -20,8 +20,7 @@ def packet_from_edited_sources(edit_file, old, new):
     """Rebuild the packet from copied sources with one text change applied."""
     with tempfile.TemporaryDirectory(prefix="northlake-source-test-") as folder:
         root = Path(folder)
-        for directory in ["providers", "scenarios", "eem", "security"]:
-            shutil.copytree(ROOT / directory, root / directory)
+        shutil.copytree(ROOT / "data", root / "data")
         file = root / edit_file
         text = file.read_text(encoding="utf-8")
         assert text.count(old) == 1, old
@@ -149,15 +148,15 @@ class NorthlakePacketTests(unittest.TestCase):
 
     def test_drifted_identifiers_and_ownership_are_rejected(self):
         with self.assertRaisesRegex(AssertionError, "Account identifier drift: ved_student_center"):
-            packet_from_edited_sources("scenarios/demo-university-v1.yaml", "SYN-VED-A-0010004", "WRONG-ACCOUNT")
+            packet_from_edited_sources("data/scenarios/demo-university-v1.yaml", "SYN-VED-A-0010004", "WRONG-ACCOUNT")
         with self.assertRaisesRegex(AssertionError, "Stage 1 sites differ from scenario ownership: northlake_thermal_plant"):
-            packet_from_edited_sources("eem/northlake-eem-stage1-setup-v1.yaml", "hierarchySitesFromScenario: [northlake_central_plant]", "hierarchySitesFromScenario: [northlake_central_plant, northlake_main_campus]")
+            packet_from_edited_sources("data/eem/northlake-eem-stage1-setup-v1.yaml", "hierarchySitesFromScenario: [northlake_central_plant]", "hierarchySitesFromScenario: [northlake_central_plant, northlake_main_campus]")
         with self.assertRaisesRegex(AssertionError, "Aggregate parent is not a hierarchy node: agg_nlu_science_net_electric_kwh_15m"):
-            packet_from_edited_sources("eem/northlake-eem-metaworld-stage1b-v1.yaml", "parentPath: System / Northlake University / Northlake Main Campus / Science Center", "parentPath: System / Northlake University / Northlake Main Campus / Applied Science Center")
+            packet_from_edited_sources("data/eem/northlake-eem-metaworld-stage1b-v1.yaml", "parentPath: System / Northlake University / Northlake Main Campus / Science Center", "parentPath: System / Northlake University / Northlake Main Campus / Applied Science Center")
         with self.assertRaisesRegex(AssertionError, "Duplicate building path"):
-            packet_from_edited_sources("scenarios/demo-university-v1.yaml", "        displayName: Library\n", "        displayName: Science Center\n")
+            packet_from_edited_sources("data/scenarios/demo-university-v1.yaml", "        displayName: Library\n", "        displayName: Science Center\n")
         with self.assertRaisesRegex(AssertionError, "Security scope buildings differ from scenario ownership: northlake_thermal_plant"):
-            packet_from_edited_sources("security/northlake-eem-security-v1.yaml", "      buildings: [central_plant]", "      buildings: [central_plant, science_center]")
+            packet_from_edited_sources("data/security/northlake-eem-security-v1.yaml", "      buildings: [central_plant]", "      buildings: [central_plant, science_center]")
 
     def test_company_contacts_cover_the_handover_and_department_ownership(self):
         contacts = {row[1]: row for row in self.sheets["Contacts"]["rows"]}
@@ -204,8 +203,14 @@ class NorthlakePacketTests(unittest.TestCase):
         self.assertTrue(backfill[0].startswith("'2024-01-15 20:00:00'"))
         self.assertTrue(backfill[-1].startswith("'2024-01-15 21:45:00'"))
 
+    def test_checked_in_documents_match_regeneration(self):
+        for pdf in GENERATED_DOCUMENTS:
+            rendered = io.BytesIO()
+            render_generated_document(self.packet, pdf, rendered)
+            self.assertTrue((ROOT / pdf).read_bytes() == rendered.getvalue(), f"{pdf} is stale; run python generators/northlake_packet.py")
+
     def test_checked_in_deliveries_and_hashes_match_regeneration(self):
-        directory = ROOT / CUSTOMER / "sample-data/acquisuite"
+        directory = ROOT / SAMPLES
         expected = json.loads((directory / "expected-results.json").read_text(encoding="utf-8"))
         self.assertEqual("Not run", expected["installedAcceptance"])
         for case, sample in sample_files().items():

@@ -3,7 +3,7 @@
 This directory implements the realistic-provider portion of ADR-002a without
 changing EnergyHippo. It runs a pinned Keycloak realm behind trusted localhost
 HTTPS and derives all fictional users and groups from
-[`security/northlake-eem-security-v1.yaml`](../security/northlake-eem-security-v1.yaml).
+[`data/security/northlake-eem-security-v1.yaml`](../data/security/northlake-eem-security-v1.yaml).
 The same realm is a third-party-style OpenID Connect provider and SAML 2.0
 Identity Provider (IdP).
 
@@ -786,7 +786,7 @@ to `(new iss, sub)`.
 
 Checked-in sources:
 
-- `security/northlake-eem-security-v1.yaml`: users, enabled state, companies,
+- `data/security/northlake-eem-security-v1.yaml`: users, enabled state, companies,
   groups, permission intent, and validation counts.
 - `realm/generate_realm.py`: protocol, client, claim, lifetime, and stable-ID rules.
 - `configuration/fields.json`: presentation metadata for the Phase 1 form.

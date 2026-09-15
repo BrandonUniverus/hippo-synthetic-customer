@@ -33,7 +33,7 @@ SPEC.loader.exec_module(generate_realm)
 
 class GenerateRealmTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.manifest = REPOSITORY_ROOT / "security" / "northlake-eem-security-v1.yaml"
+        self.manifest = REPOSITORY_ROOT / "data" / "security" / "northlake-eem-security-v1.yaml"
         self.environment = {
             "IDENTITY_HOST": "localhost",
             "IDENTITY_HTTPS_PORT": "8443",

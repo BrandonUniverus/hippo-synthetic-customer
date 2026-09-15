@@ -1,29 +1,46 @@
-"""Render the Northlake intake package binder from the customer Markdown sources.
+"""Render the Northlake intake package binder from the customer document sources.
 
-The binder packages every document listed in
-customer-provided/northlake-university/design-brief.md into one self-contained HTML
-page: a cover, a table of contents and one section per document. It formats and
-never rewrites: each section is rendered from the current Markdown, and the packet
-version and issue date come from scenarios/northlake-onboarding-v1.yaml. Regenerate
-after any source change; --check exits with status 1 when the binder is stale.
-Print the page from a browser for the paper binder.
+The binder packages every document listed in the intake package design brief
+(generators/documents/sources/implementation/briefs/intake-package-design-brief.md)
+into one self-contained HTML page: a cover, a table of contents and one section per
+document. It formats and never rewrites: each section is rendered from the current
+Markdown source, the register and source-system inventory come straight from the
+packet, and the packet version and issue date come from
+data/scenarios/northlake-onboarding-v1.yaml. Regenerate after any source change;
+--check exits with status 1 when the binder is stale. Print the page from a browser
+for the paper binder.
 """
 
 import argparse
 import base64
 import html
 import re
+import sys
 from datetime import date
 from pathlib import Path
 
 import yaml
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from generators.northlake_packet import build_packet, register_markdown, source_inventory_markdown  # noqa: E402
+
 
 ROOT = Path(__file__).resolve().parents[1]
-CUSTOMER = Path("customer-provided/northlake-university")
-ONBOARDING = Path("scenarios/northlake-onboarding-v1.yaml")
-TARGET = Path("output/intake/Northlake Intake Package.html")
+SOURCES = Path("generators/documents/sources/documents")
+ONBOARDING = Path("data/scenarios/northlake-onboarding-v1.yaml")
+TARGET = Path("documents/intake-package/Northlake Intake Package.html")
 FONTS = Path(__file__).resolve().parent / "fonts"
+FRONT_MATTER = re.compile(r"\A---\n.*?\n---\n+", re.S)
+
+# Binder source name -> where its Markdown lives under SOURCES; the register and
+# source-system inventory have no Markdown source and are built from the packet.
+SOURCE_FOLDERS = {
+    "northlake-facilities-and-utility-overview.md": "guides",
+    "chart-of-accounts-and-gl-guide.md": "guides",
+    "sustainability-requirements.md": "guides",
+    "tenant-and-lease-roster.md": "guides",
+}
+GENERATED_SOURCES = {"facilities-and-meter-register.md": register_markdown, "source-system-inventory.md": source_inventory_markdown}
 
 # Source stem -> (palette, band colour, band ink, icon). Order is the binder order.
 TARIFF_SHEETS = {
@@ -87,6 +104,17 @@ ICONS = {
 
 def read_text(path):
     return path.read_text(encoding="utf-8").replace("\r\n", "\n")
+
+
+def read_source(name, root=ROOT, packet=None):
+    """The Markdown for one binder source, without its PDF front matter."""
+    if name in GENERATED_SOURCES:
+        return GENERATED_SOURCES[name](packet or build_packet(root))
+    if name.startswith("rate-tariff-sheets/"):
+        path = SOURCES / "rate-tariffs" / Path(name).name
+    else:
+        path = SOURCES / SOURCE_FOLDERS.get(name, "intake-package") / name
+    return FRONT_MATTER.sub("", read_text(root / path), count=1)
 
 
 def is_table_start(lines, index):
@@ -179,8 +207,10 @@ def link(match, links):
     label, target = match[1], html.unescape(match[2])
     if target.startswith(("http://", "https://", "mailto:")):
         return f'<a href="{html.escape(target)}">{label}</a>'
-    if target in links:
-        return f'<a href="#{links[target]}">{label}</a>'
+    # Sources link to each other's PDFs; inside the binder those become section anchors.
+    stem = Path(target.partition("#")[0]).stem
+    if stem in links:
+        return f'<a href="#{links[stem]}">{label}</a>'
     return label
 
 
@@ -400,14 +430,15 @@ def render_package(root=ROOT):
     version = str(onboarding["packetVersion"])
     issued = date.fromisoformat(str(onboarding["issuedOn"]))
     issued_text = f"{issued:%B} {issued.day}, {issued.year}"
-    documents = {source: read_text(root / CUSTOMER / source) for section in SECTIONS for source in section["sources"]}
+    packet = build_packet(root)
+    documents = {source: read_source(source, root, packet) for section in SECTIONS for source in section["sources"]}
     coverage = re.search(r"\*\*Planned coverage period:\*\*\s*(.+)", documents["00-cover-letter.md"])
     if coverage is None:
         raise ValueError("00-cover-letter.md must state the planned coverage period")
     links = {}
     for section in SECTIONS:
         for source in section["sources"]:
-            links[Path(source).name] = f"sheet-{Path(source).stem}" if section["layout"] == "tariffs" else f"section-{section['key']}"
+            links[Path(source).stem] = f"sheet-{Path(source).stem}" if section["layout"] == "tariffs" else f"section-{section['key']}"
 
     sections, contents = [], []
     for number, section in enumerate(SECTIONS, start=1):

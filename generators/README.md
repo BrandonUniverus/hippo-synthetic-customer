@@ -2,21 +2,23 @@
 
 The first generator builds the facilities/meter register, customer source
 mapping, gateway coverage, a blank UI-ID capture template, and three AcquiSuite
-deliveries. It never opens a database or configures an EEM instance.
+deliveries. It never opens a database or configures an EEM instance. Every other
+Northlake document is rendered from its Markdown source; see
+[`documents/README.md`](documents/README.md).
 
 ## Sources and ownership
 
 | Source | Owns |
 | --- | --- |
-| `scenarios/demo-university-v1.yaml` | The physical inventory: companies, sites and the company that owns each, buildings with service profiles and apartment counts, accounts, utility meters and their channels, owned submeters and sources (with per-apartment templates), and gateway-side bindings |
-| `providers/*.yaml` | Numeric base tariffs, identifier formats and provider facts |
-| `eem/northlake-eem-stage1-setup-v1.yaml` | The level names shared by every company (Site, Building, Meter, Point), the scenario sites each company creates, the Weather Reference site and security groups |
-| `eem/northlake-eem-metaworld-stage1b-v1.yaml` | EEM mapping only: measure types, which channel roles become points and how they are named, rate schedule and billing account kinds, weather stations and assignments, aggregates and baselines |
-| `scenarios/northlake-onboarding-v1.yaml` | Packet decisions, contact responsibilities and department ownership, source descriptions, known events and first sample contract |
-| `security/northlake-eem-security-v1.yaml` | Existing fictional people's names, titles, personal email and company ownership, reused for Northlake contacts |
+| `data/scenarios/demo-university-v1.yaml` | The physical inventory: companies, sites and the company that owns each, buildings with service profiles and apartment counts, accounts, utility meters and their channels, owned submeters and sources (with per-apartment templates), and gateway-side bindings |
+| `data/providers/*.yaml` | Numeric base tariffs, identifier formats and provider facts |
+| `data/eem/northlake-eem-stage1-setup-v1.yaml` | The level names shared by every company (Site, Building, Meter, Point), the scenario sites each company creates, the Weather Reference site and security groups |
+| `data/eem/northlake-eem-metaworld-stage1b-v1.yaml` | EEM mapping only: measure types, which channel roles become points and how they are named, rate schedule and billing account kinds, weather stations and assignments, aggregates and baselines |
+| `data/scenarios/northlake-onboarding-v1.yaml` | Packet decisions, contact responsibilities and department ownership, source descriptions, known events and first sample contract |
+| `data/security/northlake-eem-security-v1.yaml` | Existing fictional people's names, titles, personal email and company ownership, reused for Northlake contacts |
 
 These files own different fields and never re-list each other's facts; the
-rules are in [`docs/northlake-inventory-standard.md`](../docs/northlake-inventory-standard.md).
+rules are in [`implementation/northlake-inventory-standard.pdf`](../implementation/northlake-inventory-standard.pdf).
 The generator joins them: it expands the per-apartment submeter and gateway
 templates (one electric and one water submeter for each of the 124 Cedar Row
 apartments), builds the hierarchy from the scenario sites and buildings under
@@ -33,7 +35,7 @@ actual EEM nodes. Later-phase workbook tabs are preserved by the updater.
 
 ## Generate and validate
 
-Python 3.11+ with the dependency in `requirements.txt`:
+Python 3.11+ with the dependencies in `requirements.txt`:
 
 ```powershell
 python -m pip install -r generators/requirements.txt
@@ -43,15 +45,16 @@ python generators/northlake_packet.py
 python generators/update_workbook.py
 ```
 
-The third command writes customer Markdown/sample files, the EEM mapping template
-and coverage, plus `out/northlake-onboarding/packet.json` for inspection. The
-JSON intermediate is disposable and ignored by Git. Samples have fixed bytes and
-checksums; there is no random or current-time input.
+The fourth command writes the register and source-system inventory PDFs to
+`documents/intake-package/`, the AcquiSuite samples beside them, the gateway
+coverage PDF to `implementation/` and the EEM mapping template to `data/eem/`.
+Pass `--dump-json <path>` to also write the joined packet for inspection. PDFs
+and samples have fixed bytes; there is no random or current-time input.
 
 ## Update the workbook
 
 `update_workbook.py` rewrites the generated worksheets of the only customer
-workbook, `outputs/northlake-university/data-collection-workbook.xlsx`, with
+workbook, `documents/intake-package/data-collection-workbook.xlsx`, with
 openpyxl. It rebuilds each generated tab (title, description, table, status
 validation lists, widths, freeze panes) and leaves the later-phase tabs
 (Chart of Accounts, Users & Access, Tenants & Leases, Sustainability, Projects)
@@ -68,13 +71,14 @@ Excel locks the workbook while it is open. Close it first, or pass
 
 ## Render the intake binder
 
-`render_intake_package.py` packages the customer Markdown documents listed in
-[`design-brief.md`](../customer-provided/northlake-university/design-brief.md)
-into `output/intake/Northlake Intake Package.html`: one self-contained page with
+`render_intake_package.py` packages the customer documents listed in the
+[intake package design brief](../implementation/briefs/intake-package-design-brief.pdf)
+into `documents/intake-package/Northlake Intake Package.html`: one self-contained page with
 a cover, contents and a section per document, including the register and source
-inventory. It formats and never rewrites; the packet version and issue date come
-from `scenarios/northlake-onboarding-v1.yaml`, and the fonts are embedded from
-`generators/fonts`. Run it after regenerating the Markdown:
+inventory. It formats and never rewrites: sections come from the Markdown in
+`generators/documents/sources/documents/` and from the packet, the packet version and issue
+date come from `data/scenarios/northlake-onboarding-v1.yaml`, and the fonts are
+embedded from `generators/fonts`. Run it after changing a source:
 
 ```powershell
 python generators/render_intake_package.py
@@ -92,11 +96,11 @@ inventory print on landscape pages.
 AcquiSuite is the first file emitter. MV90 MDEF/MV9, FIG variants, Spinwave,
 Neptune, MVRS, bill import, the ODBC historian, weather fixtures, and live
 BACnet/Modbus sources remain planned in
-[`docs/synthetic-meter-system-plan.md`](../docs/synthetic-meter-system-plan.md).
+[`implementation/synthetic-meter-system-plan.pdf`](../implementation/synthetic-meter-system-plan.pdf).
 Add one real intake format and its independently checked expected results at a
 time. Do not bypass the gateway or bill importer by inserting EEM customer data.
 
 Generated samples do not establish installed acceptance. Use
-[`eem/northlake-onboarding-ui-checklist.md`](../eem/northlake-onboarding-ui-checklist.md)
+[`implementation/northlake-onboarding-ui-checklist.pdf`](../implementation/northlake-onboarding-ui-checklist.pdf)
 to create the customer through the UI, exercise ingestion, record actual IDs
 and results, and promote a tested restore baseline.

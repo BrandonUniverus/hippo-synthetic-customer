@@ -22,7 +22,7 @@ from openpyxl.worksheet.table import Table, TableStyleInfo
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from generators.northlake_packet import ROOT, build_packet  # noqa: E402
 
-TARGET = ROOT / "outputs/northlake-university/data-collection-workbook.xlsx"
+TARGET = ROOT / "documents/intake-package/data-collection-workbook.xlsx"
 STATUS_CHOICES = '"Documented,Pending,Planned,Sample supplied,Confirmed,UI acceptance pending,Ongoing"'
 LEGACY_STATUS_CHOICES = '"Draft,Needs review,Confirmed,Not applicable"'
 LEGACY_SHEETS = ["Organization Units"]
