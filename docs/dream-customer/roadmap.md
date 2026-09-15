@@ -11,11 +11,11 @@ the first gateway.
 
 ## Current milestone — UI foundation and one gateway
 
-Use the [packet 0.2 customer inventory](../../customer-provided/northlake-university/README.md)
+Use the [packet 0.3 customer inventory](../../customer-provided/northlake-university/README.md)
 and [Student Center UI checklist](../../eem/northlake-onboarding-ui-checklist.md):
 
-1. With the existing setup account, create the missing Northlake company,
-   location, provider, account, meter and two interval points through the UI.
+1. With the existing setup account, create the missing Northlake company, site,
+   building, provider, account, meter and two interval points through the UI.
 2. Configure the AcquiSuite gateway and its normal workflow/task path through
    the UI. Capture actual instance IDs; scenario numeric IDs are illustrative.
 3. Run the supplied complete-day, replay, gap and backfill cases. Confirm stored
@@ -186,7 +186,7 @@ allocation) *and* sub-metered **Cedar Row** (residential allocation).
   factor members with effective dates, meter→category mapping (electric Scope 2,
   gas/steam Scope 1), per-company scope config.
 - **ENERGY STAR ratings**: obtain responses through the supported sandbox
-  integration for the 8 mapped properties across several periods; retain
+  integration for the 13 mapped properties across several periods; retain
   request/response evidence.
 - **Weather regression**: run the supported calculation workflow for metered
   buildings from interval + weather data and verify the resulting fit statistics.

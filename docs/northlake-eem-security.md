@@ -46,11 +46,11 @@ access because it carries one or more permission profiles.
 ## Company Contexts
 
 | Company/context | Type | Create in DBAdmin? | Why it exists |
-| --- | --- | --- |
+| --- | --- | --- | --- |
 | System (`CompanyID = -1`) | Built-in EEM system context | No | Owns DB/admin/setup, implementation, gateway-prep, and support read-only users. |
 | Northlake University | Campus operations company | Yes | Owns the main campus setup, campus utility setup, broad reporting, and central finance roles. It does not duplicate Cedar Row hierarchy or meters. |
 | Cedar Row Apartments | Operating company | Yes | Tests a smaller scoped company with its own admin, bill entry, bill import, reports, and audit access. |
-| Northlake Thermal Plant | Internal service company | Yes | Tests internal service-provider behavior for chilled-water and steam allocations, including Library steam and central-plant controller points. |
+| Northlake Thermal Plant | Internal service company | Yes | Tests internal service-provider behavior for chilled-water and steam allocations. It holds only the Central Plant, including its production meters and chiller controller points; served-building meters such as Library Steam belong to Northlake University. |
 
 ## Permission Profiles
 
@@ -77,7 +77,7 @@ The manifest defines these profiles:
 
 ## User Coverage
 
-The first pass has 18 users:
+The first pass has 19 users:
 
 | User | Primary company | Coverage |
 | --- | --- | --- |
@@ -95,6 +95,7 @@ The first pass has 18 users:
 | Riley Santos | Northlake Thermal Plant | Thermal plant operator and reports. |
 | Keiko Tan | Northlake Thermal Plant | Thermal allocation and rate administration. |
 | Quinn Roberts | Northlake University | Cross-company audit read-only. |
+| Dana Okafor | Northlake University | Reports scoped to Science Center nodes only (intra-company node-scope case). |
 | Avery Singh | System (`CompanyID = -1`) | DB admin and implementation admin. |
 | Morgan Patel | System (`CompanyID = -1`) | Implementation admin and Stage 2 gateway/task prep view. |
 | Taylor Bennett | System (`CompanyID = -1`) | Support read-only. |
@@ -114,4 +115,4 @@ This security model is useful because it exercises several permission shapes:
 - Stage 1 gateway/task visibility without task execution.
 
 The expected counts are 3 created companies, 1 built-in system company context,
-26 groups, 18 users, 17 active users, and 1 disabled user.
+27 groups, 19 users, 18 active users, and 1 disabled user.

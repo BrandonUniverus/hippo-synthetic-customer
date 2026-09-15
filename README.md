@@ -29,6 +29,7 @@ The first customer is intentionally small enough to reason about and broad enoug
 docs/
   vision.md                    Project principles and rollout plan.
   synthetic-customer-v1.md     First customer shape and data scope.
+  northlake-inventory-standard.md  Adopted hierarchy and inventory rules (one building, once; one owner per fact).
   scenario-catalog.md          Behavioral scenarios this dataset should exercise.
   integration-coverage.md      Coverage matrix for gateways, reports, and integrations.
 schemas/
@@ -42,6 +43,7 @@ security/
   northlake-eem-security-v1.yaml Stage 1 EEM company/context/group/user setup.
 eem/
   northlake-eem-stage1-setup-v1.yaml DBAdmin-facing Stage 1 setup fields.
+  northlake-eem-metaworld-stage1b-v1.yaml EEM mapping rules (measure types, point rules, weather, aggregates).
 identity/
   README.md                    Runnable synthetic OIDC and SAML identity provider.
   compose.yml                  Pinned Keycloak, PostgreSQL, and HTTPS proxy stack.
@@ -51,18 +53,23 @@ generators/
 
 ## Current Status
 
-Start with the [Northlake onboarding packet](customer-provided/northlake-university/README.md)
-and [first UI implementation checklist](eem/northlake-onboarding-ui-checklist.md).
+Start with the [Northlake onboarding packet](customer-provided/northlake-university/README.md),
+the [inventory standard](docs/northlake-inventory-standard.md) it follows, and the
+[first UI implementation checklist](eem/northlake-onboarding-ui-checklist.md).
 Use the single [Data Collection workbook](outputs/northlake-university/data-collection-workbook.xlsx)
 for inventory, contacts, source systems and later-phase requirements. Contacts
-and Organization Units include the implementation people and department owners
-for all three Northlake companies.
-Packet 0.2 reconciles the existing source and EEM setup manifests into a complete
-listed inventory: 21 accounts, 29 meter/reference groups and 52 explicitly
-defined points, with nine related-measurement relationships and four aggregates.
-It supplies a deterministic Student Center AcquiSuite normal-day, gap and
-backfill sample. The gateway list covers 13 profiles / 19 format cases plus the
-handheld-event publisher; only AcquiSuite has a generated intake sample so far.
+and Departments & Responsibilities include the implementation people and
+department owners for all three Northlake companies. Every company uses the same
+Site, Building, Meter and Point levels; a building appears once, in the company
+that owns its site, and holds every meter that serves it. Hierarchy lists the
+company, site and building nodes, and Meters records each meter's full parent path.
+Packet 0.3 renders one join of the scenario, provider and EEM mapping manifests:
+3 companies, 13 buildings, 49 accounts, 322 meters (55 utility meters, 265 owned
+submeters and sources, 2 weather stations) and 431 points, including one electric
+and one water submeter for each of the 124 Cedar Row apartments. It supplies a
+deterministic Student Center AcquiSuite normal-day, gap and backfill sample. The
+gateway list covers 15 profiles / 21 format cases plus the handheld-event
+publisher; only AcquiSuite has a generated intake sample so far.
 
 UI setup, installed ingestion acceptance and baseline backup/restore are the
 next steps. A source specification or generated sample is not an installed test

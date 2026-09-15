@@ -47,7 +47,7 @@ Every cost line is coded with our **five segments** in addition to the GL accoun
 | Main Campus buildings (electric/gas/water) | by commodity | 110 Operating | Facilities |
 | Science Center labs | by commodity | 110 Operating | Labs |
 | Cedar Row Apartments | by commodity | 250 Auxiliary | Housing |
-| Thermal plant allocations | 5130-THERMAL | 700 Plant | Facilities |
+| Thermal plant allocations (six cost centers, one per served building) | 5130-THERMAL | 700 Plant | Facilities |
 | Solar PPA | 5140-SOLAR | 110 Operating | Facilities |
 
 Some segment values are intentionally left blank on certain accounts (e.g.
@@ -67,3 +67,6 @@ Activity/Project) — that is expected, not an error.
 - Confirm the exact ERP import layout for the AP voucher and GL journal.
 - Confirm object codes per commodity.
 - Confirm whether the solar PPA posts to AP or is handled as a separate agreement.
+- The Thermal Plant runs as its own operating company with its own electric, gas
+  and water accounts at the Central Plant; confirm how those accounts are coded
+  (the table above covers only its allocations).

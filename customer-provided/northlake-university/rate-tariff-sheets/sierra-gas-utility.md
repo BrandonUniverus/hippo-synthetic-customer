@@ -18,6 +18,20 @@ therms per ccf**.
 | Public purpose surcharge | rider | as applicable |
 | Utility users tax | % of charges | as applicable |
 
+## Schedule: Large Volume Firm Service (SGU-GL-1)
+
+**Effective Jan 1, 2024 – Dec 31, 2025**
+
+| Charge | Basis | Rate |
+| --- | --- | --- |
+| Customer charge | per month | $245.00 |
+| Commodity — Winter | per therm (Nov–Mar) | $0.982 |
+| Commodity — Summer | per therm (Apr–Oct) | $0.741 |
+| Transport | per therm | $0.163 |
+
+Account on this schedule: Central Plant (Northlake Thermal Plant), meter Central
+Plant Boiler Gas — boiler fuel for the campus steam loop.
+
 **Notes for setup:**
 - We expect a **monthly fuel cost adjustment** on this service — a per-therm
   amount that changes each month. Please model it so each month can carry its own
@@ -28,4 +42,7 @@ therms per ccf**.
   double-counting.
 - A negative-test file for this service intentionally uses an unsupported unit
   (BTU/hr) and should be rejected, not loaded.
-- Accounts on this schedule: Admin Hall, Science Center, Library, Student Center.
+- Accounts on SGU-GN-1: Admin Hall, Science Center, Library, Student Center,
+  Lakeview Residence Hall, Recreation and Aquatics Center, Cedar Row A, Cedar Row
+  B and Cedar Row Common House. Cedar Row A and B gas serves the central
+  domestic hot-water boilers; apartments have no gas service.

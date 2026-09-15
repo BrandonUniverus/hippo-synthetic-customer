@@ -46,7 +46,7 @@ statusHistory:
   entryLagDays: { valley_electric_district: 3, river_city_utilities: 4, sierra_gas_utility: 5, northlake_thermal_plant: 6, helios_onsite_solar: 7, cedar_row: 5 }
 
 digitalPoints:
-  - { id: ch_modbus_ntp_chiller_enable_status, stateSet: "chiller_run {0 off,1 on}", interval: 15 }
+  - { id: ch_modbus_ntp_chiller_enable_status, stateSet: "chiller_run {0 off,1 on}", interval: 5 }
   - { id: ch_student_center_occupancy_status, stateSet: "occupancy {0 unoccupied,1 occupied}", interval: 15 }
   - { id: ch_science_center_lab_exhaust_status, stateSet: "exhaust_mode {0 normal,1 high}", interval: 15 }
 
@@ -54,7 +54,7 @@ notesAndImages:
   notes:
     - { target: library electric meter, tableCode: METR, text: "Meter replaced 2024-08-14; new serial, same account; reads continuous." }
     - { target: SGU Student Center estimated bill, tableCode: BL, text: "Estimated read; corrected actual next cycle." }
-    - { target: RCU Cedar Row A account, tableCode: BA, text: "Account number changed at 2025 renewal; continuity preserved across 3 services." }
+    - { target: RCU Cedar Row A account, tableCode: BA, text: "Account number changed at the July 2024 renewal; continuity preserved for the water and sewer services." }
   images:
     - { target: each provider sample bill, tableCode: BL, kind: bill_image, fileRef: "output/pdf/<provider>/*.pdf" }
 
@@ -62,8 +62,8 @@ fixtures:
   - { id: late_bill, account: SGU Library, behavior: "stop series 1 period early -> appears in rp_LateBills (>5 day overdue)" }
   - { id: estimated_bill_correction, account: SGU Student Center, behavior: "estimated bill then corrected actual supersedes" }
   - { id: meter_replacement, account: VED Library, behavior: "meter swap 2024-08-14/15; no double-count" }
-  - { id: duplicate_file_import, account: RCU Cedar Row A, behavior: "re-import combined file; no service double-counted" }
-  - { id: account_number_change, account: RCU Cedar Row A, behavior: "new account # at 2025 renewal" }
+  - { id: duplicate_file_import, account: RCU Northlake Main Campus combined file, behavior: "same file delivered twice (2024-09); no service double-counted" }
+  - { id: account_number_change, account: RCU Cedar Row A, behavior: "new account # at the July 2024 renewal" }
   - { id: provider_rate_change, scope: VED, behavior: "bills >=2025-01 use FY2025 rates" }
   - { id: fiscal_period_not_found, behavior: "import a bill dated 2026-01 -> rejected (no calendar period)" }
 

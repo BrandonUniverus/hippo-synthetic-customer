@@ -24,8 +24,9 @@ down the tree), (b) **which screens/reports** (`SiEAppObjects` + `Permissions_TB
 types `$/A/D/EX/F/MI/MU/TS`), and (c) **authority level** (`AccessLevel` 1 read /
 2 edit / 3 approve — e.g. bill QC approval requires ≥3).
 
-**Northlake today.** Strong *design*: 3 EEM companies, hierarchy levels per
-company, 19 users, 27 groups, 16 permission profiles, disabled-user case. Units
+**Northlake today.** Strong *design*: 3 EEM companies sharing the same hierarchy
+levels (Site, Building, Meter, Point), 19 users, 27 groups, 16 permission
+profiles, disabled-user case. Units
 include the unusual ones (ton-hours, klb, ERU). All in YAML, **not loaded**, and
 no built pipeline to load it.
 
@@ -74,8 +75,10 @@ MultiPointTrend, HeatMap, LoadDurationCurve, Histogram, ScatterPlot, Summary,
 AverageHourlyProfile, DigitalSummary, DataViewExport, MonthlyEUI, UsageVariance,
 AggregateDemand, AggregatePeakLoad).
 
-**Northlake today.** Strong: 15-min electric (Science Center, Student Center) and
-solar (3 arrays), hourly chilled water, 5-min chiller kW, weather/sensor series.
+**Northlake today.** Strong: 15-min electric (Science Center, Student Center,
+Lakeview Residence Hall, Recreation and Aquatics Center, Central Plant) and solar
+(3 arrays), hourly chilled water and Central Plant production, hourly apartment
+electric submeters, 5-min chiller kW, weather/sensor series.
 
 **Gap.** Few **digital/status** points (DigitalSummary stays thin); interval
 coverage is concentrated on a few meters.
@@ -198,14 +201,16 @@ interval or bill data). 14 reports depend on this subsystem.
 > per-tenant percentages and writes them as method-1 fixed/percent rows. So to
 > exercise each method we supply the right precomputed shares + method id.
 
-**Northlake today.** Nothing usable — Cedar Row is modeled at common-area level
-only; there are no tenants, no sub-meters per unit, no allocation configs.
+**Northlake today.** The metering exists but nothing is configured — Cedar Row
+A and B are master-metered with an owned electric submeter and water submeter
+for each of the 124 apartments plus house submeters; there are no tenants and
+no allocation configs.
 
 **Gap.** Entire subsystem absent.
 
 **What to add.** A **mixed-use multi-tenant property** (proposed: *Northlake Town
-Center* — anchor retail + in-line shops + an office tower + a food court, or
-sub-metered Cedar Row units) structured to hit **every** method: fixed/%, fully
+Center* — anchor retail + in-line shops + an office tower + a food court, and
+the already sub-metered Cedar Row apartments) structured to hit **every** method: fixed/%, fully
 & partially submetered, building-areas, coincident-demand, metered substations,
 and bill aggregation up to a cost center. Plus **WUI point families** (index +
 measured, with deliberate fail-reason cases), **generated tenant bills** under
@@ -278,7 +283,7 @@ PMPropertyID) + rating **requests** (`ESRequest`) and **responses/scores**
 (`ESResponseFacility`). Reports: RatingComparison, RatingHistory, RequestLog.
 Scores normally come from the Portfolio Manager API.
 
-**Northlake today.** Excellent property mapping (8 properties, exact
+**Northlake today.** Excellent property mapping (13 properties, exact
 PrimaryFunction enums, use details) — but **no rating requests or responses**, so
 the rating reports are empty.
 
@@ -368,7 +373,7 @@ component-based **workflow** engine (gateways, REST, SQL, file transfer, email,
 run-process, control-flow nodes), scheduled by interval/cron. `TaskLog` records
 runs. Reports: TaskLog, GatewayStatus, job_scheduler dashboard.
 
-**Northlake today.** 13 gateway *profiles* are designed, but there is no task run
+**Northlake today.** 15 gateway *profiles* are designed, but there is no task run
 history, no schedules, no workflows.
 
 **What to add.** Task schedules for the gateways + bill import + report delivery;

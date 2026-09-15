@@ -2,33 +2,26 @@
 
 Provided by: Northlake Facilities & Finance. Synthetic/illustrative. These
 requirements are already represented in the Data Collection Workbook. Packet
-0.2 expands the workbook to 23 tabs with complete meter and measurement
-inventories, related measurements, rollup members, weather assignments, numeric
-base tariff components and source mappings. Contacts and Organization Units
-contain the complete implementation directory and department ownership. The
-later-phase requirements below retain their earlier content in the same workbook.
+0.3 gives the workbook 26 tabs: 21 tabs generated from the inventory (including
+Hierarchy, Service Profiles, Meters, Units and Submeters, Measured Points,
+related measurements, rollup members, weather assignments, rate schedules and
+components, and source mappings) and the 5 later-phase tabs below. Contacts and
+Departments & Responsibilities contain the complete implementation directory and
+department ownership. Hierarchy records each company's sites and buildings; a
+building appears once, in the company that owns its site, and Meters supplies
+each meter's full parent path.
 
 This document retains the later-phase requirement tables. Current structured
 inventory and tariff values are generated from the
 [versioned sources](../../generators/README.md); installed setup and acceptance
 are recorded separately.
 
-## Tab: Rate Schedules
+## Rate schedules
 
-| Provider | Schedule | Type | Effective | Key charges |
-| --- | --- | --- | --- | --- |
-| Valley Electric | VED-TOU-GS | TOU + demand | 2024 | On/Part/Off energy, demand, facility |
-| Valley Electric | VED-TOU-GS-FY25 | TOU + demand | 2025 | rate-change step |
-| Sierra Gas | SGU-GN-1 | Seasonal | 2024–2025 | customer, winter/summer commodity, transport |
-| River City | RCU-W-TIER | Tiered water | 2024–2025 | meter charge by size, 3 usage tiers |
-| River City | RCU-S-VOL | Volumetric sewer | 2024–2025 | base + per-kgal on water |
-| River City | RCU-SW-ERU | Flat stormwater | 2024–2025 | per ERU |
-| Northlake Thermal | NTP-ALLOC-CHW | Internal allocation | 2024–2025 | per ton-hour + peak ton demand |
-| Northlake Thermal | NTP-ALLOC-STEAM | Internal allocation | 2024–2025 | per klb |
-| Helios Solar | HOS-PPA-2024 | PPA | 2024–2025 | per kWh generated, escalator, export credit |
-
-(Detail in the rate tariff sheets. Analysis-only rates we'd like added: a
-real-time/index electric option and a large-demand ratchet rate.)
+The Rate Schedules and Rate Components tabs are generated from our five
+providers' tariffs (14 base schedules); the rate tariff sheets carry the detail.
+Analysis-only rates we'd like added: a real-time/index electric option and a
+large-demand ratchet rate.
 
 ## Tab: Chart of Accounts
 
@@ -71,6 +64,8 @@ Plus ≈120 building representatives as **report-delivery recipients** (groups).
 
 ## Tab: Tenants & Leases
 
+Cedar Row is part of this packet; Town Center is a later implementation phase.
+
 | Property | Building | Tenant / space | Approx. size | Split method | Master meter |
 | --- | --- | --- | --- | --- | --- |
 | Town Center | Market Hall | Anchor Store | — | Fixed + common | Mall-Main |
@@ -81,19 +76,23 @@ Plus ≈120 building representatives as **report-delivery recipients** (groups).
 | Town Center | Campus Annex | Bldg A/B/C | — | Usage + coincident demand | Annex-Main |
 | Town Center | Substation | Substation 1/2 | — | % of usage | Substation-Master |
 | Town Center | — | Property Total | — | Aggregation of all | — |
-| Cedar Row | A | 60 units | — | Sub-metered + occupancy | common-area |
-| Cedar Row | B | 64 units | — | Sub-metered + occupancy | common-area |
+| Cedar Row | A | 60 apartments | — | By apartment electric and water submeter; sewer capped at winter average; house submeters as overhead | Cedar Row A Electric Master; Cedar Row A Water Master |
+| Cedar Row | B | 64 apartments | — | Same as A | Cedar Row B Electric Master; Cedar Row B Water Master |
 
 ## Tab: Sustainability
 
 | Property | ENERGY STAR function | Score? | GHG scope sources |
 | --- | --- | --- | --- |
-| Main Campus (parent) | College/University | Yes | Scope 1 gas/plant, Scope 2 electric, Scope 3 water |
-| Admin Hall | Office | Yes | as above |
+| Main Campus (parent) | College/University | Metrics only | Scope 1 gas, Scope 2 electric, Scope 3 water; allocated plant steam and chilled water |
+| Admin Hall | Office | Metrics only | as above |
 | Science Center | Laboratory | Metrics only | as above |
-| Library | Library | Yes | as above |
-| Student Center | Food Service | Yes | as above |
-| Cedar Row | Multifamily Housing | Yes | Scope 2 electric, Scope 3 water |
+| Library | Library | Metrics only | as above |
+| Student Center | Food Service | Metrics only | as above |
+| Lakeview Residence Hall | Residence Hall/Dormitory | Yes | as above |
+| Recreation and Aquatics Center | Fitness Center/Health Club/Gym | Metrics only | as above |
+| Parking Structure | Parking | Metrics only | Scope 2 electric |
+| Cedar Row | Multifamily Housing | Yes | Scope 1 gas, Scope 2 electric, Scope 3 water |
+| Central Plant | Other - Utility | Metrics only | Scope 1 boiler gas, Scope 2 electric, Scope 3 makeup water |
 
 Solar = market-based Scope 2 reduction; Northlake retains RECs.
 
@@ -102,6 +101,6 @@ Solar = market-based Scope 2 reduction; Northlake retains RECs.
 | Project | Category | Capital | Incentive | M&V baseline |
 | --- | --- | --- | --- | --- |
 | Library LED Retrofit | Lighting | $120k | $25k | Library lighting kWh |
-| Science Center Chiller Upgrade | HVAC | $640k | $80k | CHW ton-hours |
+| Central Plant Chiller Upgrade | HVAC | $640k | $80k | plant kWh per CHW ton-hour |
 | Cedar Row Solar Expansion | Renewable | $410k | ITC | solar generation |
 | Admin Hall Recommissioning | Controls | $55k | $10k | gas + electric |

@@ -45,7 +45,7 @@ Sources: [bill-charge-line-spec](bill-charge-line-spec.md),
 | `provider_rollup` | per-provider totals | = Σ that provider's account bills |
 | `interval_counts` | 15-min channels over the span | full-period count (96/day) minus the deliberate `missing_interval_backfill` gap, restored after backfill |
 | `peak_demand_matches` | VED demand line kW | = max 15-min kW in the period for interval buildings |
-| `monthly_eui_by_building` | rp_MonthlyEUI | usage ÷ gross floor area, non-null for all 6 buildings |
+| `monthly_eui_by_building` | rp_MonthlyEUI | usage ÷ gross floor area, non-null for the 11 buildings with an area in the register (Campus Grounds and Cedar Row Carport and Grounds have none) |
 | `aggregate_campus_kwh` | campus electric aggregate | = Σ member building interval kWh |
 | `digital_on_hours` | rp_DigitalSummary | chiller/occupancy/exhaust on-hours per month, non-zero |
 | `notes_images_present` | rp_NoteHistory / rp_ImageManagement | seeded notes + bill images returned |

@@ -33,7 +33,7 @@ row:
 | River City | import | nora.chen | 4 days |
 | Northlake Thermal | manual (allocation) | keiko.tan | 6 days |
 | Helios Solar | manual entry | iris.morales | 7 days |
-| Cedar Row (VED/RCU/HOS) | manual entry | marcus.reed | 5 days |
+| Cedar Row (VED/SGU/RCU/HOS) | manual entry | marcus.reed | 5 days |
 
 This yields ≥2 distinct entry users overall (requirement) and realistic
 per-provider lags so `rp_LateBills` (default 5-day overdue) flags the slow ones.
@@ -55,13 +55,16 @@ non-trivial.
 **Why.** `rp_DigitalSummary` and the digital side of the interval engine
 (`DigitalArchive_TBL`) need points whose `point_type` is `Digital` with an
 enumerated `state_set` (see `digital_reading` in
-`schemas/synthetic-source-model.md`). Northlake is currently all analog.
+`schemas/synthetic-source-model.md`). Northlake's only Digital point so far is
+Chiller Enable Status on the Central Plant Chiller Controller, and its input
+path is still planned.
 
-Add these reference channels / points (IDs follow existing manifest conventions):
+Add these channels / points (IDs follow existing manifest conventions; the
+chiller channel already exists in the scenario):
 
 | channel id | source | commodity | point_type | state_set | interval | maps to |
 | --- | --- | --- | --- | --- | --- | --- |
-| `ch_modbus_ntp_chiller_enable_status` | thermal plant chiller controller (existing modbus meter) | control | Digital | `chiller_run` {0 off, 1 on} | 15 min | DigitalArchive_TBL |
+| `ch_modbus_ntp_chiller_enable_status` | Central Plant Chiller Controller (existing Modbus meter; point Chiller Enable Status) | electric | Digital | `chiller_run` {0 off, 1 on} | 5 min | DigitalArchive_TBL |
 | `ch_student_center_occupancy_status` | Student Center BMS | control | Digital | `occupancy` {0 unoccupied, 1 occupied} | 15 min | DigitalArchive_TBL |
 | `ch_science_center_lab_exhaust_status` | Science Center BMS | control | Digital | `exhaust_mode` {0 normal, 1 high} | 15 min | DigitalArchive_TBL |
 
@@ -89,7 +92,7 @@ viewer used across bill reports.
 | --- | --- | --- |
 | Library electric meter (replacement) | METR | "Meter replaced 2024-08-14; new synthetic serial issued, same account; reads continuous." |
 | Sierra Gas Student Center estimated bill | BL | "Estimated read this cycle; corrected actual issued next cycle (estimated_bill_correction)." |
-| Cedar Row A RCU account (renewal) | BA | "Account number changed at 2025 renewal; site/building continuity preserved across all three services." |
+| Cedar Row A RCU account (renewal) | BA | "Account number changed at the July 2024 renewal; site/building continuity preserved across its water and sewer services." |
 | Valley Electric Science Center | METR | "Lab load drives summer peak; power-factor adjustment expected on heavy months." |
 
 **Images** (`image` entity → `Images`):

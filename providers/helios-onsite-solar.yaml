@@ -28,7 +28,7 @@ supplies:
     dataTypes: [interval_15min, monthly_ppa_invoice, rec_statement]
     intervalMinutes: 15
     direction: generated
-    servedBuildings: [science_center, student_center, cedar_row_a]
+    servedBuildings: [science_center, student_center, cedar_row_carport_grounds]
     notes: Self-consumed kWh offset Valley Electric load; surplus is exported for a credit.
 
 accountModel:

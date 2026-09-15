@@ -64,6 +64,7 @@ rateSchedules:
       meterCharge:                    # by water meter size
         "1in": { unit: $/month, rate: 42.00 }
         "2in": { unit: $/month, rate: 96.00 }
+        "3in": { unit: $/month, rate: 168.00 }
         "4in": { unit: $/month, rate: 260.00 }
       tiers:
         - { upToKgal: 50, unit: $/kgal, rate: 4.85 }
@@ -82,6 +83,25 @@ rateSchedules:
     effective: "2024-01-01..2025-12-31"
     components:
       eruCharge: { unit: $/eru/month, rate: 11.20 }
+
+  - id: RCU-IRR
+    name: Irrigation Water (seasonal, no sewer)
+    type: volumetric_seasonal
+    effective: "2024-01-01..2025-12-31"
+    components:
+      meterCharge:
+        "2in": { unit: $/month, rate: 96.00 }
+        "3in": { unit: $/month, rate: 168.00 }
+      volume: { unit: $/kgal, rate: 5.30, basis: metered_water_kgal }
+  - id: RCU-FIRE
+    name: Private Fire Service Line
+    type: flat_by_line_size
+    effective: "2024-01-01..2025-12-31"
+    components:
+      lineCharge:
+        "4in": { unit: $/month, rate: 38.00 }
+        "6in": { unit: $/month, rate: 62.00 }
+        "8in": { unit: $/month, rate: 95.00 }
 
 billCharges:
   - { code: water_meter_charge, type: fixed, unit: $/month }
@@ -108,7 +128,7 @@ environmental:
 
 scenarioHooks:
   - { scenario: baseline_monthly_bills, role: primary }
-  - { scenario: account_number_change, role: primary, targets: [cedar_row_a], note: "Account number changes at renewal; site and building continuity preserved across all three services" }
+  - { scenario: account_number_change, role: primary, targets: [cedar_row_a], note: "Account number changes at the July 2024 renewal; site and building continuity preserved across its water and sewer services" }
   - { scenario: duplicate_file_import, role: primary, note: "Re-import the combined billing file; must not double-count any of the three services" }
 
 dataQuirks:

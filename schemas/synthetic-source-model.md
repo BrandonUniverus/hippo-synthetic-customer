@@ -7,17 +7,17 @@ The synthetic source database is the authoritative model for fake customer data.
 | Entity | Purpose |
 | --- | --- |
 | `customer` | Synthetic customer identity and global settings. |
-| `site` | Campus, apartment complex, or other customer location grouping. |
-| `building` | Physical property with use type, size, address, and weather mapping. |
-| `energy_star_property` | ENERGY STAR Portfolio Manager property mapping for a site or building (primary function, gross floor area, occupancy). |
+| `site` | Campus, apartment complex, plant, or other customer location grouping, owned by one EEM company. |
+| `building` | Physical building, or an outdoor service area such as grounds or a carport with no floor area, with use type, size, address, and weather mapping. |
+| `energy_star_property` | ENERGY STAR Portfolio Manager property mapping for a site or building (primary function, gross floor area, occupancy). Grounds have none. |
 | `property_use` | One ENERGY STAR property use on a property, such as Office or Multifamily Housing. |
 | `property_use_detail` | One use detail value on a property use, such as Weekly Operating Hours or Number of Bedrooms. |
 | `provider` | Utility provider identity, including its kind and billing model. |
 | `provider_service` | One commodity a provider supplies (a provider can supply several). |
 | `account` | Provider account assigned to a site or building. |
-| `meter` | Physical or logical meter associated with an account. |
+| `meter` | Utility meter on a provider account, or an owned meter with no account: an apartment, house or sewer-deduct submeter behind a utility meter, a plant production meter, a sensor group, a logical source, or a plant controller. |
 | `channel` | Measured stream on a meter, such as kWh, kW, therms, gallons, or chilled water tons. |
-| `reference_channel` | Non-metered source stream used by gateway tests, such as weather, BMS sensors, or SQL historian aliases. |
+| `reference_channel` | External source stream that belongs to no building: the KSAC and KSMF weather stations. Building sensors, historians, controllers and test signals are owned meters with channels. |
 | `gateway_profile` | One EEMSuite gateway component configuration to prove, such as AcquiSuite, MV90/MDEF, MV90/MV9, or BACnet. |
 | `gateway_node` | Runtime gateway node/device context used by the EEMSuite gateway components. |
 | `gateway_point` | Runtime point binding that maps an EEMSuite `PtID` to a synthetic source `channel`. |
@@ -130,8 +130,8 @@ building(
 energy_star_property(
   energy_star_property_id,
   site_id,                 -- set for campus_parent / multifamily_property roles
-  building_id,             -- set for child_property / building_within_property roles
-  role,                    -- campus_parent | child_property | multifamily_property | building_within_property
+  building_id,             -- set for child_property / building_within_property / standalone_property roles
+  role,                    -- campus_parent | child_property | multifamily_property | building_within_property | standalone_property
   primary_function,        -- exact ENERGY STAR PrimaryFunctionType value, e.g. College/University, Office
   gross_floor_area,
   gross_floor_area_units,  -- Square Feet | Square Meters
@@ -193,7 +193,7 @@ account(
 
 meter(
   meter_id,
-  account_id,
+  account_id,              -- null for owned meters (submeters, production meters, sensors, logical sources, controllers)
   building_id,
   synthetic_meter_number,
   meter_type,
@@ -207,9 +207,10 @@ channel(
   channel_id,
   meter_id,
   commodity,
-  role,                    -- billing_usage | billing_demand | interval_usage | interval_demand | derived_billing_usage | flat_service_fee | interval_generation
+  role,                    -- bill facts, no point: billing_usage | billing_demand | derived_billing_usage | flat_service_fee | monthly_allocation
+                           -- points: interval_usage | interval_demand | interval_generation | interval_generation_demand | interval_export | interval_production | interval_production_demand | submeter_interval_usage | handheld_register_reading | handheld_usage_delta | manual_register_reading | manual_usage_delta | sensor_observation | equipment_demand | equipment_status | generated_smoke_test
   unit,
-  direction,               -- delivered | generated | exported
+  direction,               -- delivered | generated | exported | produced | returned
   interval_minutes,
   point_type,              -- value written to gateway PointType where applicable
   derived_from_channel_id
@@ -217,7 +218,7 @@ channel(
 
 reference_channel(
   reference_channel_id,
-  source_kind,             -- weather_station | building_sensor | plant_controller | sql_historian | provider_file_alias | synthetic_gateway
+  source_kind,             -- weather_station (sensors, historians, controllers and test signals are owned meters)
   source_id,
   commodity,
   role,

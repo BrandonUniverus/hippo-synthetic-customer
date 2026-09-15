@@ -78,7 +78,7 @@ Determinants: **200** demand with a **`rate_ratchet`** (80% / 11-month look-back
 Needs ≥12 months interval with a strong summer peak so the winter ratchet floor
 binds. Fires the ratchet path (almost unseeded product-wide).
 
-### 4. `NL-CONTRACT-2Part` — base/excess contract demand *(new, campus central plant electric)*
+### 4. `NL-CONTRACT-2Part` — base/excess contract demand *(new, Central Plant Electric Service)*
 Determinants: **200** base contract demand + **200** excess demand (split by a
 **pre/post `rate_determinant.script`**); base + excess energy; **400** fixed;
 **800** tax. Fires determinant scripts + two-part contract demand.
@@ -123,9 +123,9 @@ currency conversion. (Optional completeness; flag as synthetic.)
 Each schedule attaches via `rate_meter_assignment` over ≥13 months:
 - `NL-GS-TOU-Seasonal` → Admin Hall, Library electric (monthly TOU registers) +
   via interval for Science/Student is `NL-LG-Ratchet`/`NL-RTP-Index`.
-- `NL-RES-Tiered` → Cedar Row A/B electric.
+- `NL-RES-Tiered` → the Cedar Row A and Cedar Row B Electric Master meters.
 - `NL-LG-Ratchet` → Science Center electric. `NL-RTP-Index` → Student Center.
-- `NL-CONTRACT-2Part` → central-plant electric. `NL-STEP-Demand` → Town Center anchor.
+- `NL-CONTRACT-2Part` → Central Plant Electric Service (Northlake Thermal Plant company). `NL-STEP-Demand` → Town Center anchor.
 - `NL-GAS-FuelAdj` → all SGU meters. `NL-MULTI-Commodity` → RCU + NTP meters.
 - `NL-OPTIONS-Phase` → an Admin Hall variant (Primary voltage, Tax-Exempt option).
 

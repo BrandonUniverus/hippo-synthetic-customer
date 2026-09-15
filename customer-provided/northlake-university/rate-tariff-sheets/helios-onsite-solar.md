@@ -21,8 +21,8 @@ Electric load; surplus is exported for a net-metering credit.
 The monthly PPA invoice = PPA energy charge − net-metering credit. Helios also
 issues a monthly REC and avoided-emissions statement (informational; no charge).
 
-**Arrays (PPA agreements by site):** Science Center, Student Center, Cedar Row A
-carport.
+**Arrays (one PPA agreement each):** Science Center, Student Center, and the
+solar carport at Cedar Row Carport and Grounds.
 
 **Notes for setup:**
 - Generation is **positive-generation / negative-load** — it reduces our net

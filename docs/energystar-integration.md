@@ -58,36 +58,55 @@ Key enum/unit values used by this dataset:
   Student`, `Dedicated Military`, `Dedicated Senior/Independent Living`,
   `Dedicated Special Accessibility Needs`, `Other dedicated housing`.
 - `OccupancyType`: 0, 5, 10, … 100. `PercentHeated` / `PercentCooled`: 0, 10, … 100.
+- `PoolSizeTypeValue`: `Recreational (20 yards x 15 yards)`,
+  `Short Course (25 yards x 20 yards)`, `Olympic (50 meters x 25 meters)`.
+  `PoolTypeValue`: `Indoor`, `Outdoor`. The Recreation and Aquatics Center pool
+  is a short-course indoor pool.
 
-## Two grouping models in this dataset
+## Three grouping models in this dataset
 
 PM supports more than one way to group buildings; the synthetic customer
-exercises both deliberately:
+exercises three deliberately:
 
 1. **Campus** — `Northlake Main Campus` is a `College/University` **campus
-   parent**. Each academic building (Admin Hall, Science Center, Library,
-   Student Center) is its own **child property** with its own `primaryFunction`
-   and uses, rolling up to the campus.
+   parent** of 545,000 sq ft. Each campus building (Admin Hall, Science Center,
+   Library, Student Center, Lakeview Residence Hall, Recreation and Aquatics
+   Center, Parking Structure) is its own **child property** with its own
+   `primaryFunction` and uses, rolling up to the campus. The Parking Structure
+   is benchmarked as its own child property and is excluded from the campus
+   floor area.
 2. **Multifamily property** — `Cedar Row Apartments` is one PM-benchmarked
-   `Multifamily Housing` **property**; Cedar Row A and B are its physical
-   **buildings within the property**.
+   `Multifamily Housing` **property** (124 units, `Dedicated Student`); Cedar
+   Row A, Cedar Row B and Cedar Row Common House are its physical **buildings
+   within the property**.
+3. **Standalone property** — the `Central Plant` is its own `Other - Utility`
+   property, benchmarked for the Northlake Thermal Plant company and excluded
+   from the campus boundary.
+
+Campus Grounds and Cedar Row Carport and Grounds are outdoor service areas and
+have no PM property.
 
 This is captured in `scenarios/demo-university-v1.yaml` under
-`energyStarProperties`, keyed by `siteId` / `buildingId` with a `role`
-(`campus_parent`, `child_property`, `multifamily_property`,
-`building_within_property`).
+`energyStarProperties` (13 entries), keyed by `siteId` / `buildingId` with a
+`role` (`campus_parent`, `child_property`, `multifamily_property`,
+`building_within_property`, `standalone_property`).
 
 ## Synthetic building → PM mapping
 
 | Building | `primaryFunction` | Property uses |
 | --- | --- | --- |
-| Northlake Main Campus (site) | `College/University` | College/University (Enrollment, FTE Workers, Grant Dollars) |
+| Northlake Main Campus (site) | `College/University` | College/University, 545,000 sq ft with parking excluded (Enrollment, FTE Workers, Grant Dollars) |
 | Admin Hall | `Office` | Office + `Other - Education` (classroom wing) |
 | Science Center | `Laboratory` | Laboratory + `Other - Education` |
 | Library | `Library` | Library |
 | Student Center | `Food Service` | Food Service + `Other - Entertainment/Public Assembly` |
-| Cedar Row Apartments (site) | `Multifamily Housing` | Multifamily Housing (124 units, `Dedicated Student`) |
+| Lakeview Residence Hall | `Residence Hall/Dormitory` | Residence Hall/Dormitory (150 rooms) |
+| Recreation and Aquatics Center | `Fitness Center/Health Club/Gym` | Fitness Center/Health Club/Gym + `Swimming Pool` |
+| Parking Structure | `Parking` | Parking |
+| Cedar Row Apartments (site) | `Multifamily Housing` | Multifamily Housing (124 units, `Dedicated Student`) + `Other - Recreation` (Common House) |
 | Cedar Row A / B | `Multifamily Housing` | Multifamily Housing (per-building) |
+| Cedar Row Common House | `Other - Recreation` | Other - Recreation |
+| Central Plant | `Other - Utility` | Other - Utility (standalone property outside the campus boundary) |
 
 Every `primaryFunction` and `function` string above is a verbatim
 `PrimaryFunctionType` enum value, so `ResolvePrimaryFunction` parses it instead
@@ -96,25 +115,44 @@ of falling back to `Other`.
 ## Use details by property type
 
 Required vs optional per the ENERGY STAR reference (Oct 2024). Optional details
-do not affect metrics but are still accepted.
+do not affect metrics but are still accepted. For Fitness Center/Health Club/Gym,
+Swimming Pool, Parking, Other - Recreation and Other - Utility the required vs
+optional split has not been checked against the reference; those rows list only
+the use details the scenario supplies, by PM name where the manifest key table
+below defines one and by manifest key otherwise.
+
+`Scored` is a property-type rule used throughout the packet: in the US a 1–100
+ENERGY STAR score exists for Office, Residence Hall/Dormitory and Multifamily
+Housing. Library is score-eligible only in Canada; every other type in this
+dataset is metrics only. Per energystar.gov, a property can receive a score only
+when more than 50 percent of its gross floor area (excluding parking) is an
+eligible type and the combined floor area of uses without a score does not
+exceed 25 percent. Lakeview Residence Hall and Cedar Row Apartments are the
+properties expected to receive a score. Admin Hall exercises the second test: it
+is Office-primary, but its 25,000 sq ft `Other - Education` classroom wing is 29
+percent of its floor area, so it gets metrics only.
 
 | Property type | Scored | Required use details | Optional use details |
 | --- | --- | --- | --- |
 | College/University | No | Gross Floor Area | Weekly Operating Hours, Enrollment, Number of FTE Workers, Number of Computers, Grant Dollars |
 | Office | Yes | Gross Floor Area (≥1,000), Weekly Operating Hours (≥30), Number of Workers on Main Shift (≥1), Number of Computers (≥1), Percent That Can Be Cooled, Occupancy (≥55% to certify) | Percent That Can Be Heated |
 | Laboratory | No | Gross Floor Area | Weekly Operating Hours, Number of Workers on Main Shift, Number of Computers |
-| Library | No | Gross Floor Area | Weekly Operating Hours, Number of Workers on Main Shift, Number of Computers, Percent That Can Be Heated, Percent That Can Be Cooled |
+| Library | No (Canada only) | Gross Floor Area | Weekly Operating Hours, Number of Workers on Main Shift, Number of Computers, Percent That Can Be Heated, Percent That Can Be Cooled |
 | Food Service | No | Gross Floor Area | Weekly Operating Hours, Number of Workers on Main Shift, Number of Computers |
 | Multifamily Housing | Yes | Gross Floor Area, Total Residential Living Units (≥20), Low-/Mid-/High-rise unit counts, Number of Bedrooms, Occupancy (≥80% to certify) | Resident Population Type, Government Subsidized Housing, Laundry Hookups (in-unit / common), Percent Heated, Percent Cooled |
 | Residence Hall/Dormitory | Yes | Gross Floor Area (≥5,000), Number of Rooms (≥5), Percent Heated, Percent Cooled | Computer Lab, Dining Hall |
+| Fitness Center/Health Club/Gym | No | Not checked. Scenario supplies Weekly Operating Hours, Number of Workers on Main Shift, Number of Computers, Percent That Can Be Cooled, Percent That Can Be Heated | Not checked |
+| Swimming Pool | No | Not checked. Scenario supplies `sizeOfPool`, `monthsInUse`, `indoorOrOutdoorPool` | Not checked |
+| Parking | No | Not checked. Scenario supplies `completelyEnclosedParkingGarageFootage`, `partiallyEnclosedParkingGarageFootage`, `openParkingLotFootage`, `supplementalHeating` | Not checked |
 | Other - Education | No | Gross Floor Area | Weekly Operating Hours, Number of Workers on Main Shift, Number of Computers |
 | Other - Entertainment/Public Assembly | No | Gross Floor Area | Weekly Operating Hours, Number of Workers on Main Shift, Number of Computers |
+| Other - Recreation | No | Not checked. Scenario supplies Weekly Operating Hours, Number of Workers on Main Shift | Not checked |
+| Other - Utility | No | Not checked. Scenario supplies Weekly Operating Hours, Number of Workers on Main Shift | Not checked |
 
-`Residence Hall/Dormitory` is documented but not currently assigned — Cedar Row
-is modeled as `Multifamily Housing` with `Dedicated Student` population because
-it is an apartment complex, not a dorm. If a true campus dormitory is added
-later, map it to `Residence Hall/Dormitory` to exercise the Number of Rooms /
-Computer Lab / Dining Hall details.
+`Residence Hall/Dormitory` is assigned to Lakeview Residence Hall (150 rooms, a
+computer lab and no dining hall), which exercises the Number of Rooms / Computer
+Lab / Dining Hall details. Cedar Row stays `Multifamily Housing` with
+`Dedicated Student` population because it is an apartment complex, not a dorm.
 
 ## Manifest field names → PM use-detail names
 
@@ -135,6 +173,13 @@ The `useDetails` keys in the manifest map to PM use details as follows:
 | `residentPopulationType` | Resident Population Type |
 | `governmentSubsidizedHousing` | Government Subsidized Housing |
 | `numberOfLaundryHookupsInAllUnits` / `InCommonAreas` | Number of Laundry Hookups in All Units / Common Area(s) |
+| `numberOfRooms` | Number of Rooms |
+| `computerLab` / `diningHall` | Computer Lab / Dining Hall |
+
+The Swimming Pool keys (`sizeOfPool`, `monthsInUse`, `indoorOrOutdoorPool`) and
+the Parking keys (`completelyEnclosedParkingGarageFootage`,
+`partiallyEnclosedParkingGarageFootage`, `openParkingLotFootage`,
+`supplementalHeating`) are not yet mapped to PM use-detail names here.
 
 ## Integration hooks (already present in EEMSuite)
 

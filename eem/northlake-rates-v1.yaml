@@ -99,7 +99,7 @@ rateSchedules:
       - { name: Minimum Bill,      type: 500, unit: $, value: 18.00, members: [Customer Charge, Energy Tier 1, Energy Tier 2, Energy Tier 3] }
       - { name: State Tax,         type: 800, unit: "%", value: 2.5, members: [all preceding] }
       - { name: Municipal Tax,     type: 800, unit: "%", value: 1.75, members: [all preceding incl State Tax] }   # tax-on-tax ordering
-    meterAssignment: { meters: [cedar_row_a electric, cedar_row_b electric], billScenario: Actual }
+    meterAssignment: { meters: [ved_cedar_row_a_master, ved_cedar_row_b_master], billScenario: Actual }
 
   - id: NL-LG-Ratchet                 # Science Center large demand
     measureType: Electricity
@@ -113,7 +113,7 @@ rateSchedules:
       - { name: Utility Users Tax, type: 800, unit: "%", value: 5.0, members: [all preceding] }
     meterAssignment: { meters: [science_center electric], billScenario: Actual, note: "needs >=12 mo interval w/ strong summer peak so winter ratchet floor binds" }
 
-  - id: NL-CONTRACT-2Part             # campus central plant electric
+  - id: NL-CONTRACT-2Part             # Central Plant electric service (thermal plant company)
     measureType: Electricity
     currency: USD
     rateClasses: [All]
@@ -123,7 +123,7 @@ rateSchedules:
       - { name: Base Energy,          type: 200, unit: $/kWh, value: 0.118, schedule: SCHED-ALLHOURS }
       - { name: Facility Charge,      type: 400, unit: $/month, value: 500.00 }
       - { name: Utility Users Tax,    type: 800, unit: "%", value: 5.0, members: [all preceding] }
-    meterAssignment: { meters: [northlake_central_plant electric], billScenario: Actual }
+    meterAssignment: { meters: [ved_central_plant_main], billScenario: Actual }
 
   - id: NL-RTP-Index                  # Student Center real-time pricing (fires type 100)
     measureType: Electricity

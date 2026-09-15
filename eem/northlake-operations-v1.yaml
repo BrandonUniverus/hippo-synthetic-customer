@@ -29,7 +29,7 @@ sourceReferences:
 projects:                  # ProjectTracking editor
   entries:
     - { name: Library LED Retrofit, category: Lighting, capital: "$120k", incentive: "$25k", mAndV: "baseline -> post lighting kWh" }
-    - { name: Science Center Chiller Upgrade, category: HVAC, capital: "$640k", incentive: "$80k", mAndV: "CHW ton-hour baseline" }
+    - { name: Central Plant Chiller Upgrade, category: HVAC, capital: "$640k", incentive: "$80k", mAndV: "plant electric kWh per chilled-water ton-hour produced, before vs after" }
     - { name: Cedar Row Solar Expansion, category: Renewable, capital: "$410k", incentive: ITC }
     - { name: Admin Hall Recommissioning, category: Controls, capital: "$55k", incentive: "$10k" }
   activities: "Design -> Procurement -> Install -> Commissioning -> M&V (+ financial events per commodity)"

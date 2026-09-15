@@ -61,14 +61,36 @@ New mixed-use site under a new EEM company `northlake_town_center` (companyType
 
 ## B. Cedar Row sub-metering (residential)
 
-Extend the existing Cedar Row A/B (today common-area only) with **unit-level
-sub-meters**:
-- Cedar Row A: 60 unit electric + water sub-meters; Cedar Row B: 64.
-- Common-area master allocated to units by **method 2 (fully submetered)** for
-  electric and **method 4 (building areas/occupancy)** for the winter-capped
-  water, with **overhead** for common-area lighting.
-- Residential angle complements the commercial Town Center, covering the same
-  methods on a housing community.
+Cedar Row A and Cedar Row B are master-metered: Valley Electric bills
+`Cedar Row A Electric Master` and `Cedar Row B Electric Master`, River City bills
+`Cedar Row A Water Master` and `Cedar Row B Water Master`, and no resident gets a
+utility bill. Every apartment already has an owned electric submeter and an owned
+water submeter behind those masters (Cedar Row A: 60 apartments, units 101–120,
+201–220 and 301–320; Cedar Row B: 64 apartments, units 101–416), one row per
+apartment on the workbook tab **Units and Submeters**. Rebilling maps apartments
+to these submeter points; it adds no meters.
+
+- **Electric: method 2 (fully submetered).** Each apartment is allocated its
+  building's electric master bill by its own electric submeter: meters
+  `Cedar Row A Unit 101 Electric` through `Cedar Row B Unit 416 Electric` (tags
+  `SYN-SUB-E-A101` … `SYN-SUB-E-B416`), hourly point `Submeter kWh 60m` from the
+  fixed-network electric submeters.
+- **Water and sewer: method 2.** Each apartment is allocated water and sewer by
+  its own water submeter (tags `SYN-SUB-W-A101` … `SYN-SUB-W-B416`), read on the
+  monthly Neptune apartment water route with points `Register Reading` and
+  `Route Usage kgal`. The apartment's sewer share is capped at its winter
+  average.
+- **House submeters: overhead.** `Cedar Row A Electric House`,
+  `Cedar Row A Water House`, `Cedar Row B Electric House` and
+  `Cedar Row B Water House` cover corridors, laundry and lighting; their usage
+  is recovered as **overhead**, not charged to one apartment.
+- **Reconciliation.** For each master bill, the apartment charges plus overhead
+  sum to the master bill. The aggregates `Cedar Row A Submetered kWh Total` and
+  `Cedar Row B Submetered kWh Total` (every apartment and house electric
+  submeter in the building) are compared with the electric master bill for
+  unaccounted load.
+- The residential case complements the commercial Town Center: fully
+  submetered allocation with overhead on a housing community.
 
 ## C. WUI point families (master point → sub-points)
 

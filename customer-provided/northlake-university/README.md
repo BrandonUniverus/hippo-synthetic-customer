@@ -15,9 +15,18 @@ into the business facts a real customer would actually send.
 **Start here:** [Facilities and Meter Register](facilities-and-meter-register.md)
 and [Data Collection](../../outputs/northlake-university/data-collection-workbook.xlsx),
 the single customer workbook. Use **Contacts** for people, email and phone, and
-**Organization Units** for department ownership and primary contacts.
-Packet **0.2** expands the earlier eight-meter inventory to the complete listed
-Stage 1B inventory. The [Student Center AcquiSuite handover](sample-data/acquisuite/README.md)
+**Departments & Responsibilities** for department ownership and primary contacts.
+**Hierarchy** lists every company's site and building nodes (all three companies
+use the Site, Building, Meter and Point levels); a building appears once, in the
+company that owns its site. **Service Profiles**
+records how each building is heated, cooled and otherwise served; **Units and
+Submeters** lists one row per Cedar Row apartment with its electric and water
+submeter. **Meters** gives each meter's full parent path. Responsible
+departments on Sites and Buildings identify the team responsible for a property,
+not its parent in the EEM tree. Packet **0.3** corrects and regenerates the
+inventory: 3 operating companies, 13 buildings, 322 meters (including an
+electric and a water submeter in each of the 124 Cedar Row apartments) and 431
+measured points. The [Student Center AcquiSuite handover](sample-data/acquisuite/README.md)
 supplies the first source files and expected values. Installed acceptance is
 still pending; follow the [UI checklist](../../eem/northlake-onboarding-ui-checklist.md).
 
@@ -27,7 +36,7 @@ still pending; follow the [UI checklist](../../eem/northlake-onboarding-ui-check
 - `rate-tariff-sheets/` — one tariff sheet per provider (Valley Electric, Sierra Gas, River City, Northlake Thermal, Helios Solar).
 - `chart-of-accounts-and-gl-guide.md` — Finance: GL chart, coding segments, AP/ERP export targets.
 - `user-access-request.md` — HR/IT: who needs access and to what (role matrix, separation of duties, the ~120 report recipients).
-- `tenant-and-lease-roster.md` — Property Mgmt/Housing: Town Center + Cedar Row sub-metering and how costs are split.
+- `tenant-and-lease-roster.md` — Property Mgmt/Housing: Cedar Row apartment submeters, Town Center (later phase) and how costs are split.
 - `sustainability-requirements.md` — Sustainability: ENERGY STAR, GHG scopes, targets, REC handling.
 - `source-system-inventory.md` — IT/Facilities: data feeds, formats, cadence, owners.
 - `facilities-and-meter-register.md` — complete building/account/meter/point inventory, related measurements, rollup members and weather assignments.
@@ -49,6 +58,7 @@ Generated files are built from these sources and written outside this directory:
 
 - `output/pdf/northlake-facilities-overview-redone.pdf`
 - `outputs/northlake-university/data-collection-workbook.xlsx` — the single implementation intake workbook, including contacts, source systems and tenants/leases.
+- `output/intake/Northlake Intake Package.html` — the combined intake binder of every document above, rendered by `python generators/render_intake_package.py`.
 
 The [versioned source manifests](../../generators/README.md) own the structured
 facts, including the complete contact and department registers. The duplicate
@@ -58,10 +68,18 @@ The older PDF overview and illustrated bills remain Draft 0.1 examples; the
 current register supersedes conflicting inventory values. Bill examples still
 need reconciliation before financial acceptance.
 
-New workbook tabs include Related Measurements, Rollup Members, Weather
-Assignments, Source Measurements and Rate Components. Known Events and Open
-Items distinguish supplied samples from later scenarios whose fixtures or
-product acceptance are pending.
+The workbook has 26 tabs: 21 generated tabs (Instructions, Hierarchy, Contacts,
+Departments & Responsibilities, Known Events, Sites, Buildings, Service
+Profiles, Utility Services, Rate Schedules, Rate Components, Accounts And
+Agreements, Meters, Units and Submeters, Measured Points, Related Measurements,
+Rollup Members, Weather Assignments, Open Items, Data Sources, Source
+Measurements) plus 5 retained later-phase tabs (Chart of Accounts, Users &
+Access, Tenants & Leases, Sustainability, Projects). Service Profiles and Units
+and Submeters are new in packet 0.3. After `python generators/northlake_packet.py`,
+rebuild the generated tabs with `python generators/update_workbook.py`; the
+later-phase tabs are left as they are. Known Events and Open Items distinguish
+supplied samples from later scenarios whose fixtures or product acceptance are
+pending.
 
 Contacts includes all eight implementation contacts named in the cover letter
 and four external utility representatives. Cedar Row and Thermal Plant contacts

@@ -249,7 +249,7 @@ companies:
     companyType: campus_operations_company
     scope:
       sites: [northlake_main_campus]
-      buildings: [admin_hall, science_center, library, student_center]
+      buildings: [admin_hall, science_center, library, student_center, lakeview_hall, recreation_center, parking_structure, campus_grounds]
       providers: [valley_electric_district, sierra_gas_utility, river_city_utilities, northlake_thermal_plant, helios_onsite_solar]
     groups:
       - id: nlu_company_admins
@@ -307,8 +307,8 @@ companies:
     companyType: operating_company
     scope:
       sites: [cedar_row_apartments]
-      buildings: [cedar_row_a, cedar_row_b, cedar_row_common_house]
-      providers: [valley_electric_district, river_city_utilities, helios_onsite_solar]
+      buildings: [cedar_row_a, cedar_row_b, cedar_row_common_house, cedar_row_carport_grounds]
+      providers: [valley_electric_district, sierra_gas_utility, river_city_utilities, helios_onsite_solar]
     groups:
       - id: cra_company_admins
         displayName: Cedar Row Company Admins
@@ -339,9 +339,9 @@ companies:
     displayName: Northlake Thermal Plant
     companyType: internal_service_company
     scope:
-      sites: [northlake_main_campus]
-      buildings: [science_center, admin_hall, student_center, library, northlake_central_plant]
-      providers: [northlake_thermal_plant, valley_electric_district, sierra_gas_utility]
+      sites: [northlake_central_plant]
+      buildings: [central_plant]
+      providers: [northlake_thermal_plant, valley_electric_district, sierra_gas_utility, river_city_utilities]
     groups:
       - id: ntp_company_admins
         displayName: Thermal Plant Company Admins

@@ -1,9 +1,10 @@
-packetVersion: 0.2
+packetVersion: 0.3
 issuedOn: '2026-09-14'
-purpose: Facilities and meter onboarding, followed by the first AcquiSuite acceptance run.
+purpose: Facilities and meter onboarding on the corrected inventory standard, followed by the first AcquiSuite acceptance run.
 
-# These are customer decisions and source-system descriptions. Existing scenario,
-# provider and Stage 1B manifests continue to own account, meter and point facts.
+# These are customer decisions and source-system descriptions. The scenario
+# manifest owns sites, buildings, accounts, meters and channels; Stage 1B owns
+# only the EEM mapping rules. See docs/northlake-inventory-standard.md.
 companies:
   northlake_university: Northlake University
   cedar_row_apartments: Cedar Row Apartments
@@ -33,48 +34,36 @@ organizationUnits:
   - {name: Sustainability Office, purpose: 'Reporting, renewable energy accounting, emissions factors and performance tracking.', contactId: leo.martinez}
   - {name: Thermal Plant Operations, purpose: 'Plant operations, steam and chilled-water service, allocation statements and controller sources.', contactId: devon.brooks}
 
-supportLocations:
-  - id: northlake_central_plant
-    name: Northlake Central Plant
-    siteId: northlake_main_campus
-    address: 4122 Plant Service Road
-    grossFloorAreaSqft: 58400
-    owner: Northlake Thermal Plant
-    note: Plant controller location; excluded from the existing 370000 sq ft academic benchmarking boundary.
-  - id: cedar_row_common_house
-    name: Cedar Row Common House
-    siteId: cedar_row_apartments
-    address: 1304 Cedar Row Lane
-    grossFloorAreaSqft: 18400
-    owner: Housing Operations
-    note: Location only in this release; no separate account or meter. Excluded from the existing 120000 sq ft residential benchmarking boundary.
-
 decisions:
-  - [Ownership, 'Campus, Cedar Row and Thermal Plant retain separate EEM company boundaries.']
-  - [Names and areas, Use scenario building areas and Stage 1B display names; the older workbook values are superseded.]
+  - [Ownership, 'Campus, Cedar Row and Thermal Plant are separate EEM companies. A building exists once, in the company that owns its site, and holds every meter that serves it.']
+  - [Thermal plant boundary, 'The plant company contains only the Central Plant: its utility services, production meters and controller. The chilled-water and steam meters at served buildings belong to the university, with the plant as provider.']
+  - [Cedar Row metering, 'Master-metered by building with owned submeters: one electric and one water submeter per apartment plus house meters. The utility bills the property, never a resident.']
+  - [Names and areas, 'Buildings keep the names the customer uses (Science Center, Library); every document and manifest uses the same name and the scenario areas.']
   - [Student Center thermal service, Steam only; chilled-water service is not part of the current inventory.]
-  - [Weather, Northlake University owns the shared KSAC and KSMF references. All listed locations use KSAC observations; KSMF is the secondary and forecast source.]
-  - [Common House, Create the location without inventing a new metered service.]
-  - [Stormwater, Campus municipal accounts include ERUs; Cedar Row accounts have water and sewer only.]
+  - [Weather, Northlake University owns the shared KSAC and KSMF references. All buildings use KSAC observations; KSMF is the secondary and forecast source.]
+  - [Deduct meters, 'Kitchen, pool-fill and cooling-tower deduct submeters are read monthly by hand; the input path into EEM is a Stage 2 decision.']
+  - [Stormwater, 'Campus building water accounts include stormwater ERUs; irrigation, fire-service, Central Plant and Cedar Row accounts have no stormwater charge.']
   - [Solar, Northlake retains RECs under HOS-PPA-2024. Keep exported energy distinct from total generated energy.]
   - [Overlapping measurements, Library historian values and meter readings represent the same service; do not add them together.]
-  - [Rollup boundary, Campus interval totals cover Science Center and Student Center only; they are not the entire campus utility total.]
+  - [Rollup boundary, 'Campus interval totals cover the four interval-metered buildings (Science Center, Student Center, Lakeview Residence Hall, Recreation and Aquatics Center); they are not the entire campus utility total.']
   - [FIG variants, Seven format cases reuse one destination measurement in separate restored runs. Never ingest all variants together as independent consumption.]
 
 # Profile IDs refer to gatewayBindings.profiles in demo-university-v1.yaml.
 sources:
-  gw_acquisuite_student_electric: [Student Center AcquiSuite logger, Facilities Operations, File delivery, AcquiSuite log, Every 15 minutes, UTC; interval-start timestamps for the onboarding sample]
+  gw_acquisuite_student_electric: [Campus AcquiSuite loggers, Facilities Operations, File delivery, AcquiSuite log, Every 15 minutes, UTC; interval-start timestamps for the onboarding sample]
   gw_mv90_valley_mdef: [Valley Electric meter-data service, Valley Electric District, File delivery, MV90 MDEF, Daily, Local timestamps; timezone and DST behavior require acceptance]
   gw_mv90_helios_mv9: [Helios solar meter-data service, Helios Onsite Solar, File delivery, MV90 MV9, Daily, Local timestamps; timezone and DST behavior require acceptance]
   gw_bacnet_thermal_plant: [Central plant building automation, Thermal Plant, Device polling, BACnet, Hourly, Poll time; historical replay is a separate input path]
   gw_noaa_ksac_observations: [KSAC weather observations, Facilities Operations, Weather service, NOAA, Hourly, Source observation time]
   gw_aeris_ksmf_weather: [KSMF observations and forecast, Sustainability, Weather service, Aeris, Hourly, Observation and forecast valid times remain separate]
-  gw_spinwave_science_lab: [Applied Science laboratory sensors, Facilities Operations, File delivery, Spinwave CSV, Every 15 minutes, Source timestamp]
+  gw_spinwave_science_lab: [Science Center laboratory sensors, Facilities Operations, File delivery, Spinwave CSV, Every 15 minutes, Source timestamp]
   gw_fig_multi_format: [Cedar Row A water export, River City Utilities, File delivery, FIG family, Hourly, Source timestamp with configured offset]
+  gw_fig_fixed_network_submeters: [Fixed-network electric submeters, Facilities and Housing Operations, File delivery, FIG fixed network, Hourly, Source timestamp]
   gw_modbus_thermal_plant: [Central plant chiller controller, Thermal Plant, Device polling, Modbus TCP, Every 5 minutes, Poll time]
-  gw_odbc_library_historian: [Main Library historian, IT, Database query, ODBC, Every 15 minutes, Source timestamp and cursor]
+  gw_odbc_library_historian: [Library historian, IT, Database query, ODBC, Every 15 minutes, Source timestamp and cursor]
   gw_fake_smoke: [Student Center commissioning test signal, Facilities Operations, Test signal, EEM Fake, Every 15 minutes, Generated time; excluded from customer consumption totals]
   gw_neptune_river_city_water: [Cedar Row B water route, River City Utilities, Handheld upload, Neptune, Monthly route, Actual reading timestamp; monthly is a cadence rather than a fixed 30-day period]
+  gw_neptune_cedar_row_submeters: [Cedar Row apartment water submeter route, Housing Operations, Handheld upload, Neptune, Monthly route, Actual reading timestamp; monthly is a cadence rather than a fixed 30-day period]
   gw_mvrs_sierra_gas: [Student Center gas route, Sierra Gas Utility, Handheld upload, MVRS, Monthly route, Actual reading timestamp; monthly is a cadence rather than a fixed 30-day period]
   hmr_events_publish: [Handheld reading exceptions, Facilities Operations, Reading event upload, HMR events, With each route, Event timestamp]
 
@@ -99,12 +88,12 @@ acquiSuiteSample:
 
 # Customer event register. Only the January 15 interval deliveries are supplied.
 knownEvents:
-  - ['2024-08-15', Main Library, Meter replacement, Electric, 'Old meter ends August 14; replacement starts August 15.', Preserve continuity without counting both meters for the same period., Planned, Bill and meter lifecycle acceptance pending.]
+  - ['2024-08-15', Library, Meter replacement, Electric, 'Old meter ends August 14; replacement starts August 15.', Preserve continuity without counting both meters for the same period., Planned, Bill and meter lifecycle acceptance pending.]
   - ['2024-02-16', Student Center, Corrected bill, Natural gas, Estimated bill followed by a corrected bill., Retain both documents and identify the corrected period., Planned, Existing illustrated statements require reconciliation.]
   - ['2024-01-15', Student Center, Missing interval block, Electric, 'Eight intervals missing from 12:00 through 13:45 PST.', 'Backfill restores 96 intervals and 2020 kWh.', Sample supplied, Installed acceptance pending.]
   - ['2024-09-04', Northlake Main Campus, Duplicate billing file, Water / sewer, River City bundled file delivered twice., The second delivery must not duplicate charges or usage., Planned, Billing fixture and acceptance pending.]
   - ['2024-07-01', Cedar Row A, Account change, Water / sewer, Municipal account number changes at renewal., Map old and new account numbers while retaining service history., Planned, The new account number and transition fixture are still to be specified.]
-  - ['2025-01-01', All Valley Electric accounts, Rate change, Electric, VED-TOU-GS changes to VED-TOU-GS-FY25., Apply the correct effective tariff., Documented, Rate model and bill acceptance pending.]
+  - ['2025-01-01', All VED-TOU-GS accounts, Rate change, Electric, VED-TOU-GS changes to VED-TOU-GS-FY25., Apply the correct effective tariff., Documented, Rate model and bill acceptance pending.]
   - ['2024-11-12', Student Center negative test, Unsupported units, Natural gas, Deliberately unsupported unit in a separate input file., Reject the file without partially loading it., Planned, Negative fixture not supplied with the AcquiSuite normal-day packet.]
 
 deferredAcceptance:
@@ -115,3 +104,5 @@ deferredAcceptance:
   - Model and validate the full rate library with complete schedules and independent bill calculations.
   - Add live BACnet and Modbus emulators, weather fixtures and the external ODBC historian.
   - Add the planned chiller digital status and activity-index input paths before claiming those measurements work.
+  - Supply the fixed-network submeter file and the Cedar Row submeter route upload before claiming apartment-level data.
+  - Decide the input path for the manual deduct-meter readings.

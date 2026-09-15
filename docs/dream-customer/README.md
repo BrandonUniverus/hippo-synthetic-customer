@@ -85,19 +85,26 @@ implemented.
 
 ## Current onboarding packet
 
-The generated packet contains **2 sites, 8 building/support locations, 5
-providers, 21 accounts/agreements, 29 meter/reference groups, 52 explicit point
-definitions, 9 measurement relationships, 4 aggregates and 9 base tariffs**.
-Six buildings retain their existing benchmarking areas; the plant and Common
-House are supporting locations outside those boundaries. Gateway mappings cover
-13 profiles and 19 format cases, plus one HMR event publisher. The UI-ID capture
-template also includes the degree-day, baseline and aggregate outputs, for 63
-point records in total.
+The generated packet (0.3) contains **3 companies, 3 sites (plus the Weather
+Reference site), 13 buildings, 5 providers, 49 accounts/agreements (40 external
+utility accounts, 6 internal cost centers, 3 PPA agreements), 322 meters (55
+utility meters, 265 owned meters including 248 apartment submeters, 2 weather
+stations), 431 points, 139 related measurements, 7 aggregates and 14 base rate
+schedules**. Each of the 124 Cedar Row apartments has an electric and a water
+submeter. Ten buildings carry gross floor area; the Parking Structure is parking
+area, and Campus Grounds and Cedar Row Carport and Grounds are outdoor service
+areas with no floor area. Gateway mappings cover 15 profiles and 21 format
+cases, plus one HMR event publisher. The UI-ID capture template also includes
+the degree-day, baseline and aggregate outputs, for 445 point records in total.
+The Data Collection workbook has 26 tabs: 21 generated plus 5 retained
+later-phase tabs.
 
 The first source delivery is executable: the Student Center AcquiSuite files
 contain a complete day, a missing-block case and its backfill, with independent
 totals and checksums. The workbook, register and coverage list are regenerated
-from the [owned source fields](../../generators/README.md).
+from the [owned source fields](../../generators/README.md): run
+`python generators/northlake_packet.py`, then `python generators/update_workbook.py`
+to rebuild the workbook's generated tabs.
 
 **Installed UI setup and ingestion acceptance have not been recorded.** The
 remaining gateways need source fixtures or services. Rate calculations, bills,
@@ -118,7 +125,7 @@ has passed. Use the current packet's gateway coverage for the first milestone.
 | Hierarchy / security / units substrate | (all reports depend on it) | 🟡 Designed, not loaded |
 | Monthly bills + charges | Bill Processing/Tracking (~20) | 🟡 Bills modeled; **no charge-line breakdown** |
 | Interval / time-series use | Use Analysis (15) | 🟢 Strong (electric, solar, CHW) |
-| Aggregates & peak/demand | AggregateDemand, AggregatePeakLoad | 🟢 4 aggregates defined |
+| Aggregates & peak/demand | AggregateDemand, AggregatePeakLoad | 🟢 7 aggregates defined |
 | Rate engine | Rate Analysis (9) | 🟡 TOU/tiered/seasonal/PPA only; **missing RTP, stepped, max-bill, ratchet, load-factor, %-riders, taxes, min-bill, class options, scripts, multi-currency** |
 | AP / GL / financial interface | AP Detail, AP Approval/Upload, GLAccountUDV | 🔴 **Missing** (no GL accounts, no UDF coding, no export formats/runs) |
 | Tenant rebilling & allocation | Tenant Rebilling (14) | 🔴 **Missing** (no multi-tenant property, no allocation/WUI configs, no generated bills, no reconciliation) |
@@ -145,7 +152,7 @@ has passed. Use the current packet's gateway coverage for the first milestone.
 Detail + acceptance criteria in [`roadmap.md`](roadmap.md).
 
 > Phase specs 0–6 and their `eem/` UI-entry plans are authored. They still require
-> current-product review, source samples and installed acceptance. Packet 0.2
+> current-product review, source samples and installed acceptance. Packet 0.3
 > starts with company/hierarchy/provider/account/meter/point entry, then the
 > AcquiSuite normal, replay, gap and backfill checks. Complete permission testing
 > follows later. Expand the source model whenever a later requirement needs

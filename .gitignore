@@ -28,3 +28,6 @@ __pycache__/
 # Logs
 *.log
 !customer-provided/northlake-university/sample-data/acquisuite/*/ASQVED01_STUDENT.log
+
+# Excel lock files
+~$*.xlsx

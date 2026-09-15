@@ -36,8 +36,8 @@ townCenter:
     - { id: tc_property_total, use: cost_center, role: aggregation_target }
 
 cedarRowSubMetering:
-  add: "unit-level electric + water sub-meters (Cedar Row A 60 units, B 64 units)"
-  allocate: "common-area master -> units via method 2 (electric) + method 4 (winter-capped water), with common-area overhead"
+  meters: "already in scenarios/demo-university-v1.yaml: one electric (hourly) and one water (monthly route) submeter per apartment (Cedar Row A 60, B 64) plus house submeters, behind each building's Electric Master and Water Master"
+  allocate: "master -> apartments via method 2 (fully submetered) for electric and for water, sewer on the same usage capped at each apartment's winter average; house submeters recovered as overhead"
 
 # ---- Allocation configs (one per method; web BillAllocationConfiguration) ----
 # Methods 2-5,7 are method-1 detail rows with precomputed % (engine branches only on 1 & 6).

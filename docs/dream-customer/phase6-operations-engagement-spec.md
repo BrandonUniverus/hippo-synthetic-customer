@@ -36,7 +36,7 @@ tables exist):
 | project | category | capital | incentive | M&V |
 | --- | --- | --- | --- | --- |
 | Library LED Retrofit | Lighting | $120k | $25k rebate | baseline `bl_nlu_*` → post lighting kWh |
-| Science Center Chiller Upgrade | HVAC | $640k | $80k | CHW ton-hour baseline |
+| Central Plant Chiller Upgrade | HVAC | $640k | $80k | plant electric kWh per chilled-water ton-hour produced |
 | Cedar Row Solar Expansion | Renewable | $410k | ITC | solar generation vs prior |
 | Admin Hall Recommissioning | Controls | $55k | $10k | gas + electric baseline |
 
@@ -70,7 +70,7 @@ views. Lights up `rp_Audit` + `rp_ActivityTracker`.
 `task_schedule` + `task_log_entry` (TaskType: 3 EEM Gateways, 6 Bill Importer,
 4 Report, 5 MFR, 2 Standard Alerts, 1 System):
 
-- Schedules for the 13 gateway profiles, the bill importer, and report/MFR
+- Schedules for the 15 gateway profiles, the bill importer, and report/MFR
   delivery (interval + cron).
 - `TaskLog` run history across 2024–2025 (successes + a few failures) →
   `rp_TaskLog`, `rp_GatewayStatus`.
@@ -103,8 +103,9 @@ energy/demand/cost metrics → `rp_EnergyAIInsights`.
 ## G. HMR (handheld meter reading)
 
 Explicit `hmr_meter` route/cycle/sequence + `hmr_read_type` (dials/decimals/
-direction/demand) tied to the existing **Neptune (Cedar Row B water)** and
-**MVRS (Student Center gas)** handheld uploads, with `hmr_reading` rows →
+direction/demand) tied to the existing **Neptune (Cedar Row B water master, and
+the Cedar Row apartment water submeter route)** and **MVRS (Student Center
+gas)** handheld uploads, with `hmr_reading` rows →
 `rp_HMRConfiguration`, `hmr_export`.
 
 ## H. Importers / file intake

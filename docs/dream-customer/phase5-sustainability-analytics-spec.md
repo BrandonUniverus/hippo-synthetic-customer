@@ -49,16 +49,23 @@ GHG reports then compute from the existing usage.
 
 ## 2. ENERGY STAR ratings
 
-Property mapping already exists (8 properties, exact PrimaryFunction). Add
+Property mapping already exists (13 properties, exact PrimaryFunction). Add
 **rating requests + responses (scores)** — normally from the PM API; seed
 `es_rating_response` directly:
 
-- **Quarterly** scores 2024–2025 for **eligible** property types: campus
-  (College/University), Office (Admin Hall), Library, Food Service (Student
-  Center), Residence-Hall/Multifamily (Cedar Row) — ENERGY STAR 1–100 scores
-  (e.g. 72 → 78 trend showing improvement).
-- **Ineligible** types (Laboratory / Science Center) get **metrics but no 1–100
-  score** (`eligible=false`) — realistic, and exercises the no-score path.
+- **Quarterly** ENERGY STAR 1–100 scores 2024–2025 for **eligible** properties
+  (e.g. 72 → 78 trend showing improvement). In the US a score exists only for
+  Office, Residence Hall/Dormitory and Multifamily Housing (Library is
+  score-eligible only in Canada); College/University, Laboratory, Food Service,
+  Fitness Center/Health Club/Gym, Parking, Other - Utility and the other types in
+  the mapping are metrics only. Per energystar.gov a property is eligible only
+  when more than 50 percent of its gross floor area (excluding parking) is an
+  eligible type and the combined floor area of uses without a score does not
+  exceed 25 percent. Lakeview Residence Hall and Cedar Row Apartments are expected
+  to score. Admin Hall is Office-primary, but its classroom wing is 29 percent of
+  its floor area, so it gets metrics only.
+- **Ineligible** properties get **metrics but no 1–100 score**
+  (`eligible=false`) — realistic, and exercises the no-score path.
 - A few requests with error/pending status for `rp_ESRatingRequestLog`.
 
 ## 3. Weather regression / normalization
@@ -87,7 +94,7 @@ enables the weather-normalized variants of ScatterPlot/UsageVariance.
 | Cost intensity | annual cost ÷ gross floor area | $/sqft |
 | GHG intensity | annual kgCO₂e ÷ gross floor area | kgCO₂e/sqft |
 
-Peer set = the 6 campus/Cedar Row buildings + Town Center buildings, so
+Peer set = the campus and Cedar Row buildings + Town Center buildings, so
 `rp_BenchmarkRanking` ranks meaningfully and `rp_PerformanceSnapshot` /
 `rp_MonthlyEUI` populate. Labs (high EUI) vs library/office (low) gives spread.
 
@@ -97,8 +104,8 @@ Peer set = the 6 campus/Cedar Row buildings + Town Center buildings, so
   Scope 2, gas/steam = Scope 1, water = Scope 3; solar shows avoided emissions.
 - `ghg_factor_change` — a 2025 factor differs from 2024 (GHGVariance non-zero).
 - `es_scores_present` — eligible properties have quarterly 1–100 scores
-  (RatingHistory trend); labs show metrics with no score; RequestLog shows a
-  pending/error request.
+  (RatingHistory trend); ineligible properties show metrics with no score;
+  RequestLog shows a pending/error request.
 - `regression_fit` — each `weather_regression_result` has R² and CV-RMSE in plausible
   ranges; baselines now have computed values.
 - `weather_normalized_use` — UsageVariance weather-normalized column differs from

@@ -2,11 +2,15 @@
 
 Provided by: Northlake Property Management & Housing Operations. Synthetic/
 illustrative. This describes the spaces where we **sub-meter and rebill** utility
-costs to tenants — at the new Northlake Town Center (commercial) and at Cedar Row
-Apartments (residential). For each space we note **how the cost is split**, in our
-own terms; please map these to the appropriate allocation method.
+costs — at Cedar Row Apartments (residential, part of this packet) and at the new
+Northlake Town Center (commercial, a later implementation phase). For each space
+we note **how the cost is split**, in our own terms; please map these to the
+appropriate allocation method.
 
-## Northlake Town Center (mixed-use, commercial)
+## Northlake Town Center (mixed-use, commercial) — later phase
+
+Town Center joins in a later implementation phase and is not part of the current
+inventory; its spaces are listed now so the allocation design covers them.
 
 A newer mixed-use property: an enclosed retail hall, an office tower, a campus
 annex, and shared infrastructure. We meter a **master** for each building and
@@ -50,13 +54,21 @@ ownership reporting.
 
 ## Cedar Row Apartments (residential)
 
-Two residential buildings with a shared common area and a solar carport. We want
-to move from common-area-only billing to **unit-level sub-metering**.
+Two apartment buildings with 124 apartments, the Common House, and a solar
+carport. Valley Electric and River City bill the property on one electric and
+one water **master meter** per building; they never bill a resident. We own an
+electric and a water **submeter in every apartment**: the electric submeters
+report hourly over the fixed network and the water submeters are read on our
+monthly handheld route. House submeters cover corridors, laundry and lighting.
+The Units and Submeters tab of the Data Collection Workbook lists every
+apartment with its two submeters.
 
-| Building | Units | How we split |
-| --- | --- | --- |
-| Cedar Row A | 60 | Electric **by unit sub-meter**; water **by unit / occupancy** (winter-capped); common-area lighting as overhead |
-| Cedar Row B | 64 | Same approach |
+| Building | Apartments | Master meters | How we split |
+| --- | --- | --- | --- |
+| Cedar Row A | 60 | Cedar Row A Electric Master; Cedar Row A Water Master | Electric **by apartment submeter**; water **by apartment submeter**, with sewer on the same usage capped at the apartment's winter average; house submeters recovered as overhead |
+| Cedar Row B | 64 | Cedar Row B Electric Master; Cedar Row B Water Master | Same approach |
+
+The apartment charges plus the house overhead must reconcile to each master bill.
 
 ## How we generate tenant bills
 

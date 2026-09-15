@@ -13,6 +13,10 @@ bill total. The per-provider charge *codes* already live in each
 `bill_charge_line.charge_type` enum, the EEMSuite determinant kind, and the
 decomposition arithmetic.
 
+**Not yet decomposed here:** the Central Plant's `VED-TOU-PRI` electric,
+`VED-AL-1` unmetered lighting, `SGU-GL-1` large-volume gas, `RCU-IRR` irrigation
+and `RCU-FIRE` fire-service schedules.
+
 ## charge_type → EEMSuite determinant kind
 
 `bill_charge_line.charge_type` (from `schemas/synthetic-source-model.md`) maps to
@@ -55,11 +59,13 @@ Each row = one `bill_charge_line` on every monthly bill for that provider/rate.
 | public_purpose_program | rider | electric | % of energy or flat | *(needs rate param — Phase 2)* |
 | utility_users_tax | tax | electric | % of pre-tax subtotal | *(needs rate param — Phase 2)* |
 
-- **TOU split for interval-metered buildings** (Science Center, Student Center):
+- **TOU split for interval-metered buildings** (Science Center, Student Center,
+  Lakeview Residence Hall, Recreation and Aquatics Center):
   peak/part/off kWh come from the 15-min interval data classified by the TOU
   calendar (summer has peak/part/off; winter has part/off only — see
   `seasons`).
-- **TOU split for monthly-only buildings** (Admin Hall, Library, Cedar Row A/B):
+- **TOU split for monthly-only buildings** (Admin Hall, Library, Parking
+  Structure, Cedar Row A, Cedar Row B, Cedar Row Common House):
   no interval data, so the bill carries TOU-split kWh from **per-TOU meter
   registers** (three register reads), not from interval data. (This is how real
   TOU meters bill non-interval accounts.) Winter bills omit the peak line.
@@ -118,8 +124,9 @@ Cost-center "bills" (account_kind = internal_cost_center), not utility bills:
 | steam_consumption | allocation | steam | klb | NTP-ALLOC-STEAM.consumption |
 | fixed_oandm_allocation | allocation | (plant) | fixed monthly share | *(annual plant O&M recovery; Phase 2 rate param)* |
 
-- Only Science Center has both chilled-water lines (it has the ton-hour/tons
-  sub-meter); Admin Hall / Library / Student Center carry steam_consumption only.
+- Science Center and the Recreation and Aquatics Center have both chilled-water
+  lines (each has a ton-hour/tons BTU meter); Admin Hall, Library, Student Center
+  and Lakeview Residence Hall carry steam_consumption only.
 - These behave like bills for rollups (`baseline_monthly_bills` secondary).
 
 ### Helios Onsite Solar — `HOS-PPA-2024` (PPA invoice)

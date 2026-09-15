@@ -4,11 +4,13 @@ This folder translates the customer/source manifests into EEM application setup
 targets.
 
 - `northlake-eem-stage1-setup-v1.yaml` is the DBAdmin-driven Stage 1 setup
-  plan for companies, definitions, contacts, levels, groups, and users.
+  plan for companies, definitions, contacts, levels (Site, Building, Meter,
+  Point in every company), groups, and users.
 - `northlake-eem-metaworld-stage1b-v1.yaml` is the DBAdmin-driven Stage 1B
   setup target for hierarchy completion, utility setup, billing account shells,
   meter nodes, point nodes, weather station assignments, aggregates, and
-  baseline shells.
+  baseline shells. It holds mapping rules only; the buildings, meters and
+  channels it maps come from `scenarios/demo-university-v1.yaml`.
 - `northlake-rates-v1.yaml` is the Phase 2 **Rate Modeler entry plan**: the rate
   library to build by hand in the WPF Rate Modeler (shared TOU/season/holiday
   schedules + scripts, then ~10 rate schedules at determinant level firing all 9
@@ -22,7 +24,9 @@ targets.
   - `northlake-ap-gl-v1.yaml` — Phase 3: GL chart, account upload flags, validation
     rules, AP approval/upload run (2 built-in formats).
   - `northlake-town-center-v1.yaml` — Phase 4: new mixed-use company/site + Cedar
-    Row sub-metering, all 7 allocation methods, WUI families, bill-gen, reconciliation.
+    Row sub-metering allocation (the apartment submeters themselves are in the
+    scenario inventory), all 7 allocation methods, WUI families, bill-gen,
+    reconciliation.
   - `northlake-sustainability-v1.yaml` — Phase 5: GHG config, ENERGY STAR setup +
     requests (scores via sandbox PM), weather regression run.
   - `northlake-operations-v1.yaml` — Phase 6: projects, alarms, tasks/workflows, MFR

@@ -1,6 +1,6 @@
 # Student Center AcquiSuite handover
 
-Provided by Northlake Facilities Operations. Packet 0.2. All readings are synthetic.
+Provided by Northlake Facilities Operations. Packet 0.3. All readings are synthetic.
 
 The Student Center electric meter is **SYN-VED-M-0040004**, on Valley Electric
 account **SYN-VED-A-0010004**. Its logger serial is **ASQVED01** and its device

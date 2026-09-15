@@ -1,7 +1,7 @@
 # Valley Electric District — EVERYDAY electric distribution utility.
 # Single commodity (electric) but the most data-rich everyday provider:
-# every account produces a monthly tariff bill, and the two interval-metered
-# campus buildings also produce 15-minute kWh and kW channels.
+# every account produces a monthly tariff bill, and the five interval-metered
+# buildings (four on campus plus the Central Plant) also produce 15-minute kWh and kW channels.
 id: valley_electric_district
 displayName: Valley Electric District
 shortName: VED
@@ -12,8 +12,9 @@ billingModel: tariff_metered
 currency: USD
 billingCadence: monthly
 description: >
-  Municipal electric distribution district serving the Northlake campus and the
-  Cedar Row apartment common areas. Demand is billed on the highest 15-minute
+  Municipal electric distribution district serving the Northlake campus, the
+  Central Plant and Cedar Row Apartments, where it bills one master meter per
+  building and never an individual apartment. Demand is billed on the highest 15-minute
   average kW in the period, and power factor is tracked so reactive-power
   adjustments can appear on lab-heavy buildings.
 
@@ -35,9 +36,10 @@ accountModel:
 meterModel:
   numberFormat: "SYN-VED-M-#######"
   example: "SYN-VED-M-0040207"
-  meterTypes: [interval_demand, monthly_kwh]
-  intervalBuildings: [science_center, student_center]
-  monthlyOnlyBuildings: [admin_hall, library, cedar_row_a, cedar_row_b]
+  meterTypes: [interval_demand, monthly_kwh, unmetered_area_lighting]
+  intervalBuildings: [science_center, student_center, lakeview_hall, recreation_center, central_plant]
+  monthlyOnlyBuildings: [admin_hall, library, parking_structure, cedar_row_a, cedar_row_b, cedar_row_common_house]
+  unmeteredServices: [campus_grounds, cedar_row_carport_grounds]
 
 channels:
   - id: electric_kwh
@@ -81,6 +83,29 @@ rateSchedules:
       demand: { unit: $/kW, rate: 19.75, basis: max_15min_kw }
       facilityCharge: { unit: $/month, rate: 67.50 }
 
+  - id: VED-TOU-PRI
+    name: Time-of-Use Primary Service
+    type: time_of_use_demand
+    effective: "2024-01-01..2025-12-31"
+    appliesTo: [central_plant]
+    seasons:
+      summer: { months: [6, 7, 8, 9], periods: [peak, part_peak, off_peak] }
+      winter: { months: [1, 2, 3, 4, 5, 10, 11, 12], periods: [part_peak, off_peak] }
+    components:
+      energy:
+        peak: { unit: $/kWh, rate: 0.214 }
+        part_peak: { unit: $/kWh, rate: 0.149 }
+        off_peak: { unit: $/kWh, rate: 0.098 }
+      demand: { unit: $/kW, rate: 21.90, basis: max_15min_kw }
+      facilityCharge: { unit: $/month, rate: 410.00 }
+  - id: VED-AL-1
+    name: Unmetered Area Lighting
+    type: flat_per_fixture
+    effective: "2024-01-01..2025-12-31"
+    appliesTo: [campus_grounds, cedar_row_carport_grounds]
+    components:
+      fixtureCharge: { unit: $/fixture/month, rate: 14.60, basis: fixture_count }
+
 billCharges:
   - { code: energy_peak, type: usage_tou, unit: $/kWh }
   - { code: energy_part_peak, type: usage_tou, unit: $/kWh }
@@ -112,7 +137,7 @@ environmental:
 
 scenarioHooks:
   - { scenario: baseline_monthly_bills, role: primary }
-  - { scenario: electric_interval_15min, role: primary, targets: [science_center, student_center] }
+  - { scenario: electric_interval_15min, role: primary, targets: [science_center, student_center, lakeview_hall, recreation_center, central_plant] }
   - { scenario: meter_replacement, role: primary, targets: [library] }
   - { scenario: missing_interval_backfill, role: primary, targets: [student_center] }
   - { scenario: provider_rate_change, role: primary, note: "FY2025 TOU rate step" }

@@ -1,7 +1,7 @@
 # Northlake University — Implementation Discovery Questionnaire (Completed)
 
 Prepared by: Campus Operations, with Facilities, Finance, Housing, and
-Sustainability. Packet version: Draft 0.1.
+Sustainability. Packet version: 0.3.
 
 This is our response to your standard discovery questionnaire. Answers reflect
 how we operate today and what we want the new system to do.
@@ -10,17 +10,20 @@ how we operate today and what we want the new system to do.
 
 **1.1 Describe your organization.**
 Northlake University is a mid-size university operating a main academic campus, a
-student housing property (Cedar Row Apartments), and a mixed-use property
-(Northlake Town Center). Facilities Operations manages campus utilities, building
-automation, and meters. Housing Operations manages Cedar Row. Finance owns
-external utility payment and internal cost allocation. The Sustainability Office
-owns reporting.
+student housing property (Cedar Row Apartments), a central thermal plant run as
+its own operating company (Northlake Thermal Plant), and — in a later phase — a
+mixed-use property (Northlake Town Center). Facilities Operations manages campus
+utilities, building automation, and meters. Housing Operations manages Cedar Row.
+The thermal plant has its own manager and operator. Finance owns external
+utility payment and internal cost allocation. The Sustainability Office owns
+reporting.
 
 **1.2 What are your top goals for this system?**
 1. One source of truth for all utility usage and cost across properties.
 2. Accurate monthly bill processing, validation, and payment/AP export.
 3. Internal cost allocation for our central thermal plant.
-4. Tenant sub-metering and rebilling at Town Center and Cedar Row.
+4. Resident rebilling from our Cedar Row apartment submeters, and later tenant
+   rebilling at Town Center.
 5. Sustainability reporting: ENERGY STAR scores and greenhouse-gas emissions.
 6. Scheduled reports delivered automatically to building and finance staff.
 
@@ -32,9 +35,14 @@ asking us to run them.
 
 ## 2. Scope
 
-**2.1 Properties in scope.** Northlake Main Campus (4 buildings + central plant +
-solar), Cedar Row Apartments (2 buildings + common area + carport), Northlake
-Town Center (retail + office tower + annex + infrastructure).
+**2.1 Properties in scope.** Northlake Main Campus (seven buildings: Admin Hall,
+Science Center, Library, Student Center, Lakeview Residence Hall, the Recreation
+and Aquatics Center and the Parking Structure, plus Campus Grounds and onsite
+solar),
+Northlake Thermal Plant (the Central Plant, its own operating company), Cedar Row
+Apartments (Cedar Row A and B with 124 apartments, the Common House, and the
+carport and grounds). Northlake Town Center (retail + office tower + annex +
+infrastructure) is a later phase.
 
 **2.2 Commodities.** Electricity, natural gas, water, sewer, stormwater, chilled
 water, steam, and onsite solar generation.
@@ -64,16 +72,23 @@ We export approved costs to our ERP for payment.
 ## 4. Metering & data
 
 **4.1 What meter/interval data do you have?** 15-minute electric interval at
-Science Center and Student Center; 15-minute solar generation/export; hourly
-chilled-water; monthly reads elsewhere. Water/gas include handheld route reads.
+Science Center, Student Center, Lakeview Residence Hall, the Recreation and
+Aquatics Center and the Central Plant; 15-minute solar generation/export; hourly
+chilled-water and plant production; hourly electric and monthly water submeter
+reads for every Cedar Row apartment; monthly reads elsewhere. Water/gas include
+handheld route reads.
 
 **4.2 What source systems feed data?** Utility billing files, meter-data-service
 interval files, AcquiSuite and MV90 files, central-plant BACnet and Modbus
-points, wireless sensor files, a SQL historian, NOAA and Aeris weather, and
-handheld route uploads. See the Source System Inventory.
+points, wireless sensor files, fixed-network submeter files, a SQL historian,
+NOAA and Aeris weather, and handheld route uploads. See the Source System
+Inventory.
 
-**4.3 Weather.** We use Sacramento-area public stations (KSAC primary, KSMF
-secondary). We are still confirming the preferred station per property.
+**4.3 Weather.** We use Sacramento-area public stations: KSAC (Sacramento
+Executive Airport) is the primary station for all 13 buildings across our three
+companies, and KSMF (Sacramento International Airport) is secondary and our
+forecast source. We want heating and cooling degree days derived from
+temperature.
 
 ## 5. Users & access
 

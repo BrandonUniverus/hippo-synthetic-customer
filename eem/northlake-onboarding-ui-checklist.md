@@ -25,16 +25,22 @@ of EEM internal tables.
 Use Database Administrator's company and Nodes screens. Create only missing
 objects after checking the existing hierarchy.
 
+Every company uses the same levels, listed below. A building exists once, in
+the company that owns its site. The Northlake Thermal Plant company contains
+only the Central Plant; chilled-water and steam meters at served buildings are
+created under those buildings in Northlake University.
+
 | Object | Intended value |
 | --- | --- |
 | Company | Northlake University |
-| Hierarchy | Campus Operations / Northlake Main Campus / Student Center |
+| Hierarchy levels | Site, Building, Meter, Point |
+| Hierarchy | System / Northlake University / Northlake Main Campus / Student Center |
 | Building area | 95,000 sq ft; address 160 Synthetic Campus Drive, Sacramento |
 | Timezone | Sacramento / America/Los_Angeles equivalent in the installed lookup |
 | Provider | Valley Electric District |
 | Billing account | SYN-VED-A-0010004 |
 | Contractual tariff reference | VED-TOU-GS for 2024; VED-TOU-GS-FY25 for 2025 |
-| Meter | Student Center Electric Interval; SYN-VED-M-0040004 |
+| Meter | Student Center Electric Main; SYN-VED-M-0040004 |
 | Energy point | Delivered kWh 15m; Analog; kWh; 15 minutes |
 | Demand point | Demand kW 15m; Analog; kW; 15 minutes |
 
@@ -55,6 +61,7 @@ Nodes; the gateway screen associates those points with a logger/device.
 
 | Setting | Value |
 | --- | --- |
+| Customer data source | Campus AcquiSuite loggers |
 | Gateway type | ACQUISUITE |
 | Gateway name | Northlake Student Center AcquiSuite |
 | Gateway node | ASQ-VED-STUDENT |
@@ -100,16 +107,26 @@ publication, storage or rendering does not complete.
 
 ## 5. Extend the same implementation
 
-1. Add Applied Science Center's existing MDEF electric meter and its two points.
-2. Configure and calculate the specified campus kWh and coincident-kW aggregates.
-   They cover Science Center and Student Center only. Coincident demand is the
-   maximum of the interval-by-interval sum, not the sum of separate meter peaks.
-3. Add the KSAC weather reference and its HDD/CDD relationships through the index
-   UI, confirming base temperature, method and station assignments.
-4. Add Student Center MVRS and Cedar Row B Neptune register/usage pairs. Create
-   the accumulator through the UI and capture its related usage point rather
-   than creating a disconnected duplicate. Replace all placeholder handheld
-   IDs, including meter and register IDs.
+1. Add Science Center Electric Main (MV90 MDEF) under
+   System / Northlake University / Northlake Main Campus / Science Center with
+   its two points, Delivered kWh 15m and Demand kW 15m.
+2. Configure and calculate the campus aggregates Campus Interval Electric kWh
+   Total and Campus Coincident Electric kW directly under Northlake Main Campus.
+   They cover the four interval-metered campus buildings, so Science Center
+   Electric Main, Student Center Electric Main, Lakeview Hall Electric Main and
+   Recreation Center Electric Main must all exist with their points first.
+   Coincident demand is the maximum of the interval-by-interval sum, not the
+   sum of separate meter peaks.
+3. Add the KSAC Sacramento Executive Airport station meter under
+   System / Northlake University / Weather Reference and its HDD/CDD
+   relationships through the index UI, confirming base temperature, method and
+   station assignments (KSAC for every building in all three companies).
+4. Add the Student Center Kitchen Gas MVRS and Cedar Row B Water Master Neptune
+   register/usage pairs (Register Reading with Route Usage Therms, and Register
+   Reading with Route Usage kgal). Create the accumulator through the UI and
+   capture its related usage point rather than creating a disconnected
+   duplicate. Replace all placeholder handheld IDs, including meter and
+   register IDs.
 5. Work through the remaining gateway format cases in the coverage list. Use
    separate restores for alternative formats that share a measurement.
 

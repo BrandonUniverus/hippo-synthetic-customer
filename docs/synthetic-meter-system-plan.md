@@ -12,7 +12,8 @@ and [UI acceptance checklist](../eem/northlake-onboarding-ui-checklist.md).
 The supplied normal, gap and backfill files have deterministic expected values;
 installed ingestion acceptance remains pending.
 
-Grounds: the 13 gateway profiles in `scenarios/demo-university-v1.yaml`, EEM's gateway
+Grounds: the 15 gateway profiles (21 format cases) plus the HMR handheld-event
+publisher in `scenarios/demo-university-v1.yaml`, EEM's gateway
 components at `EEMSuite/src/Tasks/EEMSuite.Tasks.Gateways`, and its gateway test
 fixtures (e.g. real `.MDE` samples under `EEMSuite/tests/.../Gateways/TestData`).
 
@@ -51,7 +52,7 @@ not per provider** — even though the UI groups them by provider for the operat
 
 | Mechanism | Gateways it feeds | Emulator does | Complexity |
 | --- | --- | --- | --- |
-| **File-drop** | AcquiSuite, MV90 MDEF, MV90 MV9, Spinwave, FIG (7 formats), Neptune, MVRS, bill files (BIF/CSV) | write correctly-formatted files into the folder the gateway watches | **Medium** — format fidelity is the work |
+| **File-drop** | AcquiSuite, MV90 MDEF, MV90 MV9, Spinwave, FIG (7 formats plus the fixed-network submeter file), Neptune (Cedar Row B water route and the Cedar Row apartment water submeter route), MVRS, bill files (BIF/CSV) | write correctly-formatted files into the folder the gateway watches | **Medium** — format fidelity is the work |
 | **Live device (poll)** | BACnet, Modbus | stand up a fake BACnet device + a Modbus TCP server that answer EEM's polls with scripted present-values/registers | **Higher** — must run live while "on" |
 | **Database (pull)** | ODBC historian | populate a **separate** historian DB that the ODBC gateway queries (not EEM's DB) | **Low–Medium** |
 | **External API (pull)** | NOAA, Aeris | use real public NOAA, or a mock weather endpoint returning scripted obs/forecast | **Low** (or real) |
@@ -66,7 +67,8 @@ golden-test each emitter's output against them.
 
 One small web UI + backend service:
 - **Provider panels** — Valley Electric, Sierra Gas, River City, Northlake Thermal,
-  Helios — plus a **Weather / Sensors / Historian** panel for non-provider sources.
+  Helios — plus **Weather / Sensors / Historian** and **Submeters** panels for
+  non-provider sources.
   This is your "each provider controls its meters," unified in one app.
 - **Per meter:** on/off toggle, current scenario (normal | a named anomaly),
   last-emitted timestamp + status, next scheduled run.
@@ -81,8 +83,8 @@ One small web UI + backend service:
 Both delivery models are in scope; **batch is built first.**
 
 - **Batch** (generate files/rows for a date range, drop them, let EEM ingest on its
-  schedule) covers **~11 of 13 gateways** — files, historian DB, weather, handheld,
-  bills — and is the path for the **2024–2025 historical backfill**.
+  schedule) covers **~13 of 15 gateway profiles** — files, historian DB, weather,
+  handheld, bills — and is the path for the **2024–2025 historical backfill**.
 - **Live** is required for **BACnet + Modbus**, where EEM *polls a device*: the
   emulator must be a running process answering reads while the meter is "on."
 
@@ -96,8 +98,10 @@ device" for the live two.
 The two real-time gateways poll a device, so each needs a small **running server**
 that answers EEM's reads with Layer-1 readings (same deterministic stream as batch).
 
-- **BACnet emulator** — a BACnet/IP **device** exposing the Science Center
-  chilled-water points as analog objects (ton-hours, tons). EEM's `BACnetGateway`
+- **BACnet emulator** — a BACnet/IP **device** exposing the chilled-water points
+  at Science Center and the Recreation and Aquatics Center (ton-hours, tons) and
+  the Central Plant header points (chilled-water supply, steam production,
+  condensate return) as analog objects. EEM's `BACnetGateway`
   discovers/reads present values by the object bindings already in the manifest
   (ObjectID / Object Type), pointed at the emulator's configured device address
   (BBMD / device instance). Present values update on the synthetic clock.
@@ -128,12 +132,13 @@ Design notes:
 
 | Provider panel | Meters → intake emulator |
 | --- | --- |
-| Valley Electric | Student Center electric → AcquiSuite file · Science Center electric → MV90 MDEF file · monthly bills → BIF/CSV |
-| Sierra Gas | Student Center gas → MVRS handheld file · monthly bills → BIF/CSV |
-| River City | Cedar Row water → FIG files (7 formats) · Cedar Row B → Neptune handheld · bundled bills → BIF/CSV |
-| Northlake Thermal | Science Center chilled water → **BACnet (live)** · chiller kW → **Modbus (live)** · monthly allocations → file |
+| Valley Electric | Student Center and Lakeview Residence Hall electric → AcquiSuite file · Science Center, Recreation and Aquatics Center and Central Plant electric → MV90 MDEF file · monthly bills → BIF/CSV |
+| Sierra Gas | Student Center Kitchen Gas → MVRS handheld file · monthly bills → BIF/CSV |
+| River City | Cedar Row A Water Master → FIG files (7 formats) · Cedar Row B Water Master → Neptune handheld · bundled bills → BIF/CSV |
+| Northlake Thermal | Science Center and Recreation and Aquatics Center chilled water, Central Plant production meters → **BACnet (live)** · chiller kW → **Modbus (live)** · monthly allocations → file |
 | Helios Solar | Solar generation/export → MV90 MV9 file · PPA invoices → file |
 | Weather / Sensors / Historian | KSAC → NOAA · KSMF → Aeris · lab sensors → Spinwave file · Library electric → ODBC historian · smoke → Fake |
+| Submeters | Cedar Row apartment and house electric submeters, Lakeview Residence Hall laundry, Parking Structure EV chargers → FIG fixed-network submeter file · Cedar Row apartment and house water submeters → Neptune apartment water route file |
 
 ## Determinism, safety, traceability
 
@@ -145,8 +150,11 @@ Design notes:
 
 ## Where it lives / stack (proposal)
 
-- **Generation core + file/DB/API emulators:** extend `generators/` (its README
-  already targets MDEF/BIF/interval generation; language is open).
+- **Generation core + file/DB/API emulators:** extend `generators/`. The existing
+  generators are Python: `python generators/northlake_packet.py` (with `--check`
+  to validate first) writes the register, coverage, mapping template and the
+  AcquiSuite samples, and `python generators/update_workbook.py` updates the Data
+  Collection workbook. The emulator language is still open.
 - **Live device emulators (BACnet/Modbus):** small standalone services using
   off-the-shelf libraries.
 - **Control plane:** a simple local web app + service ("doesn't have to be super
@@ -155,8 +163,10 @@ Design notes:
 ## Build phases
 
 1. **Generation core** — deterministic readings from the manifest (foundation).
-2. **File emulators** — AcquiSuite, MV90 ×2, FIG, Spinwave, Neptune, MVRS, bills
-   (covers most gateways; golden-tested vs EEM fixtures/parsers).
+2. **File emulators** — AcquiSuite, MV90 ×2, FIG (including the fixed-network
+   submeter file), Spinwave, Neptune (including the Cedar Row apartment water
+   route), MVRS, bills (covers most gateways; golden-tested vs EEM
+   fixtures/parsers).
 3. **Historian DB + weather** — ODBC source DB + NOAA/Aeris (pull paths).
 4. **Live device emulators** — BACnet + Modbus servers.
 5. **Control plane** — the web UI (on/off, scenarios, clock, status), provider panels.

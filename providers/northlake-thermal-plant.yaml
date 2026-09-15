@@ -16,7 +16,8 @@ uniqueIdentity: >
   This provider exists to stress data shapes an external utility never produces:
   internal cost allocation instead of a tariff bill, hourly (not 15-minute)
   interval, and a non-electric energy commodity. The plant is itself a Valley
-  Electric customer (chiller power) and a Sierra Gas customer (boiler fuel), so
+  Electric customer (chiller power), a Sierra Gas customer (boiler fuel) and a
+  River City customer (cooling-tower makeup water), so
   it ties Scope 1 and Scope 2 emissions to delivered thermal energy.
 
 supplies:
@@ -26,16 +27,16 @@ supplies:
     demandUnit: tons            # instantaneous cooling
     dataTypes: [interval_hourly, monthly_allocation]
     intervalMinutes: 60
-    servedBuildings: [science_center]
-    notes: Hourly ton-hour sub-meter at Science Center plus monthly cost allocation.
+    servedBuildings: [science_center, recreation_center]
+    notes: Hourly ton-hour BTU meters at Science Center and the Recreation and Aquatics Center plus monthly cost allocation; plant supply is metered hourly at the Central Plant.
   - commodity: steam
     role: production_and_allocation
     usageUnit: klb              # thousand pounds of steam
     energyEquivalentUnit: mmbtu
     dataTypes: [monthly_allocation]
     intervalMinutes: null
-    servedBuildings: [science_center, admin_hall, library, student_center]
-    notes: Campus heating loop, allocated monthly. No interval channel in V1.
+    servedBuildings: [science_center, admin_hall, library, student_center, lakeview_hall, recreation_center]
+    notes: Campus heating loop, allocated monthly; served buildings have no interval steam channel, and plant steam production is metered hourly at the Central Plant.
 
 accountModel:
   numberFormat: "SYN-NTP-C-#######"     # C = internal cost center, not a utility account
@@ -55,13 +56,13 @@ channels:
     unit: ton_hours
     direction: delivered
     intervalMinutes: 60
-    appliesTo: [science_center]
+    appliesTo: [science_center, recreation_center]
   - id: chw_tons
     commodity: chilled_water
     unit: tons
     direction: delivered
     intervalMinutes: 60
-    appliesTo: [science_center]
+    appliesTo: [science_center, recreation_center]
 
 rateSchedules:
   - id: NTP-ALLOC-CHW
@@ -108,11 +109,11 @@ environmental:
     - { name: plant_gas_input, unit: therms/klb, value: 1.18 }
 
 scenarioHooks:
-  - { scenario: chilled_water_hourly, role: primary, targets: [science_center] }
+  - { scenario: chilled_water_hourly, role: primary, targets: [science_center, recreation_center] }
   - { scenario: baseline_monthly_bills, role: secondary, note: "Monthly allocation behaves like a bill for rollups" }
 
 dataQuirks:
   - Internal allocation, not a utility bill — there is no external account number.
   - Chilled-water (cooling) demand is seasonal and peaks on summer afternoons.
-  - The plant is itself a Valley Electric and Sierra Gas customer (nested consumption).
+  - The plant is itself a Valley Electric, Sierra Gas and River City customer (nested consumption).
   - Hourly interval (not 15-minute) to exercise a non-electric interval shape.

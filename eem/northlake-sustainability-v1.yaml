@@ -39,12 +39,12 @@ ghg:
   contentGap: "GHGCompanyConfiguration has no Scope 1/2/3 toggles / baseline year / targets (note for stakeholders)"
 
 energyStar:
-  properties: "8 mapped properties already in docs/energystar-integration.md (campus + buildings + Cedar Row)"
+  properties: "13 mapped properties in scenarios/demo-university-v1.yaml energyStarProperties (campus parent + 7 child buildings, the Cedar Row property + its 3 buildings, the Central Plant)"
   requests: "quarterly rating requests 2024-2025 for eligible types"
   scores:
     classification: EXTERNAL (Track B item 1)
     how: "connect sandbox/real Portfolio Manager account; set CustomerServer + credentials; run EEMSuite.Tasks.EnergyStar sync (RatingSyncService) -> ESResponseFacility"
-    note: "scores CANNOT be hand-entered; eligible types (office/library/food-service/residence) get 1-100; labs get metrics, no score"
+    note: "scores CANNOT be hand-entered; eligible types (office, residence hall/dormitory, multifamily housing) get 1-100; college/university, laboratory, library, food service, fitness center, parking and other-utility get metrics, no score"
 
 weatherRegression:
   run: "configure period + run FF_wn* via Custom views (results computed, not entered)"
@@ -63,5 +63,5 @@ expectedAssertions:
   keyChecks:
     - GHG History = sum(usage x factor x GWP) per scope; 2025 factor differs from 2024 (GHGVariance != 0)
     - regression results have plausible R^2/CV-RMSE; baselines now computed
-    - "(after PM connect) eligible properties show quarterly 1-100 scores; labs show metrics, no score"
+    - "(after PM connect) Lakeview Residence Hall and Cedar Row show quarterly 1-100 scores; the other properties show metrics, no score, including Admin Hall, whose classroom wing is 29% of floor area and over the 25% cap"
     - "(after Track B) benchmark ranking by EUI with labs highest"
