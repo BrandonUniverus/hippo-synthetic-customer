@@ -16,6 +16,18 @@ description: >
   metered ccf and a heating-value factor. Strong winter heating seasonality and
   a near-flat summer baseload.
 
+billing:
+  remitAddress:              # where bills are paid; entered on the Utility Provider editor and chosen per billing account
+    line1: PO Box 60915
+    city: Sacramento
+    state: CA
+    postalCode: "95860"
+  businessAddress:           # the account representative's office
+    line1: 1850 Pinnacle Way
+    city: Sacramento
+    state: CA
+    postalCode: "95834"
+
 supplies:
   - commodity: natural_gas
     role: consumption

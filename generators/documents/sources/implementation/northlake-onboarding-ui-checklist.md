@@ -49,6 +49,13 @@ in Rate Modeler and bill calculations are later acceptance work; they are not
 required for raw interval ingestion. Company calendars are required before the
 later bill import milestone.
 
+The billing account needs more than its number and provider: its service address,
+the provider's remit address, the account representative, the bill entry and
+service types, the invoice template and its default GL accounts. Every account's
+values are listed in
+[the billing account setup](northlake-billing-account-setup.pdf); the GL accounts
+and the account-scope validation tests wait for their Phase 3 prerequisites.
+
 Record generated IDs and screenshots/exports after saving. Check that the point
 list contains both measurements under the correct meter. A missing required UI
 path is a product finding; do not fill the gap with SQL.

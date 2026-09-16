@@ -75,6 +75,36 @@ class NorthlakePacketTests(unittest.TestCase):
         self.assertEqual({"Utility meter", "Production meter", "Plant controller", "Sewer-deduct submeter"}, {row[6] for row in plant})
         self.assertTrue(all(row[1] in meters for row in self.sheets["Measured Points"]["rows"]))
 
+    def test_billing_accounts_carry_their_editor_setup(self):
+        accounts = {row[3]: row for row in self.sheets["Accounts And Agreements"]["rows"]}
+        details = {row[0]: row for row in self.sheets["Account Billing Details"]["rows"]}
+        self.assertEqual(49, len(accounts))
+        self.assertEqual(set(accounts), set(details))
+        for number, row in details.items():
+            self.assertTrue(row[2].endswith(", CA 95822") and row[3] and row[4] and "@" in row[5], number)
+        self.assertEqual("100 Synthetic Campus Drive, Sacramento, CA 95822", details["SYN-VED-A-0010001"][2])
+        self.assertEqual("PO Box 41027, Sacramento, CA 95841", details["SYN-VED-A-0010001"][3])
+        self.assertEqual("Owen Blake", details["SYN-VED-A-0010001"][4])
+        self.assertEqual("Devon Brooks", details["SYN-NTP-C-0000001"][4])
+
+        setup = {row[0]: row for row in self.packet["accountSetup"]["rows"]}
+        self.assertEqual(set(accounts), set(setup))
+        self.assertEqual({"AP", "AP and GL", "GL", "No Upload"}, {row[4] for row in setup.values()})
+        self.assertEqual({"Bill Importer", "Bill Entry", "Bill Allocation"}, {row[3] for row in setup.values()})
+        self.assertEqual("Bill Importer", setup["SYN-VED-A-0010001"][3])          # campus electric arrives as a file
+        self.assertEqual("Bill Entry", setup["SYN-VED-A-0010005"][3])             # Cedar Row is keyed by hand
+        self.assertEqual("Bill Allocation", setup["SYN-NTP-C-0000001"][3])
+        self.assertEqual("No Upload", setup["SYN-RCU-A-0030004"][4])              # the never-exported negative control
+        self.assertTrue(all(row[5] == "Energy Hippo Default Template" for row in setup.values()))
+        self.assertTrue(all(row[6] == "2000-AP" for row in setup.values()))
+        self.assertEqual({"5100-ELEC", "5110-GAS", "5120-WATER", "5130-THERMAL", "5140-SOLAR"}, {row[7] for row in setup.values()})
+
+        overrides = self.packet["validationOverrides"]["rows"]
+        self.assertEqual(4, len(overrides))
+        self.assertEqual({"On", "Off"}, {row[3] for row in overrides})
+        self.assertTrue(all(row[0] in accounts and row[5] for row in overrides))
+        self.assertEqual(45, sum(row[8] == "Inherits company" for row in setup.values()))
+
     def test_bill_only_meters_have_no_points(self):
         points = {}
         for row in self.sheets["Measured Points"]["rows"]:

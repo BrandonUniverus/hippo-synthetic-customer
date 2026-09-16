@@ -20,6 +20,18 @@ uniqueIdentity: >
   River City customer (cooling-tower makeup water), so
   it ties Scope 1 and Scope 2 emissions to delivered thermal energy.
 
+billing:
+  remitAddress:              # where bills are paid; entered on the Utility Provider editor and chosen per billing account
+    line1: Utility Cost Recovery, Campus Mail Stop 42
+    city: Sacramento
+    state: CA
+    postalCode: "95822"
+  businessAddress:           # the account representative's office
+    line1: Central Plant Operations, Campus Mail Stop 44
+    city: Sacramento
+    state: CA
+    postalCode: "95822"
+
 supplies:
   - commodity: chilled_water
     role: production_and_allocation

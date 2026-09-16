@@ -28,11 +28,23 @@ glChart:                    # GLAccountsView; Account Type: 0 Assets, 1 Expenses
   - { code: 5140-SOLAR, type: 1, desc: Solar PPA expense }
   - { code: 2000-AP, type: 2, desc: Accounts payable control }
 
-accountUploadFlags:        # BillingAccount Type_Code: 0 No Upload, 1 AP, 2 GL, 3 AP+GL
-  default: 1               # most accounts AP upload
-  apPlusGl: [campus electric accounts, thermal accounts]   # Type_Code 3 (exercise GL journal)
-  noUpload: [one Cedar Row account]                        # Type_Code 0 negative control
+accountUploadFlags:        # Billing Account "Bill Service Type" (Global_Type_Code 'BA'): No Upload, AP, GL, AP and GL
+  default: AP              # most accounts are paid through AP
+  rules:                   # first match wins, in order; every code is exercised
+    - { match: {providerId: valley_electric_district, companyId: northlake_university}, value: AP and GL, why: campus electric exercises the GL journal alongside the AP payment }
+    - { match: {providerId: northlake_thermal_plant}, value: AP and GL, why: internal allocations post to the GL and settle between companies }
+    - { match: {providerId: helios_onsite_solar}, value: GL, why: PPA statements post to the GL; payment runs outside AP }
+    - { match: {accountId: rcu_cedar_row_b}, value: No Upload, why: negative control - this account must never reach an export file }
   coding: "set BI_EXpAcctID per charge line by commodity; BA_DefExpAcctID/BA_DefApAcctID as fallback"
+
+glAccountDefaults:         # Billing Account "Associated G/L Accounts"; codes come from glChart above
+  apAccount: 2000-AP       # BA_DefApAcctID on every account, including the ones that never upload
+  expenseByProvider:       # BA_DefExpAcctID
+    valley_electric_district: 5100-ELEC
+    sierra_gas_utility: 5110-GAS
+    river_city_utilities: 5120-WATER
+    northlake_thermal_plant: 5130-THERMAL
+    helios_onsite_solar: 5140-SOLAR
 
 billValidationRules:       # BillValidationView; modes 1 Bill Save + 2 Batch Test
   entries:
@@ -42,6 +54,13 @@ billValidationRules:       # BillValidationView; modes 1 Bill Save + 2 Batch Tes
     - { family: usage_floor, threshold: "kWh 1000 / gas-water 100" }
     - { family: period_length, threshold: "26-36 days" }
     - { family: presence, threshold: "required fields / active account" }
+  accountOverrides:        # the same tests at Billing Account scope: On with its own threshold, or Off
+    - { accountId: ved_science_center, family: cost_change_pct, state: "On", percent: 60, why: lab and exhaust loads swing far past the 35% campus threshold }
+    - { accountId: sgu_student_center, family: usage_change_pct, state: "Off", why: the estimated read and its corrected actual are a deliberate swing }
+    - { accountId: rcu_cedar_row_a, family: period_length, state: "Off", why: the July 2024 account renewal produces one short period }
+    - { accountId: ntp_science_center, family: cost_max, state: "On", absolute: "$250,000", why: an internal allocation never approaches the global ceiling }
+  inheritance: "every other account inherits the company setting, and the company inherits Global; an account row is written only where it differs"
+
   fixtures:
     - bills that pass all rules
     - bills that deliberately trip each family (cost spike, short period, usage zero)

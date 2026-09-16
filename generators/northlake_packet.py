@@ -137,6 +137,80 @@ def expand_gateway_points(node, buildings):
     return points
 
 
+def format_address(address):
+    return f"{address['line1']}, {address['city']}, {address['state']} {address['postalCode']}"
+
+
+def account_setup(accounts, buildings, providers, people, onboarding, model, financials, bill_entry):
+    """Resolve, per account, every Billing Account editor value that is not the account's own.
+
+    Addresses, representative and invoice template follow the Stage 1B rules; the entry
+    method comes from the Phase 1 bill plan; the upload flag, GL defaults and validation
+    overrides come from the Phase 3 AP/GL plan.
+    """
+    rules = model["billingAccountSetup"]
+    entry_codes = {key: value for key, value in rules["billEntryTypeCodes"].items() if key != "unusedCodes"}
+    representatives = {contact["providerId"]: contact for contact in onboarding["contacts"] if "providerId" in contact}
+    internal_reps = rules["accountRepresentative"]["internalProviders"]
+    assert set(representatives) | set(internal_reps) == set(providers), "Every provider needs an account representative"
+    assert set(internal_reps.values()) <= set(people), "An internal account representative is not in the people register"
+
+    methods = {}
+    for rule in bill_entry["bills"]["preferredEntry"]:
+        method = rule["method"].split(" (")[0]
+        assert method in entry_codes, f"Bill entry method has no Global_Type_Code 'BA2' mapping: {method}"
+        for provider_id in rule.get("providers", []):
+            methods[provider_id] = method
+        if rule.get("scope"):
+            methods[rule["scope"]] = method
+    assert set(providers) <= set(methods), "Every provider needs a bill entry method"
+
+    gl_chart = {entry["code"] for entry in financials["glChart"]}
+    gl_defaults = financials["glAccountDefaults"]
+    expense_accounts = gl_defaults["expenseByProvider"]
+    assert set(expense_accounts) == set(providers), "Every provider needs a default expense account"
+    assert {gl_defaults["apAccount"], *expense_accounts.values()} <= gl_chart, "A default GL account is missing from the chart"
+
+    upload = financials["accountUploadFlags"]
+    for rule in upload["rules"]:
+        match = rule["match"]
+        assert set(match) <= {"providerId", "companyId", "accountId"}, f"Unknown upload-flag match: {match}"
+        assert "accountId" not in match or match["accountId"] in accounts, f"Upload flag names an unknown account: {match}"
+        assert "providerId" not in match or match["providerId"] in providers, f"Upload flag names an unknown provider: {match}"
+
+    families = {entry["family"] for entry in financials["billValidationRules"]["entries"]}
+    overrides = {}
+    for override in financials["billValidationRules"]["accountOverrides"]:
+        assert override["accountId"] in accounts, f"Validation override names an unknown account: {override['accountId']}"
+        assert override["family"] in families, f"Validation override names an unknown test family: {override['family']}"
+        threshold = override.get("percent") and f"{override['percent']}%" or override.get("absolute", "")
+        overrides.setdefault(override["accountId"], []).append(dict(override, threshold=threshold))
+
+    resolved = {}
+    for account in accounts.values():
+        building = buildings[account["buildingId"]]
+        provider = providers[account["providerId"]]
+        representative = representatives.get(provider["id"])
+        method = methods.get(building["companyId"], methods[provider["id"]])   # a company scope beats the provider default
+        service_type = next((rule["value"] for rule in upload["rules"]
+                             if all(value in (account["id"], provider["id"], building["companyId"]) for value in rule["match"].values())), upload["default"])
+        resolved[account["id"]] = {
+            "serviceAddress": format_address(building["address"]),
+            "remitAddress": format_address(provider["billing"]["remitAddress"]),
+            "representative": representative["name"] if representative else people[internal_reps[provider["id"]]]["displayName"],
+            "representativeContact": (representative or people[internal_reps[provider["id"]]])["email"],
+            "representativeAddress": format_address(provider["billing"]["businessAddress"]),
+            "invoiceTemplate": rules["invoiceTemplate"],
+            "billEntryType": entry_codes[method],
+            "billServiceType": service_type,
+            "apAccount": gl_defaults["apAccount"],
+            "expenseAccount": expense_accounts[provider["id"]],
+            "overrides": overrides.get(account["id"], []),
+        }
+    assert {setup["billServiceType"] for setup in resolved.values()} == {"AP", "AP and GL", "GL", "No Upload"}, "Every bill service type should be exercised"
+    return resolved
+
+
 def point_name(channel, rules):
     if channel.get("pointName"):
         return channel["pointName"]
@@ -152,6 +226,8 @@ def build_packet(root=ROOT):
     model = read_yaml(root, "data/eem/northlake-eem-metaworld-stage1b-v1.yaml")
     onboarding = read_yaml(root, "data/scenarios/northlake-onboarding-v1.yaml")
     security = read_yaml(root, "data/security/northlake-eem-security-v1.yaml")
+    financials = read_yaml(root, "data/eem/northlake-ap-gl-v1.yaml")
+    bill_entry = read_yaml(root, "data/eem/northlake-bill-entry-v1.yaml")
     people = {p["id"]: p for p in security["users"]}
     providers = {p["id"]: p for p in (read_yaml(root, f.relative_to(root)) for f in sorted((root / "data/providers").glob("*.yaml")))}
     assert {p["id"] for p in scenario["providers"]} == set(providers), "Scenario providers differ from data/providers/*.yaml"
@@ -359,7 +435,8 @@ def build_packet(root=ROOT):
     sheets["Rate Schedules"] = table(["Provider", "Schedule", "Type", "Effective", "Key charges"], rate_rows, "Base contractual tariffs. Analysis-only rate models remain a separate implementation phase.")
     sheets["Rate Components"] = table(["Provider", "Schedule", "Charge", "Rate", "Unit", "Basis", "Effective"], component_rows, "Numeric charges from the provider tariff sources. Full schedules and tariff terms are also required for rate-engine acceptance.")
 
-    account_rows = []
+    account_rows, detail_rows, setup_rows, override_rows = [], [], [], []
+    setups = account_setup(accounts, buildings, providers, people, onboarding, model, financials, bill_entry)
     account_kinds = model["billingAccountKinds"]
     for account in accounts.values():
         provider = providers[account["providerId"]]
@@ -373,8 +450,17 @@ def build_packet(root=ROOT):
                 if isinstance(charge, dict) and charge and all(re.fullmatch(r"\d+(?:\.\d+)?in", size) for size in charge):
                     for meter in account["meters"]:
                         assert meter.get("meterSize") in charge, f"{rate_id} has no charge for meter size {meter.get('meterSize')}: {meter['id']}"
-        account_rows.append([f"{building['displayName']} / {provider['shortName']}", provider["displayName"], ACCOUNT_KIND_LABELS[kind], account["syntheticAccountNumber"], f"{companies[building['companyId']]} / {building['displayName']}", account["syntheticAccountNumber"] if kind == "internalCostCenters" else "", account.get("effectiveStart", scenario["dateRange"]["start"]), account.get("effectiveEnd", "Active"), "Finance and Accounts Payable", "Documented", ", ".join(rates)])
+        name = f"{building['displayName']} / {provider['shortName']}"
+        setup = setups[account["id"]]
+        account_rows.append([name, provider["displayName"], ACCOUNT_KIND_LABELS[kind], account["syntheticAccountNumber"], f"{companies[building['companyId']]} / {building['displayName']}", account["syntheticAccountNumber"] if kind == "internalCostCenters" else "", account.get("effectiveStart", scenario["dateRange"]["start"]), account.get("effectiveEnd", "Active"), "Finance and Accounts Payable", "Documented", ", ".join(rates)])
+        detail_rows.append([account["syntheticAccountNumber"], name, setup["serviceAddress"], setup["remitAddress"], setup["representative"], setup["representativeContact"]])
+        setup_rows.append([account["syntheticAccountNumber"], name, companies[building["companyId"]], setup["billEntryType"], setup["billServiceType"], setup["invoiceTemplate"], setup["apAccount"], setup["expenseAccount"], "; ".join(f"{o['family']} {o['state']} {o['threshold']}".strip() for o in setup["overrides"]) or "Inherits company"])
+        for override in setup["overrides"]:
+            override_rows.append([account["syntheticAccountNumber"], name, override["family"], override["state"], override["threshold"], override["why"]])
     sheets["Accounts And Agreements"] = table(["Account / Agreement Name", "Provider / Counterparty", "Service Category", "Account Number", "Site / Building Scope", "Cost Center", "Start Date", "End Date", "Billing Contact", "Review Status", "Notes"], account_rows, "One row per provider account, PPA agreement or internal cost center; several services may share an account. Owned submeters have no account.")
+    sheets["Account Billing Details"] = table(["Account Number", "Account / Agreement", "Service Address", "Remit To", "Account Representative", "Representative Email"], detail_rows, "Where each account is served, where its bills are paid, and who the provider's representative is. The service address is the building's; the remit address and representative belong to the provider.")
+    packet["accountSetup"] = table(["Account Number", "Account / Agreement", "Company", "Bill Entry Type", "Bill Service Type", "Bill Invoice Template", "Default AP Account", "Default Expense Account", "Bill Validation Tests"], setup_rows, "What to enter on the Billing Account editor beyond the account's own identity. Entry type records how the bills arrive, service type whether the account reaches AP, GL, both or neither.")
+    packet["validationOverrides"] = table(["Account Number", "Account / Agreement", "Test", "Setting", "Threshold", "Why"], override_rows, "Bill validation tests set at account scope. Every other account inherits its company, and the company inherits Global.")
 
     meter_rows, point_rows, related_rows, mapping_rows, unit_rows = [], [], [], [], {}
     meter_names = {meter["id"]: meter["displayName"] for meter in meters}
@@ -504,7 +590,7 @@ def sample_files(root=ROOT):
 
 
 def register_markdown(packet):
-    register_sheets = ["Hierarchy", "Departments & Responsibilities", "Contacts", "Sites", "Buildings", "Service Profiles", "Accounts And Agreements", "Meters", "Units and Submeters", "Measured Points", "Related Measurements", "Rollup Members", "Weather Assignments"]
+    register_sheets = ["Hierarchy", "Departments & Responsibilities", "Contacts", "Sites", "Buildings", "Service Profiles", "Accounts And Agreements", "Account Billing Details", "Meters", "Units and Submeters", "Measured Points", "Related Measurements", "Rollup Members", "Weather Assignments"]
     register = ["# Northlake Facilities and Meter Register", "", f"Packet {packet['version']} | Issued {packet['issuedOn']} | Fictional customer", "", "This register describes the requested setup. Every building appears once, under the company that owns its site, and lists every meter that serves it. Installation and ingestion acceptance are pending.", "", "## Customer decisions", ""]
     register += [f"- **{name}:** {text}" for name, text in packet["decisions"]]
     for name in register_sheets:
@@ -522,11 +608,22 @@ def gateway_coverage_markdown(packet):
     return "\n".join(coverage) + "\n"
 
 
+def billing_account_setup_markdown(packet):
+    setup = ["# Northlake Billing Account Setup", "",
+             f"Packet {packet['version']} | Issued {packet['issuedOn']} | Enter on the Billing Account editor", "",
+             "Every billing account carries more than its number and provider. This lists the rest of the editor for each account: where its bills arrive from, whether it reaches AP or the GL, which invoice template it prints with, and its default GL accounts. The service address, remit address and account representative are in the facilities and meter register.", "",
+             "The GL accounts and the validation overrides need their Phase 3 prerequisites in place: the chart of accounts must exist before an account can point at one, and the global validation tests before an account can override one.", "",
+             "## Account setup", "", packet["accountSetup"]["description"], "", markdown_table(packet["accountSetup"]), "",
+             "## Bill validation overrides", "", packet["validationOverrides"]["description"], "", markdown_table(packet["validationOverrides"])]
+    return "\n".join(setup) + "\n"
+
+
 # Documents rendered straight from the packet, with no Markdown source: PDF path -> (masthead, Markdown).
 GENERATED_DOCUMENTS = {
     "documents/intake-package/facilities-and-meter-register.pdf": ({"department": "Facilities Operations"}, register_markdown),
     "documents/intake-package/source-system-inventory.pdf": ({"department": "Facilities Operations"}, source_inventory_markdown),
     "implementation/northlake-gateway-coverage.pdf": ({}, gateway_coverage_markdown),
+    "implementation/northlake-billing-account-setup.pdf": ({}, billing_account_setup_markdown),
 }
 
 
