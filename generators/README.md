@@ -16,6 +16,8 @@ Northlake document is rendered from its Markdown source; see
 | `data/eem/northlake-eem-metaworld-stage1b-v1.yaml` | EEM mapping only: measure types, which channel roles become points and how they are named, rate schedule and billing account kinds, weather stations and assignments, aggregates and baselines |
 | `data/scenarios/northlake-onboarding-v1.yaml` | Packet decisions, contact responsibilities and department ownership, source descriptions, known events and first sample contract |
 | `data/security/northlake-eem-security-v1.yaml` | Existing fictional people's names, titles, personal email and company ownership, reused for Northlake contacts |
+| `data/eem/northlake-bill-entry-v1.yaml` | How each provider's bills arrive (import, manual, allocation), which sets every account's Bill Entry Type |
+| `data/eem/northlake-ap-gl-v1.yaml` | The GL chart, each account's AP upload flag and default GL accounts, and the bill validation tests set at account scope |
 
 These files own different fields and never re-list each other's facts; the
 rules are in [`implementation/northlake-inventory-standard.pdf`](../implementation/northlake-inventory-standard.pdf).
@@ -47,7 +49,11 @@ python generators/update_workbook.py
 
 The fourth command writes the register and source-system inventory PDFs to
 `documents/intake-package/`, the AcquiSuite samples beside them, the gateway
-coverage PDF to `implementation/` and the EEM mapping template to `data/eem/`.
+coverage and billing account setup PDFs to `implementation/` and the EEM mapping
+template to `data/eem/`. Provider addresses and the Stage 1B billing account
+rules resolve per account: service address from the building, remit address and
+representative from the provider, and entry type, upload flag, invoice template
+and GL defaults from the phase plans.
 Pass `--dump-json <path>` to also write the joined packet for inspection. PDFs
 and samples have fixed bytes; there is no random or current-time input.
 

@@ -274,6 +274,25 @@ billingAccountKinds:
   internal_allocation: internalCostCenters
   ppa_generation: ppaAgreements
 
+# Everything else the Billing Account editor asks for. Each rule resolves per account;
+# the AP upload flag, GL defaults and validation overrides belong to Phase 3
+# (data/eem/northlake-ap-gl-v1.yaml), and the bills' entry method to Phase 1
+# (data/eem/northlake-bill-entry-v1.yaml).
+billingAccountSetup:
+  serviceAddress: building          # the account bills a building, so it takes that building's address
+  remitAddress: provider            # the provider's billing.remitAddress, entered on the Utility Provider editor
+  accountRepresentative:            # Account Contact and Account Address sections
+    contact: onboarding contact whose providerId matches the account's provider
+    address: the provider's billing.businessAddress
+    internalProviders:              # an internal counterparty has no external representative
+      northlake_thermal_plant: devon.brooks
+  invoiceTemplate: Energy Hippo Default Template   # the seeded BillInvoiceTemplate row; a Northlake template is a later phase
+  billEntryTypeCodes:               # Global_Type_Code 'BA2'; the method per account comes from the Phase 1 entry plan
+    import: Bill Importer
+    manual: Bill Entry
+    manual allocation: Bill Allocation
+    unusedCodes: [Bill Generation, Other]   # Bill Generation arrives with tenant rebilling in Phase 4
+
 weatherIndexTargets:
   ownerCompanyId: northlake_university
   hierarchyPath: System / Northlake University / Weather Reference

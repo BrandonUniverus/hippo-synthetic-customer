@@ -20,6 +20,18 @@ uniqueIdentity: >
   rather than against a tariff, and the provider issues a monthly REC and
   avoided-emissions statement for market-based Scope 2 reporting.
 
+billing:
+  remitAddress:              # where bills are paid; entered on the Utility Provider editor and chosen per billing account
+    line1: PO Box 3391
+    city: Davis
+    state: CA
+    postalCode: "95617"
+  businessAddress:           # the account representative's office
+    line1: 77 Solar Grove Court
+    city: Davis
+    state: CA
+    postalCode: "95618"
+
 supplies:
   - commodity: solar_generation
     role: generation

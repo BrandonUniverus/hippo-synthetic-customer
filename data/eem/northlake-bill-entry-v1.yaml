@@ -39,7 +39,7 @@ bills:
     - { providers: [valley_electric_district, river_city_utilities], method: import (DATA-PATH), user: nora.chen }
     - { providers: [sierra_gas_utility, helios_onsite_solar], method: manual (Bill Entry), user: iris.morales }
     - { providers: [northlake_thermal_plant], method: manual allocation, user: keiko.tan }
-    - { scope: cedar_row, method: manual, user: marcus.reed }
+    - { scope: cedar_row_apartments, method: manual, user: marcus.reed }   # company scope: beats the provider default above
 
 statusHistory:
   rule: "every bill gets a Status_Code 1 (Bill Entry) row; ~1/3 advanced to 2 (QC Approval) by an AccessLevel-3 user"

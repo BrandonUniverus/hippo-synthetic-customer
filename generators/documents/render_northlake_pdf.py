@@ -443,19 +443,23 @@ def column_widths(block: Block, available: float) -> list[float]:
     count = len(block.rows[0])
     longest = [0.0] * count
     word = [0.0] * count
-    for row_index, row in enumerate(block.rows):
-        font = SEMIBOLD if row_index == 0 else REGULAR
-        for column, cell in enumerate(row):
-            text = plain_text(cell)
-            longest[column] = max(longest[column], stringWidth(text, font, size))
-            # Lines may also break after an embedded hyphen (embeddedHyphenation).
-            for token in re.split(r"\s+|(?<=-)", text):
-                word[column] = max(word[column], stringWidth(token, font, size))
     # Like a browser's automatic table layout: every column is at least as wide
     # as its longest word (capped, so one long identifier cannot starve the
     # rest) and the remaining width goes to the columns that wrap the most.
     pad = 2 * table_padding(block) + 1
     cap = max(available / count * 1.5, 60.0)
+    for row_index, row in enumerate(block.rows):
+        font = SEMIBOLD if row_index == 0 else REGULAR
+        for column, cell in enumerate(row):
+            text = plain_text(cell)
+            longest[column] = max(longest[column], stringWidth(text, font, size))
+            for token in text.split():
+                width = stringWidth(token, font, size)
+                # Only a word too wide for its column breaks, and then after an
+                # embedded hyphen (embeddedHyphenation); identifiers stay whole.
+                if width > cap:
+                    width = max(stringWidth(part, font, size) for part in re.split(r"(?<=-)", token))
+                word[column] = max(word[column], width)
     minimum = [min(value, cap) + pad for value in word]
     natural = [value + pad for value in longest]
     if sum(natural) <= available:

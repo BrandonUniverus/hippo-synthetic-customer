@@ -10,7 +10,10 @@ targets.
   setup target for hierarchy completion, utility setup, billing account shells,
   meter nodes, point nodes, weather station assignments, aggregates, and
   baseline shells. It holds mapping rules only; the buildings, meters and
-  channels it maps come from `data/scenarios/demo-university-v1.yaml`.
+  channels it maps come from `data/scenarios/demo-university-v1.yaml`. Its
+  `billingAccountSetup` block says where each billing account takes its service
+  address, remit address, representative and invoice template from, and maps a
+  bill entry method to its `Global_Type_Code` 'BA2' code.
 - `northlake-rates-v1.yaml` is the Phase 2 **Rate Modeler entry plan**: the rate
   library to build by hand in the WPF Rate Modeler (shared TOU/season/holiday
   schedules + scripts, then ~10 rate schedules at determinant level firing all 9
@@ -21,8 +24,9 @@ targets.
   `implementation/dream-customer/` specs and flagging Track-B gaps:
   - `northlake-bill-entry-v1.yaml` — Phase 1: bills + charge lines, status history,
     digital points, notes/images (Bill Entry / Bill Importer).
-  - `northlake-ap-gl-v1.yaml` — Phase 3: GL chart, account upload flags, validation
-    rules, AP approval/upload run (2 built-in formats).
+  - `northlake-ap-gl-v1.yaml` — Phase 3: GL chart, per-account upload flags and
+    default GL accounts, validation rules and the tests set at account scope, AP
+    approval/upload run (2 built-in formats).
   - `northlake-town-center-v1.yaml` — Phase 4: new mixed-use company/site + Cedar
     Row sub-metering allocation (the apartment submeters themselves are in the
     scenario inventory), all 7 allocation methods, WUI families, bill-gen,

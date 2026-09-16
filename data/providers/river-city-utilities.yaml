@@ -17,6 +17,18 @@ description: >
   stormwater on a single account and statement. Only water is metered; sewer
   volume is derived from metered water and stormwater is a flat area-based fee.
 
+billing:
+  remitAddress:              # where bills are paid; entered on the Utility Provider editor and chosen per billing account
+    line1: PO Box 2216
+    city: Sacramento
+    state: CA
+    postalCode: "95812"
+  businessAddress:           # the account representative's office
+    line1: 915 Levee Street
+    city: Sacramento
+    state: CA
+    postalCode: "95814"
+
 supplies:
   - commodity: water
     role: consumption

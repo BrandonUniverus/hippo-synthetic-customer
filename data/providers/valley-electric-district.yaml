@@ -18,6 +18,18 @@ description: >
   average kW in the period, and power factor is tracked so reactive-power
   adjustments can appear on lab-heavy buildings.
 
+billing:
+  remitAddress:              # where bills are paid; entered on the Utility Provider editor and chosen per billing account
+    line1: PO Box 41027
+    city: Sacramento
+    state: CA
+    postalCode: "95841"
+  businessAddress:           # the account representative's office
+    line1: 2400 Feather River Road
+    city: Sacramento
+    state: CA
+    postalCode: "95833"
+
 supplies:
   - commodity: electric
     role: consumption
