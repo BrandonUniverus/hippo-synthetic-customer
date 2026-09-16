@@ -17,6 +17,9 @@ description: >
   stormwater on a single account and statement. Only water is metered; sewer
   volume is derived from metered water and stormwater is a flat area-based fee.
 
+website: https://www.rivercityutilities.example
+icon: fa-droplet          # the Font Awesome mark the provider picker shows
+
 billing:
   remitAddress:              # where bills are paid; entered on the Utility Provider editor and chosen per billing account
     line1: PO Box 2216
@@ -28,6 +31,16 @@ billing:
     city: Sacramento
     state: CA
     postalCode: "95814"
+
+  billCycles:                # the provider owns the calendar; a meter stores only the cycle number
+    periods: calendar months across the scenario date range
+    cycles:
+      - { number: 1, description: "Campus water, sewer and stormwater" }
+      - { number: 2, description: "Cedar Row, read a fortnight after the campus cycle", companies: [cedar_row_apartments] }
+  companyAccounts:           # CompanyProvider: what each company is to this provider
+    northlake_university: { vendorNumber: RCU-3308, alias: RCU }
+    cedar_row_apartments: { vendorNumber: RCU-3309, alias: RCU }
+    northlake_thermal_plant: { vendorNumber: RCU-3310, alias: RCU }
 
 supplies:
   - commodity: water
@@ -55,6 +68,7 @@ accountModel:
   meta: [service_address, water_meter_size_in, eru_count]
 
 meterModel:
+  providerNumberFormat: "RCU-DEV-#######"   # the provider's own badge number; the digits repeat our meter number
   numberFormat: "SYN-RCU-M-#######"
   example: "SYN-RCU-M-0060142"
   meterTypes: [water_positive_displacement, water_compound]

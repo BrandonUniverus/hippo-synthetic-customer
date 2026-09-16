@@ -20,6 +20,8 @@ uniqueIdentity: >
   River City customer (cooling-tower makeup water), so
   it ties Scope 1 and Scope 2 emissions to delivered thermal energy.
 
+icon: fa-temperature-half          # internal counterparty: no public website
+
 billing:
   remitAddress:              # where bills are paid; entered on the Utility Provider editor and chosen per billing account
     line1: Utility Cost Recovery, Campus Mail Stop 42
@@ -31,6 +33,14 @@ billing:
     city: Sacramento
     state: CA
     postalCode: "95822"
+
+  billCycles:                # the provider owns the calendar; a meter stores only the cycle number
+    periods: calendar months across the scenario date range
+    cycles:
+      - { number: 1, description: "Internal allocation, closed with the month" }
+  companyAccounts:           # CompanyProvider: what each company is to this provider
+    northlake_university: { vendorNumber: NTP-INTERNAL, alias: NTP }
+    cedar_row_apartments: { vendorNumber: NTP-INTERNAL-CR, alias: NTP }
 
 supplies:
   - commodity: chilled_water

@@ -18,6 +18,9 @@ description: >
   average kW in the period, and power factor is tracked so reactive-power
   adjustments can appear on lab-heavy buildings.
 
+website: https://www.valleyelectric.example
+icon: fa-bolt          # the Font Awesome mark the provider picker shows
+
 billing:
   remitAddress:              # where bills are paid; entered on the Utility Provider editor and chosen per billing account
     line1: PO Box 41027
@@ -29,6 +32,15 @@ billing:
     city: Sacramento
     state: CA
     postalCode: "95833"
+
+  billCycles:                # the provider owns the calendar; a meter stores only the cycle number
+    periods: calendar months across the scenario date range
+    cycles:
+      - { number: 1, description: "Campus and plant accounts, read in the first week" }
+  companyAccounts:           # CompanyProvider: what each company is to this provider
+    northlake_university: { vendorNumber: VED-10042, alias: VED }
+    cedar_row_apartments: { vendorNumber: VED-10043, alias: VED }
+    northlake_thermal_plant: { vendorNumber: VED-10044, alias: VED }
 
 supplies:
   - commodity: electric
@@ -46,6 +58,7 @@ accountModel:
   meta: [service_address, rate_schedule_id, voltage_level, service_territory_synthetic]
 
 meterModel:
+  providerNumberFormat: "VED-BADGE-#######"   # the provider's own badge number; the digits repeat our meter number
   numberFormat: "SYN-VED-M-#######"
   example: "SYN-VED-M-0040207"
   meterTypes: [interval_demand, monthly_kwh, unmetered_area_lighting]

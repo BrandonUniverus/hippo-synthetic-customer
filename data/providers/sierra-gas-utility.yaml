@@ -16,6 +16,9 @@ description: >
   metered ccf and a heating-value factor. Strong winter heating seasonality and
   a near-flat summer baseload.
 
+website: https://www.sierragas.example
+icon: fa-fire          # the Font Awesome mark the provider picker shows
+
 billing:
   remitAddress:              # where bills are paid; entered on the Utility Provider editor and chosen per billing account
     line1: PO Box 60915
@@ -27,6 +30,15 @@ billing:
     city: Sacramento
     state: CA
     postalCode: "95834"
+
+  billCycles:                # the provider owns the calendar; a meter stores only the cycle number
+    periods: calendar months across the scenario date range
+    cycles:
+      - { number: 1, description: "All Northlake gas accounts, read mid-month" }
+  companyAccounts:           # CompanyProvider: what each company is to this provider
+    northlake_university: { vendorNumber: SGU-55120, alias: SGU }
+    cedar_row_apartments: { vendorNumber: SGU-55121, alias: SGU }
+    northlake_thermal_plant: { vendorNumber: SGU-55122, alias: SGU }
 
 supplies:
   - commodity: natural_gas
@@ -45,6 +57,7 @@ accountModel:
   meta: [service_address, rate_schedule_id, meter_set_size]
 
 meterModel:
+  providerNumberFormat: "SGU-SET-#######"   # the provider's own badge number; the digits repeat our meter number
   numberFormat: "SYN-SGU-M-#######"
   example: "SYN-SGU-M-0050118"
   meterTypes: [monthly_diaphragm, monthly_rotary]

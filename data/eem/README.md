@@ -13,7 +13,10 @@ targets.
   channels it maps come from `data/scenarios/demo-university-v1.yaml`. Its
   `billingAccountSetup` block says where each billing account takes its service
   address, remit address, representative and invoice template from, and maps a
-  bill entry method to its `Global_Type_Code` 'BA2' code.
+  bill entry method to its `Global_Type_Code` 'BA2' code. `meterSetup` covers the
+  rest of the Meter editor: provider meter numbers, multipliers and which provider
+  bill cycle a meter bills on. `pointRules` records what the Point editor accepts
+  and what EEM creates on its own.
 - `northlake-rates-v1.yaml` is the Phase 2 **Rate Modeler entry plan**: the rate
   library to build by hand in the WPF Rate Modeler (shared TOU/season/holiday
   schedules + scripts, then ~10 rate schedules at determinant level firing all 9
