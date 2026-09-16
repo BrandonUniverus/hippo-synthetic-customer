@@ -20,6 +20,9 @@ uniqueIdentity: >
   rather than against a tariff, and the provider issues a monthly REC and
   avoided-emissions statement for market-based Scope 2 reporting.
 
+website: https://www.helios-onsite.example
+icon: fa-sun          # the Font Awesome mark the provider picker shows
+
 billing:
   remitAddress:              # where bills are paid; entered on the Utility Provider editor and chosen per billing account
     line1: PO Box 3391
@@ -31,6 +34,14 @@ billing:
     city: Davis
     state: CA
     postalCode: "95618"
+
+  billCycles:                # the provider owns the calendar; a meter stores only the cycle number
+    periods: calendar months across the scenario date range
+    cycles:
+      - { number: 1, description: "PPA statement cycle" }
+  companyAccounts:           # CompanyProvider: what each company is to this provider
+    northlake_university: { vendorNumber: HOS-PPA-77, alias: HOS }
+    cedar_row_apartments: { vendorNumber: HOS-PPA-78, alias: HOS }
 
 supplies:
   - commodity: solar_generation

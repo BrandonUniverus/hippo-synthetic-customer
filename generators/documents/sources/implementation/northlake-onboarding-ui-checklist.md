@@ -56,6 +56,13 @@ values are listed in
 [the billing account setup](northlake-billing-account-setup.pdf); the GL accounts
 and the account-scope validation tests wait for their Phase 3 prerequisites.
 
+Meters and points have the same kind of detail: provider meter number, multiplier
+and bill cycle on a meter, and reading type, measure type, unit, archive interval
+and index on a point. Each one is in
+[the meter and point setup](northlake-meter-and-point-setup.pdf). Enter only the
+points it marks Enter: EEM creates a usage and a rate-of-change point behind every
+register point, and the degree-day points behind a temperature index.
+
 Record generated IDs and screenshots/exports after saving. Check that the point
 list contains both measurements under the correct meter. A missing required UI
 path is a product finding; do not fill the gap with SQL.

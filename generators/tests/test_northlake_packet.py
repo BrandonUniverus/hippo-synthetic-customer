@@ -36,8 +36,8 @@ class NorthlakePacketTests(unittest.TestCase):
 
     def test_counts_and_table_shapes_come_from_one_join(self):
         expected = {"companies": 3, "sites": 3, "buildings": 13, "providers": 5, "accounts": 49, "utilityMeters": 55, "ownedMeters": 265, "weatherStations": 2,
-                    "meters": 322, "points": 431, "apartments": 124, "relatedMeasurements": 139, "aggregates": 7, "gatewayProfiles": 15, "gatewayFormats": 21,
-                    "eventPublishers": 1, "baseRates": 14, "contacts": 12, "organizationUnits": 6}
+                    "meters": 322, "points": 431, "pointsToEnter": 299, "pointsGeneratedByEem": 264, "apartments": 124, "relatedMeasurements": 139,
+                    "aggregates": 7, "gatewayProfiles": 15, "gatewayFormats": 21, "eventPublishers": 1, "baseRates": 14, "contacts": 12, "organizationUnits": 6}
         self.assertEqual(expected, self.packet["counts"])
         for name, sheet in self.sheets.items():
             for row in sheet["rows"]:
@@ -159,9 +159,34 @@ class NorthlakePacketTests(unittest.TestCase):
         self.assertTrue(all(row[-2:] == ["Not run", "Not run"] for row in coverage))
         self.assertEqual(["Generated"], [row[4] for row in coverage if row[0] == "gw_acquisuite_student_electric"])
         records = self.packet["instanceMapping"]["rows"]
-        self.assertEqual(431 + 4 + 3 + 7, len(records))  # points + degree-day + baseline + aggregate points.
+        self.assertEqual(322 + 431 + 4 + 3 + 7, len(records))  # meters + points + degree-day + baseline + aggregate points.
         self.assertEqual(len(records), len({row[1] for row in records}))
-        self.assertTrue(all(row[8:12] == ["", "", "", ""] for row in records))
+        self.assertTrue(all(row[19:23] == ["", "", "", ""] for row in records))   # the installed IDs stay blank
+
+    def test_meters_and_points_carry_their_editor_setup(self):
+        meters = {row[0]: row for row in self.packet["meterSetup"]["rows"]}
+        self.assertEqual(322, len(meters))
+        self.assertEqual(55, sum(1 for row in meters.values() if row[7] != ""))          # a bill cycle needs a provider
+        self.assertEqual(44, sum(1 for row in meters.values() if row[4]))                # provider badge numbers
+        self.assertEqual("VED-BADGE-0040001", meters["SYN-VED-M-0040001"][4])
+        self.assertEqual(1, meters["SYN-VED-M-0040001"][7])
+        self.assertEqual(2, meters["SYN-RCU-M-0060003"][7])                              # Cedar Row runs the second cycle
+        self.assertEqual([40, 10], [row[5] for row in meters.values() if row[5]])
+
+        points = self.packet["pointSetup"]["rows"]
+        entered = sum(row[6] for row in points if row[5].startswith("Enter"))
+        generated = sum(row[6] for row in points if row[5].startswith("Generated"))
+        self.assertEqual([299, 132], [entered, generated])
+        self.assertEqual({5, 15, 60, "None"}, {row[3] for row in points})             # only intervals the editor offers
+        self.assertTrue(all(row[1] == "Digital" and row[2] == "State" for row in points if row[0] == "Digital"))
+        self.assertTrue(all(row[1] == "Temperature" for row in points if row[4] != "None"))
+        self.assertEqual(2, sum(row[6] for row in points if row[4] != "None"))           # the two degree-day drivers
+
+        providers = {row[0]: row for row in self.packet["providerSetup"]["rows"]}
+        self.assertEqual(5, len(providers))
+        self.assertTrue(all(row[3] and row[4] and row[5] for row in providers.values()))  # remit, cycles, vendor numbers
+        self.assertIn("2 Cedar Row", providers["River City Utilities"][4])
+        self.assertEqual("None - internal counterparty", providers["Northlake Thermal Plant"][1])
 
     def test_tariff_and_area_values_come_from_existing_sources(self):
         buildings = {row[0]: row for row in self.sheets["Buildings"]["rows"]}

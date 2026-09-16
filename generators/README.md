@@ -11,9 +11,9 @@ Northlake document is rendered from its Markdown source; see
 | Source | Owns |
 | --- | --- |
 | `data/scenarios/demo-university-v1.yaml` | The physical inventory: companies, sites and the company that owns each, buildings with service profiles and apartment counts, accounts, utility meters and their channels, owned submeters and sources (with per-apartment templates), and gateway-side bindings |
-| `data/providers/*.yaml` | Numeric base tariffs, identifier formats and provider facts |
+| `data/providers/*.yaml` | Numeric base tariffs, identifier formats and provider facts: remit and business addresses, website and icon, bill cycles, and each company's vendor number |
 | `data/eem/northlake-eem-stage1-setup-v1.yaml` | The level names shared by every company (Site, Building, Meter, Point), the scenario sites each company creates, the Weather Reference site and security groups |
-| `data/eem/northlake-eem-metaworld-stage1b-v1.yaml` | EEM mapping only: measure types, which channel roles become points and how they are named, rate schedule and billing account kinds, weather stations and assignments, aggregates and baselines |
+| `data/eem/northlake-eem-metaworld-stage1b-v1.yaml` | EEM mapping only: measure types, which channel roles become points and how they are named, which points EEM creates itself, the archive intervals and index the editor allows, meter multipliers and bill-cycle rules, rate schedule and billing account kinds, weather stations and assignments, aggregates and baselines |
 | `data/scenarios/northlake-onboarding-v1.yaml` | Packet decisions, contact responsibilities and department ownership, source descriptions, known events and first sample contract |
 | `data/security/northlake-eem-security-v1.yaml` | Existing fictional people's names, titles, personal email and company ownership, reused for Northlake contacts |
 | `data/eem/northlake-bill-entry-v1.yaml` | How each provider's bills arrive (import, manual, allocation), which sets every account's Bill Entry Type |
@@ -49,8 +49,10 @@ python generators/update_workbook.py
 
 The fourth command writes the register and source-system inventory PDFs to
 `documents/intake-package/`, the AcquiSuite samples beside them, the gateway
-coverage and billing account setup PDFs to `implementation/` and the EEM mapping
-template to `data/eem/`. Provider addresses and the Stage 1B billing account
+coverage, billing account setup and meter and point setup PDFs to
+`implementation/`, and the EEM mapping template to `data/eem/`. That template is
+the full object sheet: a row per meter and point with the editor values each one
+needs and blank columns for the installed IDs. Provider addresses and the Stage 1B billing account
 rules resolve per account: service address from the building, remit address and
 representative from the provider, and entry type, upload flag, invoice template
 and GL defaults from the phase plans.

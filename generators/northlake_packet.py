@@ -42,6 +42,7 @@ KIND_LABELS = {
 ACCOUNT_KIND_LABELS = {"externalUtilityAccounts": "External utility account", "internalCostCenters": "Internal cost center", "ppaAgreements": "PPA agreement"}
 ACRONYMS = {"btu": "BTU", "chw": "CHW", "dc": "DC", "dx": "DX", "eru": "ERU", "ev": "EV", "hvac": "HVAC", "kw": "kW", "modbus": "Modbus", "ppa": "PPA", "pv": "PV", "sql": "SQL", "tou": "TOU"}
 MANUAL_ROLES = {"manual_register_reading", "manual_usage_delta"}
+ROUTE_INTERVAL_MINUTES = 43200   # a monthly route read: a cadence, never an archive interval
 
 
 def read_yaml(root, filename):
@@ -211,6 +212,52 @@ def account_setup(accounts, buildings, providers, people, onboarding, model, fin
     return resolved
 
 
+def meter_and_point_setup(meters, points, providers, model):
+    """Resolve the Meter and Point editor values that follow from the rules, and assert the product's own limits."""
+    rules, measure_types = model["pointRules"], model["measureTypes"]
+    meter_rules = model["meterSetup"]
+    multipliers = {entry["meterId"]: entry for entry in meter_rules["multipliers"]}
+    assert set(multipliers) <= {meter["id"] for meter in meters}, "A multiplier names a meter that does not exist"
+
+    for meter in meters:
+        provider = providers.get(meter.get("providerId"))
+        meter["multiplier"] = multipliers[meter["id"]]["value"] if meter["id"] in multipliers else ""
+        meter["providerMeterNumber"] = ""
+        meter["billCycle"] = ""
+        if provider is None:
+            continue
+        number_format = provider["meterModel"].get("providerNumberFormat")
+        if number_format:
+            digits = re.sub(r"\D", "", meter["syntheticMeterNumber"])[-number_format.count("#"):]
+            meter["providerMeterNumber"] = number_format.replace("#" * number_format.count("#"), digits)
+            assert identifier_pattern(number_format).fullmatch(meter["providerMeterNumber"]), f"Provider meter number drift: {meter['id']}"
+        cycles = provider["billing"]["billCycles"]["cycles"]
+        by_company = {company: cycle["number"] for cycle in cycles for company in cycle.get("companies", [])}
+        default = [cycle["number"] for cycle in cycles if not cycle.get("companies")]
+        assert len(default) == 1, f"A provider needs exactly one default bill cycle: {provider['id']}"
+        meter["billCycle"] = by_company.get(meter["companyId"], default[0])
+
+    for point in points.values():
+        meter = point["meter"]
+        point["unitName"] = rules["unitLabels"].get(point.get("unit"), point.get("unit"))
+        point["measureType"] = (measure_types["byPointType"].get(point["pointType"])
+                                or measure_types["byUnit"].get(point.get("unit"))
+                                or meter["measureType"])
+        interval = point.get("intervalMinutes")
+        allowed = rules["archiveIntervalMinutes"]
+        assert interval is None or interval in allowed or interval == ROUTE_INTERVAL_MINUTES, f"Archive interval is not one the editor offers: {point['key']} ({interval})"
+        # A route or monthly register read archives nothing, so it carries no interval.
+        point["archiveInterval"] = interval if interval in allowed else ""
+        declared = point.get("indexType") == "DegreeDays"
+        assert declared == bool(point.get("createsRelatedPoints")), f"A degree-day index and its children go together: {point['key']}"
+        point["indexType"] = rules["indexTypeForDegreeDays"] if declared else ""
+        assert not point["indexType"] or point["measureType"] == rules["indexTypeForDegreeDays"], f"Only a Temperature point can carry the degree-day index: {point['key']}"
+        point["howCreated"] = rules["howCreated"].get(point["pointType"], rules["howCreated"]["default"])
+    generated = [point for point in points.values() if point["pointType"] in rules["generatedPointTypes"]]
+    assert generated, "The dataset should exercise the points EEM creates for an accumulator"
+    return len(generated)
+
+
 def point_name(channel, rules):
     if channel.get("pointName"):
         return channel["pointName"]
@@ -304,6 +351,7 @@ def build_packet(root=ROOT):
                 point = dict(channel, key=channel["id"], name=point_name(channel, rules), pointType=rules["pointTypeByRole"][channel["role"]], meter=meter)
             assert point["key"] not in points, f"Repeated channel: {point['key']}"
             points[point["key"]] = point
+    generated_points = meter_and_point_setup(meters, points, providers, model)
     bill_channels = {c["id"] for m in meters for c in m["channels"] if c.get("role") in rules["billOnlyRoles"]}
     assert not bill_channels & set(points)
 
@@ -462,7 +510,7 @@ def build_packet(root=ROOT):
     packet["accountSetup"] = table(["Account Number", "Account / Agreement", "Company", "Bill Entry Type", "Bill Service Type", "Bill Invoice Template", "Default AP Account", "Default Expense Account", "Bill Validation Tests"], setup_rows, "What to enter on the Billing Account editor beyond the account's own identity. Entry type records how the bills arrive, service type whether the account reaches AP, GL, both or neither.")
     packet["validationOverrides"] = table(["Account Number", "Account / Agreement", "Test", "Setting", "Threshold", "Why"], override_rows, "Bill validation tests set at account scope. Every other account inherits its company, and the company inherits Global.")
 
-    meter_rows, point_rows, related_rows, mapping_rows, unit_rows = [], [], [], [], {}
+    meter_rows, point_rows, related_rows, mapping_rows, unit_rows, setup_rows = [], [], [], [], {}, []
     meter_names = {meter["id"]: meter["displayName"] for meter in meters}
     for meter in meters:
         source_ids = list(dict.fromkeys(s for c in meter["channels"] for s in point_sources.get(c["id"], [])))
@@ -484,6 +532,10 @@ def build_packet(root=ROOT):
             notes += " " + meter["notes"]
         provider_name = providers[meter["providerId"]]["displayName"] if meter.get("providerId") else "Public weather station" if meter["kind"] == "weather_station" else "Northlake owned"
         meter_rows.append([meter["displayName"], meter["syntheticMeterNumber"], meter["measureType"], meter["siteName"], meter["buildingName"], provider_name, KIND_LABELS[meter["kind"]], companies[meter["companyId"]], read_method, "Documented", notes, meter["parentPath"]])
+        account_number = accounts[meter["accountId"]]["syntheticAccountNumber"] if meter.get("accountId") else ""
+        setup_rows.append([meter["syntheticMeterNumber"], meter["displayName"], companies[meter["companyId"]], meter["measureType"], meter["providerMeterNumber"], meter["multiplier"], provider_name, meter["billCycle"], account_number])
+        mapping_rows.append(["Meter", meter["id"], companies[meter["companyId"]], meter["buildingName"], meter["displayName"], "", "", "",
+                             meter["measureType"], "", "", "", "Enter", meter["syntheticMeterNumber"], meter["providerMeterNumber"], meter["multiplier"], provider_name, meter["billCycle"], account_number, "", "", "", "", "Not entered", ""])
         if meter.get("unit"):
             row = unit_rows.setdefault((meter["buildingId"], meter["unit"]), [meter["buildingName"], meter["unit"], meter["floor"], "", "", "", "", "", ""])
             usage = [c for c in meter["channels"] if c["role"] != "handheld_register_reading"]
@@ -499,11 +551,12 @@ def build_packet(root=ROOT):
             point = points[channel["id"]]
             interval = point.get("intervalMinutes")
             frequency = "Monthly / actual bill period" if interval is None else "Monthly route / actual reading dates" if interval == 43200 else f"{interval} minutes"
-            point_rows.append([point["name"], meter["displayName"], sentence(point["role"]), point["pointType"], point["unit"], frequency, "Exclude test signal" if meter.get("excludeFromTotals") else "Yes", "Documented", "Source: " + "; ".join(onboarding["sources"][s][0] for s in point_sources[point["key"]]) if point["key"] in point_sources else "Manual reading, related-point calculation or a later input path."])
-            mapping_rows.append(["Point", point["key"], companies[meter["companyId"]], meter["buildingName"], meter["displayName"], point["name"], point["unit"], interval, "", "", "", "", "Not entered", ""])
+            point_rows.append([point["name"], meter["displayName"], sentence(point["role"]), point["pointType"], point["unitName"], frequency, point["howCreated"], "Exclude test signal" if meter.get("excludeFromTotals") else "Yes", "Documented", "Source: " + "; ".join(onboarding["sources"][s][0] for s in point_sources[point["key"]]) if point["key"] in point_sources else "Manual reading, related-point calculation or a later input path."])
+            mapping_rows.append(["Point", point["key"], companies[meter["companyId"]], meter["buildingName"], meter["displayName"], point["name"], point["unitName"], interval,
+                                 point["measureType"], point["pointType"], point["archiveInterval"], point["indexType"], point["howCreated"], "", "", "", "", "", "", "", "", "", "", "Not entered", ""])
             for related in point.get("createsRelatedPoints", []):
                 related_rows.append([meter["displayName"], point["name"], meter["displayName"], related, "Heating degree days" if related.startswith("HDD") else "Cooling degree days", "Daily", "Create through the temperature index setting; verify base and calculation method in the UI."])
-                mapping_rows.append(["Weather related point", f"{meter['id']}.{related}", companies[meter["companyId"]], meter["buildingName"], meter["displayName"], related, "Degree days (F)", 1440, "", "", "", "", "Not entered", ""])
+                mapping_rows.append(["Weather related point", f"{meter['id']}.{related}", companies[meter["companyId"]], meter["buildingName"], meter["displayName"], related, "Degree days (F)", 1440, "", "", 1440, "", "Generated by EEM from the temperature index", "", "", "", "", "", "", "", "", "", "", "Not entered", ""])
         registers = [points[c["id"]] for c in meter["channels"] if c["id"] in points and points[c["id"]]["pointType"] == "Accumulator"]
         deltas = [points[c["id"]] for c in meter["channels"] if c["id"] in points and points[c["id"]]["pointType"] == "AccumulatorDelta"]
         assert len(registers) == len(deltas) <= 1, f"Register and usage points must come in pairs: {meter['id']}"
@@ -513,15 +566,15 @@ def build_packet(root=ROOT):
         point = points[baseline["measuredPoint"]]
         assert point["unit"] == baseline["unit"] and point["intervalMinutes"] == baseline["intervalMinutes"], f"Baseline differs from its measured point: {baseline['id']}"
         related_rows.append([point["meter"]["displayName"], point["name"], point["meter"]["displayName"], baseline["baselinePointName"], "Measured versus baseline", f"{baseline['intervalMinutes']} minutes", "Baseline definition only; calculation and expected values are a later acceptance step."])
-        mapping_rows.append(["Baseline point", baseline["id"], companies[baseline["companyId"]], point["meter"]["buildingName"], point["meter"]["displayName"], baseline["baselinePointName"], baseline["unit"], baseline["intervalMinutes"], "", "", "", "", "Not entered", ""])
+        mapping_rows.append(["Baseline point", baseline["id"], companies[baseline["companyId"]], point["meter"]["buildingName"], point["meter"]["displayName"], baseline["baselinePointName"], baseline["unit"], baseline["intervalMinutes"], "", "", baseline["intervalMinutes"], "", "Generated by the baseline setting", "", "", "", "", "", "", "", "", "", "", "Not entered", ""])
     sheets["Meters"] = table(["Meter Name", "Meter Number / Tag", "Service Category", "Site Name", "Building Name", "Provider / Counterparty", "Meter Kind", "Ownership", "Read Method", "Review Status", "Notes", "Parent Path"], meter_rows, "Create each Meter node beneath its full Parent Path from Hierarchy. Measured Points identifies its Point children; bill-only meters have none. Ownership identifies the EEM company.")
     sheets["Units and Submeters"] = table(["Building", "Unit", "Floor", "Electric Submeter Tag", "Electric Point", "Water Submeter Tag", "Water Register Point", "Water Usage Point", "Read Method"], [unit_rows[key] for key in sorted(unit_rows)], "One row per apartment. Each apartment has an owned electric submeter and an owned water submeter behind the building's utility master meters; tenant rebilling maps to these points.")
-    sheets["Measured Points"] = table(["Point Name", "Meter Name", "Measurement", "Direction / Role", "Units", "Interval / Frequency", "Use In Reporting", "Review Status", "Notes"], point_rows, "Point definitions for interval, route, register, sensor and equipment channels. Bill usage stays on the billing account and has no point here.")
+    sheets["Measured Points"] = table(["Point Name", "Meter Name", "Measurement", "Direction / Role", "Units", "Interval / Frequency", "How Created", "Use In Reporting", "Review Status", "Notes"], point_rows, "Point definitions for interval, route, register, sensor and equipment channels. Enter only the points marked Enter: EEM creates a usage and a rate-of-change point behind every register point, and the degree-day points behind a temperature index. Bill usage stays on the billing account and has no point here.")
     sheets["Related Measurements"] = table(["Source Meter", "Source Measurement", "Related Meter", "Related Measurement", "Relationship", "Frequency", "Requirement"], related_rows, "Business relationships to create through the product's supported point/index settings.")
     rollups = []
     for aggregate in model["aggregateTargets"]:
         assert aggregate["parentPath"] in hierarchy, f"Aggregate parent is not a hierarchy node: {aggregate['id']}"
-        mapping_rows.append(["Aggregate point", aggregate["id"], companies[aggregate["companyId"]], aggregate["parentPath"].rsplit(" / ", 1)[-1], "", aggregate["aggregatePointName"], aggregate["unit"], aggregate["intervalMinutes"], "", "", "", "", "Not entered", ""])
+        mapping_rows.append(["Aggregate point", aggregate["id"], companies[aggregate["companyId"]], aggregate["parentPath"].rsplit(" / ", 1)[-1], "", aggregate["aggregatePointName"], aggregate["unit"], aggregate["intervalMinutes"], "", "", aggregate["intervalMinutes"], "", "Enter as an aggregate point", "", "", "", "", "", "", "", "", "", "", "Not entered", ""])
         members = list(aggregate["members"])
         if "memberTemplate" in aggregate:
             template = aggregate["memberTemplate"]
@@ -529,7 +582,7 @@ def build_packet(root=ROOT):
         for member in members:
             point = points[member["sourceChannelId"]]
             assert point["unit"] == aggregate["unit"] and point["intervalMinutes"] == aggregate["intervalMinutes"], f"Incompatible aggregate member: {aggregate['id']}"
-            rollups.append([aggregate["aggregatePointName"], point["meter"]["displayName"], point["name"], member["multiplier"], "Required" if member["required"] else "Optional", aggregate["unit"], aggregate["intervalMinutes"], aggregate["boundary"]])
+            rollups.append([aggregate["aggregatePointName"], point["meter"]["displayName"], point["name"], member["multiplier"], "Required" if member["required"] else "Optional", rules["unitLabels"].get(aggregate["unit"], aggregate["unit"]), aggregate["intervalMinutes"], aggregate["boundary"]])
     sheets["Rollup Members"] = table(["Requested Total", "Member Meter", "Member Measurement", "Multiplier", "Availability", "Unit", "Interval Minutes", "Boundary"], rollups, "One row per member. Aggregate points sit directly under the site or building they summarise. Never add monthly bills to their interval representation or include the commissioning test signal.")
     assignments = model["weatherIndexTargets"]["stationAssignments"]
     exceptions = {(a["companyId"], a["buildingId"]): a["stationId"] for a in assignments.get("exceptions", [])}
@@ -549,17 +602,41 @@ def build_packet(root=ROOT):
             values = point.get("values", {})
             selectors = "; ".join(f"{'Route ID' if k == 'MetaWorldID' else k}={v}" for k, v in values.items() if k not in {"PtID_Usage", "PtID_Reading"})
             device = node.get("values", {}).get("Serial Number", node["name"])
-            source_mapping_rows.append([name, target["meter"]["displayName"], target["name"], device, selectors, target["unit"], timestamps])
+            source_mapping_rows.append([name, target["meter"]["displayName"], target["name"], device, selectors, target["unitName"], timestamps])
     for provider in providers.values():
         source_rows.append([f"{provider['displayName']} billing", "Billing statement", "Monthly utility / allocation / PPA statement", "Finance", "Statement and supported bill-import file", "Monthly", provider["shortName"], "Finance", "Documented", "Existing illustrated bills are examples; reconcile their values before rate or bill acceptance."])
     sheets["Data Sources"] = table(["Source Name", "Source Type", "Service Category", "Owner / Vendor", "Delivery Method", "Expected Cadence", "File / System Reference", "Credential Owner", "Review Status", "Notes"], source_rows, "Source ownership and delivery information. Credentials are exchanged separately and are never stored in the workbook.")
     sheets["Source Measurements"] = table(["Source System", "Meter", "Measurement", "Device / Station", "Channel / Source Fields", "Unit", "Timestamp Convention"], source_mapping_rows, "Vendor-side identifiers matched to the customer's measurement inventory; installed database IDs belong in the implementation record.")
     packet["coverage"] = table(["Profile", "Format", "Destinations", "Measurements", "Artifact status", "UI setup", "Ingestion acceptance"], coverage_rows, "Independent format cases; planned coverage is not a claim of supported installed behavior.")
-    packet["instanceMapping"] = table(["Object kind", "Source reference", "Company", "Location", "Meter", "Point", "Unit", "Interval minutes", "Installed point ID", "Installed meter ID", "Installed gateway ID", "Installed node ID", "Status", "Evidence"], mapping_rows, "Copy before use. Capture real IDs after UI creation; never insert the illustrative IDs from a scenario into EEMSuite.")
+    packet["instanceMapping"] = table(["Object kind", "Source reference", "Company", "Location", "Meter", "Point", "Unit", "Interval minutes",
+                                       "Measure Type", "Reading Type", "Archive Interval", "Index", "How Created",
+                                       "Meter Number", "Provider Meter Number", "Multiplier", "Utility Provider", "Bill Cycle", "Billing Account",
+                                       "Installed point ID", "Installed meter ID", "Installed gateway ID", "Installed node ID", "Status", "Evidence"], mapping_rows,
+                                      "Every meter and point to create, with the editor values each one needs and blank columns for the installed IDs. Copy before use; never insert the illustrative IDs from a scenario into EEMSuite.")
+    packet["meterSetup"] = table(["Meter Number", "Meter", "Company", "Measure Type", "Provider Meter Number", "Multiplier", "Utility Provider", "Bill Cycle", "Billing Account"], setup_rows,
+                                 "The Meter editor for each meter. A multiplier is blank where the meter records exactly what its source delivers, and the bill cycle is the number the provider runs for that company.")
+    provider_rows = []
+    for provider in providers.values():
+        billing = provider["billing"]
+        cycles = "; ".join(f"{cycle['number']} {cycle['description']}" for cycle in billing["billCycles"]["cycles"])
+        vendors = "; ".join(f"{companies[company]} {account['vendorNumber']}" for company, account in billing["companyAccounts"].items())
+        assert set(billing["companyAccounts"]) <= set(companies), f"A company account names an unknown company: {provider['id']}"
+        provider_rows.append([provider["displayName"], provider.get("website", "None - internal counterparty"), provider["icon"],
+                              format_address(billing["remitAddress"]), cycles, vendors])
+    packet["providerSetup"] = table(["Provider", "Website", "Icon", "Remit To", "Bill Cycles", "Vendor Numbers"], provider_rows,
+                                    "The Utility Provider editor. The provider owns the bill cycle calendar: a meter stores only the cycle number, which is why its Bill Cycle stays locked until a provider is chosen.")
+
+    kinds = {}
+    for point in points.values():
+        key = (point["pointType"], point["measureType"], point["unitName"], point["archiveInterval"] or "None", point["indexType"] or "None", point["howCreated"])
+        kinds[key] = kinds.get(key, 0) + 1
+    packet["pointSetup"] = table(["Reading Type", "Measure Type", "Units", "Archive Interval", "Index", "How Created", "Points"],
+                                 [[*key, count] for key, count in sorted(kinds.items())],
+                                 "Every combination the Point editor is asked for, and how many points use it. Archive Interval is blank where a point archives nothing, such as a monthly route read.")
     packet["decisions"] = onboarding["decisions"]
     packet["counts"] = {"companies": len(companies), "sites": len(sites), "buildings": len(buildings), "providers": len(providers), "accounts": len(accounts),
                         "utilityMeters": sum(m["kind"] == "utility" for m in meters), "ownedMeters": sum(m["kind"] not in {"utility", "weather_station"} for m in meters), "weatherStations": sum(m["kind"] == "weather_station" for m in meters),
-                        "meters": len(meters), "points": len(points), "apartments": len(unit_rows), "relatedMeasurements": len(related_rows), "aggregates": len(model["aggregateTargets"]),
+                        "meters": len(meters), "points": len(points), "pointsToEnter": len(points) - generated_points, "pointsGeneratedByEem": generated_points * 2, "apartments": len(unit_rows), "relatedMeasurements": len(related_rows), "aggregates": len(model["aggregateTargets"]),
                         "gatewayProfiles": len(profiles) - 1, "gatewayFormats": len(coverage_rows) - 1, "eventPublishers": 1, "baseRates": len(rate_rows), "contacts": len(contacts), "organizationUnits": len(organization_rows)}
     return packet
 
@@ -618,12 +695,29 @@ def billing_account_setup_markdown(packet):
     return "\n".join(setup) + "\n"
 
 
+def meter_and_point_setup_markdown(packet):
+    counts = packet["counts"]
+    setup = ["# Northlake Meter and Point Setup", "",
+             f"Packet {packet['version']} | Issued {packet['issuedOn']} | Enter on the Utility Provider, Meter and Point editors", "",
+             "What each meter and point needs beyond its name and its place in the hierarchy. The same values, one row per object and with blank columns for the installed IDs, are in data/eem/northlake-instance-mapping.template.csv.", "",
+             "The product creates some of these itself. Saving a register point creates its usage point and a rate-of-change point; a temperature index creates the degree-day points; a baseline setting creates its baseline point. "
+             f"Of the {counts['points']} points listed here, {counts['pointsToEnter']} are entered and EEM generates {counts['pointsGeneratedByEem']} more behind them, so never enter a point marked Generated.", "",
+             "Three limits the editors enforce: a point archives on 1, 5, 10, 15, 30, 60 or 1440 minutes and nothing else, so a monthly route read carries no interval at all; the degree-day index is offered only on a Temperature point; and a digital point must use the Digital measure type with the State unit.", "",
+             "## Utility providers", "", packet["providerSetup"]["description"], "", markdown_table(packet["providerSetup"]), "",
+             "## Points by editor combination", "", packet["pointSetup"]["description"], "", markdown_table(packet["pointSetup"]), "",
+             "## Meters", "", packet["meterSetup"]["description"], "",
+             "A meter's Bill Cycle stays locked until its utility provider is set, and saving a meter takes the provider from its billing account. Enter the account first and the provider follows.", "",
+             markdown_table(packet["meterSetup"])]
+    return "\n".join(setup) + "\n"
+
+
 # Documents rendered straight from the packet, with no Markdown source: PDF path -> (masthead, Markdown).
 GENERATED_DOCUMENTS = {
     "documents/intake-package/facilities-and-meter-register.pdf": ({"department": "Facilities Operations"}, register_markdown),
     "documents/intake-package/source-system-inventory.pdf": ({"department": "Facilities Operations"}, source_inventory_markdown),
     "implementation/northlake-gateway-coverage.pdf": ({}, gateway_coverage_markdown),
     "implementation/northlake-billing-account-setup.pdf": ({}, billing_account_setup_markdown),
+    "implementation/northlake-meter-and-point-setup.pdf": ({}, meter_and_point_setup_markdown),
 }
 
 
