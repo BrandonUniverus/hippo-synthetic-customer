@@ -1,0 +1,92 @@
+/* ==========================================================================
+   Northlake University: design tokens
+
+   One file per organisation. Every Northlake surface reads these names: the
+   university site, the sign-in pages, documents and internal statements.
+   Change a value here and each surface follows on its next build.
+
+   Character: a public research university in Sacramento. Collegiate and
+   editorial: serif headlines, warm paper, navy text, gold used sparingly.
+   Not EEM: no Open Sans, no grey app canvas, no uppercase micro-labels.
+   ========================================================================== */
+:root {
+  /* Colour: brand ------------------------------------------------------- */
+  --primary: #14263F;          /* Northlake Navy: header bar, footer, headings, primary buttons */
+  --primary-strong: #0B1828;   /* hover and pressed */
+  --on-primary: #FFFFFF;       /* text and icons on navy */
+  --accent: #C8A24A;           /* Northlake Gold: rules, the mark, highlights on navy */
+  --accent-ink: #7A5D12;       /* gold for text on light surfaces (5.6:1 on paper) */
+  --on-accent: #14263F;        /* text on gold */
+  --support: #2E6E7E;          /* Lake: charts and illustration only, never chrome */
+
+  /* Colour: neutrals ---------------------------------------------------- */
+  --ink: #1C2430;              /* body text */
+  --muted: #59606B;            /* secondary text */
+  --canvas: #F7F4EC;           /* warm paper behind content */
+  --surface: #FFFFFF;          /* cards, forms, tables */
+  --tint: #EFE9DB;             /* table heads, quiet panels */
+  --line: #DDD5C4;             /* hairlines */
+  --line-strong: #A3967C;      /* field borders */
+  --link: #14263F;             /* links are navy, underlined */
+  --heading-ink: #14263F;      /* headings are navy */
+
+  /* Colour: status ------------------------------------------------------ */
+  --positive: #2F6B3E;
+  --negative: #A3302A;
+  --caution: #7A5D12;
+  --positive-tint: #EDF5EF;
+  --negative-tint: #FBEDEC;
+  --caution-tint: #F7EFD9;
+
+  /* Page chrome --------------------------------------------------------- */
+  --topbar-bg: #14263F;        /* thin bar: Directory, Maps, Give, MyNorthlake */
+  --topbar-ink: #E9E2CF;
+  --header-bg: #FFFFFF;        /* main header is white with the navy lockup */
+  --header-ink: #14263F;
+  --header-rule: #C8A24A;      /* 3px gold rule under the main header */
+  --footer-bg: #14263F;
+  --footer-ink: #E9E2CF;
+
+  /* Type ---------------------------------------------------------------- */
+  --font-display: "Spectral", Georgia, "Times New Roman", serif;
+  --font-text: "IBM Plex Sans", "Segoe UI", Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", Consolas, monospace;
+  --weight-display: 600;
+  --weight-strong: 600;
+  --tracking-display: -0.01em;
+  --case-heading: none;        /* sentence case everywhere */
+  --case-label: none;          /* kickers are sentence case, in Spectral italic */
+  --case-button: none;
+  --size-h1: 46px;
+  --size-h2: 30px;
+  --size-h3: 21px;
+  --size-body: 16px;
+  --size-small: 14px;
+  --size-label: 13px;
+  --leading-body: 1.6;
+
+  /* Space: 8-point, generous ----------------------------------------- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 80px;
+  --content-width: 1160px;
+
+  /* Shape --------------------------------------------------------------- */
+  --radius: 0;               /* square: collegiate and editorial */
+  --rule: 1px;
+  --rule-accent: 3px;
+
+  /* Logo use ------------------------------------------------------------ */
+  --logo-height: 46px;         /* full lockup in the header */
+  --logo-min-height: 24px;     /* below this, use the mark alone (down to 16px) */
+  /* Clear space: the height of the star's long point on every side.
+     Navy lockup on white or paper. Reversed lockup (white wordmark, gold mark)
+     on navy only. Never on gold, never on a photograph without a navy panel.
+     Departments use the unit lockup: mark, "Northlake University", a hairline,
+     then the unit name in IBM Plex Sans (see thermal-plant/tokens.css). */
+}

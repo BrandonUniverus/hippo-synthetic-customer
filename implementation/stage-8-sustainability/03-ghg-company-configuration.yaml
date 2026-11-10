@@ -1,0 +1,63 @@
+# Stage 8, step 3: GHG Company Configuration (Web, #/GHGCompanyConfiguration).
+# One record per company: pick the company, set Starting Year / Ending Year, pick a Default Emission Source
+# Category, then enable each Emission Factor Source that company should report against.
+stage: 8
+step: 3
+title: GHG company configuration
+app: Web
+screen: GHGCompanyConfiguration
+source:
+- implementation/stage-1-foundation/01-companies.yaml
+- implementation/stage-8-sustainability/01-emission-factors.yaml
+notes:
+- 'Screen fields (viewGHGCompanyConfiguration.ts): a Company picker (excludes CompanyID -1), Starting Year and
+  Ending Year combos (EmissionCompanyConfig.BaseStartYear/BaseEndYear, verified columns), a Default Emission
+  Source Category combo, and a grid of Emission Factor Source / Meter Assignment / Commodities / Emission Types
+  with an enable Action per row.'
+- 'Content gap: this screen has no Scope 1/2/3 toggle and no target field. Starting Year and Ending Year are the GHG
+  baseline that GHG Variance compares against, not a reporting range (rp_GHGVariance.sql:184-196). Recorded under
+  Findings; do not try to work around it with SQL.'
+- Enable every source that company has an assigned meter for (step 2); a source with zero assigned meters for a
+  company still enables cleanly but will not add rows to GHG History for it.
+- 'Added 2026-10-01 (Ridgeline Wind): no new record, because the configuration is per company and the Thermal Plant''s
+  now also covers its second site. What changes is the plant''s electric count: 2 assigned meters (the Central Plant
+  input and the Ridgeline Interconnection Meter, station service only) and the 10 turbine meters Excluded in step 2.
+  The enabled sources are the company''s automatic-assignment list, not just a reporting choice: with eGRID enabled,
+  the warehouse job maps every unassigned, unexcluded Electricity meter in California at this Default Emission
+  Source Category, Stationary for the plant (SeedHelpGuides.sql:1007; CreateDefaultEmissionMeterMap.sql:14-70). That
+  is why step 2 comes first and why the interconnection meter is assigned Indirect by hand. The Meter Assignment
+  column on this grid shows the source''s link rule (eGRID: State/Region; Non-electric commodities: none, so it never
+  assigns on its own), not a meter count. Starting Year 2024 and Ending Year 2025 stay: Ridgeline has data from July
+  2024, and a multi-year baseline averages each fiscal month over the years that have results, without filling
+  January to June 2024 with zeros (SeedHelpGuides.sql:987-992).'
+records:
+- key: nlu_ghg_config
+  installed:
+    companyId: 6
+  Company: Northlake University
+  Starting Year: 2024
+  Ending Year: 2025
+  Default Emission Source Category: Indirect
+  Enabled Sources:
+  - {source: eGRID, meterAssignment: "10 electric meters (step 2)", commodities: Electric, emissionTypes: "CO2, CH4, N2O"}
+  - {source: Non-electric commodities, meterAssignment: "6 gas meters + 6 water meters (step 2, excludes the Thermal Plant company)", commodities: "Natural Gas, Potable Water", emissionTypes: CO2}
+- key: cra_ghg_config
+  installed:
+    companyId: 3
+  Company: Cedar Row Apartments
+  Starting Year: 2024
+  Ending Year: 2025
+  Default Emission Source Category: Indirect
+  Enabled Sources:
+  - {source: eGRID, meterAssignment: "4 electric meters (Cedar Row A, B, Common House, area lighting)", commodities: Electric, emissionTypes: "CO2, CH4, N2O"}
+  - {source: Non-electric commodities, meterAssignment: "3 gas meters + 2 water meters (Cedar Row A, B, Common House)", commodities: "Natural Gas, Potable Water", emissionTypes: CO2}
+- key: ntp_ghg_config
+  installed:
+    companyId: 5
+  Company: Northlake Thermal Plant
+  Starting Year: 2024
+  Ending Year: 2025
+  Default Emission Source Category: Stationary
+  Enabled Sources:
+  - {source: eGRID, meterAssignment: "2 electric meters (plant chiller input; Ridgeline Interconnection Meter, station service only); the 10 Ridgeline turbine meters are Excluded in step 2", commodities: Electric, emissionTypes: "CO2, CH4, N2O"}
+  - {source: Non-electric commodities, meterAssignment: "1 gas meter (plant boiler input)", commodities: Natural Gas, emissionTypes: CO2}

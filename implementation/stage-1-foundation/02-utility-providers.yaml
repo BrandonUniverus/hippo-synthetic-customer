@@ -1,0 +1,447 @@
+# Stage 1, step 2: Utility Providers (Database Administrator > Utility Providers).
+# One record per provider. Pages in the order the editor wants them: Definitions first (save), then
+# Provider Address, Provider Contact, Remit Addresses, Bill Cycles, Associated Companies, Notes.
+stage: 1
+step: 2
+title: Utility providers
+app: Database Administrator
+screen: Utility Providers
+source:
+- data/providers/*.yaml
+- data/scenarios/northlake-onboarding-v1.yaml (contacts)
+- documents/rate-tariffs/*.pdf
+- documents/intake-package/facilities-and-meter-register.pdf
+notes:
+- Create the provider on Definitions and save before the other pages unlock.
+- 'Bill Cycles: add one cycle grouping per Cycle number, then its 24 periods (2024-01 to 2025-12; Ridgeline Wind has
+  18, from its 2024-07 acquisition). Period and Year
+  are the month the bill posts to; a period runs from one read to the day before the next. The page can also Import
+  the periods from Excel.'
+- 'Days counts both ends (2024-01-01 to 2024-01-31 is 31), as the Bill Cycles grid shows it. The installed cycles
+  were saved through a path that stored the end minus the start, one short (30); the save now always counts Days from
+  the dates (UtilityProviderService, changed 2026-10-02, needs the build installed). Once it is, open each provider''s
+  Bill Cycles and save every grouping again; checks.sql 02 Bill cycles then passes on Days.'
+- A meter stores only its provider's cycle number, so the cycles must exist before Stage 2 meters are saved.
+- Associated Companies is where each company's vendor number for this provider is entered; the companies from step
+  1 must exist first.
+- Remit addresses are chosen per billing account in Stage 2; enter them here once.
+- 'The Northlake Thermal Plant is an internal counterparty: no website, the plant manager as contact, campus mail
+  stops as addresses.'
+- Icons are Font Awesome 6 class names as the picker shows them.
+records:
+- key: helios_onsite_solar
+  installed:
+    providerId: 5
+    recordedOn: 2026-09-18
+    remitAddressIds:
+  Definitions:
+    Name: Helios Onsite Solar
+    Description: Owns and operates photovoltaic arrays under a power purchase agreement. Provides generation, exported
+      energy, monthly invoices, renewable energy certificates, and avoided-emissions information.
+    Website: https://www.helios-onsite.example
+    Icon: fa-sun
+  Provider Address:
+    Address: 77 Solar Grove Court
+    City: Davis
+    Region: CA
+    Postal Code: '95618'
+    Country: UNITED STATES
+  Provider Contact:
+    First Name: Simone
+    Last Name: Hart
+    Title: Solar PPA representative
+    Phone: 916-555-6300
+    Email: simone.hart@helios.example
+  Remit Addresses:
+  - Address: PO Box 3391
+    City: Davis
+    Region: CA
+    Postal Code: '95617'
+    Country: UNITED STATES
+  Bill Cycles:
+  - Cycle: 1
+    Description: PPA statement, calendar month
+    Periods:
+    - {Period: 1, Year: 2024, Start Date: 2024-01-01, End Date: 2024-01-31, Days: 31, Description: Jan-24}
+    - {Period: 2, Year: 2024, Start Date: 2024-02-01, End Date: 2024-02-29, Days: 29, Description: Feb-24}
+    - {Period: 3, Year: 2024, Start Date: 2024-03-01, End Date: 2024-03-31, Days: 31, Description: Mar-24}
+    - {Period: 4, Year: 2024, Start Date: 2024-04-01, End Date: 2024-04-30, Days: 30, Description: Apr-24}
+    - {Period: 5, Year: 2024, Start Date: 2024-05-01, End Date: 2024-05-31, Days: 31, Description: May-24}
+    - {Period: 6, Year: 2024, Start Date: 2024-06-01, End Date: 2024-06-30, Days: 30, Description: Jun-24}
+    - {Period: 7, Year: 2024, Start Date: 2024-07-01, End Date: 2024-07-31, Days: 31, Description: Jul-24}
+    - {Period: 8, Year: 2024, Start Date: 2024-08-01, End Date: 2024-08-31, Days: 31, Description: Aug-24}
+    - {Period: 9, Year: 2024, Start Date: 2024-09-01, End Date: 2024-09-30, Days: 30, Description: Sep-24}
+    - {Period: 10, Year: 2024, Start Date: 2024-10-01, End Date: 2024-10-31, Days: 31, Description: Oct-24}
+    - {Period: 11, Year: 2024, Start Date: 2024-11-01, End Date: 2024-11-30, Days: 30, Description: Nov-24}
+    - {Period: 12, Year: 2024, Start Date: 2024-12-01, End Date: 2024-12-31, Days: 31, Description: Dec-24}
+    - {Period: 1, Year: 2025, Start Date: 2025-01-01, End Date: 2025-01-31, Days: 31, Description: Jan-25}
+    - {Period: 2, Year: 2025, Start Date: 2025-02-01, End Date: 2025-02-28, Days: 28, Description: Feb-25}
+    - {Period: 3, Year: 2025, Start Date: 2025-03-01, End Date: 2025-03-31, Days: 31, Description: Mar-25}
+    - {Period: 4, Year: 2025, Start Date: 2025-04-01, End Date: 2025-04-30, Days: 30, Description: Apr-25}
+    - {Period: 5, Year: 2025, Start Date: 2025-05-01, End Date: 2025-05-31, Days: 31, Description: May-25}
+    - {Period: 6, Year: 2025, Start Date: 2025-06-01, End Date: 2025-06-30, Days: 30, Description: Jun-25}
+    - {Period: 7, Year: 2025, Start Date: 2025-07-01, End Date: 2025-07-31, Days: 31, Description: Jul-25}
+    - {Period: 8, Year: 2025, Start Date: 2025-08-01, End Date: 2025-08-31, Days: 31, Description: Aug-25}
+    - {Period: 9, Year: 2025, Start Date: 2025-09-01, End Date: 2025-09-30, Days: 30, Description: Sep-25}
+    - {Period: 10, Year: 2025, Start Date: 2025-10-01, End Date: 2025-10-31, Days: 31, Description: Oct-25}
+    - {Period: 11, Year: 2025, Start Date: 2025-11-01, End Date: 2025-11-30, Days: 30, Description: Nov-25}
+    - {Period: 12, Year: 2025, Start Date: 2025-12-01, End Date: 2025-12-31, Days: 31, Description: Dec-25}
+  Associated Companies:
+  - {Company: Northlake University, Vendor Number: HOS-PPA-77, Vendor Name Alias: HOS}
+  - {Company: Cedar Row Apartments, Vendor Number: HOS-PPA-78, Vendor Name Alias: HOS}
+  Notes:
+  - Generation sign convention — channels are positive-generation, reducing net load.
+  - Priced per kWh generated (PPA), not per kWh consumed; there is no demand charge.
+  - Supplies environmental attributes (RECs, avoided CO2e) no everyday meter has.
+  - Output follows the daily solar shape and weather, peaking midday; near zero overnight.
+  - A small battery can shift an evening discharge (reserved for V2).
+- key: northlake_thermal_plant
+  installed:
+    providerId: 4
+    recordedOn: 2026-09-18
+    remitAddressIds:
+  Definitions:
+    Name: Northlake Thermal Plant
+    Description: University-owned central plant. Allocates chilled water and steam costs to served buildings using
+      internal cost centers and submetered consumption.
+    Website:
+    Icon: fa-temperature-high
+  Provider Address:
+    Address: Central Plant Operations
+    Address 2: Campus Mail Stop 44
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+  Provider Contact:
+    First Name: Devon
+    Last Name: Brooks
+    Title: Thermal Plant Manager
+    Phone: 916-555-4500
+    Email: devon.brooks@northlake.example.edu
+  Remit Addresses:
+  - Address: Utility Cost Recovery
+    Address 2: Campus Mail Stop 42
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+  Bill Cycles:
+  - Cycle: 1
+    Description: Internal allocation, closed with the calendar month
+    Periods:
+    - {Period: 1, Year: 2024, Start Date: 2024-01-01, End Date: 2024-01-31, Days: 31, Description: Jan-24}
+    - {Period: 2, Year: 2024, Start Date: 2024-02-01, End Date: 2024-02-29, Days: 29, Description: Feb-24}
+    - {Period: 3, Year: 2024, Start Date: 2024-03-01, End Date: 2024-03-31, Days: 31, Description: Mar-24}
+    - {Period: 4, Year: 2024, Start Date: 2024-04-01, End Date: 2024-04-30, Days: 30, Description: Apr-24}
+    - {Period: 5, Year: 2024, Start Date: 2024-05-01, End Date: 2024-05-31, Days: 31, Description: May-24}
+    - {Period: 6, Year: 2024, Start Date: 2024-06-01, End Date: 2024-06-30, Days: 30, Description: Jun-24}
+    - {Period: 7, Year: 2024, Start Date: 2024-07-01, End Date: 2024-07-31, Days: 31, Description: Jul-24}
+    - {Period: 8, Year: 2024, Start Date: 2024-08-01, End Date: 2024-08-31, Days: 31, Description: Aug-24}
+    - {Period: 9, Year: 2024, Start Date: 2024-09-01, End Date: 2024-09-30, Days: 30, Description: Sep-24}
+    - {Period: 10, Year: 2024, Start Date: 2024-10-01, End Date: 2024-10-31, Days: 31, Description: Oct-24}
+    - {Period: 11, Year: 2024, Start Date: 2024-11-01, End Date: 2024-11-30, Days: 30, Description: Nov-24}
+    - {Period: 12, Year: 2024, Start Date: 2024-12-01, End Date: 2024-12-31, Days: 31, Description: Dec-24}
+    - {Period: 1, Year: 2025, Start Date: 2025-01-01, End Date: 2025-01-31, Days: 31, Description: Jan-25}
+    - {Period: 2, Year: 2025, Start Date: 2025-02-01, End Date: 2025-02-28, Days: 28, Description: Feb-25}
+    - {Period: 3, Year: 2025, Start Date: 2025-03-01, End Date: 2025-03-31, Days: 31, Description: Mar-25}
+    - {Period: 4, Year: 2025, Start Date: 2025-04-01, End Date: 2025-04-30, Days: 30, Description: Apr-25}
+    - {Period: 5, Year: 2025, Start Date: 2025-05-01, End Date: 2025-05-31, Days: 31, Description: May-25}
+    - {Period: 6, Year: 2025, Start Date: 2025-06-01, End Date: 2025-06-30, Days: 30, Description: Jun-25}
+    - {Period: 7, Year: 2025, Start Date: 2025-07-01, End Date: 2025-07-31, Days: 31, Description: Jul-25}
+    - {Period: 8, Year: 2025, Start Date: 2025-08-01, End Date: 2025-08-31, Days: 31, Description: Aug-25}
+    - {Period: 9, Year: 2025, Start Date: 2025-09-01, End Date: 2025-09-30, Days: 30, Description: Sep-25}
+    - {Period: 10, Year: 2025, Start Date: 2025-10-01, End Date: 2025-10-31, Days: 31, Description: Oct-25}
+    - {Period: 11, Year: 2025, Start Date: 2025-11-01, End Date: 2025-11-30, Days: 30, Description: Nov-25}
+    - {Period: 12, Year: 2025, Start Date: 2025-12-01, End Date: 2025-12-31, Days: 31, Description: Dec-25}
+  Associated Companies:
+  - {Company: Northlake University, Vendor Number: NTP-INTERNAL, Vendor Name Alias: NTP}
+  - {Company: Cedar Row Apartments, Vendor Number: NTP-INTERNAL-CR, Vendor Name Alias: NTP}
+  Notes:
+  - Internal allocation, not a utility bill — there is no external account number.
+  - Chilled-water (cooling) demand is seasonal and peaks on summer afternoons.
+  - The plant is itself a Valley Electric, Sierra Gas and River City customer (nested consumption).
+  - Hourly interval (not 15-minute) to exercise a non-electric interval shape.
+# Added 2026-10-01: the plant's own wind company, bought 2024-07-01. Its statement is generated by EEM
+# (Bill Generation), so its cycle starts with the acquisition: 18 periods, 2024-07 to 2025-12.
+- key: ridgeline_wind
+  installed:
+    providerId: null
+  Definitions:
+    Name: Ridgeline Wind
+    Description: The Thermal Plant's own wind company, bought 2024-07-01. Ten 660 kW turbines near Rio Vista sell
+      their output to the plant at an internal transfer price; EEM generates the monthly statement from the turbine
+      meters.
+    Website: https://ridgeline.northlake.example.edu
+    Icon: fa-wind
+  Provider Address:
+    Address: 8400 Montezuma Hills Road
+    City: Rio Vista
+    Region: CA
+    Postal Code: '94571'
+    Country: UNITED STATES
+  Provider Contact:
+    First Name: Mateo
+    Last Name: Alvarez
+    Title: Ridgeline Wind Site Manager
+    Phone: 707-555-0146
+    Email: mateo.alvarez@northlake.example.edu
+  Remit Addresses:
+  - Address: Ridgeline Wind Accounting
+    Address 2: Campus Mail Stop 46
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+  Bill Cycles:
+  - Cycle: 1
+    Description: Internal transfer, closed with the calendar month
+    Periods:
+    - {Period: 7, Year: 2024, Start Date: 2024-07-01, End Date: 2024-07-31, Days: 31, Description: Jul-24}
+    - {Period: 8, Year: 2024, Start Date: 2024-08-01, End Date: 2024-08-31, Days: 31, Description: Aug-24}
+    - {Period: 9, Year: 2024, Start Date: 2024-09-01, End Date: 2024-09-30, Days: 30, Description: Sep-24}
+    - {Period: 10, Year: 2024, Start Date: 2024-10-01, End Date: 2024-10-31, Days: 31, Description: Oct-24}
+    - {Period: 11, Year: 2024, Start Date: 2024-11-01, End Date: 2024-11-30, Days: 30, Description: Nov-24}
+    - {Period: 12, Year: 2024, Start Date: 2024-12-01, End Date: 2024-12-31, Days: 31, Description: Dec-24}
+    - {Period: 1, Year: 2025, Start Date: 2025-01-01, End Date: 2025-01-31, Days: 31, Description: Jan-25}
+    - {Period: 2, Year: 2025, Start Date: 2025-02-01, End Date: 2025-02-28, Days: 28, Description: Feb-25}
+    - {Period: 3, Year: 2025, Start Date: 2025-03-01, End Date: 2025-03-31, Days: 31, Description: Mar-25}
+    - {Period: 4, Year: 2025, Start Date: 2025-04-01, End Date: 2025-04-30, Days: 30, Description: Apr-25}
+    - {Period: 5, Year: 2025, Start Date: 2025-05-01, End Date: 2025-05-31, Days: 31, Description: May-25}
+    - {Period: 6, Year: 2025, Start Date: 2025-06-01, End Date: 2025-06-30, Days: 30, Description: Jun-25}
+    - {Period: 7, Year: 2025, Start Date: 2025-07-01, End Date: 2025-07-31, Days: 31, Description: Jul-25}
+    - {Period: 8, Year: 2025, Start Date: 2025-08-01, End Date: 2025-08-31, Days: 31, Description: Aug-25}
+    - {Period: 9, Year: 2025, Start Date: 2025-09-01, End Date: 2025-09-30, Days: 30, Description: Sep-25}
+    - {Period: 10, Year: 2025, Start Date: 2025-10-01, End Date: 2025-10-31, Days: 31, Description: Oct-25}
+    - {Period: 11, Year: 2025, Start Date: 2025-11-01, End Date: 2025-11-30, Days: 30, Description: Nov-25}
+    - {Period: 12, Year: 2025, Start Date: 2025-12-01, End Date: 2025-12-31, Days: 31, Description: Dec-25}
+  Associated Companies:
+  - {Company: Northlake Thermal Plant, Vendor Number: RWL-INTERNAL, Vendor Name Alias: RWL}
+  Notes:
+  - Internal transfer, not a utility bill; nobody sends it. EEM generates the statement (Bill Generation).
+  - The only provider with 10-minute data and a metric site (m/s, degC, kPa, kg/m3).
+  - The plant also holds a Valley Electric generator account at the Ridgeline substation; its export credit moves to
+    the Central Plant's account (VED-BCT).
+  - First statement July 2024; the hand-made July statement is the acceptance sample.
+- key: river_city_utilities
+  installed:
+    providerId: 3
+    recordedOn: 2026-09-18
+    remitAddressIds:
+  Definitions:
+    Name: River City Utilities
+    Description: Provides bundled municipal water, sewer, and stormwater service. Potable water is metered; sewer
+      is billed from water volume; stormwater is an area-based service fee where applicable.
+    Website: https://www.rivercityutilities.example
+    Icon: fa-hand-holding-water
+  Provider Address:
+    Address: 915 Levee Street
+    City: Sacramento
+    Region: CA
+    Postal Code: '95814'
+    Country: UNITED STATES
+  Provider Contact:
+    First Name: Dana
+    Last Name: Perez
+    Title: Municipal utility representative
+    Phone: 916-555-6200
+    Email: dana.perez@rivercity.example
+  Remit Addresses:
+  - Address: PO Box 2216
+    City: Sacramento
+    Region: CA
+    Postal Code: '95812'
+    Country: UNITED STATES
+  Bill Cycles:
+  - Cycle: 1
+    Description: Campus water, sewer and stormwater, calendar month
+    Periods:
+    - {Period: 1, Year: 2024, Start Date: 2024-01-01, End Date: 2024-01-31, Days: 31, Description: Jan-24}
+    - {Period: 2, Year: 2024, Start Date: 2024-02-01, End Date: 2024-02-29, Days: 29, Description: Feb-24}
+    - {Period: 3, Year: 2024, Start Date: 2024-03-01, End Date: 2024-03-31, Days: 31, Description: Mar-24}
+    - {Period: 4, Year: 2024, Start Date: 2024-04-01, End Date: 2024-04-30, Days: 30, Description: Apr-24}
+    - {Period: 5, Year: 2024, Start Date: 2024-05-01, End Date: 2024-05-31, Days: 31, Description: May-24}
+    - {Period: 6, Year: 2024, Start Date: 2024-06-01, End Date: 2024-06-30, Days: 30, Description: Jun-24}
+    - {Period: 7, Year: 2024, Start Date: 2024-07-01, End Date: 2024-07-31, Days: 31, Description: Jul-24}
+    - {Period: 8, Year: 2024, Start Date: 2024-08-01, End Date: 2024-08-31, Days: 31, Description: Aug-24}
+    - {Period: 9, Year: 2024, Start Date: 2024-09-01, End Date: 2024-09-30, Days: 30, Description: Sep-24}
+    - {Period: 10, Year: 2024, Start Date: 2024-10-01, End Date: 2024-10-31, Days: 31, Description: Oct-24}
+    - {Period: 11, Year: 2024, Start Date: 2024-11-01, End Date: 2024-11-30, Days: 30, Description: Nov-24}
+    - {Period: 12, Year: 2024, Start Date: 2024-12-01, End Date: 2024-12-31, Days: 31, Description: Dec-24}
+    - {Period: 1, Year: 2025, Start Date: 2025-01-01, End Date: 2025-01-31, Days: 31, Description: Jan-25}
+    - {Period: 2, Year: 2025, Start Date: 2025-02-01, End Date: 2025-02-28, Days: 28, Description: Feb-25}
+    - {Period: 3, Year: 2025, Start Date: 2025-03-01, End Date: 2025-03-31, Days: 31, Description: Mar-25}
+    - {Period: 4, Year: 2025, Start Date: 2025-04-01, End Date: 2025-04-30, Days: 30, Description: Apr-25}
+    - {Period: 5, Year: 2025, Start Date: 2025-05-01, End Date: 2025-05-31, Days: 31, Description: May-25}
+    - {Period: 6, Year: 2025, Start Date: 2025-06-01, End Date: 2025-06-30, Days: 30, Description: Jun-25}
+    - {Period: 7, Year: 2025, Start Date: 2025-07-01, End Date: 2025-07-31, Days: 31, Description: Jul-25}
+    - {Period: 8, Year: 2025, Start Date: 2025-08-01, End Date: 2025-08-31, Days: 31, Description: Aug-25}
+    - {Period: 9, Year: 2025, Start Date: 2025-09-01, End Date: 2025-09-30, Days: 30, Description: Sep-25}
+    - {Period: 10, Year: 2025, Start Date: 2025-10-01, End Date: 2025-10-31, Days: 31, Description: Oct-25}
+    - {Period: 11, Year: 2025, Start Date: 2025-11-01, End Date: 2025-11-30, Days: 30, Description: Nov-25}
+    - {Period: 12, Year: 2025, Start Date: 2025-12-01, End Date: 2025-12-31, Days: 31, Description: Dec-25}
+  - Cycle: 2
+    Description: Cedar Row, read on the 15th, a fortnight after the campus cycle
+    Periods:
+    - {Period: 1, Year: 2024, Start Date: 2023-12-15, End Date: 2024-01-14, Days: 31, Description: Jan-24}
+    - {Period: 2, Year: 2024, Start Date: 2024-01-15, End Date: 2024-02-14, Days: 31, Description: Feb-24}
+    - {Period: 3, Year: 2024, Start Date: 2024-02-15, End Date: 2024-03-14, Days: 29, Description: Mar-24}
+    - {Period: 4, Year: 2024, Start Date: 2024-03-15, End Date: 2024-04-14, Days: 31, Description: Apr-24}
+    - {Period: 5, Year: 2024, Start Date: 2024-04-15, End Date: 2024-05-14, Days: 30, Description: May-24}
+    - {Period: 6, Year: 2024, Start Date: 2024-05-15, End Date: 2024-06-14, Days: 31, Description: Jun-24}
+    - {Period: 7, Year: 2024, Start Date: 2024-06-15, End Date: 2024-07-14, Days: 30, Description: Jul-24}
+    - {Period: 8, Year: 2024, Start Date: 2024-07-15, End Date: 2024-08-14, Days: 31, Description: Aug-24}
+    - {Period: 9, Year: 2024, Start Date: 2024-08-15, End Date: 2024-09-14, Days: 31, Description: Sep-24}
+    - {Period: 10, Year: 2024, Start Date: 2024-09-15, End Date: 2024-10-14, Days: 30, Description: Oct-24}
+    - {Period: 11, Year: 2024, Start Date: 2024-10-15, End Date: 2024-11-14, Days: 31, Description: Nov-24}
+    - {Period: 12, Year: 2024, Start Date: 2024-11-15, End Date: 2024-12-14, Days: 30, Description: Dec-24}
+    - {Period: 1, Year: 2025, Start Date: 2024-12-15, End Date: 2025-01-14, Days: 31, Description: Jan-25}
+    - {Period: 2, Year: 2025, Start Date: 2025-01-15, End Date: 2025-02-14, Days: 31, Description: Feb-25}
+    - {Period: 3, Year: 2025, Start Date: 2025-02-15, End Date: 2025-03-14, Days: 28, Description: Mar-25}
+    - {Period: 4, Year: 2025, Start Date: 2025-03-15, End Date: 2025-04-14, Days: 31, Description: Apr-25}
+    - {Period: 5, Year: 2025, Start Date: 2025-04-15, End Date: 2025-05-14, Days: 30, Description: May-25}
+    - {Period: 6, Year: 2025, Start Date: 2025-05-15, End Date: 2025-06-14, Days: 31, Description: Jun-25}
+    - {Period: 7, Year: 2025, Start Date: 2025-06-15, End Date: 2025-07-14, Days: 30, Description: Jul-25}
+    - {Period: 8, Year: 2025, Start Date: 2025-07-15, End Date: 2025-08-14, Days: 31, Description: Aug-25}
+    - {Period: 9, Year: 2025, Start Date: 2025-08-15, End Date: 2025-09-14, Days: 31, Description: Sep-25}
+    - {Period: 10, Year: 2025, Start Date: 2025-09-15, End Date: 2025-10-14, Days: 30, Description: Oct-25}
+    - {Period: 11, Year: 2025, Start Date: 2025-10-15, End Date: 2025-11-14, Days: 31, Description: Nov-25}
+    - {Period: 12, Year: 2025, Start Date: 2025-11-15, End Date: 2025-12-14, Days: 30, Description: Dec-25}
+  Associated Companies:
+  - {Company: Northlake University, Vendor Number: RCU-3308, Vendor Name Alias: RCU}
+  - {Company: Cedar Row Apartments, Vendor Number: RCU-3309, Vendor Name Alias: RCU}
+  - {Company: Northlake Thermal Plant, Vendor Number: RCU-3310, Vendor Name Alias: RCU}
+  Notes:
+  - One account, multiple service line items on a single statement.
+  - Sewer volume is derived from metered water, not independently metered.
+  - Stormwater is a flat ERU fee with a zero usage quantity.
+  - Apartment occupancy scales water usage, and therefore sewer, month to month.
+- key: sierra_gas_utility
+  installed:
+    providerId: 2
+    recordedOn: 2026-09-18
+    remitAddressIds:
+  Definitions:
+    Name: Sierra Gas Utility
+    Description: Supplies natural gas service. Bills monthly therms; used for heating and food-service loads.
+    Website: https://www.sierragas.example
+    Icon: fa-fire
+  Provider Address:
+    Address: 1850 Pinnacle Way
+    City: Sacramento
+    Region: CA
+    Postal Code: '95834'
+    Country: UNITED STATES
+  Provider Contact:
+    First Name: Marisol
+    Last Name: Vega
+    Title: Gas account representative
+    Phone: 916-555-6150
+    Email: marisol.vega@sierragas.example
+  Remit Addresses:
+  - Address: PO Box 60915
+    City: Sacramento
+    Region: CA
+    Postal Code: '95860'
+    Country: UNITED STATES
+  Bill Cycles:
+  - Cycle: 1
+    Description: All Northlake gas accounts, read on the 15th
+    Periods:
+    - {Period: 1, Year: 2024, Start Date: 2023-12-15, End Date: 2024-01-14, Days: 31, Description: Jan-24}
+    - {Period: 2, Year: 2024, Start Date: 2024-01-15, End Date: 2024-02-14, Days: 31, Description: Feb-24}
+    - {Period: 3, Year: 2024, Start Date: 2024-02-15, End Date: 2024-03-14, Days: 29, Description: Mar-24}
+    - {Period: 4, Year: 2024, Start Date: 2024-03-15, End Date: 2024-04-14, Days: 31, Description: Apr-24}
+    - {Period: 5, Year: 2024, Start Date: 2024-04-15, End Date: 2024-05-14, Days: 30, Description: May-24}
+    - {Period: 6, Year: 2024, Start Date: 2024-05-15, End Date: 2024-06-14, Days: 31, Description: Jun-24}
+    - {Period: 7, Year: 2024, Start Date: 2024-06-15, End Date: 2024-07-14, Days: 30, Description: Jul-24}
+    - {Period: 8, Year: 2024, Start Date: 2024-07-15, End Date: 2024-08-14, Days: 31, Description: Aug-24}
+    - {Period: 9, Year: 2024, Start Date: 2024-08-15, End Date: 2024-09-14, Days: 31, Description: Sep-24}
+    - {Period: 10, Year: 2024, Start Date: 2024-09-15, End Date: 2024-10-14, Days: 30, Description: Oct-24}
+    - {Period: 11, Year: 2024, Start Date: 2024-10-15, End Date: 2024-11-14, Days: 31, Description: Nov-24}
+    - {Period: 12, Year: 2024, Start Date: 2024-11-15, End Date: 2024-12-14, Days: 30, Description: Dec-24}
+    - {Period: 1, Year: 2025, Start Date: 2024-12-15, End Date: 2025-01-14, Days: 31, Description: Jan-25}
+    - {Period: 2, Year: 2025, Start Date: 2025-01-15, End Date: 2025-02-14, Days: 31, Description: Feb-25}
+    - {Period: 3, Year: 2025, Start Date: 2025-02-15, End Date: 2025-03-14, Days: 28, Description: Mar-25}
+    - {Period: 4, Year: 2025, Start Date: 2025-03-15, End Date: 2025-04-14, Days: 31, Description: Apr-25}
+    - {Period: 5, Year: 2025, Start Date: 2025-04-15, End Date: 2025-05-14, Days: 30, Description: May-25}
+    - {Period: 6, Year: 2025, Start Date: 2025-05-15, End Date: 2025-06-14, Days: 31, Description: Jun-25}
+    - {Period: 7, Year: 2025, Start Date: 2025-06-15, End Date: 2025-07-14, Days: 30, Description: Jul-25}
+    - {Period: 8, Year: 2025, Start Date: 2025-07-15, End Date: 2025-08-14, Days: 31, Description: Aug-25}
+    - {Period: 9, Year: 2025, Start Date: 2025-08-15, End Date: 2025-09-14, Days: 31, Description: Sep-25}
+    - {Period: 10, Year: 2025, Start Date: 2025-09-15, End Date: 2025-10-14, Days: 30, Description: Oct-25}
+    - {Period: 11, Year: 2025, Start Date: 2025-10-15, End Date: 2025-11-14, Days: 31, Description: Nov-25}
+    - {Period: 12, Year: 2025, Start Date: 2025-11-15, End Date: 2025-12-14, Days: 30, Description: Dec-25}
+  Associated Companies:
+  - {Company: Northlake University, Vendor Number: SGU-55120, Vendor Name Alias: SGU}
+  - {Company: Cedar Row Apartments, Vendor Number: SGU-55121, Vendor Name Alias: SGU}
+  - {Company: Northlake Thermal Plant, Vendor Number: SGU-55122, Vendor Name Alias: SGU}
+  Notes:
+  - Strong winter heating peak; near-flat summer baseload.
+  - One billing period is issued as an estimate, then superseded by an actual read.
+  - The negative-test file intentionally uses an unsupported usage unit.
+- key: valley_electric_district
+  installed:
+    providerId: 1
+    recordedOn: 2026-09-18
+    remitAddressIds:
+  Definitions:
+    Name: Valley Electric District
+    Description: Supplies external electric service. Bills monthly energy, time-of-use charges, and billing demand.
+      Science Center and Student Center also have interval demand data.
+    Website: https://www.valleyelectric.example
+    Icon: fa-bolt-lightning
+  Provider Address:
+    Address: 2400 Feather River Road
+    City: Sacramento
+    Region: CA
+    Postal Code: '95833'
+    Country: UNITED STATES
+  Provider Contact:
+    First Name: Owen
+    Last Name: Blake
+    Title: Electric account representative
+    Phone: 916-555-6100
+    Email: owen.blake@valleyelectric.example
+  Remit Addresses:
+  - Address: PO Box 41027
+    City: Sacramento
+    Region: CA
+    Postal Code: '95841'
+    Country: UNITED STATES
+  Bill Cycles:
+  - Cycle: 1
+    Description: Campus and plant accounts, read on the 5th
+    Periods:
+    - {Period: 1, Year: 2024, Start Date: 2023-12-05, End Date: 2024-01-04, Days: 31, Description: Jan-24}
+    - {Period: 2, Year: 2024, Start Date: 2024-01-05, End Date: 2024-02-04, Days: 31, Description: Feb-24}
+    - {Period: 3, Year: 2024, Start Date: 2024-02-05, End Date: 2024-03-04, Days: 29, Description: Mar-24}
+    - {Period: 4, Year: 2024, Start Date: 2024-03-05, End Date: 2024-04-04, Days: 31, Description: Apr-24}
+    - {Period: 5, Year: 2024, Start Date: 2024-04-05, End Date: 2024-05-04, Days: 30, Description: May-24}
+    - {Period: 6, Year: 2024, Start Date: 2024-05-05, End Date: 2024-06-04, Days: 31, Description: Jun-24}
+    - {Period: 7, Year: 2024, Start Date: 2024-06-05, End Date: 2024-07-04, Days: 30, Description: Jul-24}
+    - {Period: 8, Year: 2024, Start Date: 2024-07-05, End Date: 2024-08-04, Days: 31, Description: Aug-24}
+    - {Period: 9, Year: 2024, Start Date: 2024-08-05, End Date: 2024-09-04, Days: 31, Description: Sep-24}
+    - {Period: 10, Year: 2024, Start Date: 2024-09-05, End Date: 2024-10-04, Days: 30, Description: Oct-24}
+    - {Period: 11, Year: 2024, Start Date: 2024-10-05, End Date: 2024-11-04, Days: 31, Description: Nov-24}
+    - {Period: 12, Year: 2024, Start Date: 2024-11-05, End Date: 2024-12-04, Days: 30, Description: Dec-24}
+    - {Period: 1, Year: 2025, Start Date: 2024-12-05, End Date: 2025-01-04, Days: 31, Description: Jan-25}
+    - {Period: 2, Year: 2025, Start Date: 2025-01-05, End Date: 2025-02-04, Days: 31, Description: Feb-25}
+    - {Period: 3, Year: 2025, Start Date: 2025-02-05, End Date: 2025-03-04, Days: 28, Description: Mar-25}
+    - {Period: 4, Year: 2025, Start Date: 2025-03-05, End Date: 2025-04-04, Days: 31, Description: Apr-25}
+    - {Period: 5, Year: 2025, Start Date: 2025-04-05, End Date: 2025-05-04, Days: 30, Description: May-25}
+    - {Period: 6, Year: 2025, Start Date: 2025-05-05, End Date: 2025-06-04, Days: 31, Description: Jun-25}
+    - {Period: 7, Year: 2025, Start Date: 2025-06-05, End Date: 2025-07-04, Days: 30, Description: Jul-25}
+    - {Period: 8, Year: 2025, Start Date: 2025-07-05, End Date: 2025-08-04, Days: 31, Description: Aug-25}
+    - {Period: 9, Year: 2025, Start Date: 2025-08-05, End Date: 2025-09-04, Days: 31, Description: Sep-25}
+    - {Period: 10, Year: 2025, Start Date: 2025-09-05, End Date: 2025-10-04, Days: 30, Description: Oct-25}
+    - {Period: 11, Year: 2025, Start Date: 2025-10-05, End Date: 2025-11-04, Days: 31, Description: Nov-25}
+    - {Period: 12, Year: 2025, Start Date: 2025-11-05, End Date: 2025-12-04, Days: 30, Description: Dec-25}
+  Associated Companies:
+  - {Company: Northlake University, Vendor Number: VED-10042, Vendor Name Alias: VED}
+  - {Company: Cedar Row Apartments, Vendor Number: VED-10043, Vendor Name Alias: VED}
+  - {Company: Northlake Thermal Plant, Vendor Number: VED-10044, Vendor Name Alias: VED}
+  Notes:
+  - Summer cooling load raises Science Center peak demand and shifts energy into peak hours.
+  - Power factor below 0.95 on lab loads adds a reactive-power adjustment line.
+  - One meter swap keeps the same account but issues a new synthetic meter number.

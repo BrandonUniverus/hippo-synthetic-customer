@@ -1,0 +1,84 @@
+# Stage 4, step 2: Seasons (Database Administrator > Schedule, Seasons tab).
+# Seasons are shared catalog entries, picked per Schedule bundle in 04-schedules.yaml the same way
+# holidays are. Season Type (By Month Day / By Day of Week) locks as soon as the season has a date row;
+# to change it, delete every date first.
+stage: 4
+step: 2
+title: Seasons
+app: Database Administrator
+screen: Schedule > Seasons
+source:
+- data/providers/valley-electric-district.yaml (seasons: summer months 6-9)
+- data/providers/sierra-gas-utility.yaml (commodity.winter/summer months)
+notes:
+- SeasonID 0 "Annual All Hrs" already exists as the system default (Month Day type, Jan 1-Dec 31); it needs no entry
+  and is what the all-hours Schedule (04-schedules.yaml) uses.
+- 'SeasonID 1 already exists, named "New Season", created 2026-09-14 alongside UtilitySchedule 1 (VED-TOU-GS). It
+  is Month Day type with one date row, Jan 1-Dec 31 (the same span as season 0), which is not a real summer/winter
+  split. This step repurposes it rather than creating a fifth season: rename it and replace its date, since Season
+  Type is already locked to Month Day and does not need to change.'
+- Add Season creates a blank row on the Selected Season combo; type the name, save, then use Add Date to add its
+  one date row. Deleting a season''s existing date first is required before its own new date can be entered when
+  the span changes (the grid does not let two Month Day rows overlap the same season).
+- The two provider families use different calendar boundaries for their own seasonal pricing (VED summer/winter
+  for TOU energy, SGU winter/summer for gas heating season), so this step creates four real seasons in total, on
+  top of repurposing SeasonID 1.
+records:
+- key: ved_summer
+  installed:
+    seasonId: 1
+    note: reuses existing SeasonID 1, "New Season" (created 2026-09-14); rename and replace its date
+  Seasons:
+    Season Name: VED Summer (Jun-Sep)
+    Season Type: By Month Day
+    Dates:
+    - action: delete existing Jan 1-Dec 31 row first
+    - Start Month: June
+      Start Day: 1
+      End Month: September
+      End Day: 30
+  Notes:
+  - Matches Valley Electric's TOU summer months (6,7,8,9) in valley-electric-district.yaml.
+  - Feeds the three summer Schedules in 04-schedules.yaml (Summer Peak, Summer Part-Peak, Summer Off-Peak).
+- key: ved_winter
+  installed:
+    seasonId: null
+  Seasons:
+    Season Name: VED Winter (Oct-May)
+    Season Type: By Month Day
+    Dates:
+    - Start Month: October
+      Start Day: 1
+      End Month: May
+      End Day: 31
+  Notes:
+  - Matches Valley Electric's TOU winter months (1,2,3,4,5,10,11,12); a Month Day range that wraps the year end
+    is entered as Start Month October through End Month May, same as a season row would read on paper.
+  - Feeds the two winter Schedules in 04-schedules.yaml (Winter Part-Peak, Winter Off-Peak).
+- key: sgu_winter
+  installed:
+    seasonId: null
+  Seasons:
+    Season Name: SGU Winter (Nov-Mar)
+    Season Type: By Month Day
+    Dates:
+    - Start Month: November
+      Start Day: 1
+      End Month: March
+      End Day: 31
+  Notes:
+  - Matches Sierra Gas's heating-season winter months (11,12,1,2,3) in sierra-gas-utility.yaml; different boundary
+    than VED Winter on purpose, so keep the two seasons separate.
+- key: sgu_summer
+  installed:
+    seasonId: null
+  Seasons:
+    Season Name: SGU Summer (Apr-Oct)
+    Season Type: By Month Day
+    Dates:
+    - Start Month: April
+      Start Day: 1
+      End Month: October
+      End Day: 31
+  Notes:
+  - Matches Sierra Gas's non-heating months (4,5,6,7,8,9,10).

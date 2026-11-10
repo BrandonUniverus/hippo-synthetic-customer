@@ -1,0 +1,6 @@
+**
+!services
+!services/historian
+!services/historian/**
+services/historian/**/__pycache__
+services/historian/tests

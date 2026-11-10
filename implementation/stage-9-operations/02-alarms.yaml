@@ -1,0 +1,280 @@
+# Stage 9, step 2: Point Alarm Definition (Database Administrator, Nodes > point > Definitions > Point Alarm
+# Definition tab), plus the Alarm Mail Service task that emails when one fires.
+stage: 9
+step: 2
+title: Alarms
+app: Database Administrator
+screen: Nodes > point > Point Alarm Definition
+source:
+- generators/documents/sources/implementation/dream-customer/phase6-operations-engagement-spec.md
+- data/scenarios/demo-university-v1.yaml
+notes:
+- 'Screen fields (PointAlarmDefinitionViewModel.cs, verified against the XAML labels): Activation, Priority
+  (PriorityLevels, verified 5 rows: 1 Informational, 2 Warning, 3 Important, 4 Critical, 5 Emergency), Notify
+  User, Notify Group, Alarm Type, Deadband, then the threshold values High Alarm / High Warning / Normal / Low
+  Warning / Low Alarm. A digital point instead gets four state colors/text (State 0-3) in place of the five
+  thresholds.'
+- 'CORRECTION: AlarmType is a 1-row system lookup (verified: only "default", ResourceSet db_alarming_default).
+  There is no per-scenario Alarm Type choice ("high-demand", "chiller-fault", "data-gap", "high-usage" are this
+  chapter''s names for what each alarm is watching, not a field value); every record below uses Alarm Type
+  default and the distinction lives entirely in the threshold values and Priority.'
+- 'CORRECTION: the data-gap alarm point is Student Center''s electric interval, not Science Center''s. Verified in
+  data/providers/valley-electric-district.yaml: scenarioHooks lists missing_interval_backfill with
+  targets: [student_center] (role primary); Science Center has no backfill scenario. Point on the same building
+  as step 7''s Neptune/MVRS handheld work for a different reason is a coincidence, not a dependency.'
+- Points are named by their Stage 2/3 scenario channel id since Stages 2-7 are running in parallel; look each one
+  up by display name once installed PointIDs are recorded.
+- 'Notify User/Group use Stage 1 people and groups (installed already): jordan.hale and NLU Facilities Setup for
+  the campus points, valerie.kim and CRA Housing Ops for Cedar Row.'
+- 'Added 2026-10-01 (Ridgeline Wind): 11 more alarms, on the ten Turbine State points (digital) and the met mast''s
+  Hub-Height Wind Speed 10m (analog), for 15 in all, and two goals that enter nothing. The people notified are the
+  plant''s: Mateo Alvarez and ntp_wind_ops, a Northlake Thermal Plant group, which is why the Notify Group is the plant''s
+  copy (the group and the node must be in the same company). State text and colours are the Thermal Plant company''s own
+  digital defaults (Company_TBL State0 to State3 for CompanyID 5, verified: 000000, 008000, FF0000, FC8040, which are
+  black, green, red and orange).'
+- 'Normal is the band between the thresholds: the screen shows its colour and no value (PointAlarmDefinitionView.xaml),
+  so the Normal figures on the records above are reference baselines, not entries, and the Ridgeline analog record
+  leaves it blank.'
+- 'What a digital alarm does (read from PointData_UpdateAlarms.sql, PointData_DigitalSave.sql, AlarmNotification.sql and
+  the screen''s XAML, not yet run on Ridgeline data): every change of state is recorded as an AlarmData row whose
+  Severity is Priority x the distance of the new state from the point''s Normal State. No screen sets Normal State (the
+  view model carries it, the XAML binds neither it nor Log State Change), so it stays at its stored value, which
+  PointData_DigitalSave reads as 0, while the notification job, when SysConstants ResolveNormalAlarms is on, treats state
+  1 as the return to normal. For Turbine State that gives Stopped no severity, Running 1 x Priority (cleared as the
+  state returns to 1), Fault 2 x Priority and Curtailed 3 x Priority: Fault is recorded, coloured red and mailed, but
+  state 2 cannot be singled out, and Curtailed ranks above Fault. Proposed finding.'
+records:
+- key: student_center_demand_alarm
+  installed:
+    pointAlarmId:
+  Point: ch_ved_student_center_kw_15m (Student Center Electric Main, demand kW)
+  Activation: Normal
+  Priority: 4 Critical
+  Notify User: jordan.hale
+  Notify Group: nlu_facilities_setup
+  Alarm Type: default
+  Deadband: 5
+  High Alarm: 850     # kW; assumed threshold above the summer-event peak
+  High Warning: 750    # assumed
+  Normal: 500           # assumed baseline midday demand
+  Low Warning:          # not used; demand has no low-side alarm
+  Low Alarm:
+- key: chiller_enable_fault_alarm
+  installed:
+    pointAlarmId:
+  Point: ch_modbus_ntp_chiller_enable_status (Chiller Enable Status, digital)
+  Activation: Normal
+  Priority: 3 Important
+  Notify User: jordan.hale
+  Notify Group: nlu_facilities_setup
+  Alarm Type: default
+  State Colors:
+  - {State: 0, Text: Chiller Off, Color: '#008040'}
+  - {State: 1, Text: Chiller Enabled, Color: '#008040'}
+  - {State: 2, Text: Chiller Fault, Color: '#FF0000'}
+  - {State: 3, Text: Unknown, Color: '#FF8000'}
+- key: student_center_data_gap_alarm
+  installed:
+    pointAlarmId:
+  Point: ch_ved_student_center_kwh_15m (Student Center Electric Main, interval kWh; the missing_interval_backfill target)
+  Activation: Normal
+  Priority: 2 Warning
+  Notify User: jordan.hale
+  Notify Group: eem_gateway_reports # Northlake University copy (CompanyID 6); Avery's membership is pending cross-company support.
+  Alarm Type: default
+  Deadband: 0
+  Note: Data-gap alarms fire from missing interval rows, not a threshold on the value; Deadband/thresholds are
+    left at product defaults and the alarm is exercised by the missing_interval_backfill window itself.
+- key: cedar_row_water_alarm
+  installed:
+    pointAlarmId:
+  Point: ch_rcu_cedar_row_a_water_kgal_monthly (Cedar Row A water, kgal)
+  Activation: Normal
+  Priority: 2 Warning
+  Notify User: valerie.kim
+  Notify Group: cra_housing_ops
+  Alarm Type: default
+  Deadband: 2
+  High Alarm: 950      # assumed: kgal/month, above a full-occupancy month
+  High Warning: 850     # assumed
+  Normal: 650            # assumed typical occupied month
+  Low Warning:
+  Low Alarm:
+# ---- Ridgeline Wind ----
+# One alarm per Turbine State point. Priority 3 Important is assumed for all ten, as for the chiller fault.
+- key: wtg01_turbine_state_alarm
+  installed:
+    pointAlarmId:
+  Point: ch_rwl_wtg01_state_10m (Ridgeline WTG-01 Turbine State, digital)
+  Activation: Normal
+  Priority: 3 Important
+  Notify User: mateo.alvarez
+  Notify Group: ntp_wind_ops
+  Alarm Type: default
+  State Colors:
+  - {State: 0, Text: Stopped, Color: '#000000'}
+  - {State: 1, Text: Running, Color: '#008000'}
+  - {State: 2, Text: Fault, Color: '#FF0000'}
+  - {State: 3, Text: Curtailed, Color: '#FC8040'}
+- key: wtg02_turbine_state_alarm
+  installed:
+    pointAlarmId:
+  Point: ch_rwl_wtg02_state_10m (Ridgeline WTG-02 Turbine State, digital)
+  Activation: Normal
+  Priority: 3 Important
+  Notify User: mateo.alvarez
+  Notify Group: ntp_wind_ops
+  Alarm Type: default
+  State Colors:
+  - {State: 0, Text: Stopped, Color: '#000000'}
+  - {State: 1, Text: Running, Color: '#008000'}
+  - {State: 2, Text: Fault, Color: '#FF0000'}
+  - {State: 3, Text: Curtailed, Color: '#FC8040'}
+- key: wtg03_turbine_state_alarm
+  installed:
+    pointAlarmId:
+  Point: ch_rwl_wtg03_state_10m (Ridgeline WTG-03 Turbine State, digital)
+  Activation: Normal
+  Priority: 3 Important
+  Notify User: mateo.alvarez
+  Notify Group: ntp_wind_ops
+  Alarm Type: default
+  State Colors:
+  - {State: 0, Text: Stopped, Color: '#000000'}
+  - {State: 1, Text: Running, Color: '#008000'}
+  - {State: 2, Text: Fault, Color: '#FF0000'}
+  - {State: 3, Text: Curtailed, Color: '#FC8040'}
+- key: wtg04_turbine_state_alarm
+  installed:
+    pointAlarmId:
+  Point: ch_rwl_wtg04_state_10m (Ridgeline WTG-04 Turbine State, digital)
+  Activation: Normal
+  Priority: 3 Important
+  Notify User: mateo.alvarez
+  Notify Group: ntp_wind_ops
+  Alarm Type: default
+  State Colors:
+  - {State: 0, Text: Stopped, Color: '#000000'}
+  - {State: 1, Text: Running, Color: '#008000'}
+  - {State: 2, Text: Fault, Color: '#FF0000'}
+  - {State: 3, Text: Curtailed, Color: '#FC8040'}
+- key: wtg05_turbine_state_alarm
+  installed:
+    pointAlarmId:
+  Point: ch_rwl_wtg05_state_10m (Ridgeline WTG-05 Turbine State, digital)
+  Activation: Normal
+  Priority: 3 Important
+  Notify User: mateo.alvarez
+  Notify Group: ntp_wind_ops
+  Alarm Type: default
+  State Colors:
+  - {State: 0, Text: Stopped, Color: '#000000'}
+  - {State: 1, Text: Running, Color: '#008000'}
+  - {State: 2, Text: Fault, Color: '#FF0000'}
+  - {State: 3, Text: Curtailed, Color: '#FC8040'}
+- key: wtg06_turbine_state_alarm
+  installed:
+    pointAlarmId:
+  Point: ch_rwl_wtg06_state_10m (Ridgeline WTG-06 Turbine State, digital)
+  Activation: Normal
+  Priority: 3 Important
+  Notify User: mateo.alvarez
+  Notify Group: ntp_wind_ops
+  Alarm Type: default
+  State Colors:
+  - {State: 0, Text: Stopped, Color: '#000000'}
+  - {State: 1, Text: Running, Color: '#008000'}
+  - {State: 2, Text: Fault, Color: '#FF0000'}
+  - {State: 3, Text: Curtailed, Color: '#FC8040'}
+- key: wtg07_turbine_state_alarm
+  installed:
+    pointAlarmId:
+  Point: ch_rwl_wtg07_state_10m (Ridgeline WTG-07 Turbine State, digital; the gearbox outage 2025-02-11 to 2025-04-22 is its Fault)
+  Activation: Normal
+  Priority: 3 Important
+  Notify User: mateo.alvarez
+  Notify Group: ntp_wind_ops
+  Alarm Type: default
+  State Colors:
+  - {State: 0, Text: Stopped, Color: '#000000'}
+  - {State: 1, Text: Running, Color: '#008000'}
+  - {State: 2, Text: Fault, Color: '#FF0000'}
+  - {State: 3, Text: Curtailed, Color: '#FC8040'}
+- key: wtg08_turbine_state_alarm
+  installed:
+    pointAlarmId:
+  Point: ch_rwl_wtg08_state_10m (Ridgeline WTG-08 Turbine State, digital)
+  Activation: Normal
+  Priority: 3 Important
+  Notify User: mateo.alvarez
+  Notify Group: ntp_wind_ops
+  Alarm Type: default
+  State Colors:
+  - {State: 0, Text: Stopped, Color: '#000000'}
+  - {State: 1, Text: Running, Color: '#008000'}
+  - {State: 2, Text: Fault, Color: '#FF0000'}
+  - {State: 3, Text: Curtailed, Color: '#FC8040'}
+- key: wtg09_turbine_state_alarm
+  installed:
+    pointAlarmId:
+  Point: ch_rwl_wtg09_state_10m (Ridgeline WTG-09 Turbine State, digital)
+  Activation: Normal
+  Priority: 3 Important
+  Notify User: mateo.alvarez
+  Notify Group: ntp_wind_ops
+  Alarm Type: default
+  State Colors:
+  - {State: 0, Text: Stopped, Color: '#000000'}
+  - {State: 1, Text: Running, Color: '#008000'}
+  - {State: 2, Text: Fault, Color: '#FF0000'}
+  - {State: 3, Text: Curtailed, Color: '#FC8040'}
+- key: wtg10_turbine_state_alarm
+  installed:
+    pointAlarmId:
+  Point: ch_rwl_wtg10_state_10m (Ridgeline WTG-10 Turbine State, digital)
+  Activation: Normal
+  Priority: 3 Important
+  Notify User: mateo.alvarez
+  Notify Group: ntp_wind_ops
+  Alarm Type: default
+  State Colors:
+  - {State: 0, Text: Stopped, Color: '#000000'}
+  - {State: 1, Text: Running, Color: '#008000'}
+  - {State: 2, Text: Fault, Color: '#FF0000'}
+  - {State: 3, Text: Curtailed, Color: '#FC8040'}
+- key: met_mast_high_wind_alarm
+  installed:
+    pointAlarmId:
+  Point: ch_rwl_met_wind_ms_10m (Ridgeline Met Mast Hub-Height Wind Speed 10m, m/s)
+  Activation: Normal
+  Priority: 2 Warning
+  Notify User: mateo.alvarez
+  Notify Group: ntp_wind_ops
+  Alarm Type: default
+  Deadband: 1           # m/s; assumed
+  High Alarm: 25        # m/s; assumed: the usual cut-out speed of a 660 kW class turbine, where it stops itself
+  High Warning: 20      # assumed
+  Normal:               # a band between the thresholds, no value on the screen
+  Low Warning:          # not used; winter calms are ordinary (the generator bill for 2025-01-05 to 2025-02-04 exported 418,836 kWh) and a low reading cannot tell still air from a stuck sensor
+  Low Alarm:
+- key: goal_turbine_performance_ratio_alarm
+  kind: goal
+  goal: 41
+  installed: {}
+  Wanted: "An analog alarm on each turbine's performance ratio (generated energy over possible energy) and on the farm's, with a Low Warning and a Low Alarm, so a turbine that is Running but delivering well under its possible power alarms, which a threshold on a raw value cannot see; WTG-07's outage would read as a ratio of 0. The farm's ratio alone would only fall to about 87% with one of ten turbines down, so the per-turbine ratio is the one that catches it."
+  Needs: "A calculated point. EEM cannot derive one point from others by formula, and an aggregate is a weighted sum of like quantities (product finding 41), so it cannot divide Generated kWh 10m by Possible kW 10m x 10/60 either. Until it exists the alarms above watch raw values: a turbine's state and the wind."
+  Low Warning: 90   # percent; assumed, against 96.7% for July 2024
+  Low Alarm: 80     # percent; assumed, the same 80% the Radar scorecard paints orange at (goal 47)
+- key: goal_met_mast_stuck_anemometer_alarm
+  kind: goal
+  goal: 41
+  installed: {}
+  Wanted: "An alarm when the met mast's Hub-Height Wind Speed 10m holds one value for hours (a stuck or iced anemometer), which a threshold cannot see: still air and a stuck sensor read alike."
+  Needs: "A derived point such as the wind speed's rolling range over the last few hours, which is the same mechanism as the performance ratio (calculated points, goal 41). The data-gap alarm cannot do it: the rows keep arriving."
+- key: alarm_mail_task
+  installed:
+    taskItemId:
+  app: Web
+  screen: tasks/manager
+  Task Manager: {Task: "Alarm Mail Service (Task 4, verified in Task_Tbl, EEMSuite.Tasks.EngineWorker, workflow \"Alarm Mail Notification\")", Schedule: "every 300 seconds (its MinIntervalSeconds)"}
+  note: "scheduled here so the 15 alarms above can actually mail; also listed among Stage 9 step 4's standard task schedules"

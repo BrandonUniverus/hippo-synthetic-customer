@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" role="img" aria-label="Sierra Gas Utility">
+  <title>Sierra Gas Utility</title>
+  <path d="M20 3 C26 11 32 16 32 26 A12 12 0 0 1 8 26 C8 19 12 15 15 9 C16 15 18 18 20 19 C22 14 22 9 20 3 Z" fill="#B5441B"/>
+  <path d="M20 21 C24 25 26.5 28 26.5 31.5 A6.5 6.5 0 0 1 13.5 31.5 C13.5 28 16.5 25 20 21 Z" fill="#F08A3E"/>
+  <rect x="6" y="42" width="28" height="3" fill="#2B2F33"/>
+</svg>

@@ -1,0 +1,92 @@
+name: northlake-sources
+services:
+  producer:
+    build:
+      context: ../..
+      dockerfile: services/sources/Dockerfile
+      target: producer
+    image: ${NORTHLAKE_IMAGE_PREFIX:-}hippo-northlake-sources:${NORTHLAKE_IMAGE_TAG:-local}
+    restart: unless-stopped
+    command: ["run"]
+    volumes:
+      - source-data:/state
+    healthcheck:
+      test: ["CMD", "python", "-m", "services.sources", "health", "--state", "/state"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30m
+  web:
+    build:
+      context: ../..
+      dockerfile: services/sources/Dockerfile
+      target: web
+    image: ${NORTHLAKE_IMAGE_PREFIX:-}hippo-northlake-sources-web:${NORTHLAKE_IMAGE_TAG:-local}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${NORTHLAKE_HTTP_PORT:-18081}:8080"
+    volumes:
+      - source-data:/state:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health/ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30m
+  deliver:
+    profiles: ["delivery"]
+    image: ${NORTHLAKE_IMAGE_PREFIX:-}hippo-northlake-sources:${NORTHLAKE_IMAGE_TAG:-local}
+    command: ["--help"]
+    volumes:
+      - source-data:/state:ro
+      - type: bind
+        source: ${NORTHLAKE_DELIVERY_ROOT:-./delivery-output}
+        target: /delivery-root
+  handheld:
+    profiles: ["handheld"]
+    build:
+      context: ../..
+      dockerfile: services/handheld/Dockerfile
+      args:
+        SOURCE_IMAGE: ${NORTHLAKE_IMAGE_PREFIX:-}hippo-northlake-sources:${NORTHLAKE_IMAGE_TAG:-local}
+    image: ${NORTHLAKE_IMAGE_PREFIX:-}hippo-northlake-handheld:${NORTHLAKE_IMAGE_TAG:-local}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${NORTHLAKE_HANDHELD_PORT:-18082}:8080"
+    volumes:
+      - handheld-state:/handheld
+      # Cover the base image's unused /state VOLUME without allocating anonymous volumes.
+      - handheld-state:/state:ro
+      - source-data:/source:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://localhost:8080/health/ready', timeout=4).read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+  historian:
+    profiles: ["historian"]
+    build:
+      context: ../..
+      dockerfile: services/historian/Dockerfile
+      args:
+        SOURCE_IMAGE: ${NORTHLAKE_IMAGE_PREFIX:-}hippo-northlake-sources:${NORTHLAKE_IMAGE_TAG:-local}
+    image: ${NORTHLAKE_IMAGE_PREFIX:-}hippo-northlake-historian:${NORTHLAKE_IMAGE_TAG:-local}
+    restart: unless-stopped
+    volumes:
+      # Cover the base image's unused /state VOLUME without allocating anonymous volumes.
+      - source-data:/state:ro
+      - source-data:/source:ro
+      # The Access database Energy Hippo's ODBC gateway reads. Point it at a folder the
+      # Workers service can read, such as C:\ProgramData\EEM Suite\NorthLake\Historian.
+      - type: bind
+        source: ${NORTHLAKE_HISTORIAN_ROOT:-./historian-output}
+        target: /historian
+    healthcheck:
+      test: ["CMD", "python", "-m", "services.historian", "health"]
+      interval: 5m
+      timeout: 30s
+      retries: 2
+      start_period: 15m
+volumes:
+  source-data:
+  handheld-state:

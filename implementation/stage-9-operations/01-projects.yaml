@@ -1,0 +1,146 @@
+# Stage 9, step 1: Project Tracking (Web, #/ProjectTracking/Editor, routed from #/reporting/ProjectTrackingConfiguration).
+# One record per project. VERIFIED against ProjectTrackingEditorModels.cs and the installed ProjectCategory/
+# ProjectType/ActivityCategory/ActivityType/EventCategory lookups -- the real editor is narrower than the phase 6
+# design note assumed (see the correction below).
+stage: 9
+step: 1
+title: Projects
+app: Web
+screen: ProjectTracking Editor
+source:
+- generators/documents/sources/implementation/dream-customer/phase6-operations-engagement-spec.md
+notes:
+- 'Editor fields (ProjectTrackingEditorSaveRequest, verified): Name, Hierarchy node, Currency Unit, Project Type
+  (which carries its Project Category), Start Date, End Date, Primary Activity Type, Secondary Activity Type,
+  Tracking Number, Operating Cost, Capital Cost, Incentives, and an Events list (Event Type, Measure Type, Unit,
+  a monthly value series).'
+- 'CORRECTION to the phase 6 design note: there is no "Design -> Procurement -> Install -> Commissioning -> M&V"
+  activity sequence in the product. Verified: the only project-level activity lookup is ActivityCategory (1
+  "Funding Source", 2 "Cogen Facility Fuel Source") with ActivityType children 7 Local Funding, 8 Project 2100, 9
+  Utility Rebates (under Funding Source; category 2''s six fuel types do not apply to a building retrofit). A
+  project carries exactly two of these, Primary and Secondary Activity Type -- they classify how the project is
+  funded, not its construction phases. M&V is represented as Events over time (below), not as a phase.'
+- 'Events use EventCategory (verified, 4 rows): 1 Implementation Costs, 2 Cost Savings, 3 Use Savings, 4 Renewable
+  Energy. Each Event is a monthly value series (one row per month, a Value and a Start/End Date), so "M&V" in this
+  product means adding a Cost Savings and/or Use Savings event and filling in the post-install months, not a
+  status field.'
+- ProjectType lookups are reference data with no create screen (as the design note already expected); the five
+  types below (8, 2, 20, 3, 22) are existing rows, picked for the closest fit.
+- Incentives is one decimal field. Cedar Row Solar''s "ITC" is entered as its estimated dollar value (30% of
+  capital cost) with a note, since the field cannot hold a percentage or a program name.
+- 'Added 2026-10-01 (Ridgeline Wind): WTG-07 Gearbox Replacement, the fifth project. There is no Generation category:
+  ProjectCategory has 5 rows (1 Conservation, 2 Cost Avoidance, 3 Renewable Energy, 4 Water Conservation, 5 Water Cost
+  Avoidance, verified), so a wind turbine repair is Renewable Energy with Project Type Wind (22). For that category the
+  editor (viewProjectTrackingEditor.ts) offers the Cogen Facility Fuel Source list as the "Renewable activity" (No Cogen
+  for a turbine) and no Secondary Activity Type; the schedule is a start month plus 1 to 12 months, so Start and End Date
+  are whole months and every monthly series lies inside them; and a series is added as a pair (Generation in kWh and in
+  USD), with no Implementation Costs series, the Capital Cost field holding the cost. The outage (2025-02-11 to
+  2025-04-22) therefore sits inside an 11-month window that runs to the end of the scenario, so the months after the
+  repair fit.'
+- 'The four earlier records were written against the models file alone and have not been re-checked against those
+  rules: a Secondary Activity Type of Local Funding is not offered (a Local Funding primary has no secondary at all),
+  Cedar Row Solar Expansion, being Renewable Energy, is offered the fuel list and neither Local Funding nor Utility
+  Rebates, their monthly series run past the project''s end month, and the drawer adds no Implementation Costs series.
+  They are left as written; reconcile them when this step is entered.'
+records:
+- key: library_led_retrofit
+  installed:
+    projectId:
+  Name: Library LED Retrofit
+  Hierarchy: Library
+  Currency Unit: USD
+  Project Category: Conservation
+  Project Type: Lighting Project or Schedule Change
+  Start Date: 2024-03-01
+  End Date: 2024-08-31
+  Primary Activity Type: Utility Rebates
+  Secondary Activity Type: Local Funding
+  Tracking Number: NLU-PRJ-2024-001
+  Capital Cost: 120000
+  Operating Cost: 0
+  Incentives: 25000
+  Events:
+  - {Event Type: Implementation Costs, Measure Type: Money, Unit: USD, Monthly Values: "120000 spread across Mar-Jun 2024"}
+  - {Event Type: Use Savings, Measure Type: Electricity, Unit: kWh, Monthly Values: "post-install Jul 2024 - Dec 2025, baseline lighting kWh minus post-retrofit LED kWh"}
+  - {Event Type: Cost Savings, Measure Type: Money, Unit: USD, Monthly Values: "post-install Jul 2024 - Dec 2025, Use Savings x the Library''s VED rate"}
+- key: central_plant_chiller_upgrade
+  installed:
+    projectId:
+  Name: Central Plant Chiller Upgrade
+  Hierarchy: Central Plant
+  Currency Unit: USD
+  Project Category: Conservation
+  Project Type: Central Plant Project
+  Start Date: 2024-01-15
+  End Date: 2024-12-15
+  Primary Activity Type: Utility Rebates
+  Secondary Activity Type: Local Funding
+  Tracking Number: NTP-PRJ-2024-001
+  Capital Cost: 640000
+  Operating Cost: 0
+  Incentives: 80000
+  Events:
+  - {Event Type: Implementation Costs, Measure Type: Money, Unit: USD, Monthly Values: "640000 spread across Jan-Nov 2024"}
+  - {Event Type: Use Savings, Measure Type: Chilled Water, Unit: ton_hours, Monthly Values: "plant electric kWh per chilled-water ton-hour produced, before (2024) vs after (2025)"}
+  - {Event Type: Cost Savings, Measure Type: Money, Unit: USD, Monthly Values: "post-install 2025, plant electric savings x VED rate"}
+- key: cedar_row_solar_expansion
+  installed:
+    projectId:
+  Name: Cedar Row Solar Expansion
+  Hierarchy: Cedar Row Apartments
+  Currency Unit: USD
+  Project Category: Renewable Energy
+  Project Type: Solar PV
+  Start Date: 2024-05-01
+  End Date: 2024-10-31
+  Primary Activity Type: Local Funding
+  Secondary Activity Type: Utility Rebates
+  Tracking Number: CRA-PRJ-2024-001
+  Capital Cost: 410000
+  Operating Cost: 0
+  Incentives: 123000   # assumed: federal ITC at 30% of capital cost; the field holds a dollar value, not a program name
+  Events:
+  - {Event Type: Implementation Costs, Measure Type: Money, Unit: USD, Monthly Values: "410000 spread across May-Sep 2024"}
+  - {Event Type: Renewable Energy, Measure Type: Electricity, Unit: kWh, Monthly Values: "post-install Nov 2024 - Dec 2025, Helios generation at Cedar Row"}
+- key: admin_hall_recommissioning
+  installed:
+    projectId:
+  Name: Admin Hall Recommissioning
+  Hierarchy: Admin Hall
+  Currency Unit: USD
+  Project Category: Conservation
+  Project Type: Continuous Commissioning Project
+  Start Date: 2024-02-01
+  End Date: 2024-05-31
+  Primary Activity Type: Utility Rebates
+  Secondary Activity Type: Local Funding
+  Tracking Number: NLU-PRJ-2024-002
+  Capital Cost: 55000
+  Operating Cost: 0
+  Incentives: 10000
+  Events:
+  - {Event Type: Implementation Costs, Measure Type: Money, Unit: USD, Monthly Values: "55000 spread across Feb-Apr 2024"}
+  - {Event Type: Use Savings, Measure Type: Natural Gas, Unit: therms, Monthly Values: "post-install Jun 2024 - Dec 2025, gas baseline vs recommissioned"}
+  - {Event Type: Use Savings, Measure Type: Electricity, Unit: kWh, Monthly Values: "post-install Jun 2024 - Dec 2025, electric baseline vs recommissioned"}
+  - {Event Type: Cost Savings, Measure Type: Money, Unit: USD, Monthly Values: "post-install 2024-2025, both savings streams x their rates"}
+# ---- Ridgeline Wind ----
+- key: wtg07_gearbox_replacement
+  installed:
+    projectId:
+  Name: WTG-07 Gearbox Replacement
+  Hierarchy: Ridgeline Turbine Field
+  Currency Unit: USD
+  Project Category: Renewable Energy   # there is no Generation category (verified, 5 rows)
+  Project Type: Wind
+  Start Date: 2025-02-01   # whole months; the outage ran 2025-02-11 to 2025-04-22
+  End Date: 2025-12-31     # 11 months, to the end of the scenario, so the months after the repair fit
+  Primary Activity Type: No Cogen   # shown as "Renewable activity" for this category; assumed: nothing is burned
+  Secondary Activity Type:          # not offered for a Renewable Energy project
+  Tracking Number: NTP-PRJ-2025-001   # assumed: the plant's next number after NTP-PRJ-2024-001
+  Capital Cost: 310000   # assumed: a capital repair, funded locally
+  Operating Cost: 0
+  Incentives: 0   # assumed: no insurance or warranty recovery
+  Events:
+  - {Event Type: Generation, Measure Type: Electricity, Unit: kWh, Monthly Values: "Feb-Dec 2025, WTG-07 Generated kWh 10m summed per month: February and April partial (the days outside the outage), March zero, May on the repaired turbine"}
+  - {Event Type: Generation, Measure Type: Electricity, Unit: USD, Monthly Values: "Feb-Dec 2025, the kWh series x $0.058/kWh, the RWL-XFER-2024 transfer price"}   # assumed: the editor's currency row is valued at the plant's transfer price
+  Note: "M&V is WTG-07 generated kWh against the power it could have made: the Generation series above holds the first, and possible power is not a project event, so the comparison is the saved trend saved_ridgeline_wtg07_generated_vs_possible (step 5)."

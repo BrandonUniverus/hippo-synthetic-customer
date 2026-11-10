@@ -1,0 +1,550 @@
+# Stage 1, step 5: create users with explicit IsAdmin, then assign their home-company groups.
+# A shared Group ID has a separate copy and separate membership in each company.
+# Casey remains inactive for the disabled-user regression case.
+stage: 1
+step: 5
+title: Users
+app: Database Administrator
+screen: Users & Groups > Users
+source:
+- data/security/northlake-eem-security-v1.yaml
+- documents/intake-package/user-access-request.pdf
+notes:
+- 'Create and save the user, set the Administrator checkbox to IsAdmin, then assign Groups in that same home company.
+  A shared Group ID occurs in several companies: select the copy in the user''s company.'
+- All listed Groups are current assignments. Shared Points groups preserve their target company in every copy. Nora uses
+  the Northlake copies of eem_nlu_points_read and eem_cra_points_read to read Northlake and Cedar Row respectively.
+- The nine shared Points masters provide Read/Modify/Insert-Delete for each target company. Choose the copy in the user's
+  home company; sharing does not copy memberships. Dana's Science Center-only Points group remains local.
+- Samantha, Jordan and Priya already exist in the 2026-09-23 snapshot. Finish 04-groups-reconciliation.md before entering
+  the remaining users, and reconcile these three existing records rather than creating duplicates. Future task/rate keys
+  stay deferred at the end of 04-groups.yaml.
+- IsAdmin is explicitly true or false for every user. True means system administrator for a Common user and company
+  administrator for a customer-company user. Ordinary groups, including eem_company_setup, do not grant that protected role.
+  IsAdmin specifies the User Editor setting; it is not an instruction to add a database column.
+- User Name is the sign-in name and the key EEM stores; Display Name is what screens show.
+- Authentication Policy LocalAndFederated is the product default for a human user; WorkloadOnly is for service principals
+  only.
+- The three energyhippo.example.com people belong to Common (System); they are the implementation and support accounts.
+- Do not delete the built-in Admin, SiE_Setup, reportemail, dbo or Worker principals.
+records:
+- key: samantha.ireland
+  installed:
+    userId: samantha.ireland
+    recordedOn: '2026-09-23'
+  User Name: samantha.ireland
+  Display Name: Samantha Ireland
+  Email: samantha.ireland@northlake.example.edu
+  Company: Northlake University
+  IsAdmin: true
+  Principal Type: Human
+  Authentication Policy: LocalAndFederated
+  Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+  Inactive: false
+  Groups:
+    Northlake University:
+    - eem_company_setup
+    - eem_reports
+    - eem_sustainability_reports
+    - eem_nlu_points_admin
+- key: jordan.hale
+  installed:
+    userId: jordan.hale
+    recordedOn: '2026-09-23'
+  User Name: jordan.hale
+  Display Name: Jordan Hale
+  Email: jordan.hale@northlake.example.edu
+  Company: Northlake University
+  IsAdmin: true
+  Principal Type: Human
+  Authentication Policy: LocalAndFederated
+  Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+  Inactive: false
+  Groups:
+    Northlake University:
+    - eem_company_setup
+    - nlu_facilities_setup
+    - nlu_utility_setup
+    - eem_gateway_reports
+    - eem_nlu_points_admin
+- key: priya.nandakumar
+  installed:
+    userId: priya.nandakumar
+    recordedOn: '2026-09-23'
+  User Name: priya.nandakumar
+  Display Name: Priya Nandakumar
+  Email: priya.nandakumar@northlake.example.edu
+  Company: Northlake University
+  IsAdmin: false
+  Principal Type: Human
+  Authentication Policy: LocalAndFederated
+  Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+  Inactive: false
+  Groups:
+    Northlake University:
+    - nlu_utility_setup
+    - eem_rate_allocations
+    - eem_bill_import
+    - eem_nlu_points_admin
+    - eem_ntp_points_modify
+- key: nora.chen
+  installed:
+    userId: null
+  User Name: nora.chen
+  Display Name: Nora Chen
+  Email: nora.chen@northlake.example.edu
+  Company: Northlake University
+  IsAdmin: false
+  Principal Type: Human
+  Authentication Policy: LocalAndFederated
+  Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+  Inactive: false
+  Groups:
+    Northlake University:
+    - eem_bill_import
+    - eem_nlu_points_read
+    - eem_cra_points_read
+- key: iris.morales
+  installed:
+    userId: null
+  User Name: iris.morales
+  Display Name: Iris Morales
+  Email: iris.morales@northlake.example.edu
+  Company: Northlake University
+  IsAdmin: false
+  Principal Type: Human
+  Authentication Policy: LocalAndFederated
+  Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+  Inactive: false
+  Groups:
+    Northlake University:
+    - eem_bill_entry
+    - eem_nlu_points_read
+- key: leo.martinez
+  installed:
+    userId: null
+  User Name: leo.martinez
+  Display Name: Leo Martinez
+  Email: leo.martinez@northlake.example.edu
+  Company: Northlake University
+  IsAdmin: false
+  Principal Type: Human
+  Authentication Policy: LocalAndFederated
+  Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+  Inactive: false
+  Groups:
+    Northlake University:
+    - eem_reports
+    - eem_sustainability_reports
+    - eem_nlu_points_read
+    - eem_ntp_points_read
+- key: emerson.fox
+  installed:
+    userId: null
+  User Name: emerson.fox
+  Display Name: Emerson Fox
+  Email: emerson.fox@northlake.example.edu
+  Company: Northlake University
+  IsAdmin: false
+  Principal Type: Human
+  Authentication Policy: LocalAndFederated
+  Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+  Inactive: false
+  Groups:
+    Northlake University:
+    - nlu_database_admins
+    - nlu_facilities_setup
+    - eem_nlu_points_admin
+- key: maya.chen
+  installed:
+    userId: null
+  User Name: maya.chen
+  Display Name: Maya Chen
+  Email: maya.chen@northlake.example.edu
+  Company: Cedar Row Apartments
+  IsAdmin: true
+  Principal Type: Human
+  Authentication Policy: LocalAndFederated
+  Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+  Inactive: false
+  Groups:
+    Cedar Row Apartments:
+    - eem_company_setup
+    - cra_housing_ops
+    - eem_reports
+    - eem_sustainability_reports
+    - eem_cra_points_admin
+- key: marcus.reed
+  installed:
+    userId: null
+  User Name: marcus.reed
+  Display Name: Marcus Reed
+  Email: marcus.reed@northlake.example.edu
+  Company: Cedar Row Apartments
+  IsAdmin: false
+  Principal Type: Human
+  Authentication Policy: LocalAndFederated
+  Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+  Inactive: false
+  Groups:
+    Cedar Row Apartments:
+    - eem_bill_entry
+    - eem_cra_points_read
+- key: valerie.kim
+  installed:
+    userId: null
+  User Name: valerie.kim
+  Display Name: Valerie Kim
+  Email: valerie.kim@northlake.example.edu
+  Company: Cedar Row Apartments
+  IsAdmin: false
+  Principal Type: Human
+  Authentication Policy: LocalAndFederated
+  Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+  Inactive: false
+  Groups:
+    Cedar Row Apartments:
+    - cra_housing_ops
+    - eem_reports
+    - eem_sustainability_reports
+    - eem_cra_points_modify
+- key: devon.brooks
+  installed:
+    userId: null
+  User Name: devon.brooks
+  Display Name: Devon Brooks
+  Email: devon.brooks@northlake.example.edu
+  Company: Northlake Thermal Plant
+  IsAdmin: true
+  Principal Type: Human
+  Authentication Policy: LocalAndFederated
+  Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+  Inactive: false
+  Groups:
+    Northlake Thermal Plant:
+    - eem_company_setup
+    - ntp_plant_ops
+    - eem_reports
+    - eem_ntp_points_admin
+- key: riley.santos
+  installed:
+    userId: null
+  User Name: riley.santos
+  Display Name: Riley Santos
+  Email: riley.santos@northlake.example.edu
+  Company: Northlake Thermal Plant
+  IsAdmin: false
+  Principal Type: Human
+  Authentication Policy: LocalAndFederated
+  Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+  Inactive: false
+  Groups:
+    Northlake Thermal Plant:
+    - ntp_plant_ops
+    - eem_reports
+    - eem_ntp_points_modify
+- key: keiko.tan
+  installed:
+    userId: null
+  User Name: keiko.tan
+  Display Name: Keiko Tan
+  Email: keiko.tan@northlake.example.edu
+  Company: Northlake Thermal Plant
+  IsAdmin: false
+  Principal Type: Human
+  Authentication Policy: LocalAndFederated
+  Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+  Inactive: false
+  Groups:
+    Northlake Thermal Plant:
+    - eem_rate_allocations
+    - eem_ntp_points_modify
+    - eem_nlu_points_read
+- key: quinn.roberts
+  installed:
+    userId: null
+  User Name: quinn.roberts
+  Display Name: Quinn Roberts
+  Email: quinn.roberts@northlake.example.edu
+  Company: Northlake University
+  IsAdmin: false
+  Principal Type: Human
+  Authentication Policy: LocalAndFederated
+  Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+  Inactive: false
+  Groups:
+    Northlake University:
+    - eem_reports
+    - eem_sustainability_reports
+    - eem_audit_readonly
+    - eem_nlu_points_read
+    - eem_cra_points_read
+    - eem_ntp_points_read
+- key: dana.okafor
+  installed:
+    userId: null
+  User Name: dana.okafor
+  Display Name: Dana Okafor
+  Email: dana.okafor@northlake.example.edu
+  Company: Northlake University
+  IsAdmin: false
+  Principal Type: Human
+  Authentication Policy: LocalAndFederated
+  Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+  Inactive: false
+  Groups:
+    Northlake University:
+    - eem_reports
+    - nlu_science_center_scope
+- key: avery.singh
+  installed:
+    userId: null
+  User Name: avery.singh
+  Display Name: Avery Singh
+  Email: avery.singh@energyhippo.example.com
+  Company: Common (System, CompanyID -1)
+  IsAdmin: true
+  Principal Type: Human
+  Authentication Policy: LocalAndFederated
+  Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+  Inactive: false
+  Groups:
+    Common (System, CompanyID -1):
+    - eem_system_db_admins
+    - eem_implementation_admins
+  Notes: Common groups provide the required setup permissions, reports and all-company Points, including Northlake.
+- key: morgan.patel
+  installed:
+    userId: null
+  User Name: morgan.patel
+  Display Name: Morgan Patel
+  Email: morgan.patel@energyhippo.example.com
+  Company: Common (System, CompanyID -1)
+  IsAdmin: false
+  Principal Type: Human
+  Authentication Policy: LocalAndFederated
+  Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+  Inactive: false
+  Groups:
+    Common (System, CompanyID -1):
+    - eem_implementation_admins
+    - eem_gateway_reports
+- key: taylor.bennett
+  installed:
+    userId: null
+  User Name: taylor.bennett
+  Display Name: Taylor Bennett
+  Email: taylor.bennett@energyhippo.example.com
+  Company: Common (System, CompanyID -1)
+  IsAdmin: false
+  Principal Type: Human
+  Authentication Policy: LocalAndFederated
+  Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+  Inactive: false
+  Groups:
+    Common (System, CompanyID -1):
+    - eem_support_readonly
+- key: casey.holt
+  installed:
+    userId: null
+  User Name: casey.holt
+  Display Name: Casey Holt
+  Email: casey.holt@northlake.example.edu
+  Company: Northlake University
+  IsAdmin: false
+  Principal Type: Human
+  Authentication Policy: LocalAndFederated
+  Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+  Inactive: true
+  Groups:
+    Northlake University:
+    - eem_bill_entry
+    - eem_nlu_points_read
+  Notes: Disabled-user permission regression case.
+# Added 2026-10-01 for Ridgeline Wind. Their groups exist from step 4; the groups' Points arrive in Stage 2
+# (04-groups.yaml laterPermissions), so until then they can sign in but see no nodes.
+- key: mateo.alvarez
+  installed:
+    userId: null
+  User Name: mateo.alvarez
+  Display Name: Mateo Alvarez
+  Email: mateo.alvarez@northlake.example.edu
+  Company: Northlake Thermal Plant
+  IsAdmin: false
+  Principal Type: Human
+  Authentication Policy: LocalAndFederated
+  Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+  Inactive: false
+  Groups:
+    Northlake Thermal Plant:
+    - eem_reports
+    - ntp_wind_ops
+  Notes: Ridgeline Wind Site Manager; also the provider contact and the account representative on the Ridgeline accounts.
+- key: renee.castillo
+  installed:
+    userId: null
+  User Name: renee.castillo
+  Display Name: Renee Castillo
+  Email: renee.castillo@northlake.example.edu
+  Company: Northlake Thermal Plant
+  IsAdmin: false
+  Principal Type: Human
+  Authentication Policy: LocalAndFederated
+  Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+  Inactive: false
+  Groups:
+    Northlake Thermal Plant:
+    - ntp_wind_ops
+- key: elena.vasquez
+  installed:
+    userId: null
+  User Name: elena.vasquez
+  Display Name: Elena Vasquez
+  Email: elena.vasquez@northlake.example.edu
+  Company: Northlake University
+  IsAdmin: false
+  Principal Type: Human
+  Authentication Policy: LocalAndFederated
+  Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+  Inactive: false
+  Groups:
+    Northlake University:
+    - eem_ridgeline_research
+  Notes: A university user whose only data scope is a site of another company.
+- key: kai.nakamura
+  installed:
+    userId: null
+  User Name: kai.nakamura
+  Display Name: Kai Nakamura
+  Email: kai.nakamura@northlake.example.edu
+  Company: Northlake University
+  IsAdmin: false
+  Principal Type: Human
+  Authentication Policy: LocalAndFederated
+  Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+  Inactive: false
+  Groups:
+    Northlake University:
+    - eem_ridgeline_research
+companyIds:
+  Common (System, CompanyID -1): -1
+  Northlake University: 6
+  Cedar Row Apartments: 3
+  Northlake Thermal Plant: 5
+
+# Group membership entry: select the company, open Groups and assign the listed user names.
+# These lists mirror records[].Groups above; keep both views in sync when assignments change.
+# Unlisted groups have no expected members from this 23-user roster.
+# Include casey.holt in the listed groups and keep that user Inactive=true.
+# Administrator roles still use each user's IsAdmin field above.
+# The rates group uses its installed ID eem_rate_allocations (singular rate).
+groupMemberships:
+  Common (System, CompanyID -1):
+    eem_gateway_reports:
+    - morgan.patel
+    eem_implementation_admins:
+    - avery.singh
+    - morgan.patel
+    eem_support_readonly:
+    - taylor.bennett
+    eem_system_db_admins:
+    - avery.singh
+  Northlake University:
+    eem_audit_readonly:
+    - quinn.roberts
+    eem_bill_entry:
+    - casey.holt
+    - iris.morales
+    eem_bill_import:
+    - nora.chen
+    - priya.nandakumar
+    eem_company_setup:
+    - jordan.hale
+    - samantha.ireland
+    eem_cra_points_read:
+    - nora.chen
+    - quinn.roberts
+    eem_gateway_reports:
+    - jordan.hale
+    eem_nlu_points_admin:
+    - emerson.fox
+    - jordan.hale
+    - priya.nandakumar
+    - samantha.ireland
+    eem_nlu_points_read:
+    - casey.holt
+    - iris.morales
+    - leo.martinez
+    - nora.chen
+    - quinn.roberts
+    eem_ntp_points_modify:
+    - priya.nandakumar
+    eem_ntp_points_read:
+    - leo.martinez
+    - quinn.roberts
+    eem_rate_allocations:
+    - priya.nandakumar
+    eem_reports:
+    - dana.okafor
+    - leo.martinez
+    - quinn.roberts
+    - samantha.ireland
+    eem_ridgeline_research:
+    - elena.vasquez
+    - kai.nakamura
+    eem_sustainability_reports:
+    - leo.martinez
+    - quinn.roberts
+    - samantha.ireland
+    nlu_database_admins:
+    - emerson.fox
+    nlu_facilities_setup:
+    - emerson.fox
+    - jordan.hale
+    nlu_science_center_scope:
+    - dana.okafor
+    nlu_utility_setup:
+    - jordan.hale
+    - priya.nandakumar
+  Cedar Row Apartments:
+    cra_housing_ops:
+    - maya.chen
+    - valerie.kim
+    eem_bill_entry:
+    - marcus.reed
+    eem_company_setup:
+    - maya.chen
+    eem_cra_points_admin:
+    - maya.chen
+    eem_cra_points_modify:
+    - valerie.kim
+    eem_cra_points_read:
+    - marcus.reed
+    eem_reports:
+    - maya.chen
+    - valerie.kim
+    eem_sustainability_reports:
+    - maya.chen
+    - valerie.kim
+  Northlake Thermal Plant:
+    eem_company_setup:
+    - devon.brooks
+    eem_nlu_points_read:
+    - keiko.tan
+    eem_ntp_points_admin:
+    - devon.brooks
+    eem_ntp_points_modify:
+    - keiko.tan
+    - riley.santos
+    eem_rate_allocations:
+    - keiko.tan
+    eem_reports:
+    - devon.brooks
+    - mateo.alvarez
+    - riley.santos
+    ntp_plant_ops:
+    - devon.brooks
+    - riley.santos
+    ntp_wind_ops:
+    - mateo.alvarez
+    - renee.castillo

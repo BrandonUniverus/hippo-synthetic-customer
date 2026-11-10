@@ -1,0 +1,2985 @@
+# Stage 2, step 4: Points (Database Administrator > Nodes > Point nodes; PointDefinitionViewModel).
+# One record per point a person enters, key = the source model's channel id (or the baseline
+# target's own id for the 3 baseline point shells; see 07). What EEM creates on its own
+# (AccumulatorDelta behind every Accumulator, HDD/CDD behind a Degree Days index) is not listed
+# as a record; capture its id on the parent's own installed: block instead. Meter names the
+# point's meter as the tree shows it (Description) with its Meter Number from 03-meters.yaml.
+stage: 2
+step: 4
+title: Points
+app: Database Administrator
+screen: Nodes > Point nodes
+source:
+- data/scenarios/demo-university-v1.yaml (channels)
+- data/eem/northlake-eem-metaworld-stage1b-v1.yaml (pointRules, weatherIndexTargets, baselineTargets)
+notes:
+- '474 points to enter here, including the 3 baseline shells and 18 independent hourly NOAA forecast points.
+  EEM adds 197 AccumulatorDelta points and 6 HDD/CDD points behind the three observed station temperatures,
+  for 677 ordinary/generated points. Forecast points have no Degree Days index. The handheld routes (added
+  2026-11-07) bring 73 of them: Cedar Row C''s 50 water registers, the 4 irrigation registers, the generators'' 9
+  (each a fuel register, and an Analog run-hours register with its own Analog usage point) and the switchgear''s 10
+  (6 registers and 4 demand points), so 63 more Deltas.'
+- 'A new Accumulator must be in an Energy or Volume unit or one with a rate unit (Point_Save; the point editor lists
+  only those for a new register). A register in any other unit, like the generators'' run hours in Hour, is an
+  Analog register with a separate Analog usage point instead.'
+- 'Apply the weather measurement catalog upgrade before configuring these points. Keep existing channel identities,
+  point IDs, units and readings. Add the missing KSAC/KSMF dew point and KSMF/KSUU humidity observations. Change the three station wind points from Weather to Wind Speed, and KSUU Dew Point
+  from Temperature to Dew Point, so each observation can be associated with its matching forecast measurement.'
+- 'Meter multipliers (added 2026-10-04): the last two records put a daily register on the two meters whose multiplier
+  would otherwise touch no data, Science Center Electric Lab Wing (x40, its current-transformer ratio) and Central Plant
+  Boiler Gas (x3.0367, the pressure factor of its 30 psig delivery). Each register reads the raw dial: secondary kWh for
+  the lab wing, line-pressure volume for the boiler gas, which the multiplier turns into billed units. The boiler gas
+  register takes Hundreds of Cubic Feet - (ccf), the Volume unit, not Gas Hundreds of Cubic Feet - (ccf), the Energy
+  unit with the same label: a pressure factor corrects volume.'
+- 'Ridgeline points archive at 10 minutes (the turbine SCADA grain) except the Valley Electric interconnection (15) and
+  KSUU (60). Turbine State is the four-state Digital point (0 Stopped, 1 Running, 2 Fault, 3 Curtailed; the plant''s
+  digital alarm colors black, green, red, orange). Rotor Speed is Activity Level, the only measure type RPM is
+  seeded under. Possible kW is the turbine controller''s own expected output at the measured wind, the expected side
+  of the expected-against-actual goal. Air Density takes Kilogram per cubic meter, not the Gas cubic meter unit with
+  the same label.'
+- 'Values are written the way the editor shows them. Measure Type is the MeasureType name (Electricity, Potable Water,
+  Relative Humidity, Activity Level, ...). Units is the list entry "Name - (abbreviation)", for example
+  "KilowattHours - (kWh)"; the abbreviation alone is ambiguous (Natural Gas has two units abbreviated ccf). A new point
+  starts as Analog, Activity Level, Percent, 60 minutes: change every field before the first save.'
+- 'Register points (Reading Type Accumulator): Units on a NEW accumulator is the usage unit the generated Delta point
+  will carry (Thousands of Gallons for water, Therm for the kitchen gas route). EEM then stores the register itself as
+  Reading. PRODUCT FINDING 39: saving with Reading instead sends Point_Save down a legacy branch that picks the Delta''s
+  unit arbitrarily.'
+- 'Point_Save creates only the AccumulatorDelta behind a register point, not an AccumulatorROC as well; the stage1b
+  model''s ''generatedPointTypes'' list (AccumulatorDelta, AccumulatorROC) overstates what the save proc does. Do not
+  expect or wait for a rate-of-change point.'
+- 'Index: Degree Days is offered only on a Temperature point and creates daily HDD and CDD children
+  (IndexPoints_Save) named <point> HDD and <point> CDD. KSAC Outside Air Temperature is in degrees Fahrenheit and gets
+  HDD(F)/CDD(F) children; KSMF Outside Air Temperature is in degrees Centigrade (the Aeris feed''s metric field) and
+  gets HDD(C)/CDD(C). Activity Level is offered only on an Activity Level point and creates nothing; the Student Center
+  Event Count carries it.'
+- 'Archive Interval offers only 1, 5, 10, 15, 30, 60 or 1440 minutes; there is no blank. Monthly route and manual
+  register reads use 1440. The file uses every allowed value: 1 (chiller kW), 5 (chiller status), 10 (lab sensors),
+  15, 30 (Library historian), 60 and 1440.'
+- 'Accumulator and Degree Days points lock Reading Type, Measure Type, Units, Index and Archive Interval after the
+  first save, because EEM has created their children. A wrong one is deleted and entered again.'
+- 'Five points use units Northlake adds or extends in Step 0 (00-units.yaml), so the unit system is exercised: KSAC
+  Wind Speed (Miles per Hour, new), KSMF Wind Speed (Kilometers per Hour, newly associated with Weather),
+  Plane-of-Array Irradiance (Watts per Square Meter, a new User-defined unit), Steam Header Pressure (PSIG, newly
+  associated with Pressure) and Student Center Event Count (Events, a new Activity Level unit). Since 2026-11-07 a
+  sixth does too: the switchgear''s Power Factor at Max Demand (Power Factor, a new User-defined unit). Enter Step 0
+  first, or those Units lists come up without them.'
+- Time Zone (a Definitions-page field common to every node type, not specific to points) is Pacific for every point,
+  inherited from its building; none needs to change it.
+- The Baseline group (Baseline Algorithm, Display baseline, Baseline For) on the Point editor is left at its default
+  ([None]) for every point here. The 3 baseline point shells are configured in Stage 3, once their measured points
+  have a gateway (see stage-3-gateways-and-data/06-baselines.yaml).
+- A meter whose channels are all bill facts (for example a flat monthly kWh/kW utility meter with no interval data)
+  has no points at all; only meters with at least one non-bill channel appear above.
+- 'The Student Center Event Count sits directly under the Student Center building (Parent, not Meter): EEM places a
+  point under any broader node, and the event feed has no device.'
+records:
+- key: ch_ved_science_center_kwh_15m
+  installed:
+    pointId:
+  Meter: {Description: Science Center Electric Main, Meter Number: SYN-VED-M-0040002}
+  Point Definition: {Description: Delivered kWh 15m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 15,
+    Index: ''}
+- key: ch_ved_science_center_kw_15m
+  installed:
+    pointId:
+  Meter: {Description: Science Center Electric Main, Meter Number: SYN-VED-M-0040002}
+  Point Definition: {Description: Demand kW 15m, Reading Type: Analog, Measure Type: Electricity, Unit: Kilowatt - (kW), Archive Interval: 15,
+    Index: ''}
+- key: ch_ved_student_center_kwh_15m
+  installed:
+    pointId:
+  Meter: {Description: Student Center Electric Main, Meter Number: SYN-VED-M-0040004}
+  Point Definition: {Description: Delivered kWh 15m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 15,
+    Index: ''}
+- key: ch_ved_student_center_kw_15m
+  installed:
+    pointId:
+  Meter: {Description: Student Center Electric Main, Meter Number: SYN-VED-M-0040004}
+  Point Definition: {Description: Demand kW 15m, Reading Type: Analog, Measure Type: Electricity, Unit: Kilowatt - (kW), Archive Interval: 15,
+    Index: ''}
+- key: ch_ved_lakeview_hall_kwh_15m
+  installed:
+    pointId:
+  Meter: {Description: Lakeview Hall Electric Main, Meter Number: SYN-VED-M-0040008}
+  Point Definition: {Description: Delivered kWh 15m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 15,
+    Index: ''}
+- key: ch_ved_lakeview_hall_kw_15m
+  installed:
+    pointId:
+  Meter: {Description: Lakeview Hall Electric Main, Meter Number: SYN-VED-M-0040008}
+  Point Definition: {Description: Demand kW 15m, Reading Type: Analog, Measure Type: Electricity, Unit: Kilowatt - (kW), Archive Interval: 15,
+    Index: ''}
+- key: ch_ved_recreation_center_kwh_15m
+  installed:
+    pointId:
+  Meter: {Description: Recreation Center Electric Main, Meter Number: SYN-VED-M-0040009}
+  Point Definition: {Description: Delivered kWh 15m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 15,
+    Index: ''}
+- key: ch_ved_recreation_center_kw_15m
+  installed:
+    pointId:
+  Meter: {Description: Recreation Center Electric Main, Meter Number: SYN-VED-M-0040009}
+  Point Definition: {Description: Demand kW 15m, Reading Type: Analog, Measure Type: Electricity, Unit: Kilowatt - (kW), Archive Interval: 15,
+    Index: ''}
+- key: ch_ved_central_plant_kwh_15m
+  installed:
+    pointId:
+  Meter: {Description: Central Plant Electric Service, Meter Number: SYN-VED-M-0040014}
+  Point Definition: {Description: Delivered kWh 15m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 15,
+    Index: ''}
+- key: ch_ved_central_plant_kw_15m
+  installed:
+    pointId:
+  Meter: {Description: Central Plant Electric Service, Meter Number: SYN-VED-M-0040014}
+  Point Definition: {Description: Demand kW 15m, Reading Type: Analog, Measure Type: Electricity, Unit: Kilowatt - (kW), Archive Interval: 15,
+    Index: ''}
+- key: ch_ved_ridgeline_received_kwh_15m
+  installed:
+    pointId:
+  Meter: {Description: Ridgeline Interconnection Meter, Meter Number: SYN-VED-M-0040015}
+  Point Definition: {Description: Exported kWh 15m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 15,
+    Index: ''}
+- key: ch_ved_ridgeline_delivered_kwh_15m
+  installed:
+    pointId:
+  Meter: {Description: Ridgeline Interconnection Meter, Meter Number: SYN-VED-M-0040015}
+  Point Definition: {Description: Station Service kWh 15m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh),
+    Archive Interval: 15, Index: ''}
+- key: ch_ved_ridgeline_kvarh_15m
+  installed:
+    pointId:
+  Meter: {Description: Ridgeline Interconnection Meter, Meter Number: SYN-VED-M-0040015}
+  Point Definition: {Description: Reactive kVArh 15m, Reading Type: Analog, Measure Type: Electricity, Unit: KiloVoltAmpereReactiveHours - (kVArh),
+    Archive Interval: 15, Index: ''}
+- key: ch_sgu_student_center_gas_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Student Center Kitchen Gas, Meter Number: SYN-SGU-M-0050004}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Natural Gas, Unit: Therm - (Therm),
+    Archive Interval: 1440, Index: ''}
+- key: ch_fig_cedar_row_a_water_kgal_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Water Master, Meter Number: SYN-RCU-M-0060003}
+  Point Definition: {Description: Delivered kgal 60m, Reading Type: Analog, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal), Archive Interval: 60,
+    Index: ''}
+- key: ch_rcu_cedar_row_b_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Water Master, Meter Number: SYN-RCU-M-0060004}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_ntp_science_center_chw_ton_hours_hourly
+  installed:
+    pointId:
+  Meter: {Description: Science Center Chilled Water, Meter Number: SYN-NTP-M-0070001}
+  Point Definition: {Description: Delivered Ton-Hours 60m, Reading Type: Analog, Measure Type: Chilled Water, Unit: Ton-Hour - (TonHr),
+    Archive Interval: 60, Index: ''}
+- key: ch_ntp_science_center_chw_tons_hourly
+  installed:
+    pointId:
+  Meter: {Description: Science Center Chilled Water, Meter Number: SYN-NTP-M-0070001}
+  Point Definition: {Description: Demand Tons 60m, Reading Type: Analog, Measure Type: Chilled Water, Unit: Cooling Ton - (Ton),
+    Archive Interval: 60, Index: ''}
+- key: ch_ntp_recreation_center_chw_ton_hours_hourly
+  installed:
+    pointId:
+  Meter: {Description: Recreation Center Chilled Water, Meter Number: SYN-NTP-M-0070006}
+  Point Definition: {Description: Delivered Ton-Hours 60m, Reading Type: Analog, Measure Type: Chilled Water, Unit: Ton-Hour - (TonHr),
+    Archive Interval: 60, Index: ''}
+- key: ch_ntp_recreation_center_chw_tons_hourly
+  installed:
+    pointId:
+  Meter: {Description: Recreation Center Chilled Water, Meter Number: SYN-NTP-M-0070006}
+  Point Definition: {Description: Demand Tons 60m, Reading Type: Analog, Measure Type: Chilled Water, Unit: Cooling Ton - (Ton),
+    Archive Interval: 60, Index: ''}
+- key: ch_hos_science_center_gen_kwh_15m
+  installed:
+    pointId:
+  Meter: {Description: Science Center PV Array, Meter Number: SYN-HOS-M-0080001}
+  Point Definition: {Description: Generated kWh 15m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh),
+    Archive Interval: 15, Index: ''}
+- key: ch_hos_science_center_export_kwh_15m
+  installed:
+    pointId:
+  Meter: {Description: Science Center PV Array, Meter Number: SYN-HOS-M-0080001}
+  Point Definition: {Description: Exported kWh 15m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh),
+    Archive Interval: 15, Index: ''}
+- key: ch_hos_science_center_gen_kw_15m
+  installed:
+    pointId:
+  Meter: {Description: Science Center PV Array, Meter Number: SYN-HOS-M-0080001}
+  Point Definition: {Description: Generated kW 15m, Reading Type: Analog, Measure Type: Electricity, Unit: Kilowatt - (kW),
+    Archive Interval: 15, Index: ''}
+- key: ch_hos_science_center_poa_irradiance_15m
+  installed:
+    pointId:
+  Meter: {Description: Science Center PV Array, Meter Number: SYN-HOS-M-0080001}
+  Point Definition: {Description: Plane-of-Array Irradiance 15m, Reading Type: Analog, Measure Type: Weather, Unit: Watts per
+      Square Meter - (W/m2), Archive Interval: 15, Index: ''}
+- key: ch_hos_student_center_gen_kwh_15m
+  installed:
+    pointId:
+  Meter: {Description: Student Center PV Array, Meter Number: SYN-HOS-M-0080002}
+  Point Definition: {Description: Generated kWh 15m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh),
+    Archive Interval: 15, Index: ''}
+- key: ch_hos_student_center_export_kwh_15m
+  installed:
+    pointId:
+  Meter: {Description: Student Center PV Array, Meter Number: SYN-HOS-M-0080002}
+  Point Definition: {Description: Exported kWh 15m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh),
+    Archive Interval: 15, Index: ''}
+- key: ch_hos_student_center_gen_kw_15m
+  installed:
+    pointId:
+  Meter: {Description: Student Center PV Array, Meter Number: SYN-HOS-M-0080002}
+  Point Definition: {Description: Generated kW 15m, Reading Type: Analog, Measure Type: Electricity, Unit: Kilowatt - (kW),
+    Archive Interval: 15, Index: ''}
+- key: ch_hos_cedar_row_carport_gen_kwh_15m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row Solar Carport, Meter Number: SYN-HOS-M-0080003}
+  Point Definition: {Description: Generated kWh 15m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh),
+    Archive Interval: 15, Index: ''}
+- key: ch_hos_cedar_row_carport_export_kwh_15m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row Solar Carport, Meter Number: SYN-HOS-M-0080003}
+  Point Definition: {Description: Exported kWh 15m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh),
+    Archive Interval: 15, Index: ''}
+# ---- Ridgeline Wind turbines (added 2026-10-01): the same six points on each of the ten pad meters ----
+- key: ch_rwl_wtg01_kwh_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-01, Meter Number: SYN-RWL-M-0110001}
+  Point Definition: {Description: Generated kWh 10m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg01_kw_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-01, Meter Number: SYN-RWL-M-0110001}
+  Point Definition: {Description: Active Power kW 10m, Reading Type: Analog, Measure Type: Electricity, Unit: Kilowatt - (kW), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg01_possible_kw_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-01, Meter Number: SYN-RWL-M-0110001}
+  Point Definition: {Description: Possible kW 10m, Reading Type: Analog, Measure Type: Electricity, Unit: Kilowatt - (kW), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg01_nacelle_wind_ms_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-01, Meter Number: SYN-RWL-M-0110001}
+  Point Definition: {Description: Nacelle Wind Speed 10m, Reading Type: Analog, Measure Type: Weather, Unit: Meters per Second - (m/s), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg01_rotor_rpm_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-01, Meter Number: SYN-RWL-M-0110001}
+  Point Definition: {Description: Rotor Speed 10m, Reading Type: Analog, Measure Type: Activity Level, Unit: Revolutions per minute - (RPM), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg01_state_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-01, Meter Number: SYN-RWL-M-0110001}
+  Point Definition: {Description: Turbine State, Reading Type: Digital, Measure Type: Digital, Unit: State - (State), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg02_kwh_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-02, Meter Number: SYN-RWL-M-0110002}
+  Point Definition: {Description: Generated kWh 10m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg02_kw_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-02, Meter Number: SYN-RWL-M-0110002}
+  Point Definition: {Description: Active Power kW 10m, Reading Type: Analog, Measure Type: Electricity, Unit: Kilowatt - (kW), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg02_possible_kw_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-02, Meter Number: SYN-RWL-M-0110002}
+  Point Definition: {Description: Possible kW 10m, Reading Type: Analog, Measure Type: Electricity, Unit: Kilowatt - (kW), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg02_nacelle_wind_ms_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-02, Meter Number: SYN-RWL-M-0110002}
+  Point Definition: {Description: Nacelle Wind Speed 10m, Reading Type: Analog, Measure Type: Weather, Unit: Meters per Second - (m/s), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg02_rotor_rpm_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-02, Meter Number: SYN-RWL-M-0110002}
+  Point Definition: {Description: Rotor Speed 10m, Reading Type: Analog, Measure Type: Activity Level, Unit: Revolutions per minute - (RPM), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg02_state_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-02, Meter Number: SYN-RWL-M-0110002}
+  Point Definition: {Description: Turbine State, Reading Type: Digital, Measure Type: Digital, Unit: State - (State), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg03_kwh_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-03, Meter Number: SYN-RWL-M-0110003}
+  Point Definition: {Description: Generated kWh 10m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg03_kw_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-03, Meter Number: SYN-RWL-M-0110003}
+  Point Definition: {Description: Active Power kW 10m, Reading Type: Analog, Measure Type: Electricity, Unit: Kilowatt - (kW), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg03_possible_kw_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-03, Meter Number: SYN-RWL-M-0110003}
+  Point Definition: {Description: Possible kW 10m, Reading Type: Analog, Measure Type: Electricity, Unit: Kilowatt - (kW), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg03_nacelle_wind_ms_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-03, Meter Number: SYN-RWL-M-0110003}
+  Point Definition: {Description: Nacelle Wind Speed 10m, Reading Type: Analog, Measure Type: Weather, Unit: Meters per Second - (m/s), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg03_rotor_rpm_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-03, Meter Number: SYN-RWL-M-0110003}
+  Point Definition: {Description: Rotor Speed 10m, Reading Type: Analog, Measure Type: Activity Level, Unit: Revolutions per minute - (RPM), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg03_state_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-03, Meter Number: SYN-RWL-M-0110003}
+  Point Definition: {Description: Turbine State, Reading Type: Digital, Measure Type: Digital, Unit: State - (State), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg04_kwh_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-04, Meter Number: SYN-RWL-M-0110004}
+  Point Definition: {Description: Generated kWh 10m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg04_kw_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-04, Meter Number: SYN-RWL-M-0110004}
+  Point Definition: {Description: Active Power kW 10m, Reading Type: Analog, Measure Type: Electricity, Unit: Kilowatt - (kW), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg04_possible_kw_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-04, Meter Number: SYN-RWL-M-0110004}
+  Point Definition: {Description: Possible kW 10m, Reading Type: Analog, Measure Type: Electricity, Unit: Kilowatt - (kW), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg04_nacelle_wind_ms_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-04, Meter Number: SYN-RWL-M-0110004}
+  Point Definition: {Description: Nacelle Wind Speed 10m, Reading Type: Analog, Measure Type: Weather, Unit: Meters per Second - (m/s), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg04_rotor_rpm_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-04, Meter Number: SYN-RWL-M-0110004}
+  Point Definition: {Description: Rotor Speed 10m, Reading Type: Analog, Measure Type: Activity Level, Unit: Revolutions per minute - (RPM), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg04_state_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-04, Meter Number: SYN-RWL-M-0110004}
+  Point Definition: {Description: Turbine State, Reading Type: Digital, Measure Type: Digital, Unit: State - (State), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg05_kwh_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-05, Meter Number: SYN-RWL-M-0110005}
+  Point Definition: {Description: Generated kWh 10m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg05_kw_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-05, Meter Number: SYN-RWL-M-0110005}
+  Point Definition: {Description: Active Power kW 10m, Reading Type: Analog, Measure Type: Electricity, Unit: Kilowatt - (kW), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg05_possible_kw_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-05, Meter Number: SYN-RWL-M-0110005}
+  Point Definition: {Description: Possible kW 10m, Reading Type: Analog, Measure Type: Electricity, Unit: Kilowatt - (kW), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg05_nacelle_wind_ms_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-05, Meter Number: SYN-RWL-M-0110005}
+  Point Definition: {Description: Nacelle Wind Speed 10m, Reading Type: Analog, Measure Type: Weather, Unit: Meters per Second - (m/s), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg05_rotor_rpm_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-05, Meter Number: SYN-RWL-M-0110005}
+  Point Definition: {Description: Rotor Speed 10m, Reading Type: Analog, Measure Type: Activity Level, Unit: Revolutions per minute - (RPM), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg05_state_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-05, Meter Number: SYN-RWL-M-0110005}
+  Point Definition: {Description: Turbine State, Reading Type: Digital, Measure Type: Digital, Unit: State - (State), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg06_kwh_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-06, Meter Number: SYN-RWL-M-0110006}
+  Point Definition: {Description: Generated kWh 10m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg06_kw_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-06, Meter Number: SYN-RWL-M-0110006}
+  Point Definition: {Description: Active Power kW 10m, Reading Type: Analog, Measure Type: Electricity, Unit: Kilowatt - (kW), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg06_possible_kw_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-06, Meter Number: SYN-RWL-M-0110006}
+  Point Definition: {Description: Possible kW 10m, Reading Type: Analog, Measure Type: Electricity, Unit: Kilowatt - (kW), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg06_nacelle_wind_ms_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-06, Meter Number: SYN-RWL-M-0110006}
+  Point Definition: {Description: Nacelle Wind Speed 10m, Reading Type: Analog, Measure Type: Weather, Unit: Meters per Second - (m/s), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg06_rotor_rpm_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-06, Meter Number: SYN-RWL-M-0110006}
+  Point Definition: {Description: Rotor Speed 10m, Reading Type: Analog, Measure Type: Activity Level, Unit: Revolutions per minute - (RPM), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg06_state_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-06, Meter Number: SYN-RWL-M-0110006}
+  Point Definition: {Description: Turbine State, Reading Type: Digital, Measure Type: Digital, Unit: State - (State), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg07_kwh_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-07, Meter Number: SYN-RWL-M-0110007}
+  Point Definition: {Description: Generated kWh 10m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg07_kw_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-07, Meter Number: SYN-RWL-M-0110007}
+  Point Definition: {Description: Active Power kW 10m, Reading Type: Analog, Measure Type: Electricity, Unit: Kilowatt - (kW), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg07_possible_kw_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-07, Meter Number: SYN-RWL-M-0110007}
+  Point Definition: {Description: Possible kW 10m, Reading Type: Analog, Measure Type: Electricity, Unit: Kilowatt - (kW), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg07_nacelle_wind_ms_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-07, Meter Number: SYN-RWL-M-0110007}
+  Point Definition: {Description: Nacelle Wind Speed 10m, Reading Type: Analog, Measure Type: Weather, Unit: Meters per Second - (m/s), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg07_rotor_rpm_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-07, Meter Number: SYN-RWL-M-0110007}
+  Point Definition: {Description: Rotor Speed 10m, Reading Type: Analog, Measure Type: Activity Level, Unit: Revolutions per minute - (RPM), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg07_state_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-07, Meter Number: SYN-RWL-M-0110007}
+  Point Definition: {Description: Turbine State, Reading Type: Digital, Measure Type: Digital, Unit: State - (State), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg08_kwh_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-08, Meter Number: SYN-RWL-M-0110008}
+  Point Definition: {Description: Generated kWh 10m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg08_kw_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-08, Meter Number: SYN-RWL-M-0110008}
+  Point Definition: {Description: Active Power kW 10m, Reading Type: Analog, Measure Type: Electricity, Unit: Kilowatt - (kW), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg08_possible_kw_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-08, Meter Number: SYN-RWL-M-0110008}
+  Point Definition: {Description: Possible kW 10m, Reading Type: Analog, Measure Type: Electricity, Unit: Kilowatt - (kW), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg08_nacelle_wind_ms_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-08, Meter Number: SYN-RWL-M-0110008}
+  Point Definition: {Description: Nacelle Wind Speed 10m, Reading Type: Analog, Measure Type: Weather, Unit: Meters per Second - (m/s), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg08_rotor_rpm_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-08, Meter Number: SYN-RWL-M-0110008}
+  Point Definition: {Description: Rotor Speed 10m, Reading Type: Analog, Measure Type: Activity Level, Unit: Revolutions per minute - (RPM), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg08_state_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-08, Meter Number: SYN-RWL-M-0110008}
+  Point Definition: {Description: Turbine State, Reading Type: Digital, Measure Type: Digital, Unit: State - (State), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg09_kwh_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-09, Meter Number: SYN-RWL-M-0110009}
+  Point Definition: {Description: Generated kWh 10m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg09_kw_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-09, Meter Number: SYN-RWL-M-0110009}
+  Point Definition: {Description: Active Power kW 10m, Reading Type: Analog, Measure Type: Electricity, Unit: Kilowatt - (kW), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg09_possible_kw_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-09, Meter Number: SYN-RWL-M-0110009}
+  Point Definition: {Description: Possible kW 10m, Reading Type: Analog, Measure Type: Electricity, Unit: Kilowatt - (kW), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg09_nacelle_wind_ms_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-09, Meter Number: SYN-RWL-M-0110009}
+  Point Definition: {Description: Nacelle Wind Speed 10m, Reading Type: Analog, Measure Type: Weather, Unit: Meters per Second - (m/s), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg09_rotor_rpm_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-09, Meter Number: SYN-RWL-M-0110009}
+  Point Definition: {Description: Rotor Speed 10m, Reading Type: Analog, Measure Type: Activity Level, Unit: Revolutions per minute - (RPM), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg09_state_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-09, Meter Number: SYN-RWL-M-0110009}
+  Point Definition: {Description: Turbine State, Reading Type: Digital, Measure Type: Digital, Unit: State - (State), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg10_kwh_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-10, Meter Number: SYN-RWL-M-0110010}
+  Point Definition: {Description: Generated kWh 10m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg10_kw_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-10, Meter Number: SYN-RWL-M-0110010}
+  Point Definition: {Description: Active Power kW 10m, Reading Type: Analog, Measure Type: Electricity, Unit: Kilowatt - (kW), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg10_possible_kw_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-10, Meter Number: SYN-RWL-M-0110010}
+  Point Definition: {Description: Possible kW 10m, Reading Type: Analog, Measure Type: Electricity, Unit: Kilowatt - (kW), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg10_nacelle_wind_ms_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-10, Meter Number: SYN-RWL-M-0110010}
+  Point Definition: {Description: Nacelle Wind Speed 10m, Reading Type: Analog, Measure Type: Weather, Unit: Meters per Second - (m/s), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg10_rotor_rpm_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-10, Meter Number: SYN-RWL-M-0110010}
+  Point Definition: {Description: Rotor Speed 10m, Reading Type: Analog, Measure Type: Activity Level, Unit: Revolutions per minute - (RPM), Archive Interval: 10, Index: ''}
+- key: ch_rwl_wtg10_state_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline WTG-10, Meter Number: SYN-RWL-M-0110010}
+  Point Definition: {Description: Turbine State, Reading Type: Digital, Measure Type: Digital, Unit: State - (State), Archive Interval: 10, Index: ''}
+- key: ch_spinwave_science_lab_temp_f_10m
+  installed:
+    pointId:
+  Meter: {Description: Science Center Lab Environment, Meter Number: SCIENCE-CENTER-ENVIRONMENTAL-SENSORS}
+  Point Definition: {Description: Lab Air Temperature, Reading Type: Analog, Measure Type: Temperature, Unit: Degrees Fahrenheit - (degF),
+    Archive Interval: 10, Index: ''}
+- key: ch_spinwave_science_lab_rh_10m
+  installed:
+    pointId:
+  Meter: {Description: Science Center Lab Environment, Meter Number: SCIENCE-CENTER-ENVIRONMENTAL-SENSORS}
+  Point Definition: {Description: Lab Relative Humidity, Reading Type: Analog, Measure Type: Relative Humidity, Unit: Percent - (%),
+    Archive Interval: 10, Index: ''}
+- key: ch_odbc_library_electric_kwh_30m
+  installed:
+    pointId:
+  Meter: {Description: Library Electric Historian, Meter Number: LIBRARY-HISTORIAN-ELECTRIC-INTERVAL}
+  Point Definition: {Description: Historian Delivered kWh 30m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh),
+    Archive Interval: 30, Index: ''}
+- key: ch_student_center_kitchen_deduct_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Student Center Kitchen Sewer Deduct, Meter Number: SYN-DED-W-SC01}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_fake_gateway_smoke_kwh_15m
+  installed:
+    pointId:
+  Meter: {Description: Student Center Fake Gateway Smoke, Meter Number: FAKE-GATEWAY-SMOKE-METER}
+  Point Definition: {Description: Fake Gateway Smoke kWh 15m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh),
+    Archive Interval: 15, Index: ''}
+- key: ch_lakeview_hall_laundry_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Lakeview Hall Laundry Electric, Meter Number: SYN-SUB-E-LV01}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_recreation_center_pool_fill_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Recreation Center Pool Fill Deduct, Meter Number: SYN-DED-W-RC01}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_parking_structure_ev_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Parking Structure EV Chargers, Meter Number: SYN-SUB-E-PS01}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_101_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 101 Electric, Meter Number: SYN-SUB-E-A101}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_102_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 102 Electric, Meter Number: SYN-SUB-E-A102}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_103_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 103 Electric, Meter Number: SYN-SUB-E-A103}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_104_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 104 Electric, Meter Number: SYN-SUB-E-A104}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_105_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 105 Electric, Meter Number: SYN-SUB-E-A105}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_106_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 106 Electric, Meter Number: SYN-SUB-E-A106}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_107_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 107 Electric, Meter Number: SYN-SUB-E-A107}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_108_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 108 Electric, Meter Number: SYN-SUB-E-A108}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_109_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 109 Electric, Meter Number: SYN-SUB-E-A109}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_110_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 110 Electric, Meter Number: SYN-SUB-E-A110}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_111_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 111 Electric, Meter Number: SYN-SUB-E-A111}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_112_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 112 Electric, Meter Number: SYN-SUB-E-A112}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_113_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 113 Electric, Meter Number: SYN-SUB-E-A113}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_114_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 114 Electric, Meter Number: SYN-SUB-E-A114}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_115_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 115 Electric, Meter Number: SYN-SUB-E-A115}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_116_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 116 Electric, Meter Number: SYN-SUB-E-A116}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_117_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 117 Electric, Meter Number: SYN-SUB-E-A117}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_118_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 118 Electric, Meter Number: SYN-SUB-E-A118}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_119_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 119 Electric, Meter Number: SYN-SUB-E-A119}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_120_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 120 Electric, Meter Number: SYN-SUB-E-A120}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_201_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 201 Electric, Meter Number: SYN-SUB-E-A201}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_202_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 202 Electric, Meter Number: SYN-SUB-E-A202}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_203_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 203 Electric, Meter Number: SYN-SUB-E-A203}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_204_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 204 Electric, Meter Number: SYN-SUB-E-A204}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_205_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 205 Electric, Meter Number: SYN-SUB-E-A205}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_206_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 206 Electric, Meter Number: SYN-SUB-E-A206}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_207_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 207 Electric, Meter Number: SYN-SUB-E-A207}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_208_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 208 Electric, Meter Number: SYN-SUB-E-A208}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_209_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 209 Electric, Meter Number: SYN-SUB-E-A209}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_210_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 210 Electric, Meter Number: SYN-SUB-E-A210}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_211_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 211 Electric, Meter Number: SYN-SUB-E-A211}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_212_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 212 Electric, Meter Number: SYN-SUB-E-A212}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_213_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 213 Electric, Meter Number: SYN-SUB-E-A213}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_214_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 214 Electric, Meter Number: SYN-SUB-E-A214}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_215_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 215 Electric, Meter Number: SYN-SUB-E-A215}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_216_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 216 Electric, Meter Number: SYN-SUB-E-A216}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_217_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 217 Electric, Meter Number: SYN-SUB-E-A217}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_218_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 218 Electric, Meter Number: SYN-SUB-E-A218}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_219_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 219 Electric, Meter Number: SYN-SUB-E-A219}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_220_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 220 Electric, Meter Number: SYN-SUB-E-A220}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_301_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 301 Electric, Meter Number: SYN-SUB-E-A301}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_302_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 302 Electric, Meter Number: SYN-SUB-E-A302}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_303_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 303 Electric, Meter Number: SYN-SUB-E-A303}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_304_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 304 Electric, Meter Number: SYN-SUB-E-A304}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_305_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 305 Electric, Meter Number: SYN-SUB-E-A305}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_306_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 306 Electric, Meter Number: SYN-SUB-E-A306}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_307_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 307 Electric, Meter Number: SYN-SUB-E-A307}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_308_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 308 Electric, Meter Number: SYN-SUB-E-A308}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_309_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 309 Electric, Meter Number: SYN-SUB-E-A309}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_310_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 310 Electric, Meter Number: SYN-SUB-E-A310}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_311_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 311 Electric, Meter Number: SYN-SUB-E-A311}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_312_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 312 Electric, Meter Number: SYN-SUB-E-A312}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_313_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 313 Electric, Meter Number: SYN-SUB-E-A313}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_314_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 314 Electric, Meter Number: SYN-SUB-E-A314}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_315_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 315 Electric, Meter Number: SYN-SUB-E-A315}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_316_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 316 Electric, Meter Number: SYN-SUB-E-A316}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_317_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 317 Electric, Meter Number: SYN-SUB-E-A317}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_318_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 318 Electric, Meter Number: SYN-SUB-E-A318}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_319_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 319 Electric, Meter Number: SYN-SUB-E-A319}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_320_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Unit 320 Electric, Meter Number: SYN-SUB-E-A320}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_house_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row A Electric House, Meter Number: SYN-SUB-E-AH}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_a_unit_101_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 101 Water, Meter Number: SYN-SUB-W-A101}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_102_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 102 Water, Meter Number: SYN-SUB-W-A102}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_103_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 103 Water, Meter Number: SYN-SUB-W-A103}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_104_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 104 Water, Meter Number: SYN-SUB-W-A104}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_105_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 105 Water, Meter Number: SYN-SUB-W-A105}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_106_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 106 Water, Meter Number: SYN-SUB-W-A106}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_107_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 107 Water, Meter Number: SYN-SUB-W-A107}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_108_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 108 Water, Meter Number: SYN-SUB-W-A108}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_109_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 109 Water, Meter Number: SYN-SUB-W-A109}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_110_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 110 Water, Meter Number: SYN-SUB-W-A110}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_111_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 111 Water, Meter Number: SYN-SUB-W-A111}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_112_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 112 Water, Meter Number: SYN-SUB-W-A112}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_113_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 113 Water, Meter Number: SYN-SUB-W-A113}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_114_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 114 Water, Meter Number: SYN-SUB-W-A114}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_115_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 115 Water, Meter Number: SYN-SUB-W-A115}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_116_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 116 Water, Meter Number: SYN-SUB-W-A116}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_117_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 117 Water, Meter Number: SYN-SUB-W-A117}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_118_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 118 Water, Meter Number: SYN-SUB-W-A118}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_119_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 119 Water, Meter Number: SYN-SUB-W-A119}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_120_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 120 Water, Meter Number: SYN-SUB-W-A120}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_201_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 201 Water, Meter Number: SYN-SUB-W-A201}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_202_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 202 Water, Meter Number: SYN-SUB-W-A202}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_203_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 203 Water, Meter Number: SYN-SUB-W-A203}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_204_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 204 Water, Meter Number: SYN-SUB-W-A204}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_205_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 205 Water, Meter Number: SYN-SUB-W-A205}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_206_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 206 Water, Meter Number: SYN-SUB-W-A206}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_207_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 207 Water, Meter Number: SYN-SUB-W-A207}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_208_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 208 Water, Meter Number: SYN-SUB-W-A208}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_209_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 209 Water, Meter Number: SYN-SUB-W-A209}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_210_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 210 Water, Meter Number: SYN-SUB-W-A210}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_211_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 211 Water, Meter Number: SYN-SUB-W-A211}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_212_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 212 Water, Meter Number: SYN-SUB-W-A212}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_213_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 213 Water, Meter Number: SYN-SUB-W-A213}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_214_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 214 Water, Meter Number: SYN-SUB-W-A214}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_215_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 215 Water, Meter Number: SYN-SUB-W-A215}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_216_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 216 Water, Meter Number: SYN-SUB-W-A216}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_217_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 217 Water, Meter Number: SYN-SUB-W-A217}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_218_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 218 Water, Meter Number: SYN-SUB-W-A218}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_219_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 219 Water, Meter Number: SYN-SUB-W-A219}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_220_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 220 Water, Meter Number: SYN-SUB-W-A220}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_301_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 301 Water, Meter Number: SYN-SUB-W-A301}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_302_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 302 Water, Meter Number: SYN-SUB-W-A302}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_303_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 303 Water, Meter Number: SYN-SUB-W-A303}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_304_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 304 Water, Meter Number: SYN-SUB-W-A304}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_305_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 305 Water, Meter Number: SYN-SUB-W-A305}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_306_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 306 Water, Meter Number: SYN-SUB-W-A306}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_307_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 307 Water, Meter Number: SYN-SUB-W-A307}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_308_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 308 Water, Meter Number: SYN-SUB-W-A308}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_309_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 309 Water, Meter Number: SYN-SUB-W-A309}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_310_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 310 Water, Meter Number: SYN-SUB-W-A310}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_311_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 311 Water, Meter Number: SYN-SUB-W-A311}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_312_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 312 Water, Meter Number: SYN-SUB-W-A312}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_313_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 313 Water, Meter Number: SYN-SUB-W-A313}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_314_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 314 Water, Meter Number: SYN-SUB-W-A314}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_315_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 315 Water, Meter Number: SYN-SUB-W-A315}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_316_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 316 Water, Meter Number: SYN-SUB-W-A316}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_317_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 317 Water, Meter Number: SYN-SUB-W-A317}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_318_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 318 Water, Meter Number: SYN-SUB-W-A318}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_319_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 319 Water, Meter Number: SYN-SUB-W-A319}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_unit_320_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Unit 320 Water, Meter Number: SYN-SUB-W-A320}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_a_house_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row A Water House, Meter Number: SYN-SUB-W-AH}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_101_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 101 Electric, Meter Number: SYN-SUB-E-B101}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_102_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 102 Electric, Meter Number: SYN-SUB-E-B102}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_103_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 103 Electric, Meter Number: SYN-SUB-E-B103}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_104_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 104 Electric, Meter Number: SYN-SUB-E-B104}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_105_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 105 Electric, Meter Number: SYN-SUB-E-B105}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_106_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 106 Electric, Meter Number: SYN-SUB-E-B106}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_107_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 107 Electric, Meter Number: SYN-SUB-E-B107}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_108_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 108 Electric, Meter Number: SYN-SUB-E-B108}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_109_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 109 Electric, Meter Number: SYN-SUB-E-B109}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_110_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 110 Electric, Meter Number: SYN-SUB-E-B110}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_111_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 111 Electric, Meter Number: SYN-SUB-E-B111}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_112_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 112 Electric, Meter Number: SYN-SUB-E-B112}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_113_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 113 Electric, Meter Number: SYN-SUB-E-B113}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_114_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 114 Electric, Meter Number: SYN-SUB-E-B114}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_115_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 115 Electric, Meter Number: SYN-SUB-E-B115}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_116_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 116 Electric, Meter Number: SYN-SUB-E-B116}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_201_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 201 Electric, Meter Number: SYN-SUB-E-B201}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_202_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 202 Electric, Meter Number: SYN-SUB-E-B202}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_203_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 203 Electric, Meter Number: SYN-SUB-E-B203}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_204_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 204 Electric, Meter Number: SYN-SUB-E-B204}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_205_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 205 Electric, Meter Number: SYN-SUB-E-B205}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_206_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 206 Electric, Meter Number: SYN-SUB-E-B206}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_207_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 207 Electric, Meter Number: SYN-SUB-E-B207}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_208_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 208 Electric, Meter Number: SYN-SUB-E-B208}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_209_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 209 Electric, Meter Number: SYN-SUB-E-B209}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_210_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 210 Electric, Meter Number: SYN-SUB-E-B210}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_211_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 211 Electric, Meter Number: SYN-SUB-E-B211}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_212_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 212 Electric, Meter Number: SYN-SUB-E-B212}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_213_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 213 Electric, Meter Number: SYN-SUB-E-B213}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_214_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 214 Electric, Meter Number: SYN-SUB-E-B214}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_215_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 215 Electric, Meter Number: SYN-SUB-E-B215}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_216_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 216 Electric, Meter Number: SYN-SUB-E-B216}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_301_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 301 Electric, Meter Number: SYN-SUB-E-B301}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_302_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 302 Electric, Meter Number: SYN-SUB-E-B302}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_303_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 303 Electric, Meter Number: SYN-SUB-E-B303}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_304_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 304 Electric, Meter Number: SYN-SUB-E-B304}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_305_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 305 Electric, Meter Number: SYN-SUB-E-B305}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_306_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 306 Electric, Meter Number: SYN-SUB-E-B306}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_307_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 307 Electric, Meter Number: SYN-SUB-E-B307}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_308_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 308 Electric, Meter Number: SYN-SUB-E-B308}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_309_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 309 Electric, Meter Number: SYN-SUB-E-B309}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_310_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 310 Electric, Meter Number: SYN-SUB-E-B310}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_311_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 311 Electric, Meter Number: SYN-SUB-E-B311}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_312_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 312 Electric, Meter Number: SYN-SUB-E-B312}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_313_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 313 Electric, Meter Number: SYN-SUB-E-B313}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_314_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 314 Electric, Meter Number: SYN-SUB-E-B314}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_315_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 315 Electric, Meter Number: SYN-SUB-E-B315}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_316_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 316 Electric, Meter Number: SYN-SUB-E-B316}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_401_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 401 Electric, Meter Number: SYN-SUB-E-B401}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_402_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 402 Electric, Meter Number: SYN-SUB-E-B402}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_403_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 403 Electric, Meter Number: SYN-SUB-E-B403}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_404_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 404 Electric, Meter Number: SYN-SUB-E-B404}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_405_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 405 Electric, Meter Number: SYN-SUB-E-B405}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_406_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 406 Electric, Meter Number: SYN-SUB-E-B406}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_407_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 407 Electric, Meter Number: SYN-SUB-E-B407}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_408_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 408 Electric, Meter Number: SYN-SUB-E-B408}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_409_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 409 Electric, Meter Number: SYN-SUB-E-B409}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_410_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 410 Electric, Meter Number: SYN-SUB-E-B410}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_411_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 411 Electric, Meter Number: SYN-SUB-E-B411}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_412_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 412 Electric, Meter Number: SYN-SUB-E-B412}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_413_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 413 Electric, Meter Number: SYN-SUB-E-B413}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_414_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 414 Electric, Meter Number: SYN-SUB-E-B414}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_415_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 415 Electric, Meter Number: SYN-SUB-E-B415}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_416_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Unit 416 Electric, Meter Number: SYN-SUB-E-B416}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_house_kwh_60m
+  installed:
+    pointId:
+  Meter: {Description: Cedar Row B Electric House, Meter Number: SYN-SUB-E-BH}
+  Point Definition: {Description: Submeter kWh 60m, Reading Type: Analog, Measure Type: Electricity, Unit: KilowattHours - (kWh), Archive Interval: 60,
+    Index: ''}
+- key: ch_cedar_row_b_unit_101_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 101 Water, Meter Number: SYN-SUB-W-B101}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_102_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 102 Water, Meter Number: SYN-SUB-W-B102}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_103_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 103 Water, Meter Number: SYN-SUB-W-B103}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_104_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 104 Water, Meter Number: SYN-SUB-W-B104}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_105_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 105 Water, Meter Number: SYN-SUB-W-B105}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_106_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 106 Water, Meter Number: SYN-SUB-W-B106}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_107_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 107 Water, Meter Number: SYN-SUB-W-B107}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_108_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 108 Water, Meter Number: SYN-SUB-W-B108}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_109_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 109 Water, Meter Number: SYN-SUB-W-B109}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_110_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 110 Water, Meter Number: SYN-SUB-W-B110}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_111_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 111 Water, Meter Number: SYN-SUB-W-B111}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_112_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 112 Water, Meter Number: SYN-SUB-W-B112}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_113_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 113 Water, Meter Number: SYN-SUB-W-B113}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_114_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 114 Water, Meter Number: SYN-SUB-W-B114}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_115_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 115 Water, Meter Number: SYN-SUB-W-B115}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_116_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 116 Water, Meter Number: SYN-SUB-W-B116}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_201_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 201 Water, Meter Number: SYN-SUB-W-B201}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_202_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 202 Water, Meter Number: SYN-SUB-W-B202}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_203_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 203 Water, Meter Number: SYN-SUB-W-B203}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_204_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 204 Water, Meter Number: SYN-SUB-W-B204}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_205_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 205 Water, Meter Number: SYN-SUB-W-B205}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_206_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 206 Water, Meter Number: SYN-SUB-W-B206}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_207_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 207 Water, Meter Number: SYN-SUB-W-B207}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_208_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 208 Water, Meter Number: SYN-SUB-W-B208}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_209_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 209 Water, Meter Number: SYN-SUB-W-B209}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_210_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 210 Water, Meter Number: SYN-SUB-W-B210}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_211_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 211 Water, Meter Number: SYN-SUB-W-B211}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_212_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 212 Water, Meter Number: SYN-SUB-W-B212}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_213_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 213 Water, Meter Number: SYN-SUB-W-B213}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_214_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 214 Water, Meter Number: SYN-SUB-W-B214}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_215_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 215 Water, Meter Number: SYN-SUB-W-B215}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_216_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 216 Water, Meter Number: SYN-SUB-W-B216}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_301_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 301 Water, Meter Number: SYN-SUB-W-B301}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_302_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 302 Water, Meter Number: SYN-SUB-W-B302}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_303_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 303 Water, Meter Number: SYN-SUB-W-B303}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_304_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 304 Water, Meter Number: SYN-SUB-W-B304}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_305_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 305 Water, Meter Number: SYN-SUB-W-B305}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_306_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 306 Water, Meter Number: SYN-SUB-W-B306}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_307_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 307 Water, Meter Number: SYN-SUB-W-B307}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_308_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 308 Water, Meter Number: SYN-SUB-W-B308}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_309_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 309 Water, Meter Number: SYN-SUB-W-B309}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_310_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 310 Water, Meter Number: SYN-SUB-W-B310}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_311_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 311 Water, Meter Number: SYN-SUB-W-B311}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_312_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 312 Water, Meter Number: SYN-SUB-W-B312}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_313_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 313 Water, Meter Number: SYN-SUB-W-B313}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_314_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 314 Water, Meter Number: SYN-SUB-W-B314}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_315_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 315 Water, Meter Number: SYN-SUB-W-B315}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_316_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 316 Water, Meter Number: SYN-SUB-W-B316}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_401_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 401 Water, Meter Number: SYN-SUB-W-B401}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_402_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 402 Water, Meter Number: SYN-SUB-W-B402}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_403_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 403 Water, Meter Number: SYN-SUB-W-B403}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_404_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 404 Water, Meter Number: SYN-SUB-W-B404}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_405_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 405 Water, Meter Number: SYN-SUB-W-B405}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_406_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 406 Water, Meter Number: SYN-SUB-W-B406}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_407_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 407 Water, Meter Number: SYN-SUB-W-B407}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_408_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 408 Water, Meter Number: SYN-SUB-W-B408}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_409_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 409 Water, Meter Number: SYN-SUB-W-B409}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_410_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 410 Water, Meter Number: SYN-SUB-W-B410}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_411_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 411 Water, Meter Number: SYN-SUB-W-B411}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_412_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 412 Water, Meter Number: SYN-SUB-W-B412}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_413_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 413 Water, Meter Number: SYN-SUB-W-B413}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_414_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 414 Water, Meter Number: SYN-SUB-W-B414}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_415_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 415 Water, Meter Number: SYN-SUB-W-B415}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_unit_416_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Unit 416 Water, Meter Number: SYN-SUB-W-B416}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_b_house_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row B Water House, Meter Number: SYN-SUB-W-BH}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_common_house_pool_fill_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Common House Pool Fill Deduct, Meter Number: SYN-DED-W-CH01}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_ntp_plant_chw_ton_hours_hourly
+  installed:
+    pointId:
+  Meter: {Description: Central Plant Chilled Water Supply, Meter Number: SYN-NTP-P-0090001}
+  Point Definition: {Description: Produced Ton-Hours 60m, Reading Type: Analog, Measure Type: Chilled Water, Unit: Ton-Hour - (TonHr),
+    Archive Interval: 60, Index: ''}
+- key: ch_ntp_plant_chw_tons_hourly
+  installed:
+    pointId:
+  Meter: {Description: Central Plant Chilled Water Supply, Meter Number: SYN-NTP-P-0090001}
+  Point Definition: {Description: Production Rate Tons 60m, Reading Type: Analog, Measure Type: Chilled Water, Unit: Cooling Ton - (Ton),
+    Archive Interval: 60, Index: ''}
+- key: ch_ntp_plant_steam_klb_hourly
+  installed:
+    pointId:
+  Meter: {Description: Central Plant Steam Production, Meter Number: SYN-NTP-P-0090002}
+  Point Definition: {Description: Produced klb 60m, Reading Type: Analog, Measure Type: Steam, Unit: Steam Thousands of Pounds - (klb), Archive Interval: 60,
+    Index: ''}
+- key: ch_ntp_plant_steam_lb_per_hour_hourly
+  installed:
+    pointId:
+  Meter: {Description: Central Plant Steam Production, Meter Number: SYN-NTP-P-0090002}
+  Point Definition: {Description: Production Rate lb/h 60m, Reading Type: Analog, Measure Type: Steam, Unit: Steam Pounds per Hour - (lb/h),
+    Archive Interval: 60, Index: ''}
+- key: ch_ntp_plant_steam_header_psig_15m
+  installed:
+    pointId:
+  Meter: {Description: Central Plant Steam Production, Meter Number: SYN-NTP-P-0090002}
+  Point Definition: {Description: Steam Header Pressure 15m, Reading Type: Analog, Measure Type: Pressure, Unit: PSIG - (PSIG),
+    Archive Interval: 15, Index: ''}
+- key: ch_ntp_plant_condensate_kgal_hourly
+  installed:
+    pointId:
+  Meter: {Description: Central Plant Condensate Return, Meter Number: SYN-NTP-P-0090003}
+  Point Definition: {Description: Produced kgal 60m, Reading Type: Analog, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal), Archive Interval: 60,
+    Index: ''}
+- key: ch_ntp_plant_cooling_tower_deduct_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Central Plant Cooling Tower Deduct, Meter Number: SYN-DED-W-CP01}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Thousands of Gallons - (kgal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_modbus_ntp_chiller_kw_1m
+  installed:
+    pointId:
+  Meter: {Description: Central Plant Chiller Controller, Meter Number: NTP-MODBUS-CHILLER-CONTROLLER}
+  Point Definition: {Description: Chiller Demand kW 1m, Reading Type: Analog, Measure Type: Electricity, Unit: Kilowatt - (kW),
+    Archive Interval: 1, Index: ''}
+- key: ch_modbus_ntp_chiller_enable_status
+  installed:
+    pointId:
+  Meter: {Description: Central Plant Chiller Controller, Meter Number: NTP-MODBUS-CHILLER-CONTROLLER}
+  Point Definition: {Description: Chiller Enable Status, Reading Type: Digital, Measure Type: Digital, Unit: State - (State),
+    Archive Interval: 5, Index: ''}
+# ---- Ridgeline met mast (added 2026-10-01): metric, 10-minute, four measure types on one meter ----
+- key: ch_rwl_met_wind_ms_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline Met Mast, Meter Number: RIDGELINE-MET-MAST}
+  Point Definition: {Description: Hub-Height Wind Speed 10m, Reading Type: Analog, Measure Type: Weather, Unit: Meters per Second - (m/s), Archive Interval: 10, Index: ''}
+- key: ch_rwl_met_wind_direction_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline Met Mast, Meter Number: RIDGELINE-MET-MAST}
+  Point Definition: {Description: Wind Direction 10m, Reading Type: Analog, Measure Type: Weather, Unit: "Degrees - (°)", Archive Interval: 10, Index: ''}
+- key: ch_rwl_met_air_temp_c_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline Met Mast, Meter Number: RIDGELINE-MET-MAST}
+  Point Definition: {Description: Air Temperature 10m, Reading Type: Analog, Measure Type: Temperature, Unit: Degrees Centigrade - (degC), Archive Interval: 10, Index: ''}
+- key: ch_rwl_met_pressure_kpa_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline Met Mast, Meter Number: RIDGELINE-MET-MAST}
+  Point Definition: {Description: Barometric Pressure 10m, Reading Type: Analog, Measure Type: Pressure, Unit: KiloPascal - (kPa), Archive Interval: 10, Index: ''}
+- key: ch_rwl_met_air_density_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline Met Mast, Meter Number: RIDGELINE-MET-MAST}
+  Point Definition: {Description: Air Density 10m, Reading Type: Analog, Measure Type: Weather, Unit: Kilogram per cubic meter - (kg/m3), Archive Interval: 10, Index: ''}
+- key: ch_rwl_met_rh_10m
+  installed: {pointId: }
+  Meter: {Description: Ridgeline Met Mast, Meter Number: RIDGELINE-MET-MAST}
+  Point Definition: {Description: Relative Humidity 10m, Reading Type: Analog, Measure Type: Relative Humidity, Unit: Percent - (%), Archive Interval: 10, Index: ''}
+- key: ch_weather_ksac_temp_f_hourly
+  installed:
+    pointId:
+    hddPointId:
+    cddPointId:
+  Meter: {Description: KSAC Sacramento Executive Airport, Meter Number: KSAC}
+  Point Definition: {Description: KSAC Outside Air Temperature, Reading Type: Analog, Measure Type: Temperature,
+    Unit: Degrees Fahrenheit - (degF), Archive Interval: 60, Index: Degree Days}
+- key: ch_weather_ksac_dewpoint_f_hourly
+  installed:
+    pointId:
+  Meter: {Description: KSAC Sacramento Executive Airport, Meter Number: KSAC}
+  Point Definition: {Description: KSAC Dew Point, Reading Type: Analog, Measure Type: Dew Point, Unit: Degrees Fahrenheit - (degF), Archive Interval: 60, Index: ''}
+- key: ch_weather_ksac_rh_hourly
+  installed:
+    pointId:
+  Meter: {Description: KSAC Sacramento Executive Airport, Meter Number: KSAC}
+  Point Definition: {Description: KSAC Relative Humidity, Reading Type: Analog, Measure Type: Relative Humidity, Unit: Percent - (%),
+    Archive Interval: 60, Index: ''}
+- key: ch_weather_ksac_wind_mph_hourly
+  installed:
+    pointId:
+  Meter: {Description: KSAC Sacramento Executive Airport, Meter Number: KSAC}
+  Point Definition: {Description: KSAC Wind Speed, Reading Type: Analog, Measure Type: Wind Speed, Unit: Miles per Hour - (mph), Archive Interval: 60,
+    Index: ''}
+- key: ch_weather_ksmf_temp_c_hourly
+  installed:
+    pointId:
+    hddPointId:
+    cddPointId:
+  Meter: {Description: KSMF Sacramento International Airport, Meter Number: KSMF}
+  Point Definition: {Description: KSMF Outside Air Temperature, Reading Type: Analog, Measure Type: Temperature,
+    Unit: Degrees Centigrade - (degC), Archive Interval: 60, Index: Degree Days}
+- key: ch_weather_ksmf_rh_hourly
+  installed:
+    pointId:
+  Meter: {Description: KSMF Sacramento International Airport, Meter Number: KSMF}
+  Point Definition: {Description: KSMF Relative Humidity, Reading Type: Analog, Measure Type: Relative Humidity, Unit: Percent - (%), Archive Interval: 60, Index: ''}
+- key: ch_weather_ksmf_dewpoint_c_hourly
+  installed:
+    pointId:
+  Meter: {Description: KSMF Sacramento International Airport, Meter Number: KSMF}
+  Point Definition: {Description: KSMF Dew Point, Reading Type: Analog, Measure Type: Dew Point, Unit: Degrees Centigrade - (degC), Archive Interval: 60, Index: ''}
+- key: ch_weather_ksac_forecast_temp_f_hourly
+  installed:
+    pointId:
+  Meter: {Description: KSAC Sacramento Executive Airport, Meter Number: KSAC}
+  Point Definition: {Description: KSAC Forecast Temperature, Reading Type: Analog, Measure Type: Temperature, Unit: Degrees Fahrenheit - (degF), Archive Interval: 60, Index: ''}
+- key: ch_weather_ksac_forecast_dewpoint_f_hourly
+  installed:
+    pointId:
+  Meter: {Description: KSAC Sacramento Executive Airport, Meter Number: KSAC}
+  Point Definition: {Description: KSAC Forecast Dew Point, Reading Type: Analog, Measure Type: Dew Point, Unit: Degrees Fahrenheit - (degF), Archive Interval: 60, Index: ''}
+- key: ch_weather_ksac_forecast_rh_hourly
+  installed:
+    pointId:
+  Meter: {Description: KSAC Sacramento Executive Airport, Meter Number: KSAC}
+  Point Definition: {Description: KSAC Forecast Relative Humidity, Reading Type: Analog, Measure Type: Relative Humidity, Unit: Percent - (%), Archive Interval: 60, Index: ''}
+- key: ch_weather_ksac_forecast_wind_mph_hourly
+  installed:
+    pointId:
+  Meter: {Description: KSAC Sacramento Executive Airport, Meter Number: KSAC}
+  Point Definition: {Description: KSAC Forecast Wind Speed, Reading Type: Analog, Measure Type: Wind Speed, Unit: Miles per Hour - (mph), Archive Interval: 60, Index: ''}
+- key: ch_weather_ksac_forecast_wind_direction_hourly
+  installed:
+    pointId:
+  Meter: {Description: KSAC Sacramento Executive Airport, Meter Number: KSAC}
+  Point Definition: {Description: KSAC Forecast Wind Direction, Reading Type: Analog, Measure Type: Wind Direction, Unit: Degrees - (°), Archive Interval: 60, Index: ''}
+- key: ch_weather_ksac_forecast_precip_probability_hourly
+  installed:
+    pointId:
+  Meter: {Description: KSAC Sacramento Executive Airport, Meter Number: KSAC}
+  Point Definition: {Description: KSAC Forecast Precipitation Probability, Reading Type: Analog, Measure Type: Precipitation Probability, Unit: Percent - (%), Archive Interval: 60, Index: ''}
+- key: ch_weather_ksuu_forecast_temp_c_hourly
+  installed:
+    pointId:
+  Meter: {Description: KSUU Travis Air Force Base, Meter Number: KSUU}
+  Point Definition: {Description: KSUU Forecast Temperature, Reading Type: Analog, Measure Type: Temperature, Unit: Degrees Centigrade - (degC), Archive Interval: 60, Index: ''}
+- key: ch_weather_ksuu_forecast_dewpoint_c_hourly
+  installed:
+    pointId:
+  Meter: {Description: KSUU Travis Air Force Base, Meter Number: KSUU}
+  Point Definition: {Description: KSUU Forecast Dew Point, Reading Type: Analog, Measure Type: Dew Point, Unit: Degrees Centigrade - (degC), Archive Interval: 60, Index: ''}
+- key: ch_weather_ksuu_forecast_rh_hourly
+  installed:
+    pointId:
+  Meter: {Description: KSUU Travis Air Force Base, Meter Number: KSUU}
+  Point Definition: {Description: KSUU Forecast Relative Humidity, Reading Type: Analog, Measure Type: Relative Humidity, Unit: Percent - (%), Archive Interval: 60, Index: ''}
+- key: ch_weather_ksuu_forecast_wind_knots_hourly
+  installed:
+    pointId:
+  Meter: {Description: KSUU Travis Air Force Base, Meter Number: KSUU}
+  Point Definition: {Description: KSUU Forecast Wind Speed, Reading Type: Analog, Measure Type: Wind Speed, Unit: Knots - (kn), Archive Interval: 60, Index: ''}
+- key: ch_weather_ksuu_forecast_wind_direction_hourly
+  installed:
+    pointId:
+  Meter: {Description: KSUU Travis Air Force Base, Meter Number: KSUU}
+  Point Definition: {Description: KSUU Forecast Wind Direction, Reading Type: Analog, Measure Type: Wind Direction, Unit: Degrees - (°), Archive Interval: 60, Index: ''}
+- key: ch_weather_ksuu_forecast_precip_probability_hourly
+  installed:
+    pointId:
+  Meter: {Description: KSUU Travis Air Force Base, Meter Number: KSUU}
+  Point Definition: {Description: KSUU Forecast Precipitation Probability, Reading Type: Analog, Measure Type: Precipitation Probability, Unit: Percent - (%), Archive Interval: 60, Index: ''}
+- key: ch_weather_ksmf_forecast_temp_f_hourly
+  installed:
+    pointId:
+  Meter: {Description: KSMF Sacramento International Airport, Meter Number: KSMF}
+  Point Definition: {Description: KSMF Forecast Temperature, Reading Type: Analog, Measure Type: Temperature, Unit: Degrees Fahrenheit - (degF),
+    Archive Interval: 60, Index: ''}
+- key: ch_weather_ksmf_forecast_dewpoint_c_hourly
+  installed:
+    pointId:
+  Meter: {Description: KSMF Sacramento International Airport, Meter Number: KSMF}
+  Point Definition: {Description: KSMF Forecast Dew Point, Reading Type: Analog, Measure Type: Dew Point, Unit: Degrees Centigrade - (degC), Archive Interval: 60, Index: ''}
+- key: ch_weather_ksmf_forecast_rh_hourly
+  installed:
+    pointId:
+  Meter: {Description: KSMF Sacramento International Airport, Meter Number: KSMF}
+  Point Definition: {Description: KSMF Forecast Relative Humidity, Reading Type: Analog, Measure Type: Relative Humidity, Unit: Percent - (%), Archive Interval: 60, Index: ''}
+- key: ch_weather_ksmf_forecast_wind_kph_hourly
+  installed:
+    pointId:
+  Meter: {Description: KSMF Sacramento International Airport, Meter Number: KSMF}
+  Point Definition: {Description: KSMF Forecast Wind Speed, Reading Type: Analog, Measure Type: Wind Speed, Unit: Kilometers per Hour - (km/h), Archive Interval: 60, Index: ''}
+- key: ch_weather_ksmf_forecast_wind_direction_hourly
+  installed:
+    pointId:
+  Meter: {Description: KSMF Sacramento International Airport, Meter Number: KSMF}
+  Point Definition: {Description: KSMF Forecast Wind Direction, Reading Type: Analog, Measure Type: Wind Direction, Unit: Degrees - (°), Archive Interval: 60, Index: ''}
+- key: ch_weather_ksmf_forecast_precip_probability_hourly
+  installed:
+    pointId:
+  Meter: {Description: KSMF Sacramento International Airport, Meter Number: KSMF}
+  Point Definition: {Description: KSMF Forecast Precipitation Probability, Reading Type: Analog, Measure Type: Precipitation Probability, Unit: Percent - (%), Archive Interval: 60, Index: ''}
+- key: ch_weather_ksmf_wind_kph_hourly
+  installed:
+    pointId:
+  Meter: {Description: KSMF Sacramento International Airport, Meter Number: KSMF}
+  Point Definition: {Description: KSMF Wind Speed, Reading Type: Analog, Measure Type: Wind Speed, Unit: Kilometers per Hour - (km/h),
+    Archive Interval: 60, Index: ''}
+# ---- KSUU (added 2026-10-01): the Ridgeline site's station; the third degree-day driver ----
+- key: ch_weather_ksuu_temp_c_hourly
+  installed:
+    pointId:
+    hddPointId:
+    cddPointId:
+  Meter: {Description: KSUU Travis Air Force Base, Meter Number: KSUU}
+  Point Definition: {Description: KSUU Outside Air Temperature, Reading Type: Analog, Measure Type: Temperature,
+    Unit: Degrees Centigrade - (degC), Archive Interval: 60, Index: Degree Days}
+- key: ch_weather_ksuu_rh_hourly
+  installed:
+    pointId:
+  Meter: {Description: KSUU Travis Air Force Base, Meter Number: KSUU}
+  Point Definition: {Description: KSUU Relative Humidity, Reading Type: Analog, Measure Type: Relative Humidity, Unit: Percent - (%), Archive Interval: 60, Index: ''}
+- key: ch_weather_ksuu_wind_knots_hourly
+  installed:
+    pointId:
+  Meter: {Description: KSUU Travis Air Force Base, Meter Number: KSUU}
+  Point Definition: {Description: KSUU Wind Speed, Reading Type: Analog, Measure Type: Wind Speed, Unit: Knots - (kn), Archive Interval: 60,
+    Index: ''}
+- key: ch_weather_ksuu_dewpoint_c_hourly
+  installed:
+    pointId:
+  Meter: {Description: KSUU Travis Air Force Base, Meter Number: KSUU}
+  Point Definition: {Description: KSUU Dew Point, Reading Type: Analog, Measure Type: Dew Point, Unit: Degrees Centigrade - (degC),
+    Archive Interval: 60, Index: ''}
+- key: bl_nlu_science_electric_kwh_15m
+  installed:
+    pointId:
+  Meter: {Description: Science Center Electric Main, Meter Number: SYN-VED-M-0040002}
+  Point Definition: {Description: Science Center Electric kWh Baseline, Reading Type: Analog, Measure Type: Electricity,
+    Unit: KilowattHours - (kWh), Archive Interval: 15, Index: ''}
+- key: bl_nlu_student_demand_kw_15m
+  installed:
+    pointId:
+  Meter: {Description: Student Center Electric Main, Meter Number: SYN-VED-M-0040004}
+  Point Definition: {Description: Student Center Demand kW Baseline, Reading Type: Analog, Measure Type: Electricity,
+    Unit: Kilowatt - (kW), Archive Interval: 15, Index: ''}
+- key: bl_nlu_science_chw_ton_hours_hourly
+  installed:
+    pointId:
+  Meter: {Description: Science Center Chilled Water, Meter Number: SYN-NTP-M-0070001}
+  Point Definition: {Description: Science Center Chilled Water Ton-Hours Baseline, Reading Type: Analog, Measure Type: Chilled
+      Water, Unit: Ton-Hour - (TonHr), Archive Interval: 60, Index: ''}
+- key: student_center_event_count_daily
+  installed:
+    pointId:
+  Parent: Student Center
+  Point Definition: {Description: Student Center Event Count, Reading Type: Analog, Measure Type: Activity Level,
+    Unit: Events - (events), Archive Interval: 1440, Index: Activity Level}
+# ---- Meter multiplier registers (added 2026-10-04): a daily register on each meter whose multiplier had no data ----
+- key: ch_ved_science_center_lab_wing_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Science Center Electric Lab Wing, Meter Number: SYN-VED-M-0040007}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Electricity, Unit: KilowattHours - (kWh),
+    Archive Interval: 1440, Index: ''}
+- key: ch_sgu_central_plant_boiler_gas_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Central Plant Boiler Gas, Meter Number: SYN-SGU-M-0050010}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Natural Gas, Unit: Hundreds of Cubic Feet - (ccf),
+    Archive Interval: 1440, Index: ''}
+# ---- Handheld route registers (added 2026-11-07): read by hand on the Stage 3 Step 5 routes ----
+# Cedar Row C (route CRCWTR): floors 1 and 2, the house and the laundry register gallons; floors 3 and 4 register ccf.
+- key: ch_cedar_row_c_unit_101_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 101 Water, Meter Number: SYN-SUB-W-C101}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Gallons - (gal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_unit_102_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 102 Water, Meter Number: SYN-SUB-W-C102}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Gallons - (gal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_unit_103_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 103 Water, Meter Number: SYN-SUB-W-C103}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Gallons - (gal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_unit_104_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 104 Water, Meter Number: SYN-SUB-W-C104}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Gallons - (gal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_unit_105_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 105 Water, Meter Number: SYN-SUB-W-C105}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Gallons - (gal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_unit_106_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 106 Water, Meter Number: SYN-SUB-W-C106}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Gallons - (gal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_unit_107_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 107 Water, Meter Number: SYN-SUB-W-C107}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Gallons - (gal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_unit_108_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 108 Water, Meter Number: SYN-SUB-W-C108}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Gallons - (gal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_unit_109_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 109 Water, Meter Number: SYN-SUB-W-C109}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Gallons - (gal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_unit_110_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 110 Water, Meter Number: SYN-SUB-W-C110}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Gallons - (gal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_unit_111_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 111 Water, Meter Number: SYN-SUB-W-C111}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Gallons - (gal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_unit_112_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 112 Water, Meter Number: SYN-SUB-W-C112}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Gallons - (gal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_unit_201_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 201 Water, Meter Number: SYN-SUB-W-C201}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Gallons - (gal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_unit_202_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 202 Water, Meter Number: SYN-SUB-W-C202}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Gallons - (gal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_unit_203_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 203 Water, Meter Number: SYN-SUB-W-C203}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Gallons - (gal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_unit_204_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 204 Water, Meter Number: SYN-SUB-W-C204}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Gallons - (gal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_unit_205_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 205 Water, Meter Number: SYN-SUB-W-C205}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Gallons - (gal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_unit_206_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 206 Water, Meter Number: SYN-SUB-W-C206}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Gallons - (gal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_unit_207_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 207 Water, Meter Number: SYN-SUB-W-C207}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Gallons - (gal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_unit_208_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 208 Water, Meter Number: SYN-SUB-W-C208}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Gallons - (gal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_unit_209_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 209 Water, Meter Number: SYN-SUB-W-C209}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Gallons - (gal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_unit_210_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 210 Water, Meter Number: SYN-SUB-W-C210}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Gallons - (gal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_unit_211_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 211 Water, Meter Number: SYN-SUB-W-C211}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Gallons - (gal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_unit_212_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 212 Water, Meter Number: SYN-SUB-W-C212}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Gallons - (gal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_unit_301_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 301 Water, Meter Number: SYN-SUB-W-C301}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Hundreds of Cubic Feet - (ccf),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_unit_302_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 302 Water, Meter Number: SYN-SUB-W-C302}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Hundreds of Cubic Feet - (ccf),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_unit_303_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 303 Water, Meter Number: SYN-SUB-W-C303}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Hundreds of Cubic Feet - (ccf),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_unit_304_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 304 Water, Meter Number: SYN-SUB-W-C304}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Hundreds of Cubic Feet - (ccf),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_unit_305_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 305 Water, Meter Number: SYN-SUB-W-C305}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Hundreds of Cubic Feet - (ccf),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_unit_306_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 306 Water, Meter Number: SYN-SUB-W-C306}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Hundreds of Cubic Feet - (ccf),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_unit_307_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 307 Water, Meter Number: SYN-SUB-W-C307}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Hundreds of Cubic Feet - (ccf),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_unit_308_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 308 Water, Meter Number: SYN-SUB-W-C308}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Hundreds of Cubic Feet - (ccf),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_unit_309_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 309 Water, Meter Number: SYN-SUB-W-C309}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Hundreds of Cubic Feet - (ccf),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_unit_310_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 310 Water, Meter Number: SYN-SUB-W-C310}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Hundreds of Cubic Feet - (ccf),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_unit_311_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 311 Water, Meter Number: SYN-SUB-W-C311}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Hundreds of Cubic Feet - (ccf),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_unit_312_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 312 Water, Meter Number: SYN-SUB-W-C312}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Hundreds of Cubic Feet - (ccf),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_unit_401_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 401 Water, Meter Number: SYN-SUB-W-C401}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Hundreds of Cubic Feet - (ccf),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_unit_402_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 402 Water, Meter Number: SYN-SUB-W-C402}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Hundreds of Cubic Feet - (ccf),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_unit_403_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 403 Water, Meter Number: SYN-SUB-W-C403}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Hundreds of Cubic Feet - (ccf),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_unit_404_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 404 Water, Meter Number: SYN-SUB-W-C404}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Hundreds of Cubic Feet - (ccf),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_unit_405_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 405 Water, Meter Number: SYN-SUB-W-C405}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Hundreds of Cubic Feet - (ccf),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_unit_406_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 406 Water, Meter Number: SYN-SUB-W-C406}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Hundreds of Cubic Feet - (ccf),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_unit_407_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 407 Water, Meter Number: SYN-SUB-W-C407}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Hundreds of Cubic Feet - (ccf),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_unit_408_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 408 Water, Meter Number: SYN-SUB-W-C408}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Hundreds of Cubic Feet - (ccf),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_unit_409_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 409 Water, Meter Number: SYN-SUB-W-C409}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Hundreds of Cubic Feet - (ccf),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_unit_410_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 410 Water, Meter Number: SYN-SUB-W-C410}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Hundreds of Cubic Feet - (ccf),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_unit_411_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 411 Water, Meter Number: SYN-SUB-W-C411}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Hundreds of Cubic Feet - (ccf),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_unit_412_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Unit 412 Water, Meter Number: SYN-SUB-W-C412}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Hundreds of Cubic Feet - (ccf),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_house_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Water House, Meter Number: SYN-SUB-W-CH}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Gallons - (gal),
+    Archive Interval: 1440, Index: ''}
+- key: ch_cedar_row_c_laundry_water_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row C Laundry Water, Meter Number: SYN-SUB-W-CL}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Gallons - (gal),
+    Archive Interval: 1440, Index: ''}
+# Irrigation check reads (route IRRIG): River City bills these four meters; Facilities reads them in ccf in season.
+- key: ch_rcu_irrigation_north_quad_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Campus Grounds Irrigation North Quad, Meter Number: SYN-RCU-M-0060009}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Hundreds of Cubic Feet - (ccf),
+    Archive Interval: 1440, Index: ''}
+- key: ch_rcu_irrigation_south_fields_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Campus Grounds Irrigation South Fields, Meter Number: SYN-RCU-M-0060010}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Hundreds of Cubic Feet - (ccf),
+    Archive Interval: 1440, Index: ''}
+- key: ch_rcu_irrigation_athletics_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Campus Grounds Irrigation Athletics, Meter Number: SYN-RCU-M-0060011}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Hundreds of Cubic Feet - (ccf),
+    Archive Interval: 1440, Index: ''}
+- key: ch_rcu_cedar_row_irrigation_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Cedar Row Landscape Irrigation, Meter Number: SYN-RCU-M-0060018}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water, Unit: Hundreds of Cubic Feet - (ccf),
+    Archive Interval: 1440, Index: ''}
+# Emergency generators (route GEN): two registers each, run hours and diesel gallons. The fuel totalizer is an
+# Accumulator with its Delta. The run-hour meter cannot be: Point_Save takes a new Accumulator only in an Energy or
+# Volume unit or one with a rate unit, and Hour is a Time unit with neither (the Stage 2 import of 2026-11-09 failed
+# on it). So run hours are an Analog register and a separate Analog usage point, the pattern Massport uses for all of
+# its handheld registers: the import writes the read to the register and the difference to the usage point.
+- key: ch_gen_library_run_hours_register
+  installed:
+    pointId:
+  Meter: {Description: Library Emergency Generator, Meter Number: SYN-GEN-LIB01}
+  Point Definition: {Description: Run Hours Register, Reading Type: Analog, Measure Type: Time, Unit: Hour - (hr),
+    Archive Interval: 1440, Index: ''}
+- key: ch_gen_library_run_hours
+  installed:
+    pointId:
+  Meter: {Description: Library Emergency Generator, Meter Number: SYN-GEN-LIB01}
+  Point Definition: {Description: Run Hours, Reading Type: Analog, Measure Type: Time, Unit: Hour - (hr),
+    Archive Interval: 1440, Index: ''}
+- key: ch_gen_library_fuel_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Library Emergency Generator, Meter Number: SYN-GEN-LIB01}
+  Point Definition: {Description: Fuel Register, Reading Type: Accumulator, Measure Type: 'Fuel Oil #2', Unit: 'Fuel Oil#2 Gallon - (gal)',
+    Archive Interval: 1440, Index: ''}
+- key: ch_gen_science_center_run_hours_register
+  installed:
+    pointId:
+  Meter: {Description: Science Center Emergency Generator, Meter Number: SYN-GEN-SCI01}
+  Point Definition: {Description: Run Hours Register, Reading Type: Analog, Measure Type: Time, Unit: Hour - (hr),
+    Archive Interval: 1440, Index: ''}
+- key: ch_gen_science_center_run_hours
+  installed:
+    pointId:
+  Meter: {Description: Science Center Emergency Generator, Meter Number: SYN-GEN-SCI01}
+  Point Definition: {Description: Run Hours, Reading Type: Analog, Measure Type: Time, Unit: Hour - (hr),
+    Archive Interval: 1440, Index: ''}
+- key: ch_gen_science_center_fuel_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Science Center Emergency Generator, Meter Number: SYN-GEN-SCI01}
+  Point Definition: {Description: Fuel Register, Reading Type: Accumulator, Measure Type: 'Fuel Oil #2', Unit: 'Fuel Oil#2 Gallon - (gal)',
+    Archive Interval: 1440, Index: ''}
+- key: ch_gen_central_plant_run_hours_register
+  installed:
+    pointId:
+  Meter: {Description: Central Plant Emergency Generator, Meter Number: SYN-GEN-CP01}
+  Point Definition: {Description: Run Hours Register, Reading Type: Analog, Measure Type: Time, Unit: Hour - (hr),
+    Archive Interval: 1440, Index: ''}
+- key: ch_gen_central_plant_run_hours
+  installed:
+    pointId:
+  Meter: {Description: Central Plant Emergency Generator, Meter Number: SYN-GEN-CP01}
+  Point Definition: {Description: Run Hours, Reading Type: Analog, Measure Type: Time, Unit: Hour - (hr),
+    Archive Interval: 1440, Index: ''}
+- key: ch_gen_central_plant_fuel_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Central Plant Emergency Generator, Meter Number: SYN-GEN-CP01}
+  Point Definition: {Description: Fuel Register, Reading Type: Accumulator, Measure Type: 'Fuel Oil #2', Unit: 'Fuel Oil#2 Gallon - (gal)',
+    Archive Interval: 1440, Index: ''}
+# Central Plant Main Switchgear (route SWGR): ten display registers. Six accumulate (energy, time-of-use energy,
+# reactive and apparent energy) and get a Delta; four are maximum demands and the power factor at the maximum, read
+# straight into an Analog point with no register behind them.
+- key: ch_swgr_kwh_delivered_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Central Plant Main Switchgear, Meter Number: SYN-SUB-E-CPSWGR}
+  Point Definition: {Description: kWh Delivered Register, Reading Type: Accumulator, Measure Type: Electricity, Unit: KilowattHours - (kWh),
+    Archive Interval: 1440, Index: ''}
+- key: ch_swgr_on_peak_kwh_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Central Plant Main Switchgear, Meter Number: SYN-SUB-E-CPSWGR}
+  Point Definition: {Description: On-Peak kWh Register, Reading Type: Accumulator, Measure Type: Electricity, Unit: KilowattHours - (kWh),
+    Archive Interval: 1440, Index: ''}
+- key: ch_swgr_mid_peak_kwh_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Central Plant Main Switchgear, Meter Number: SYN-SUB-E-CPSWGR}
+  Point Definition: {Description: Mid-Peak kWh Register, Reading Type: Accumulator, Measure Type: Electricity, Unit: KilowattHours - (kWh),
+    Archive Interval: 1440, Index: ''}
+- key: ch_swgr_off_peak_kwh_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Central Plant Main Switchgear, Meter Number: SYN-SUB-E-CPSWGR}
+  Point Definition: {Description: Off-Peak kWh Register, Reading Type: Accumulator, Measure Type: Electricity, Unit: KilowattHours - (kWh),
+    Archive Interval: 1440, Index: ''}
+- key: ch_swgr_kvarh_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Central Plant Main Switchgear, Meter Number: SYN-SUB-E-CPSWGR}
+  Point Definition: {Description: kVArh Register, Reading Type: Accumulator, Measure Type: Electricity, Unit: KiloVoltAmpereReactiveHours - (kVArh),
+    Archive Interval: 1440, Index: ''}
+- key: ch_swgr_kvah_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Central Plant Main Switchgear, Meter Number: SYN-SUB-E-CPSWGR}
+  Point Definition: {Description: kVAh Register, Reading Type: Accumulator, Measure Type: Electricity, Unit: KiloVoltAmpereHours - (kVAh),
+    Archive Interval: 1440, Index: ''}
+- key: ch_swgr_max_demand_kw
+  installed:
+    pointId:
+  Meter: {Description: Central Plant Main Switchgear, Meter Number: SYN-SUB-E-CPSWGR}
+  Point Definition: {Description: Max Demand kW, Reading Type: Analog, Measure Type: Electricity, Unit: Kilowatt - (kW),
+    Archive Interval: 1440, Index: ''}
+- key: ch_swgr_on_peak_max_demand_kw
+  installed:
+    pointId:
+  Meter: {Description: Central Plant Main Switchgear, Meter Number: SYN-SUB-E-CPSWGR}
+  Point Definition: {Description: On-Peak Max Demand kW, Reading Type: Analog, Measure Type: Electricity, Unit: Kilowatt - (kW),
+    Archive Interval: 1440, Index: ''}
+- key: ch_swgr_max_demand_kva
+  installed:
+    pointId:
+  Meter: {Description: Central Plant Main Switchgear, Meter Number: SYN-SUB-E-CPSWGR}
+  Point Definition: {Description: Max Demand kVA, Reading Type: Analog, Measure Type: Electricity, Unit: KiloVoltAmpere - (kVA),
+    Archive Interval: 1440, Index: ''}
+- key: ch_swgr_power_factor
+  installed:
+    pointId:
+  Meter: {Description: Central Plant Main Switchgear, Meter Number: SYN-SUB-E-CPSWGR}
+  Point Definition: {Description: Power Factor at Max Demand, Reading Type: Analog, Measure Type: Electricity, Unit: Power Factor - (PF),
+    Archive Interval: 1440, Index: ''}

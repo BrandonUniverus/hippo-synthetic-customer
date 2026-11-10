@@ -1,0 +1,235 @@
+# Stage 7, step 8: Ridgeline Wind's monthly transfer statement (Database Administrator > Nodes > meter node > Tenant
+# Rebill tab; the Web Bill Generation Configuration and Generated Bills reports show the same rows). Added 2026-10-01
+# (Ridgeline Wind). The mechanism is step 6's (a Rate Configuration row, a Bill Generation row, then the Run Bill Gen
+# task writes the bill) but the story is the opposite: no tenant and no allocation. The Thermal Plant buys the output
+# of its own ten turbines at an internal transfer price and EEM generates the one statement that prices it. It has its
+# own file because it is the only generation whose quantity is a sum over several meters, which EEM cannot bill
+# directly (PRODUCT FINDING 66). Stage 2 therefore carries a logical billing meter whose one point is the farm
+# aggregate, and this step configures generation on that meter alone.
+stage: 7
+step: 8
+title: Ridgeline Wind transfer statement generation
+app: Database Administrator (records) + Web (Task Manager, Generated Bills)
+screen: Nodes > meter node > Tenant Rebill tab; "#/tasks/manager"; "#/reporting/GeneratedBills"
+source:
+- data/bills/northlake-itemized-bills-v1.yaml
+- data/providers/ridgeline-wind.yaml
+- data/scenarios/demo-university-v1.yaml
+- data/eem/northlake-bill-entry-v1.yaml
+- implementation/stage-2-hierarchy/03-meters.yaml (rwl_farm_transfer)
+- implementation/stage-2-hierarchy/06-aggregates.yaml (agg_ntp_ridgeline_generated_kwh_10m)
+- implementation/stage-3-gateways-and-data/04-acceptance-runs.yaml (the Ridgeline SCADA recipe and period rules)
+- implementation/stage-4-rates/ (RWL-XFER-2024, its Commodity Mapping, and its meter assignment)
+notes:
+- 'SYN-RWL-G-0000001 is the one account whose bill EEM writes itself: Bill Entry Type Bill Generation (BA2 code 2), Bill
+  Service Type Bill Payment (GL only, a journal), Billing Charges Report template, Default Expense Account 5150-WIND
+  (Stages 2 and 6). Bill Entry lists only BillType_Code 0 accounts, so it never shows this one and nobody keys its bill;
+  the bill comes from the Bill Generation row below and step 7''s Run Bill Gen task.'
+- 'How EEM generates a bill (UtilityGenBill_Create, which Task_Tbl 42 Run Bill Gen runs with @ForceSave Y, confirmed in
+  dbo.TaskParamsDefault): one dbo.UtilityMeterRatesBillGen row per meter and bill scenario (unique on MetaWorldID +
+  BillScenarioID) holds the schedule, period range, generation type, Available % and Offset; UtilityGenBillDates_Set
+  turns it into one dbo.UtilityBillGenLog row per period; for each log row UtilityRate_Exec prices that one meter node
+  from its rate assignment (dbo.UtilityMeterRates, the latest Start Date on or before the period end) and the points
+  under it; beBill_Sav and beBillItem_Sav write the bill on the meter''s billing account. The older BillGenConfigMeter,
+  BillGenConfigPoint and BillGenBill_Generate set is still in the database but nothing under src calls it; the 7.0
+  screens write UtilityMeterRatesBillGen only. Bill Allocation (Task_Tbl 24, Job_BillAllocation) is a different engine:
+  it splits a bill that already exists and generates nothing from interval data.'
+- 'PRODUCT FINDING 66: generation prices the points under ONE meter node (UtilityRates_GetPoints reads only nodes whose
+  parent is that meter) and writes one bill per meter and period, so it cannot bill a sum across meters. Configure the
+  ten pad meters instead and EEM writes ten bills on SYN-RWL-G-0000001 for every month, each repeating the monthly
+  research credit: July 2024''s lines would add to 118,080.28 (the ten per-turbine lines, each rounded to the cent, add
+  to 130,580.28, one cent more than the farm line, less ten credits of 1,250.00) instead of 129,330.27. A fixed charge
+  could be kept to one pad meter only by giving that meter a second rate, which splits RWL-XFER-2024 in two (a meter
+  carries one rate at a time, PRODUCT FINDING 65). This step shows the working side: with generation on the billing meter
+  alone the account gets one bill a month (the generated_statements check).'
+- 'The way round is the one EEM''s own demo database uses (its Tenant 1, 123456 HCSG, Ele 6011072 and ST-10 meters
+  generate bills from aggregate points): a logical meter whose only point is an aggregate of the other meters'' points.
+  Stage 2 carries it: Ridgeline Farm Transfer Meter (SYN-RWL-M-0110000, key rwl_farm_transfer in 03-meters.yaml) under
+  Ridgeline Turbine Field on SYN-RWL-G-0000001, with the farm aggregate Ridgeline Farm Generated kWh 10m
+  (agg_ntp_ridgeline_generated_kwh_10m in 06-aggregates.yaml: the ten Generated kWh 10m points, all Required, multiplier
+  1) as its one point. This step enters neither node; it configures generation on that meter alone. The ten pad meters
+  keep their account and their six points and get no generation row, and since Stage 4 assigns RWL-XFER-2024 to the
+  billing meter only, no rate either.'
+- 'The billing point needs what Stage 2''s aggregates need: PRODUCT FINDING 14 fixed first (the desktop does not write
+  PointAggregates_TBL, so Recalculate fails and the meter has no data) and Stage 3''s ridgeline_aggregates run over the
+  whole range. Under a meter the farm aggregate counts the turbines'' energy a second time in the plant''s tree, so keep
+  it out of any roll-up that sums Electricity (PRODUCT FINDING 44).'
+- 'RWL-XFER-2024 (Stage 4) must be priced by a class the engine applies to the meter. UtilityRate_Exec takes a rate class
+  into a meter''s determinant list when it is the All type (ClassType 0), or its Rate Option is the default
+  (UtilityRateClassDefault.RateClassDefault = 1), or the meter is bound to it (UtilityRateClassMeter, no screen: PRODUCT
+  FINDING 7). Add Rate creates the class All with that type (UtilityRate_Save; every rate in the reference database has
+  one), so Stage 4 puts both determinants under All and gives each a Commodity Mapping. An added class would be Unique
+  and price nothing without an option default, while its rate tests still passed (PRODUCT FINDINGS 8 and 69).'
+- 'Rate Configuration (Tenant Rebill tab, Actual scenario) is entered in Stage 4 step 6, on the billing meter only; the
+  record below repeats it so this step''s dependency is explicit, and entering it twice is refused (Rate already
+  assigned to Meter). The list offers only the meter''s own provider''s rates of the meter''s measure type
+  (TenantRebillViewModel), so the billing meter is Utility Provider Ridgeline Wind, Measure Type Electricity, and
+  UtilityRateMeterAssignment_Save refuses a rate of any other measure type. Start Date 2024-07-01: a month is logged
+  only if it starts on or after the rate''s Start Date (UtilityGenBillDates_Set). Bill (EnableBillReconcilliation) stays
+  unchecked although a new row starts checked: it would copy the rate onto a Bill Meter Reconciliation scenario that
+  Northlake Thermal Plant does not have (UtilityMeterRates.BillScenarioID is NOT NULL, so the save fails), and the
+  statement is the bill itself, not something to reconcile against one. End Date is not stored for an Actual row; the
+  rate''s own dates end it on 2025-12-31.'
+- 'Point Assignment: nothing to exclude, the billing meter has one point. On a meter with several points it matters:
+  UtilityGenBillDates_Set counts every non-excluded point''s rows as Available Intervals against one point''s Expected
+  Intervals, so a six-point pad meter would read about 600% available and the Available % test could never fail (and the
+  exclusion save probably never applies, PRODUCT FINDING 68).'
+- 'Bill Generation row: Schedule Company Calendar (CC), the Thermal Plant''s monthly fiscal periods from Stage 1 (Bill
+  Cycle, BC, would give the same months from Ridgeline''s cycle 1; CC is chosen because the statement posts to a fiscal
+  period). Status Auto (3): the Run Bill Gen task writes each missing month once its data is complete and does not rewrite
+  it. Auto w/ Auto Regen (4) is not used: it regenerates any month whose data changes, and a statement already exported to
+  the GL is refused by beBill_Upt (bill.exported, when uaDisableBillExportDelete is set) or, with that setting off,
+  silently rewritten. Fiscal Start 2024-07, Fiscal End 2025-12: 18 periods, from the acquisition to the end of the
+  scenario window (None would also list 2026 periods, which have no data). The dropdowns list the company calendar''s
+  periods as 2024-07 and one extra entry, None (999901). Offset 0.'
+- 'Available % is the complete-month guard and stays 100 (# assumed): at 0 a month in progress is billed as soon as one
+  interval exists, because UtilityGenBill_Create keeps log rows with Available Intervals above 0 and then drops only
+  those under the threshold. Expected is the calendar month at the point''s 10 minutes, 4,464 intervals in July. The
+  engine cuts a month on the points'' stored LocalTimeStamp, in the points'' own zone (UtilityRates_LoadData,
+  UtilityGenBillDates_Set: stamps after 00:00 on the 1st up to and including 00:00 on the next 1st). Stage 3''s recipe
+  stores Pacific local time (Pacific points, the task''s Timestamp Type utc, OffsetTimeMinutes 480, PRODUCT FINDING 46),
+  so a statement month is the Pacific civil month, as Stage 3 assumed. The SCADA clock keeps PST all year, so a summer
+  Pacific month starts an hour early on it: July 2024 is the ten minutes from 2024-06-30 23:00 PST to 2024-07-31 23:00
+  PST, the rows stamped 2024-06-30 23:10 PST through 2024-07-31 23:00 PST. Data requirement: the SCADA feed starts with
+  the row stamped 2024-06-30 23:10 PST (the ten minutes from Pacific midnight), not 2024-07-01 00:10 PST, or July 2024 is
+  an hour short (4,458 of 4,464 intervals, 99.87%) and waits. March 2025 is short whatever the feed:
+  Pacific time skips 2 AM on 2025-03-09, so the month holds 4,458 of 4,464 (the expected count is the local calendar) and
+  waits too. Remedy for that one month (# assumed): set Available % to 99, Run Now on Run Bill Gen, set it back to 100. A
+  manual Create on Generated Bills would also do, but it needs Bill Entry Web at level 3 (beBill_Sav) and no Thermal Plant
+  user holds that function. November 2024 holds 4,326 against 4,320 expected (the repeated hour) and is not affected.'
+- 'Which stamp closes a month: the engine reads a stored stamp as the END of its interval, so a month takes stamps after
+  00:00 on the 1st up to and including 00:00 on the next 1st (UtilityRates_LoadData.sql:111-114,
+  UtilityGenBillDates_Set.sql:242), and the interval reports cut their hours the same way (wh_GetIntervalData.sql:155-156).
+  The SCADA file is therefore written with interval-end stamps (data/providers/ridgeline-wind.yaml), and Stage 3''s July
+  day and ridgeline_period_totals cut on the same rule. The feed from the row stamped 2024-06-30 23:10 PST through the row
+  stamped 2026-01-01 00:00 PST (the ten minutes ending at midnight on December 31) is then exactly Pacific July 2024 to
+  December 2025, with OffsetTimeMinutes left at 480 and no extra row at either end. A source that stamps interval starts
+  would need its ten minutes added to the offset: FIG has no setting for the stamp position. The acceptance check below
+  uses the engine''s cut.'
+- 'PRODUCT FINDING 70: Offset cannot hold a statement back. UtilityGenBillDates_Set lists a period once its end date is
+  before today plus Offset, so a positive Offset brings a month forward, and the desktop model clamps Offset at 0
+  (UtilityBillGeneration). The two-day entry lag the bill-entry plan gives Ridgeline therefore has no setting: the
+  statement is written when the month''s data completes, in the first hours of the next month, by the task''s login and
+  not by keiko.tan, with no invoice number or due date. The Web grid saves Offset without the clamp
+  (sr_BillGenerationConfig_Save); a value of -2 there is the one thing to try.'
+- 'How lines form: UtilityRate_Exec returns one amount per rate determinant and UtilityBillLineItems_Get turns them into bill
+  items through dbo.UtilityCommodityMap, the Commodity Mapping on each determinant (Stage 4). A usage determinant mapped to
+  one commodity for quantity and charge gives one line with both (Transfer energy: quantity in kWh and the amount); a fixed
+  Charge Type 400 determinant gives a money line (Research credit). A determinant with no mapping adds its amount to the
+  bill total and writes no line at all (inner joins), so the lines stop adding to the total (PRODUCT FINDING 71); the
+  generated_statements check tests for that. Each line is rounded to the cent (round(@Amount, 2)) while the bill total is
+  the sum of the unrounded amounts kept to four decimals (129,330.2720 for July) and the day count is end minus start (30
+  for July), so compare ROUND(BL_Amount, 2) with the lines, never BL_Amount itself. The four-decimal header, the day count
+  and the availability count (Point Assignment note) are PRODUCT FINDING 72, none of them blocking. Items carry no expense
+  account of their own (beBillItem_Sav is passed 0 and stores NULL), so coding falls to the account''s Default Expense
+  Account, 5150-WIND (Stage 6).'
+- 'What the generated statement will not reproduce from the hand-made one, and does not need to: its bill date is the period
+  end, 2024-07-31 and not 2024-08-02 (beBill_Sav is passed BL_BillDate = period end); it has no invoice number or due date (a
+  journal needs neither); its meter section is the billing meter''s one row, the farm total, not the ten per-turbine rows
+  (those stay in the pad meters'' own data, which the acceptance case sums); and the four informational rows (possible
+  energy, performance, export, collection losses) are not generated, they belong to the expected-against-actual goal
+  (PRODUCT FINDINGS 41 and 47). The two lines and the total must match.'
+- 'Entered by a Thermal Plant company administrator, devon.brooks: UtilityGenerationConfig_Save refuses anyone who is not a
+  company or system administrator, and adding a rate assignment needs node level 3 (Points level 3, eem_ntp_points_admin).
+  keiko.tan (Points level 2, Rates and Allocations) can read the rows and the result. Neither she nor devon.brooks holds
+  the Bill Entry Web function (devon.brooks has Bill Administration and Bill Validation), so neither could press Create on
+  Generated Bills, which is one more reason the status is Auto.'
+records:
+- key: rwl_billing_meter
+  kind: Stage 2 records this step reads (entered in Stage 2, not entered again here)
+  Meter: rwl_farm_transfer in implementation/stage-2-hierarchy/03-meters.yaml
+  Meter facts: Ridgeline Farm Transfer Meter, SYN-RWL-M-0110000, under Ridgeline Turbine Field, billing account SYN-RWL-G-0000001,
+    Utility Provider Ridgeline Wind, Bill Cycle 1, Measure Type Electricity, Open from 2024-07-01, no keywords, no provider meter number
+  Point: agg_ntp_ridgeline_generated_kwh_10m in implementation/stage-2-hierarchy/06-aggregates.yaml
+  Point facts: Ridgeline Farm Generated kWh 10m, Parent Ridgeline Farm Transfer Meter, Electricity, KilowattHours - (kWh), 10 minutes,
+    the ten Generated kWh 10m points as Required members at multiplier 1
+  Needed first: the meter has its point (a meter with no child point is refused by UtilityGenerationConfig_Save), the aggregate is
+    registered (PRODUCT FINDING 14), and Stage 3 has loaded the turbines and run ridgeline_aggregates over 2024-07 to 2025-12
+- key: rwl_farm_transfer_billgen
+  Node: Ridgeline Farm Transfer Meter (Stage 2, rwl_farm_transfer)
+  Bill Scenarios:
+    Rate Configuration:             # entered in Stage 4 step 6, on this meter only; shown because the Bill Generation row needs it
+    - Rate: RWL-XFER-2024
+      Start Date: 2024-07-01
+      End Date: null
+      Bill: false
+      Scenario: Actual
+    Point Assignment: none excluded, the meter's one point is the aggregate
+  Bill Generation:
+    Assigned Rates: RWL-XFER-2024
+    Fiscal Start:
+      Year: 2024
+      Period: 7
+    Fiscal End:
+      Year: 2025
+      Period: 12
+    Schedule: CC (Company Calendar)
+    Status: Auto
+    Available %: 100                # assumed, see the notes
+    Offset: 0
+  Repeat: 'March 2025 only (assumed): the month holds 4,458 of 4,464 intervals and waits at Available % 100, so set Available % to 99,
+    Run Now on Run Bill Gen once the other months have generated, then set it back to 100.'
+  notes: Generation type 3, Auto. One generation row for the meter and scenario, so Add shows only while there is none. Stage 4
+    assigns the rate to the billing meter only, so the ten pad meters have neither a rate nor a generation row and only this
+    meter writes bills. The same row can be edited on the Web Bill Generation Configuration report once the meter has its rate.
+- key: rwl_transfer_acceptance_2024_07
+  Account: SYN-RWL-G-0000001
+  Period: {Fiscal Year: 2024, Fiscal Period: 7, Service From: 2024-07-01, Service To: 2024-07-31}
+  Must equal: the hand-made July 2024 statement, bill rwl_transfer_2024_07 in data/bills/northlake-itemized-bills-v1.yaml
+  Generated kWh 10m summed over the engine's July, per turbine:
+    SYN-RWL-M-0110001 (WTG-01): 238412
+    SYN-RWL-M-0110002 (WTG-02): 233905
+    SYN-RWL-M-0110003 (WTG-03): 229768
+    SYN-RWL-M-0110004 (WTG-04): 226341
+    SYN-RWL-M-0110005 (WTG-05): 224087
+    SYN-RWL-M-0110006 (WTG-06): 225530
+    SYN-RWL-M-0110007 (WTG-07): 222196
+    SYN-RWL-M-0110008 (WTG-08): 219874
+    SYN-RWL-M-0110009 (WTG-09): 217402
+    SYN-RWL-M-0110010 (WTG-10): 213869
+  Farm total kWh: 2251384
+  Generated bill:
+    Bills: 1
+    Lines:
+    - {Line: Transfer energy, Quantity: 2251384, Unit: kWh, Rate: 0.058, Amount: 130580.27}
+    - {Line: Research credit, Quantity: 0, Amount: -1250.00}   # the hand-made statement prints 1 month at -1,250.00; the engine writes every money-only line with Quantity 0 (UtilityBillLineItems_Get.sql:121-123)
+    Total: 129330.27
+  notes: 2,251,384 x 0.058 = 130,580.272, which rounds to the line amount; less 1,250.00 gives 129,330.27 (the header keeps
+    129,330.2720). The sums are over the points' stored LocalTimeStamp, which Stage 3's recipe makes Pacific civil time, cut the
+    way the engine cuts a month (stamps after 2024-07-01 00:00 up to and including 2024-08-01 00:00, 4,464 intervals, which is
+    the rows stamped 2024-06-30 23:10 PST through 2024-07-31 23:00 PST on the SCADA clock; see the Available % and stamp notes). Stage 3's
+    ridgeline_period_totals ties the same figures out, and Bill Generation slices on the same stored stamps, which answers the
+    question Stage 3 left open for this step. The ten rows of per-turbine kWh also check Stage 3 on their own; they are the
+    hand-made statement's meter rows. In the bill items, Stage 4's Commodity Mapping names the commodities (Non-TOU kWh for
+    the energy line and Elec Misc Chgs/Credits for the credit, both in the installed catalog); the energy line's quantity
+    and both amounts are what must match, and the credit line's quantity is 0, as on every money-only generated line.
+- key: rwl_wtg07_outage_months
+  Months: 2025-02, 2025-03 and 2025-04
+  Turbine: WTG-07 (SYN-RWL-M-0110007), gearbox failure 2025-02-11 to 2025-04-22
+  Data: Generated kWh 10m is 0 for every interval from 2025-02-11 to 2025-04-22, Turbine State 2 (Fault) and Possible kW 10m
+    still reported; the rows keep arriving, so the interval counts do not change
+  Expect: the three statements are lower because WTG-07's share (9.9% of July 2024's farm, 12,887.37 of 130,580.27) is missing;
+    each still has exactly the two lines and the research credit once, with no adjustment line and no regeneration, while
+    January and May 2025 carry all ten turbines
+  notes: No outage rule is configured anywhere. The rate prices metered energy, and lost production is not metered; EEM
+    carries it only as the gap between Possible kW and Generated kWh (the expected-against-actual goal, findings 41 and 47).
+- key: rwl_transfer_run_order
+  Run Order:
+  - 'Stage 1: the Thermal Plant calendar (24 months, 2024-2025), the Ridgeline Wind provider with Bill Cycle 1 and its 18 periods, and the groups
+    and users (devon.brooks administers the company, keiko.tan reads).'
+  - 'Stage 2: account SYN-RWL-G-0000001, the billing meter Ridgeline Farm Transfer Meter, the ten pad meters with their Generated kWh 10m
+    points, then the farm aggregate under the billing meter (after the fix for PRODUCT FINDING 14). The meter must have its point before
+    the Bill Generation row can be saved (UtilityGenerationConfig_Save refuses No interval points assigned to meter).'
+  - 'Stage 3: the Ridgeline FIG import, from the row stamped 2024-06-30 23:10 PST (the ten minutes from Pacific midnight) through the row
+    stamped 2026-01-01 00:00 PST (the stamp note), then ridgeline_aggregates (Recalculate) so the farm aggregate holds every interval. This can also
+    come after the next two items; only the last two need it.'
+  - 'Stage 4: RWL-XFER-2024 (Transfer energy 0.058 per kWh, Research credit -1,250.00 per month, effective 2024-07-01 to 2025-12-31) with
+    its determinants under the class All and their Commodity Mapping, then step 6 assigns it to the billing meter only, Bill unchecked. The rate must
+    exist before the assignment, and the assignment before the Bill Generation row.'
+  - 'This step: save the Bill Generation row on the billing meter. Saving it creates the 18 UtilityBillGenLog rows (2024-07 to 2025-12).'
+  - 'Preview: the Billing Charges report on the billing meter for 2024-07-01 to 2024-07-31 shows the two lines and 129,330.27 before any bill
+    is written.'
+  - 'Step 7: Run Bill Gen (Task_Tbl 42) scheduled every 5 minutes, then Run Now. Each month whose data is complete becomes one bill; a month
+    under Available % waits and is not an error. Then the March 2025 step in the record above.'
+  - 'Check: Generated Bills for Northlake Thermal Plant, Actual, 2024-07 to 2025-12 lists 18 rows with a bill each; the acceptance case and
+    the outage months above.'

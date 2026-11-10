@@ -6,7 +6,7 @@
   <meta name="robots" content="noindex, nofollow">
   <meta name="color-scheme" content="light">
   <title>Configure Northlake Synthetic Identity</title>
-  <meta name="theme-color" content="#1F3A5F">
+  <meta name="theme-color" content="#14263F">
   <link rel="icon" href="/branding/northlake-mark.svg" type="image/svg+xml">
   <link rel="icon" href="/branding/favicon-32.png" type="image/png">
   <link rel="stylesheet" href="/branding/brand.css">
@@ -19,7 +19,7 @@
     <div class="nl-masthead__inner">
       <div class="nl-masthead__brand">
         <a class="nl-lockup" href="/">
-          <img class="nl-lockup__image" src="/branding/northlake-logo-reversed.svg" alt="Northlake University" width="237" height="64">
+          <img class="nl-lockup__image" src="/brands/northlake/logo.svg" alt="Northlake University" width="238" height="64">
         </a>
         <span class="nl-masthead__title">Identity configuration</span>
       </div>
@@ -118,12 +118,74 @@
         </section>
       </aside>
     </div>
+
+    <!-- Moved from the old launchpad, which is now the Northlake site. -->
+    <section class="test-provider" aria-labelledby="test-title">
+      <p class="eyebrow">Try it</p>
+      <h2 id="test-title">Test the provider with Energy Hippo</h2>
+      <div class="test-grid">
+        <div class="nl-card test-card">
+          <h3>Single sign-on, step by step</h3>
+          <ol class="test-steps">
+            <li>
+              <b>Sign in to Northlake.</b> Keycloak validates the user and starts the
+              provider's browser session.
+              <a href="/realms/northlake/account/" target="_blank" rel="noopener">Open the account page</a>
+            </li>
+            <li>
+              <b>Open Energy Hippo.</b> Energy Hippo starts its own OIDC authorization
+              request or SAML AuthnRequest and validates the callback. The shortcuts on
+              the <a href="/">Northlake site</a> do this through
+              <code>Account/ExternalAutoLogin?provider=…&amp;returnRoute=…</code> and land
+              on one page.
+            </li>
+            <li>
+              <b>Return without another password.</b> Northlake reuses its session and
+              returns OIDC tokens or a signed SAML response to the registered callback.
+            </li>
+          </ol>
+          <p class="test-note">These pages never handle passwords or tokens.</p>
+        </div>
+        <div class="nl-card test-card">
+          <h3>SAML 2.0 provider</h3>
+          <p class="test-note">
+            Keycloak returns a persistent NameID and the Northlake attribute set in an
+            HTTP-POST response. Both the response and the assertion are signed with
+            RSA-SHA256; the focused verifier checks signatures, issuer, audience,
+            destination, recipient, time bounds, request correlation, replay
+            resistance, logout and disabled users.
+          </p>
+          <dl class="test-contract">
+            <div><dt>Service-provider entity ID</dt><dd>urn:energyhippo:eemsuite-web:saml:standard</dd></div>
+            <div><dt>NameID</dt><dd>persistent</dd></div>
+            <div><dt>Response binding</dt><dd>HTTP-POST</dd></div>
+            <div><dt>Identity key</dt><dd>(IdP entity ID, persistent NameID)</dd></div>
+            <div><dt>Signatures</dt><dd>Response + Assertion · RSA-SHA256</dd></div>
+          </dl>
+          <div class="actions">
+            <a class="button button-secondary" href="/realms/northlake/protocol/saml/descriptor">Open SAML metadata</a>
+            <a class="button button-secondary" href="/realms/northlake/protocol/saml/clients/northlake-saml-standard" target="_blank" rel="noopener">Launch IdP-initiated SSO</a>
+          </div>
+          <p class="test-note">
+            IdP-initiated SSO posts to the SAML client's default ACS. Energy Hippo
+            accepts it only when the provider allows unsolicited responses, and then
+            opens the user's home page: it treats any RelayState as its own handle, so
+            this path cannot land on a specific page.
+          </p>
+        </div>
+      </div>
+      <p class="test-links">
+        <a href="/realms/northlake/.well-known/openid-configuration">OIDC discovery</a> ·
+        <a href="/admin/northlake/console/">Realm administration</a> ·
+        <a href="https://customer.localtest.me:8443/customer/">Customer browser lab</a>
+      </p>
+    </section>
   </main>
 
   <footer class="nl-page-footer">
     <div class="nl-page-footer__inner">
     <span>Development use only · loopback Docker environment</span>
-    <a href="/">Back to identity launchpad</a>
+    <a href="/">Northlake site</a>
   </div>
   </footer>
 </body>

@@ -1,10 +1,10 @@
-packetVersion: 0.3
-issuedOn: '2026-09-14'
-purpose: Facilities and meter onboarding on the corrected inventory standard, followed by the first AcquiSuite acceptance run.
+packetVersion: 0.4
+issuedOn: '2026-10-01'
+purpose: Facilities and meter onboarding on the corrected inventory standard, followed by the first AcquiSuite acceptance run. Revision 0.4 adds the Ridgeline Wind Site the Thermal Plant acquired on 2024-07-01.
 
 # These are customer decisions and source-system descriptions. The scenario
 # manifest owns sites, buildings, accounts, meters and channels; Stage 1B owns
-# only the EEM mapping rules. See implementation/northlake-inventory-standard.pdf.
+# only the EEM mapping rules. See implementation/stage-2-hierarchy/northlake-inventory-standard.pdf.
 companies:
   northlake_university: Northlake University
   cedar_row_apartments: Cedar Row Apartments
@@ -21,6 +21,8 @@ contacts:
   - {personId: leo.martinez, email: sustainability@northlake.example.edu, phone: '916-555-4400', appliesTo: 'Solar, weather and sustainability reporting', notes: Sustainability shared mailbox.}
   - {personId: maya.chen, email: housing.ops@northlake.example.edu, phone: '916-555-4200', appliesTo: Cedar Row operations and resident utility questions, notes: Housing shared mailbox; belongs to Cedar Row Apartments.}
   - {personId: devon.brooks, phone: '916-555-0104', appliesTo: 'Thermal plant operations, steam and chilled-water allocations', notes: Internal thermal-service counterparty and plant escalation contact.}
+  - {personId: mateo.alvarez, email: ridgeline.ops@northlake.example.edu, phone: '707-555-0146', appliesTo: 'Ridgeline Wind site, turbine SCADA, met mast and the monthly transfer statement', notes: Ridgeline operations shared mailbox; internal counterparty for the transfer statements.}
+  - {personId: elena.vasquez, email: wind.research@northlake.example.edu, phone: '916-555-4510', appliesTo: Wind Energy Research Lab data access and turbine performance research, notes: Research lab shared mailbox; read-only access to the Ridgeline site.}
   - {id: owen.blake, providerId: valley_electric_district, name: Owen Blake, role: Electric account representative, email: owen.blake@valleyelectric.example, phone: '916-555-6100', appliesTo: Electric bills and interval files}
   - {id: marisol.vega, providerId: sierra_gas_utility, name: Marisol Vega, role: Gas account representative, email: marisol.vega@sierragas.example, phone: '916-555-6150', appliesTo: Gas bills and route files}
   - {id: dana.perez, providerId: river_city_utilities, name: Dana Perez, role: Municipal utility representative, email: dana.perez@rivercity.example, phone: '916-555-6200', appliesTo: 'Water, sewer and stormwater bills'}
@@ -33,6 +35,8 @@ organizationUnits:
   - {name: Finance and Accounts Payable, purpose: 'Utility account ownership, invoice payment, account changes and bill processing.', contactId: priya.nandakumar}
   - {name: Sustainability Office, purpose: 'Reporting, renewable energy accounting, emissions factors and performance tracking.', contactId: leo.martinez}
   - {name: Thermal Plant Operations, purpose: 'Plant operations, steam and chilled-water service, allocation statements and controller sources.', contactId: devon.brooks}
+  - {name: Ridgeline Wind Operations, purpose: 'The plant''s wind company: turbines, SCADA and met mast, the Valley Electric interconnection and the monthly transfer statement.', contactId: mateo.alvarez}
+  - {name: Wind Energy Research Lab, purpose: 'Mechanical Engineering research on the Ridgeline turbines: performance, power curves and wake losses. Reads data; never changes setup.', contactId: elena.vasquez}
 
 decisions:
   - [Ownership, 'Campus, Cedar Row and Thermal Plant are separate EEM companies. A building exists once, in the company that owns its site, and holds every meter that serves it.']
@@ -40,13 +44,16 @@ decisions:
   - [Cedar Row metering, 'Master-metered by building with owned submeters: one electric and one water submeter per apartment plus house meters. The utility bills the property, never a resident.']
   - [Names and areas, 'Buildings keep the names the customer uses (Science Center, Library); every document and manifest uses the same name and the scenario areas.']
   - [Student Center thermal service, Steam only; chilled-water service is not part of the current inventory.]
-  - [Weather, Northlake University owns the shared KSAC and KSMF references. All buildings use KSAC observations; KSMF is the secondary and forecast source.]
+  - [Weather, Northlake University owns the shared KSAC/KSMF/KSUU stations. Campus and Central Plant use KSAC; Cedar Row uses KSMF; Ridgeline uses KSUU. Each station has six separate hourly forecast points.]
   - [Deduct meters, 'Kitchen, pool-fill and cooling-tower deduct submeters are read monthly by hand; the input path into EEM is a Stage 2 decision.']
   - [Stormwater, 'Campus building water accounts include stormwater ERUs; irrigation, fire-service, Central Plant and Cedar Row accounts have no stormwater charge.']
   - [Solar, Northlake retains RECs under HOS-PPA-2024. Keep exported energy distinct from total generated energy.]
   - [Overlapping measurements, Library historian values and meter readings represent the same service; do not add them together.]
   - [Rollup boundary, 'Campus interval totals cover the four interval-metered buildings (Science Center, Student Center, Lakeview Residence Hall, Recreation and Aquatics Center); they are not the entire campus utility total.']
   - [FIG variants, Seven format cases reuse one destination measurement in separate restored runs. Never ingest all variants together as independent consumption.]
+  - [Ridgeline Wind, 'The Thermal Plant bought Ridgeline Wind on 2024-07-01 with university capital funding. Its site belongs to the plant company: ten turbine meters, a met mast and the Valley Electric interconnection meter. The plant buys the output at an internal transfer price, and EEM generates that monthly statement.']
+  - [Wind credits, 'Valley Electric credits the farm''s export on the generator account and moves the credit to the Central Plant account (VED-BCT). The credit appears on both bills; count it once.']
+  - [Research access, 'The Wind Energy Research Lab is part of the university. Its researchers read the Ridgeline site, and nothing else of the plant, with no access to bills or setup.']
 
 # Profile IDs refer to gatewayBindings.profiles in demo-university-v1.yaml.
 sources:
@@ -54,8 +61,7 @@ sources:
   gw_mv90_valley_mdef: [Valley Electric meter-data service, Valley Electric District, File delivery, MV90 MDEF, Daily, Local timestamps; timezone and DST behavior require acceptance]
   gw_mv90_helios_mv9: [Helios solar meter-data service, Helios Onsite Solar, File delivery, MV90 MV9, Daily, Local timestamps; timezone and DST behavior require acceptance]
   gw_bacnet_thermal_plant: [Central plant building automation, Thermal Plant, Device polling, BACnet, Hourly, Poll time; historical replay is a separate input path]
-  gw_noaa_ksac_observations: [KSAC weather observations, Facilities Operations, Weather service, NOAA, Hourly, Source observation time]
-  gw_aeris_ksmf_weather: [KSMF observations and forecast, Sustainability, Weather service, Aeris, Hourly, Observation and forecast valid times remain separate]
+  gw_noaa_ksac_observations: [NOAA observations and six hourly forecast measurements for KSAC/KSMF/KSUU, Facilities Operations, Weather service, NWS and NCEI, Current every 15 minutes; forecasts refreshed hourly, Observation times and forecast period end times stay on separate points]
   gw_spinwave_science_lab: [Science Center laboratory sensors, Facilities Operations, File delivery, Spinwave CSV, Every 15 minutes, Source timestamp]
   gw_fig_multi_format: [Cedar Row A water export, River City Utilities, File delivery, FIG family, Hourly, Source timestamp with configured offset]
   gw_fig_fixed_network_submeters: [Fixed-network electric submeters, Facilities and Housing Operations, File delivery, FIG fixed network, Hourly, Source timestamp]
@@ -65,6 +71,7 @@ sources:
   gw_neptune_river_city_water: [Cedar Row B water route, River City Utilities, Handheld upload, Neptune, Monthly route, Actual reading timestamp; monthly is a cadence rather than a fixed 30-day period]
   gw_neptune_cedar_row_submeters: [Cedar Row apartment water submeter route, Housing Operations, Handheld upload, Neptune, Monthly route, Actual reading timestamp; monthly is a cadence rather than a fixed 30-day period]
   gw_mvrs_sierra_gas: [Student Center gas route, Sierra Gas Utility, Handheld upload, MVRS, Monthly route, Actual reading timestamp; monthly is a cadence rather than a fixed 30-day period]
+  gw_fig_ridgeline_scada: [Ridgeline turbine SCADA and met mast, Ridgeline Wind Operations, File delivery, FIG CSV, Every 10 minutes, Pacific Standard Time all year; the SCADA clock never moves to daylight time]
   hmr_events_publish: [Handheld reading exceptions, Facilities Operations, Reading event upload, HMR events, With each route, Event timestamp]
 
 acquiSuiteSample:
@@ -89,12 +96,15 @@ acquiSuiteSample:
 # Customer event register. Only the January 15 interval deliveries are supplied.
 knownEvents:
   - ['2024-08-15', Library, Meter replacement, Electric, 'Old meter ends August 14; replacement starts August 15.', Preserve continuity without counting both meters for the same period., Planned, Bill and meter lifecycle acceptance pending.]
-  - ['2024-02-16', Student Center, Corrected bill, Natural gas, Estimated bill followed by a corrected bill., Retain both documents and identify the corrected period., Planned, Existing illustrated statements require reconciliation.]
+  - ['2024-12-16', Student Center, Corrected bill, Natural gas, 'Estimated bill for October 15 to November 14, 2024, corrected after the December read.', Retain both documents and identify the corrected period., Planned, Both statements supplied.]
   - ['2024-01-15', Student Center, Missing interval block, Electric, 'Eight intervals missing from 12:00 through 13:45 PST.', 'Backfill restores 96 intervals and 2020 kWh.', Sample supplied, Installed acceptance pending.]
   - ['2024-09-04', Northlake Main Campus, Duplicate billing file, Water / sewer, River City bundled file delivered twice., The second delivery must not duplicate charges or usage., Planned, Billing fixture and acceptance pending.]
-  - ['2024-07-01', Cedar Row A, Account change, Water / sewer, Municipal account number changes at renewal., Map old and new account numbers while retaining service history., Planned, The new account number and transition fixture are still to be specified.]
+  - ['2024-07-01', Cedar Row A, Account change, Water / sewer, 'Municipal account number changes at renewal, SYN-RCU-A-0030103 to SYN-RCU-A-0030003.', Map old and new account numbers while retaining service history., Planned, The September 2024 bill under the new number is supplied.]
   - ['2025-01-01', All VED-TOU-GS accounts, Rate change, Electric, VED-TOU-GS changes to VED-TOU-GS-FY25., Apply the correct effective tariff., Documented, Rate model and bill acceptance pending.]
   - ['2024-11-12', Student Center negative test, Unsupported units, Natural gas, Deliberately unsupported unit in a separate input file., Reject the file without partially loading it., Planned, Negative fixture not supplied with the AcquiSuite normal-day packet.]
+  - ['2024-07-01', Ridgeline Wind Site, Acquisition, Wind generation / electric, 'The Thermal Plant bought Ridgeline Wind. Valley Electric closed the seller''s generator account SYN-VED-A-0019014 on June 30 and opened SYN-VED-A-0010014 for the plant.', 'Start the Ridgeline accounts, meters and statements on July 1; record the seller''s number as the previous account number.', Documented, The seller's account number is from the transfer letter; confirm it against the first Valley Electric bill.]
+  - ['2024-09-04', Central Plant, Bill credit transfer, Electric, 'The first VED-BCT credit, for the export on the generator account''s first bill (July 1 to August 4), is on the Central Plant bill for August 5 to September 4; each credit lands one billing cycle after the generator bill that earned it.', 'Show the credit on the Central Plant bill and the matching transfer out on the generator bill; count it once.', Documented, Bill acceptance pending.]
+  - ['2025-02-11', Ridgeline WTG-07, Turbine outage, Wind generation, 'Gearbox failure; WTG-07 stopped until April 22. SCADA rows keep arriving with state Fault, zero energy and full possible power.', 'Report the lost production against possible power; it is an outage, not missing data.', Documented, Interval acceptance pending.]
 
 deferredAcceptance:
   - Confirm actual lookup IDs and available screens in the installed instance during UI entry.
@@ -106,3 +116,5 @@ deferredAcceptance:
   - Add the planned chiller digital status and activity-index input paths before claiming those measurements work.
   - Supply the fixed-network submeter file and the Cedar Row submeter route upload before claiming apartment-level data.
   - Decide the input path for the manual deduct-meter readings.
+  - Supply the Ridgeline SCADA and met-mast sample files, and prove the standard-time clock, before claiming wind data.
+  - Reproduce the hand-made July 2024 Ridgeline transfer statement with EEM's bill generation before relying on generated statements.

@@ -9,7 +9,7 @@ customer:
 # EEM companies are operating and security boundaries, not legal entities. Each
 # site below names the company that owns it; a building, meter or point belongs
 # to exactly one company and is never duplicated in another.
-# See implementation/northlake-inventory-standard.pdf.
+# See implementation/stage-2-hierarchy/northlake-inventory-standard.pdf.
 companies:
   - id: northlake_university
     displayName: Northlake University
@@ -27,6 +27,7 @@ companies:
 weather:
   primaryStation: KSAC
   secondaryStation: KSMF
+  windSiteStation: KSUU      # Travis AFB, the nearest airport to the Ridgeline Wind site
 
 dateRange:
   start: 2024-01-01
@@ -320,6 +321,56 @@ sites:
           latitude: 38.53725
           longitude: -121.49685
           coordinateSource: synthetic_plausible_sacramento
+  # Bought by the Thermal Plant on 2024-07-01 with university capital funding: ten 660 kW
+  # turbines in the Montezuma Hills, about fifty miles southwest of campus. The plant buys the
+  # output at an internal transfer price (provider Ridgeline Wind); Valley Electric meters the
+  # interconnection. The Mechanical Engineering department's Wind Energy Research Lab works here.
+  - id: ridgeline_wind_site
+    displayName: Ridgeline Wind Site
+    ownerCompanyId: northlake_thermal_plant
+    type: wind_generation_site
+    acquiredOn: 2024-07-01
+    address:
+      line1: 8400 Montezuma Hills Road
+      city: Rio Vista
+      state: CA
+      postalCode: "94571"
+      latitude: 38.12260
+      longitude: -121.81340
+      coordinateSource: synthetic_plausible_solano_county
+    buildings:
+      - id: ridgeline_turbine_field
+        displayName: Ridgeline Turbine Field
+        kind: grounds
+        useType: wind_turbine_array
+        serviceProfile:
+          onsiteGeneration: wind_ten_660_kw_turbines_6600_kw
+          processLoads: [turbine_scada_10_minute, met_mast_50_m_hub_height]
+          notes: Ten turbines on one ridge, each with a revenue-grade pad meter and SCADA; the met mast stands upwind of WTG-01. No floor area.
+        address:
+          line1: 8400 Montezuma Hills Road
+          city: Rio Vista
+          state: CA
+          postalCode: "94571"
+          latitude: 38.12260
+          longitude: -121.81340
+          coordinateSource: synthetic_plausible_solano_county
+      - id: ridgeline_substation
+        displayName: Ridgeline Substation
+        kind: grounds
+        useType: collector_substation
+        serviceProfile:
+          production: [collector_substation_34_5_kv_interconnection]
+          processLoads: [station_service_when_turbines_idle, research_lab_field_office]
+          notes: The point of interconnection with Valley Electric; its control house holds the SCADA server and the research lab's field office. No floor area is benchmarked.
+        address:
+          line1: 8460 Montezuma Hills Road
+          city: Rio Vista
+          state: CA
+          postalCode: "94571"
+          latitude: 38.11480
+          longitude: -121.79210
+          coordinateSource: synthetic_plausible_solano_county
 
 # ENERGY STAR Portfolio Manager property mapping.
 # Each site/building maps to a PM Property with a primaryFunction (an exact
@@ -327,7 +378,7 @@ sites:
 # details. Field names, enum values, and units are grounded in the EEMSuite
 # EnergyStar integration model and the ENERGY STAR "U.S. Property Types,
 # Definitions, and Use Details" reference (Oct 2024). See
-# implementation/energystar-integration.pdf for the full mapping and integration notes.
+# implementation/stage-8-sustainability/energystar-integration.pdf for the full mapping and integration notes.
 # Three PM grouping models are represented: a campus (College/University parent
 # with child building properties), a multifamily property (one benchmarked
 # property containing physical buildings), and a standalone plant property.
@@ -591,7 +642,7 @@ energyStarProperties:
           numberOfWorkersOnMainShift: 8
     notes: Excluded from the campus academic benchmarking boundary; benchmarked for the plant company's own reporting.
 
-# Five fully-configured providers, split 3 everyday + 2 unique identities.
+# Six fully-configured providers, split 3 everyday + 3 unique identities.
 # Full definitions (services, units, channels, rate schedules, charges, file
 # formats, environmental attributes, scenario hooks) live in data/providers/<id>.yaml.
 # Owned submeters, deduct meters, production meters and logical sources have no
@@ -623,7 +674,7 @@ providers:
     supplies: [monthly_bill]
     configRef: data/providers/river-city-utilities.yaml
     replaces: [river_city_water, capital_sewer_district]
-  # --- 2 unique provider identities (not everyday utilities) ---
+  # --- 3 unique provider identities (not everyday utilities) ---
   - id: northlake_thermal_plant
     displayName: Northlake Thermal Plant
     identityClass: unique
@@ -640,8 +691,16 @@ providers:
     categories: [solar_generation]
     supplies: [interval_15min, monthly_ppa_invoice, rec_statement]
     configRef: data/providers/helios-onsite-solar.yaml
+  - id: ridgeline_wind
+    displayName: Ridgeline Wind
+    identityClass: unique
+    providerKind: offsite_generation_internal
+    billingModel: internal_generation_transfer
+    categories: [wind_generation]
+    supplies: [interval_10min, monthly_generated_statement]
+    configRef: data/providers/ridgeline-wind.yaml
 
-# External reference streams that belong to no building: the two weather
+# External reference streams that belong to no building: the three weather
 # stations. Building sensors, historians, controllers and test signals are
 # owned meters of the building they describe (see ownedMeters).
 referenceChannels:
@@ -653,6 +712,14 @@ referenceChannels:
     unit: degF
     intervalMinutes: 60
     pointType: temp_f
+  - id: ch_weather_ksac_dewpoint_f_hourly
+    sourceKind: weather_station
+    sourceId: KSAC
+    commodity: weather
+    role: observation
+    unit: degF
+    intervalMinutes: 60
+    pointType: DewPoint
   - id: ch_weather_ksac_rh_hourly
     sourceKind: weather_station
     sourceId: KSAC
@@ -669,14 +736,46 @@ referenceChannels:
     unit: mph
     intervalMinutes: 60
     pointType: wind_mph
-  - id: ch_weather_ksmf_temp_f_hourly
+  - id: ch_weather_ksac_forecast_temp_f_hourly
+    sourceKind: weather_station
+    sourceId: KSAC
+    commodity: weather
+    role: forecast
+    unit: degF
+    intervalMinutes: 60
+    pointType: Temperature
+  - id: ch_weather_ksuu_forecast_temp_c_hourly
+    sourceKind: weather_station
+    sourceId: KSUU
+    commodity: weather
+    role: forecast
+    unit: degC
+    intervalMinutes: 60
+    pointType: Temperature
+  - id: ch_weather_ksmf_temp_c_hourly
     sourceKind: weather_station
     sourceId: KSMF
     commodity: weather
     role: observation
-    unit: degF
+    unit: degC
     intervalMinutes: 60
-    pointType: tempF
+    pointType: tempC
+  - id: ch_weather_ksmf_rh_hourly
+    sourceKind: weather_station
+    sourceId: KSMF
+    commodity: weather
+    role: observation
+    unit: pct
+    intervalMinutes: 60
+    pointType: RelativeHumidity
+  - id: ch_weather_ksmf_dewpoint_c_hourly
+    sourceKind: weather_station
+    sourceId: KSMF
+    commodity: weather
+    role: observation
+    unit: degC
+    intervalMinutes: 60
+    pointType: DewPoint
   - id: ch_weather_ksmf_forecast_temp_f_hourly
     sourceKind: weather_station
     sourceId: KSMF
@@ -685,6 +784,168 @@ referenceChannels:
     unit: degF
     intervalMinutes: 60
     pointType: tempF
+  - id: ch_weather_ksmf_wind_kph_hourly
+    sourceKind: weather_station
+    sourceId: KSMF
+    commodity: weather
+    role: observation
+    unit: kph
+    intervalMinutes: 60
+    pointType: windSpeedKPH
+  # KSUU (Travis AFB) is the long-term reference for the Ridgeline met mast. METAR reports wind
+  # in knots; configure the NOAA point output unit explicitly as Knots.
+  - id: ch_weather_ksuu_temp_c_hourly
+    sourceKind: weather_station
+    sourceId: KSUU
+    commodity: weather
+    role: observation
+    unit: degC
+    intervalMinutes: 60
+    pointType: tempm
+  - id: ch_weather_ksuu_rh_hourly
+    sourceKind: weather_station
+    sourceId: KSUU
+    commodity: weather
+    role: observation
+    unit: pct
+    intervalMinutes: 60
+    pointType: RelativeHumidity
+  - id: ch_weather_ksuu_wind_knots_hourly
+    sourceKind: weather_station
+    sourceId: KSUU
+    commodity: weather
+    role: observation
+    unit: knots
+    intervalMinutes: 60
+    pointType: wspdm
+  - id: ch_weather_ksuu_dewpoint_c_hourly
+    sourceKind: weather_station
+    sourceId: KSUU
+    commodity: weather
+    role: observation
+    unit: degC
+    intervalMinutes: 60
+    pointType: dewptm
+  - id: ch_weather_ksmf_forecast_dewpoint_c_hourly
+    sourceKind: weather_station
+    sourceId: KSMF
+    commodity: weather
+    role: forecast
+    unit: degC
+    intervalMinutes: 60
+    pointType: DewPoint
+  - id: ch_weather_ksmf_forecast_rh_hourly
+    sourceKind: weather_station
+    sourceId: KSMF
+    commodity: weather
+    role: forecast
+    unit: pct
+    intervalMinutes: 60
+    pointType: RelativeHumidity
+  - id: ch_weather_ksmf_forecast_wind_kph_hourly
+    sourceKind: weather_station
+    sourceId: KSMF
+    commodity: weather
+    role: forecast
+    unit: kph
+    intervalMinutes: 60
+    pointType: WindSpeed
+  - id: ch_weather_ksmf_forecast_wind_direction_hourly
+    sourceKind: weather_station
+    sourceId: KSMF
+    commodity: weather
+    role: forecast
+    unit: deg
+    intervalMinutes: 60
+    pointType: WindDirection
+  - id: ch_weather_ksmf_forecast_precip_probability_hourly
+    sourceKind: weather_station
+    sourceId: KSMF
+    commodity: weather
+    role: forecast
+    unit: pct
+    intervalMinutes: 60
+    pointType: ProbabilityOfPrecipitation
+  - id: ch_weather_ksac_forecast_dewpoint_f_hourly
+    sourceKind: weather_station
+    sourceId: KSAC
+    commodity: weather
+    role: forecast
+    unit: degF
+    intervalMinutes: 60
+    pointType: DewPoint
+  - id: ch_weather_ksac_forecast_rh_hourly
+    sourceKind: weather_station
+    sourceId: KSAC
+    commodity: weather
+    role: forecast
+    unit: pct
+    intervalMinutes: 60
+    pointType: RelativeHumidity
+  - id: ch_weather_ksac_forecast_wind_mph_hourly
+    sourceKind: weather_station
+    sourceId: KSAC
+    commodity: weather
+    role: forecast
+    unit: mph
+    intervalMinutes: 60
+    pointType: WindSpeed
+  - id: ch_weather_ksac_forecast_wind_direction_hourly
+    sourceKind: weather_station
+    sourceId: KSAC
+    commodity: weather
+    role: forecast
+    unit: deg
+    intervalMinutes: 60
+    pointType: WindDirection
+  - id: ch_weather_ksac_forecast_precip_probability_hourly
+    sourceKind: weather_station
+    sourceId: KSAC
+    commodity: weather
+    role: forecast
+    unit: pct
+    intervalMinutes: 60
+    pointType: ProbabilityOfPrecipitation
+  - id: ch_weather_ksuu_forecast_dewpoint_c_hourly
+    sourceKind: weather_station
+    sourceId: KSUU
+    commodity: weather
+    role: forecast
+    unit: degC
+    intervalMinutes: 60
+    pointType: DewPoint
+  - id: ch_weather_ksuu_forecast_rh_hourly
+    sourceKind: weather_station
+    sourceId: KSUU
+    commodity: weather
+    role: forecast
+    unit: pct
+    intervalMinutes: 60
+    pointType: RelativeHumidity
+  - id: ch_weather_ksuu_forecast_wind_knots_hourly
+    sourceKind: weather_station
+    sourceId: KSUU
+    commodity: weather
+    role: forecast
+    unit: knots
+    intervalMinutes: 60
+    pointType: WindSpeed
+  - id: ch_weather_ksuu_forecast_wind_direction_hourly
+    sourceKind: weather_station
+    sourceId: KSUU
+    commodity: weather
+    role: forecast
+    unit: deg
+    intervalMinutes: 60
+    pointType: WindDirection
+  - id: ch_weather_ksuu_forecast_precip_probability_hourly
+    sourceKind: weather_station
+    sourceId: KSUU
+    commodity: weather
+    role: forecast
+    unit: pct
+    intervalMinutes: 60
+    pointType: ProbabilityOfPrecipitation
 
 # Provider accounts and the utility meters on them. Every meter names the
 # building it serves; the building's site names the owning EEM company.
@@ -903,8 +1164,9 @@ accounts:
     siteId: northlake_central_plant
     buildingId: central_plant
     syntheticAccountNumber: SYN-VED-A-0010013
-    rateScheduleId: VED-TOU-PRI
+    rateScheduleIds: [VED-TOU-PRI, VED-BCT]   # VED-BCT from 2024-07: the benefiting account for Ridgeline's export credit
     effectiveStart: 2024-01-01
+    scenarios: [generator_bill_credit_transfer]
     meters:
       - id: ved_central_plant_main
         displayName: Central Plant Electric Service
@@ -915,6 +1177,30 @@ accounts:
         channels:
           - {id: ch_ved_central_plant_kwh_15m, commodity: electric, role: interval_usage, unit: kWh, direction: delivered, intervalMinutes: 15, pointType: kWh}
           - {id: ch_ved_central_plant_kw_15m, commodity: electric, role: interval_demand, unit: kW, direction: delivered, intervalMinutes: 15, pointType: kW}
+  # The generator account moved to the plant with the acquisition: the seller's account
+  # (SYN-VED-A-0019014, assumed) closed 2024-06-30 and this one opened the next day.
+  - id: ved_ridgeline_generator
+    providerId: valley_electric_district
+    siteId: ridgeline_wind_site
+    buildingId: ridgeline_substation
+    syntheticAccountNumber: SYN-VED-A-0010014
+    previousSyntheticAccountNumber: SYN-VED-A-0019014
+    rateScheduleIds: [VED-GEN-IC, VED-BCT]
+    effectiveStart: 2024-07-01
+    scenarios: [generator_bill_credit_transfer, account_transferred_at_acquisition]
+    meters:
+      - id: ved_ridgeline_interconnection
+        displayName: Ridgeline Interconnection Meter
+        syntheticMeterNumber: SYN-VED-M-0040015
+        meterType: bidirectional_interval
+        serviceVoltageKv: 34.5
+        effectiveStart: 2024-07-01
+        gatewayProfiles: [gw_mv90_valley_mdef]
+        notes: Revenue meter at the 34.5 kV point of interconnection, recording both directions and reactive energy.
+        channels:
+          - {id: ch_ved_ridgeline_received_kwh_15m, commodity: electric, role: interval_export, unit: kWh, direction: received, intervalMinutes: 15, pointType: kWh}
+          - {id: ch_ved_ridgeline_delivered_kwh_15m, commodity: electric, role: interval_usage, unit: kWh, direction: delivered, intervalMinutes: 15, pointType: kWh, pointName: Station Service kWh 15m}
+          - {id: ch_ved_ridgeline_kvarh_15m, commodity: electric, role: interval_reactive, unit: kVArh, direction: received, intervalMinutes: 15, pointType: kVArh}
 
   # ---------------------------------------------------------------- Sierra Gas Utility
   - id: sgu_admin_hall
@@ -1490,6 +1776,7 @@ accounts:
         channels:
           - {id: ch_hos_science_center_gen_kwh_15m, commodity: solar_generation, role: interval_generation, unit: kWh, direction: generated, intervalMinutes: 15, pointType: kWh}
           - {id: ch_hos_science_center_export_kwh_15m, commodity: solar_generation, role: interval_export, unit: kWh, direction: exported, intervalMinutes: 15, pointType: kWh}
+          - {id: ch_hos_science_center_poa_irradiance_15m, commodity: weather, role: sensor_observation, unit: w_per_m2, intervalMinutes: 15, pointType: irradiance, pointName: Plane-of-Array Irradiance 15m}
           - {id: ch_hos_science_center_gen_kw_15m, commodity: solar_generation, role: interval_generation_demand, unit: kW, direction: generated, intervalMinutes: 15, pointType: kW}
   - id: hos_student_center
     providerId: helios_onsite_solar
@@ -1527,6 +1814,177 @@ accounts:
           - {id: ch_hos_cedar_row_carport_gen_kwh_15m, commodity: solar_generation, role: interval_generation, unit: kWh, direction: generated, intervalMinutes: 15, pointType: kWh}
           - {id: ch_hos_cedar_row_carport_export_kwh_15m, commodity: solar_generation, role: interval_export, unit: kWh, direction: exported, intervalMinutes: 15, pointType: kWh}
 
+  # ---------------------------------------------------------------- Ridgeline Wind (the plant's own generation company)
+  # One transfer agreement covers the farm; EEM generates its monthly statement from the ten
+  # turbine pad meters (Bill Generation). Each turbine's SCADA rides on its meter: energy, power,
+  # the controller's possible power at the measured wind, nacelle wind, rotor speed and run state.
+  - id: rwl_ridgeline_transfer
+    providerId: ridgeline_wind
+    siteId: ridgeline_wind_site
+    buildingId: ridgeline_turbine_field
+    syntheticAccountNumber: SYN-RWL-G-0000001
+    rateScheduleId: RWL-XFER-2024
+    effectiveStart: 2024-07-01
+    scenarios: [generated_bills, account_opened_mid_window]
+    meters:
+      # EEM's Bill Generation prices the points under ONE meter and writes one bill per meter and month
+      # (product finding 66), so the statement is generated on this logical meter, whose only point is
+      # the farm aggregate of the ten turbines' Generated kWh (Stage 1B aggregateTargets). The pad meters
+      # below keep their own data and get no generation row. EEM's demo database bills tenants this way.
+      - id: rwl_farm_transfer
+        displayName: Ridgeline Farm Transfer Meter
+        syntheticMeterNumber: SYN-RWL-M-0110000
+        meterType: logical_billing_meter
+        providerMeterNumber: ""        # a logical meter has no turbine position tag
+        readMethod: Calculated, the farm aggregate of the ten turbine meters
+        effectiveStart: 2024-07-01
+        notes: The meter Bill Generation runs on; its one point is Ridgeline Farm Generated kWh 10m.
+        channels: []
+      - id: rwl_wtg_01
+        displayName: Ridgeline WTG-01
+        syntheticMeterNumber: SYN-RWL-M-0110001
+        meterType: turbine_pad_meter
+        nameplateKw: 660
+        effectiveStart: 2024-07-01
+        gatewayProfiles: [gw_fig_ridgeline_scada]
+        notes: Upwind end of the ridge, beside the met mast.
+        channels:
+          - {id: ch_rwl_wtg01_kwh_10m, commodity: wind_generation, role: interval_generation, unit: kWh, direction: generated, intervalMinutes: 10, pointType: kWh}
+          - {id: ch_rwl_wtg01_kw_10m, commodity: wind_generation, role: interval_generation_demand, unit: kW, direction: generated, intervalMinutes: 10, pointType: kW, pointName: Active Power kW 10m}
+          - {id: ch_rwl_wtg01_possible_kw_10m, commodity: wind_generation, role: interval_possible_generation, unit: kW, direction: possible, intervalMinutes: 10, pointType: kW}
+          - {id: ch_rwl_wtg01_nacelle_wind_ms_10m, commodity: weather, role: sensor_observation, unit: m_per_s, intervalMinutes: 10, pointType: m_per_s, pointName: Nacelle Wind Speed 10m}
+          - {id: ch_rwl_wtg01_rotor_rpm_10m, commodity: wind_generation, role: equipment_speed, unit: rpm, intervalMinutes: 10, pointType: rpm, pointName: Rotor Speed 10m}
+          - {id: ch_rwl_wtg01_state_10m, commodity: wind_generation, role: equipment_status, unit: state, intervalMinutes: 10, pointType: state, pointName: Turbine State}
+      - id: rwl_wtg_02
+        displayName: Ridgeline WTG-02
+        syntheticMeterNumber: SYN-RWL-M-0110002
+        meterType: turbine_pad_meter
+        nameplateKw: 660
+        effectiveStart: 2024-07-01
+        gatewayProfiles: [gw_fig_ridgeline_scada]
+        channels:
+          - {id: ch_rwl_wtg02_kwh_10m, commodity: wind_generation, role: interval_generation, unit: kWh, direction: generated, intervalMinutes: 10, pointType: kWh}
+          - {id: ch_rwl_wtg02_kw_10m, commodity: wind_generation, role: interval_generation_demand, unit: kW, direction: generated, intervalMinutes: 10, pointType: kW, pointName: Active Power kW 10m}
+          - {id: ch_rwl_wtg02_possible_kw_10m, commodity: wind_generation, role: interval_possible_generation, unit: kW, direction: possible, intervalMinutes: 10, pointType: kW}
+          - {id: ch_rwl_wtg02_nacelle_wind_ms_10m, commodity: weather, role: sensor_observation, unit: m_per_s, intervalMinutes: 10, pointType: m_per_s, pointName: Nacelle Wind Speed 10m}
+          - {id: ch_rwl_wtg02_rotor_rpm_10m, commodity: wind_generation, role: equipment_speed, unit: rpm, intervalMinutes: 10, pointType: rpm, pointName: Rotor Speed 10m}
+          - {id: ch_rwl_wtg02_state_10m, commodity: wind_generation, role: equipment_status, unit: state, intervalMinutes: 10, pointType: state, pointName: Turbine State}
+      - id: rwl_wtg_03
+        displayName: Ridgeline WTG-03
+        syntheticMeterNumber: SYN-RWL-M-0110003
+        meterType: turbine_pad_meter
+        nameplateKw: 660
+        effectiveStart: 2024-07-01
+        gatewayProfiles: [gw_fig_ridgeline_scada]
+        channels:
+          - {id: ch_rwl_wtg03_kwh_10m, commodity: wind_generation, role: interval_generation, unit: kWh, direction: generated, intervalMinutes: 10, pointType: kWh}
+          - {id: ch_rwl_wtg03_kw_10m, commodity: wind_generation, role: interval_generation_demand, unit: kW, direction: generated, intervalMinutes: 10, pointType: kW, pointName: Active Power kW 10m}
+          - {id: ch_rwl_wtg03_possible_kw_10m, commodity: wind_generation, role: interval_possible_generation, unit: kW, direction: possible, intervalMinutes: 10, pointType: kW}
+          - {id: ch_rwl_wtg03_nacelle_wind_ms_10m, commodity: weather, role: sensor_observation, unit: m_per_s, intervalMinutes: 10, pointType: m_per_s, pointName: Nacelle Wind Speed 10m}
+          - {id: ch_rwl_wtg03_rotor_rpm_10m, commodity: wind_generation, role: equipment_speed, unit: rpm, intervalMinutes: 10, pointType: rpm, pointName: Rotor Speed 10m}
+          - {id: ch_rwl_wtg03_state_10m, commodity: wind_generation, role: equipment_status, unit: state, intervalMinutes: 10, pointType: state, pointName: Turbine State}
+      - id: rwl_wtg_04
+        displayName: Ridgeline WTG-04
+        syntheticMeterNumber: SYN-RWL-M-0110004
+        meterType: turbine_pad_meter
+        nameplateKw: 660
+        effectiveStart: 2024-07-01
+        gatewayProfiles: [gw_fig_ridgeline_scada]
+        channels:
+          - {id: ch_rwl_wtg04_kwh_10m, commodity: wind_generation, role: interval_generation, unit: kWh, direction: generated, intervalMinutes: 10, pointType: kWh}
+          - {id: ch_rwl_wtg04_kw_10m, commodity: wind_generation, role: interval_generation_demand, unit: kW, direction: generated, intervalMinutes: 10, pointType: kW, pointName: Active Power kW 10m}
+          - {id: ch_rwl_wtg04_possible_kw_10m, commodity: wind_generation, role: interval_possible_generation, unit: kW, direction: possible, intervalMinutes: 10, pointType: kW}
+          - {id: ch_rwl_wtg04_nacelle_wind_ms_10m, commodity: weather, role: sensor_observation, unit: m_per_s, intervalMinutes: 10, pointType: m_per_s, pointName: Nacelle Wind Speed 10m}
+          - {id: ch_rwl_wtg04_rotor_rpm_10m, commodity: wind_generation, role: equipment_speed, unit: rpm, intervalMinutes: 10, pointType: rpm, pointName: Rotor Speed 10m}
+          - {id: ch_rwl_wtg04_state_10m, commodity: wind_generation, role: equipment_status, unit: state, intervalMinutes: 10, pointType: state, pointName: Turbine State}
+      - id: rwl_wtg_05
+        displayName: Ridgeline WTG-05
+        syntheticMeterNumber: SYN-RWL-M-0110005
+        meterType: turbine_pad_meter
+        nameplateKw: 660
+        effectiveStart: 2024-07-01
+        gatewayProfiles: [gw_fig_ridgeline_scada]
+        channels:
+          - {id: ch_rwl_wtg05_kwh_10m, commodity: wind_generation, role: interval_generation, unit: kWh, direction: generated, intervalMinutes: 10, pointType: kWh}
+          - {id: ch_rwl_wtg05_kw_10m, commodity: wind_generation, role: interval_generation_demand, unit: kW, direction: generated, intervalMinutes: 10, pointType: kW, pointName: Active Power kW 10m}
+          - {id: ch_rwl_wtg05_possible_kw_10m, commodity: wind_generation, role: interval_possible_generation, unit: kW, direction: possible, intervalMinutes: 10, pointType: kW}
+          - {id: ch_rwl_wtg05_nacelle_wind_ms_10m, commodity: weather, role: sensor_observation, unit: m_per_s, intervalMinutes: 10, pointType: m_per_s, pointName: Nacelle Wind Speed 10m}
+          - {id: ch_rwl_wtg05_rotor_rpm_10m, commodity: wind_generation, role: equipment_speed, unit: rpm, intervalMinutes: 10, pointType: rpm, pointName: Rotor Speed 10m}
+          - {id: ch_rwl_wtg05_state_10m, commodity: wind_generation, role: equipment_status, unit: state, intervalMinutes: 10, pointType: state, pointName: Turbine State}
+      - id: rwl_wtg_06
+        displayName: Ridgeline WTG-06
+        syntheticMeterNumber: SYN-RWL-M-0110006
+        meterType: turbine_pad_meter
+        nameplateKw: 660
+        effectiveStart: 2024-07-01
+        gatewayProfiles: [gw_fig_ridgeline_scada]
+        channels:
+          - {id: ch_rwl_wtg06_kwh_10m, commodity: wind_generation, role: interval_generation, unit: kWh, direction: generated, intervalMinutes: 10, pointType: kWh}
+          - {id: ch_rwl_wtg06_kw_10m, commodity: wind_generation, role: interval_generation_demand, unit: kW, direction: generated, intervalMinutes: 10, pointType: kW, pointName: Active Power kW 10m}
+          - {id: ch_rwl_wtg06_possible_kw_10m, commodity: wind_generation, role: interval_possible_generation, unit: kW, direction: possible, intervalMinutes: 10, pointType: kW}
+          - {id: ch_rwl_wtg06_nacelle_wind_ms_10m, commodity: weather, role: sensor_observation, unit: m_per_s, intervalMinutes: 10, pointType: m_per_s, pointName: Nacelle Wind Speed 10m}
+          - {id: ch_rwl_wtg06_rotor_rpm_10m, commodity: wind_generation, role: equipment_speed, unit: rpm, intervalMinutes: 10, pointType: rpm, pointName: Rotor Speed 10m}
+          - {id: ch_rwl_wtg06_state_10m, commodity: wind_generation, role: equipment_status, unit: state, intervalMinutes: 10, pointType: state, pointName: Turbine State}
+      - id: rwl_wtg_07
+        displayName: Ridgeline WTG-07
+        syntheticMeterNumber: SYN-RWL-M-0110007
+        meterType: turbine_pad_meter
+        nameplateKw: 660
+        effectiveStart: 2024-07-01
+        gatewayProfiles: [gw_fig_ridgeline_scada]
+        scenarios: [turbine_outage]
+        notes: Gearbox failure 2025-02-11; stopped until 2025-04-22.
+        channels:
+          - {id: ch_rwl_wtg07_kwh_10m, commodity: wind_generation, role: interval_generation, unit: kWh, direction: generated, intervalMinutes: 10, pointType: kWh}
+          - {id: ch_rwl_wtg07_kw_10m, commodity: wind_generation, role: interval_generation_demand, unit: kW, direction: generated, intervalMinutes: 10, pointType: kW, pointName: Active Power kW 10m}
+          - {id: ch_rwl_wtg07_possible_kw_10m, commodity: wind_generation, role: interval_possible_generation, unit: kW, direction: possible, intervalMinutes: 10, pointType: kW}
+          - {id: ch_rwl_wtg07_nacelle_wind_ms_10m, commodity: weather, role: sensor_observation, unit: m_per_s, intervalMinutes: 10, pointType: m_per_s, pointName: Nacelle Wind Speed 10m}
+          - {id: ch_rwl_wtg07_rotor_rpm_10m, commodity: wind_generation, role: equipment_speed, unit: rpm, intervalMinutes: 10, pointType: rpm, pointName: Rotor Speed 10m}
+          - {id: ch_rwl_wtg07_state_10m, commodity: wind_generation, role: equipment_status, unit: state, intervalMinutes: 10, pointType: state, pointName: Turbine State}
+      - id: rwl_wtg_08
+        displayName: Ridgeline WTG-08
+        syntheticMeterNumber: SYN-RWL-M-0110008
+        meterType: turbine_pad_meter
+        nameplateKw: 660
+        effectiveStart: 2024-07-01
+        gatewayProfiles: [gw_fig_ridgeline_scada]
+        channels:
+          - {id: ch_rwl_wtg08_kwh_10m, commodity: wind_generation, role: interval_generation, unit: kWh, direction: generated, intervalMinutes: 10, pointType: kWh}
+          - {id: ch_rwl_wtg08_kw_10m, commodity: wind_generation, role: interval_generation_demand, unit: kW, direction: generated, intervalMinutes: 10, pointType: kW, pointName: Active Power kW 10m}
+          - {id: ch_rwl_wtg08_possible_kw_10m, commodity: wind_generation, role: interval_possible_generation, unit: kW, direction: possible, intervalMinutes: 10, pointType: kW}
+          - {id: ch_rwl_wtg08_nacelle_wind_ms_10m, commodity: weather, role: sensor_observation, unit: m_per_s, intervalMinutes: 10, pointType: m_per_s, pointName: Nacelle Wind Speed 10m}
+          - {id: ch_rwl_wtg08_rotor_rpm_10m, commodity: wind_generation, role: equipment_speed, unit: rpm, intervalMinutes: 10, pointType: rpm, pointName: Rotor Speed 10m}
+          - {id: ch_rwl_wtg08_state_10m, commodity: wind_generation, role: equipment_status, unit: state, intervalMinutes: 10, pointType: state, pointName: Turbine State}
+      - id: rwl_wtg_09
+        displayName: Ridgeline WTG-09
+        syntheticMeterNumber: SYN-RWL-M-0110009
+        meterType: turbine_pad_meter
+        nameplateKw: 660
+        effectiveStart: 2024-07-01
+        gatewayProfiles: [gw_fig_ridgeline_scada]
+        channels:
+          - {id: ch_rwl_wtg09_kwh_10m, commodity: wind_generation, role: interval_generation, unit: kWh, direction: generated, intervalMinutes: 10, pointType: kWh}
+          - {id: ch_rwl_wtg09_kw_10m, commodity: wind_generation, role: interval_generation_demand, unit: kW, direction: generated, intervalMinutes: 10, pointType: kW, pointName: Active Power kW 10m}
+          - {id: ch_rwl_wtg09_possible_kw_10m, commodity: wind_generation, role: interval_possible_generation, unit: kW, direction: possible, intervalMinutes: 10, pointType: kW}
+          - {id: ch_rwl_wtg09_nacelle_wind_ms_10m, commodity: weather, role: sensor_observation, unit: m_per_s, intervalMinutes: 10, pointType: m_per_s, pointName: Nacelle Wind Speed 10m}
+          - {id: ch_rwl_wtg09_rotor_rpm_10m, commodity: wind_generation, role: equipment_speed, unit: rpm, intervalMinutes: 10, pointType: rpm, pointName: Rotor Speed 10m}
+          - {id: ch_rwl_wtg09_state_10m, commodity: wind_generation, role: equipment_status, unit: state, intervalMinutes: 10, pointType: state, pointName: Turbine State}
+      - id: rwl_wtg_10
+        displayName: Ridgeline WTG-10
+        syntheticMeterNumber: SYN-RWL-M-0110010
+        meterType: turbine_pad_meter
+        nameplateKw: 660
+        effectiveStart: 2024-07-01
+        gatewayProfiles: [gw_fig_ridgeline_scada]
+        notes: Downwind end of the ridge; wake losses from WTG-09 show at west winds.
+        channels:
+          - {id: ch_rwl_wtg10_kwh_10m, commodity: wind_generation, role: interval_generation, unit: kWh, direction: generated, intervalMinutes: 10, pointType: kWh}
+          - {id: ch_rwl_wtg10_kw_10m, commodity: wind_generation, role: interval_generation_demand, unit: kW, direction: generated, intervalMinutes: 10, pointType: kW, pointName: Active Power kW 10m}
+          - {id: ch_rwl_wtg10_possible_kw_10m, commodity: wind_generation, role: interval_possible_generation, unit: kW, direction: possible, intervalMinutes: 10, pointType: kW}
+          - {id: ch_rwl_wtg10_nacelle_wind_ms_10m, commodity: weather, role: sensor_observation, unit: m_per_s, intervalMinutes: 10, pointType: m_per_s, pointName: Nacelle Wind Speed 10m}
+          - {id: ch_rwl_wtg10_rotor_rpm_10m, commodity: wind_generation, role: equipment_speed, unit: rpm, intervalMinutes: 10, pointType: rpm, pointName: Rotor Speed 10m}
+          - {id: ch_rwl_wtg10_state_10m, commodity: wind_generation, role: equipment_status, unit: state, intervalMinutes: 10, pointType: state, pointName: Turbine State}
+
 # Meters the customer owns behind a utility meter, and data sources that behave
 # like meters (sensors, historians, controllers, test signals). They have no
 # provider account. An entry with perUnit: true is a template; the generator
@@ -1542,8 +2000,8 @@ ownedMeters:
     kind: sensor_group
     gatewayProfiles: [gw_spinwave_science_lab]
     channels:
-      - {id: ch_spinwave_science_lab_temp_f_15m, commodity: indoor_air, role: sensor_observation, unit: degF, intervalMinutes: 15, pointType: temp_f, pointName: Lab Air Temperature}
-      - {id: ch_spinwave_science_lab_rh_15m, commodity: indoor_air, role: sensor_observation, unit: pct, intervalMinutes: 15, pointType: relative_humidity, pointName: Lab Relative Humidity}
+      - {id: ch_spinwave_science_lab_temp_f_10m, commodity: indoor_air, role: sensor_observation, unit: degF, intervalMinutes: 10, pointType: temp_f, pointName: Lab Air Temperature}
+      - {id: ch_spinwave_science_lab_rh_10m, commodity: indoor_air, role: sensor_observation, unit: pct, intervalMinutes: 10, pointType: relative_humidity, pointName: Lab Relative Humidity}
   - id: library_historian_electric_interval
     buildingId: library
     displayName: Library Electric Historian
@@ -1553,7 +2011,7 @@ ownedMeters:
     gatewayProfiles: [gw_odbc_library_historian]
     notes: SQL historian mirror of the electric service; never added to the utility meter.
     channels:
-      - {id: ch_odbc_library_electric_kwh_15m, commodity: electric, role: interval_usage, unit: kWh, intervalMinutes: 15, pointType: kWh, pointName: Historian Delivered kWh 15m}
+      - {id: ch_odbc_library_electric_kwh_30m, commodity: electric, role: interval_usage, unit: kWh, intervalMinutes: 30, pointType: kWh, pointName: Historian Delivered kWh 30m}
   - id: student_center_kitchen_deduct_water
     buildingId: student_center
     displayName: Student Center Kitchen Sewer Deduct
@@ -1714,6 +2172,7 @@ ownedMeters:
     channels:
       - {id: ch_ntp_plant_steam_klb_hourly, commodity: steam, role: interval_production, unit: klb, direction: produced, intervalMinutes: 60, pointType: klb}
       - {id: ch_ntp_plant_steam_lb_per_hour_hourly, commodity: steam, role: interval_production_demand, unit: lb_per_hour, direction: produced, intervalMinutes: 60, pointType: lb_per_hour}
+      - {id: ch_ntp_plant_steam_header_psig_15m, commodity: steam, role: sensor_observation, unit: psig, intervalMinutes: 15, pointType: psig, pointName: Steam Header Pressure 15m}
   - id: ntp_central_plant_condensate_return
     buildingId: central_plant
     displayName: Central Plant Condensate Return
@@ -1738,13 +2197,30 @@ ownedMeters:
     kind: plant_controller
     gatewayProfiles: [gw_modbus_thermal_plant]
     channels:
-      - {id: ch_modbus_ntp_chiller_kw_5m, commodity: electric, role: equipment_demand, unit: kW, intervalMinutes: 5, pointType: kW, pointName: Chiller Demand kW 5m}
+      - {id: ch_modbus_ntp_chiller_kw_1m, commodity: electric, role: equipment_demand, unit: kW, intervalMinutes: 1, pointType: kW, pointName: Chiller Demand kW 1m}
       - {id: ch_modbus_ntp_chiller_enable_status, commodity: electric, role: equipment_status, unit: state, intervalMinutes: 5, pointType: state, pointName: Chiller Enable Status, sourceStatus: planned_input_path}
+
+  # ---------------------------------------------------------------- Ridgeline Wind Site
+  - id: rwl_met_mast
+    buildingId: ridgeline_turbine_field
+    displayName: Ridgeline Met Mast
+    syntheticMeterNumber: RIDGELINE-MET-MAST
+    kind: met_mast
+    effectiveStart: 2024-07-01
+    gatewayProfiles: [gw_fig_ridgeline_scada]
+    notes: 50 m lattice mast at hub height, upwind of WTG-01. The free-stream wind the turbines' possible power is judged against; KSUU is its long-term reference.
+    channels:
+      - {id: ch_rwl_met_wind_ms_10m, commodity: weather, role: observation, unit: m_per_s, intervalMinutes: 10, pointType: m_per_s, pointName: Hub-Height Wind Speed 10m}
+      - {id: ch_rwl_met_wind_direction_10m, commodity: weather, role: observation, unit: deg, intervalMinutes: 10, pointType: deg, pointName: Wind Direction 10m}
+      - {id: ch_rwl_met_air_temp_c_10m, commodity: weather, role: observation, unit: degC, intervalMinutes: 10, pointType: degC, pointName: Air Temperature 10m}
+      - {id: ch_rwl_met_pressure_kpa_10m, commodity: weather, role: observation, unit: kpa, intervalMinutes: 10, pointType: kpa, pointName: Barometric Pressure 10m}
+      - {id: ch_rwl_met_air_density_10m, commodity: weather, role: observation, unit: kgm3, intervalMinutes: 10, pointType: kgm3, pointName: Air Density 10m}
+      - {id: ch_rwl_met_rh_10m, commodity: weather, role: observation, unit: pct, intervalMinutes: 10, pointType: pct, pointName: Relative Humidity 10m}
 
 gatewayBindings:
   # Numeric gateway, node, point and timezone IDs below are illustrative model
   # values, not installation inputs. Create objects through the UI and capture
-  # actual IDs using data/eem/northlake-instance-mapping.template.csv.
+  # actual IDs using implementation/stage-2-hierarchy/ (the Stage 2 point files).
   timeZone:
     sourceName: America/Los_Angeles
     gatewayTimeZoneId: 13
@@ -1908,6 +2384,41 @@ gatewayBindings:
                   RecorderID: VEDPLANT01
                   Channel: 2
                   PointType: kW
+          - gwNodeId: 520104
+            name: MV90-MDEF-VED-RIDGELINE
+            isEnabled: true
+            timeStampType: local
+            points:
+              - ptId: 1520601
+                channelId: ch_ved_ridgeline_received_kwh_15m
+                ptType: 1
+                timeZoneId: 13
+                interval: 15
+                description: Ridgeline interconnection MDEF received kWh (export)
+                values:
+                  RecorderID: VEDRIDGE01
+                  Channel: 1
+                  PointType: kWh
+              - ptId: 1520602
+                channelId: ch_ved_ridgeline_delivered_kwh_15m
+                ptType: 1
+                timeZoneId: 13
+                interval: 15
+                description: Ridgeline interconnection MDEF delivered kWh (station service)
+                values:
+                  RecorderID: VEDRIDGE01
+                  Channel: 2
+                  PointType: kWh
+              - ptId: 1520603
+                channelId: ch_ved_ridgeline_kvarh_15m
+                ptType: 1
+                timeZoneId: 13
+                interval: 15
+                description: Ridgeline interconnection MDEF reactive kVArh
+                values:
+                  RecorderID: VEDRIDGE01
+                  Channel: 3
+                  PointType: kVArh
 
     - id: gw_mv90_helios_mv9
       componentId: MV90Gateway
@@ -1949,6 +2460,16 @@ gatewayBindings:
                   RecorderID: HOSSCIENCE01
                   Channel: 2
                   PointType: kWh
+              - ptId: 1520205
+                channelId: ch_hos_science_center_poa_irradiance_15m
+                ptType: 1
+                timeZoneId: 13
+                interval: 15
+                description: Science Center PV plane-of-array irradiance
+                values:
+                  RecorderID: HOSSCIENCE01
+                  Channel: 3
+                  PointType: irradiance
               - ptId: 1520203
                 channelId: ch_hos_student_center_gen_kwh_15m
                 ptType: 1
@@ -2098,6 +2619,18 @@ gatewayBindings:
                   "Object Type": 2
                   "Array Index": 0
                   PointType: lb_per_hour
+              - ptId: 1530310
+                channelId: ch_ntp_plant_steam_header_psig_15m
+                ptType: 1
+                timeZoneId: 13
+                interval: 15
+                description: Plant steam header pressure
+                values:
+                  DeviceID: 5301003
+                  ObjectID: 3001
+                  "Object Type": 0
+                  "Array Index": 0
+                  PointType: psig
               - ptId: 1530305
                 channelId: ch_ntp_plant_condensate_kgal_hourly
                 ptType: 1
@@ -2115,100 +2648,338 @@ gatewayBindings:
       componentId: NOAAGateway
       executorKey: gateway.noaa
       gatewayType: NOAA
-      proves: [noaa_weather_xml, weather_station_mapping]
-      referenceSourceIds: [KSAC]
+      proves:
+      - noaa_observations
+      - noaa_forecasts
+      - ghcn_hourly_history
+      - weather_forecast_associations
+      referenceSourceIds:
+      - KSAC
+      - KSMF
+      - KSUU
       parameters:
-        BaseUrl: https://w1.weather.gov/xml/current_obs
+        Operation: Current
+        ArchiveDelayDays: 3
       runtime:
         gatewayId: 5401
-        gatewayName: Northlake NOAA Current Observations
+        gatewayName: Northlake NOAA Weather
         gatewayGuid: SYN-GW-NOAA-5401
         nodes:
-          - gwNodeId: 540101
-            name: NOAA-KSAC
-            isEnabled: true
+        - gwNodeId: 540101
+          name: NOAA-KSAC
+          isEnabled: true
+          values:
+            WeatherKind: Observation
+            StationID: KSAC
+            GhcnStationID: USW00023232
+          points:
+          - ptId: 1540101
+            channelId: ch_weather_ksac_temp_f_hourly
+            ptType: 1
+            timeZoneId: 13
+            interval: 60
+            description: KSAC NOAA outside air temperature
             values:
-              WeatherType: history
-              StationID: KSAC
-            points:
-              - ptId: 1540101
-                channelId: ch_weather_ksac_temp_f_hourly
-                ptType: 1
-                timeZoneId: 13
-                interval: 60
-                description: KSAC NOAA outside air temperature
-                values:
-                  WeatherTypeName: tempi
-                  PointType: temp_f
-              - ptId: 1540102
-                channelId: ch_weather_ksac_rh_hourly
-                ptType: 1
-                timeZoneId: 13
-                interval: 60
-                description: KSAC NOAA relative humidity
-                values:
-                  WeatherTypeName: hum
-                  PointType: relative_humidity
-              - ptId: 1540103
-                channelId: ch_weather_ksac_wind_mph_hourly
-                ptType: 1
-                timeZoneId: 13
-                interval: 60
-                description: KSAC NOAA wind speed
-                values:
-                  WeatherTypeName: wspdi
-                  PointType: wind_mph
-
-    - id: gw_aeris_ksmf_weather
-      componentId: AerisWeatherGateway
-      executorKey: gateway.aerisweather
-      gatewayType: AERISWEATHER
-      proves: [aeris_observations, aeris_forecasts, weather_state_file]
-      referenceSourceIds: [KSMF]
-      parameters:
-        BaseUrl: https://api.aerisapi.com
-        ClientId: SYN-AERIS-CLIENT
-        ClientSecret: SYN-AERIS-SECRET
-        ForecastHours: 1
-        HistoryDaysBack: 1
-      runtime:
-        gatewayId: 5402
-        gatewayName: Northlake Aeris Weather
-        gatewayGuid: SYN-GW-AERIS-5402
-        nodes:
-          - gwNodeId: 540201
-            name: AERIS-KSMF-OBS
-            isEnabled: true
-            backFillDays: 1
+              Measurement: Temperature
+              OutputUnit: Fahrenheit
+          - ptId: 1540131
+            channelId: ch_weather_ksac_dewpoint_f_hourly
+            ptType: 1
+            timeZoneId: 13
+            interval: 60
+            description: KSAC NOAA dew point
             values:
-              WeatherType: observation
-              StationID: KSMF
-            points:
-              - ptId: 1540201
-                channelId: ch_weather_ksmf_temp_f_hourly
-                ptType: 1
-                timeZoneId: 13
-                interval: 60
-                description: KSMF Aeris observed temperature
-                values:
-                  WeatherTypeName: tempF
-                  PointType: tempF
-          - gwNodeId: 540202
-            name: AERIS-KSMF-FORECAST
-            isEnabled: true
+              Measurement: DewPoint
+              OutputUnit: Fahrenheit
+          - ptId: 1540102
+            channelId: ch_weather_ksac_rh_hourly
+            ptType: 1
+            timeZoneId: 13
+            interval: 60
+            description: KSAC NOAA relative humidity
             values:
-              WeatherType: forecast
-              StationID: KSMF
-            points:
-              - ptId: 1540202
-                channelId: ch_weather_ksmf_forecast_temp_f_hourly
-                ptType: 1
-                timeZoneId: 13
-                interval: 60
-                description: KSMF Aeris forecast temperature
-                values:
-                  WeatherTypeName: tempF
-                  PointType: tempF
+              Measurement: RelativeHumidity
+              OutputUnit: Percent
+          - ptId: 1540103
+            channelId: ch_weather_ksac_wind_mph_hourly
+            ptType: 1
+            timeZoneId: 13
+            interval: 60
+            description: KSAC NOAA wind speed
+            values:
+              Measurement: WindSpeed
+              OutputUnit: MilesPerHour
+        - gwNodeId: 540102
+          name: NOAA-KSUU
+          isEnabled: true
+          values:
+            WeatherKind: Observation
+            StationID: KSUU
+            GhcnStationID: USW00023202
+          points:
+          - ptId: 1540111
+            channelId: ch_weather_ksuu_temp_c_hourly
+            ptType: 1
+            timeZoneId: 13
+            interval: 60
+            description: KSUU NOAA outside air temperature (degC)
+            values:
+              Measurement: Temperature
+              OutputUnit: Celsius
+          - ptId: 1540134
+            channelId: ch_weather_ksuu_rh_hourly
+            ptType: 1
+            timeZoneId: 13
+            interval: 60
+            description: KSUU NOAA relative humidity
+            values:
+              Measurement: RelativeHumidity
+              OutputUnit: Percent
+          - ptId: 1540112
+            channelId: ch_weather_ksuu_wind_knots_hourly
+            ptType: 1
+            timeZoneId: 13
+            interval: 60
+            description: KSUU NOAA wind speed (knots)
+            values:
+              Measurement: WindSpeed
+              OutputUnit: Knots
+          - ptId: 1540113
+            channelId: ch_weather_ksuu_dewpoint_c_hourly
+            ptType: 1
+            timeZoneId: 13
+            interval: 60
+            description: KSUU NOAA dew point (degC)
+            values:
+              Measurement: DewPoint
+              OutputUnit: Celsius
+        - gwNodeId: 540201
+          name: NOAA-KSMF
+          isEnabled: true
+          values:
+            WeatherKind: Observation
+            StationID: KSMF
+            GhcnStationID: USW00093225
+          points:
+          - ptId: 1540201
+            channelId: ch_weather_ksmf_temp_c_hourly
+            ptType: 1
+            timeZoneId: 13
+            interval: 60
+            description: KSMF NOAA observed temperature
+            values:
+              Measurement: Temperature
+              OutputUnit: Celsius
+          - ptId: 1540210
+            channelId: ch_weather_ksmf_rh_hourly
+            ptType: 1
+            timeZoneId: 13
+            interval: 60
+            description: KSMF NOAA relative humidity
+            values:
+              Measurement: RelativeHumidity
+              OutputUnit: Percent
+          - ptId: 1540209
+            channelId: ch_weather_ksmf_dewpoint_c_hourly
+            ptType: 1
+            timeZoneId: 13
+            interval: 60
+            description: KSMF NOAA dew point
+            values:
+              Measurement: DewPoint
+              OutputUnit: Celsius
+          - ptId: 1540203
+            channelId: ch_weather_ksmf_wind_kph_hourly
+            ptType: 1
+            timeZoneId: 13
+            interval: 60
+            description: KSMF NOAA observed wind speed
+            values:
+              Measurement: WindSpeed
+              OutputUnit: KilometersPerHour
+        - gwNodeId: 540202
+          name: NOAA-KSMF-FORECAST
+          isEnabled: true
+          values:
+            WeatherKind: Forecast
+            StationID: KSMF
+          points:
+          - ptId: 1540202
+            channelId: ch_weather_ksmf_forecast_temp_f_hourly
+            ptType: 1
+            timeZoneId: 13
+            interval: 60
+            description: KSMF NOAA forecast temperature
+            values:
+              Measurement: Temperature
+              OutputUnit: Fahrenheit
+          - ptId: 1540204
+            channelId: ch_weather_ksmf_forecast_dewpoint_c_hourly
+            ptType: 1
+            timeZoneId: 13
+            interval: 60
+            description: KSMF Forecast Dew Point
+            values:
+              Measurement: DewPoint
+              OutputUnit: Celsius
+          - ptId: 1540205
+            channelId: ch_weather_ksmf_forecast_rh_hourly
+            ptType: 1
+            timeZoneId: 13
+            interval: 60
+            description: KSMF Forecast Relative Humidity
+            values:
+              Measurement: RelativeHumidity
+              OutputUnit: Percent
+          - ptId: 1540206
+            channelId: ch_weather_ksmf_forecast_wind_kph_hourly
+            ptType: 1
+            timeZoneId: 13
+            interval: 60
+            description: KSMF Forecast Wind Speed
+            values:
+              Measurement: WindSpeed
+              OutputUnit: KilometersPerHour
+          - ptId: 1540207
+            channelId: ch_weather_ksmf_forecast_wind_direction_hourly
+            ptType: 1
+            timeZoneId: 13
+            interval: 60
+            description: KSMF Forecast Wind Direction
+            values:
+              Measurement: WindDirection
+              OutputUnit: Degrees
+          - ptId: 1540208
+            channelId: ch_weather_ksmf_forecast_precip_probability_hourly
+            ptType: 1
+            timeZoneId: 13
+            interval: 60
+            description: KSMF Forecast Precipitation Probability
+            values:
+              Measurement: ProbabilityOfPrecipitation
+              OutputUnit: Percent
+        - gwNodeId: 540103
+          name: NOAA-KSAC-FORECAST
+          isEnabled: true
+          values:
+            WeatherKind: Forecast
+            StationID: KSAC
+          points:
+          - ptId: 1540104
+            channelId: ch_weather_ksac_forecast_temp_f_hourly
+            ptType: 1
+            timeZoneId: 13
+            interval: 60
+            description: KSAC Forecast Temperature
+            values:
+              Measurement: Temperature
+              OutputUnit: Fahrenheit
+          - ptId: 1540105
+            channelId: ch_weather_ksac_forecast_dewpoint_f_hourly
+            ptType: 1
+            timeZoneId: 13
+            interval: 60
+            description: KSAC Forecast Dew Point
+            values:
+              Measurement: DewPoint
+              OutputUnit: Fahrenheit
+          - ptId: 1540106
+            channelId: ch_weather_ksac_forecast_rh_hourly
+            ptType: 1
+            timeZoneId: 13
+            interval: 60
+            description: KSAC Forecast Relative Humidity
+            values:
+              Measurement: RelativeHumidity
+              OutputUnit: Percent
+          - ptId: 1540107
+            channelId: ch_weather_ksac_forecast_wind_mph_hourly
+            ptType: 1
+            timeZoneId: 13
+            interval: 60
+            description: KSAC Forecast Wind Speed
+            values:
+              Measurement: WindSpeed
+              OutputUnit: MilesPerHour
+          - ptId: 1540108
+            channelId: ch_weather_ksac_forecast_wind_direction_hourly
+            ptType: 1
+            timeZoneId: 13
+            interval: 60
+            description: KSAC Forecast Wind Direction
+            values:
+              Measurement: WindDirection
+              OutputUnit: Degrees
+          - ptId: 1540109
+            channelId: ch_weather_ksac_forecast_precip_probability_hourly
+            ptType: 1
+            timeZoneId: 13
+            interval: 60
+            description: KSAC Forecast Precipitation Probability
+            values:
+              Measurement: ProbabilityOfPrecipitation
+              OutputUnit: Percent
+        - gwNodeId: 540104
+          name: NOAA-KSUU-FORECAST
+          isEnabled: true
+          values:
+            WeatherKind: Forecast
+            StationID: KSUU
+          points:
+          - ptId: 1540114
+            channelId: ch_weather_ksuu_forecast_temp_c_hourly
+            ptType: 1
+            timeZoneId: 13
+            interval: 60
+            description: KSUU Forecast Temperature
+            values:
+              Measurement: Temperature
+              OutputUnit: Celsius
+          - ptId: 1540115
+            channelId: ch_weather_ksuu_forecast_dewpoint_c_hourly
+            ptType: 1
+            timeZoneId: 13
+            interval: 60
+            description: KSUU Forecast Dew Point
+            values:
+              Measurement: DewPoint
+              OutputUnit: Celsius
+          - ptId: 1540116
+            channelId: ch_weather_ksuu_forecast_rh_hourly
+            ptType: 1
+            timeZoneId: 13
+            interval: 60
+            description: KSUU Forecast Relative Humidity
+            values:
+              Measurement: RelativeHumidity
+              OutputUnit: Percent
+          - ptId: 1540117
+            channelId: ch_weather_ksuu_forecast_wind_knots_hourly
+            ptType: 1
+            timeZoneId: 13
+            interval: 60
+            description: KSUU Forecast Wind Speed
+            values:
+              Measurement: WindSpeed
+              OutputUnit: Knots
+          - ptId: 1540118
+            channelId: ch_weather_ksuu_forecast_wind_direction_hourly
+            ptType: 1
+            timeZoneId: 13
+            interval: 60
+            description: KSUU Forecast Wind Direction
+            values:
+              Measurement: WindDirection
+              OutputUnit: Degrees
+          - ptId: 1540119
+            channelId: ch_weather_ksuu_forecast_precip_probability_hourly
+            ptType: 1
+            timeZoneId: 13
+            interval: 60
+            description: KSUU Forecast Precipitation Probability
+            values:
+              Measurement: ProbabilityOfPrecipitation
+              OutputUnit: Percent
 
     - id: gw_spinwave_science_lab
       componentId: SpinwaveGateway
@@ -2231,20 +3002,20 @@ gatewayBindings:
               "Folder Name": SCIENCE
             points:
               - ptId: 1550101
-                channelId: ch_spinwave_science_lab_temp_f_15m
+                channelId: ch_spinwave_science_lab_temp_f_10m
                 ptType: 1
                 timeZoneId: 13
-                interval: 15
+                interval: 10
                 description: Science lab Spinwave temperature
                 values:
                   "Device Address": SW-SCI-LAB-01
                   "Channel Number": 1
                   PointType: temp_f
               - ptId: 1550102
-                channelId: ch_spinwave_science_lab_rh_15m
+                channelId: ch_spinwave_science_lab_rh_10m
                 ptType: 1
                 timeZoneId: 13
-                interval: 15
+                interval: 10
                 description: Science lab Spinwave humidity
                 values:
                   "Device Address": SW-SCI-LAB-01
@@ -2314,10 +3085,10 @@ gatewayBindings:
               "Modbus Address": 1
             points:
               - ptId: 1570101
-                channelId: ch_modbus_ntp_chiller_kw_5m
+                channelId: ch_modbus_ntp_chiller_kw_1m
                 ptType: 1
                 timeZoneId: 13
-                interval: 5
+                interval: 1
                 description: Thermal plant chiller electric demand
                 values:
                   "Register Type": "Floating Point MSR First"
@@ -2353,10 +3124,10 @@ gatewayBindings:
             daysBack: 7
             points:
               - ptId: 1580101
-                channelId: ch_odbc_library_electric_kwh_15m
+                channelId: ch_odbc_library_electric_kwh_30m
                 ptType: 1
                 timeZoneId: 13
-                interval: 15
+                interval: 30
                 description: Library electric interval from SQL historian
                 values:
                   SourceTable: SyntheticIntervalReadings
@@ -2668,6 +3439,109 @@ gatewayBindings:
                   LastReadingValue: 300
                   PointType: kgal
 
+    # Ridgeline's SCADA server writes one 10-minute CSV for the turbines and one for the met
+    # mast, each row stamped at the end of its ten minutes, the convention EEM's rate engine and
+    # Bill Generation read (a month is the stamps after its first midnight up to and including
+    # the next). Its clock keeps Pacific Standard Time all year, and EEM has no fixed UTC-08:00 time
+    # zone (product finding 46). The points stay on Pacific; the task reads the file stamps as UTC
+    # (TimeStampType utc) and each point adds OffsetTimeMinutes 480, so a PST stamp becomes its UTC
+    # instant and EEM stores the right Pacific local time all year. The GMT zone is no way round:
+    # TimeZoneID 23 resolves to Windows "GMT Standard Time", London with summer time (finding 48),
+    # and the converter's own "standard" stamp type, which would need no offset, is not offered by
+    # FIG (finding 49).
+    - id: gw_fig_ridgeline_scada
+      componentId: FIGGateway
+      executorKey: gateway.fig
+      gatewayType: FIG
+      proves: [fig_gateway, ten_minute_interval, digital_state_points, fixed_offset_source_clock, metric_units]
+      providerIds: [ridgeline_wind]
+      parameters:
+        TimeStampType: utc        # a task setting: this FIG task is Ridgeline's alone, never shared with the Cedar Row FIG task
+      generatedArtifacts:
+        - path: artifacts/demo-university-v1/fig/ridgeline-scada-turbines.fig.csv
+          format: FIG
+        - path: artifacts/demo-university-v1/fig/ridgeline-met-mast.fig.csv
+          format: FIG
+      runtime:
+        gatewayId: 5603
+        gatewayName: Ridgeline SCADA File Imports
+        gatewayGuid: SYN-GW-FIG-5603
+        nodes:
+          - gwNodeId: 560301
+            name: FIG-RIDGELINE-TURBINES
+            isEnabled: true
+            points:
+              - {ptId: 1563011, channelId: ch_rwl_wtg01_kwh_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-01 active energy kWh, values: {"Point Alias": RWL_WTG01_KWH, Channel: "01", UOM: kWh, Multiplier: 1, OffsetTimeMinutes: 480, PointType: kWh}}
+              - {ptId: 1563012, channelId: ch_rwl_wtg01_kw_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-01 active power kW, values: {"Point Alias": RWL_WTG01_KW, Channel: "02", UOM: kW, Multiplier: 1, OffsetTimeMinutes: 480, PointType: kW}}
+              - {ptId: 1563013, channelId: ch_rwl_wtg01_possible_kw_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-01 possible power kW, values: {"Point Alias": RWL_WTG01_PKW, Channel: "03", UOM: kW, Multiplier: 1, OffsetTimeMinutes: 480, PointType: kW}}
+              - {ptId: 1563014, channelId: ch_rwl_wtg01_nacelle_wind_ms_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-01 nacelle wind speed m/s, values: {"Point Alias": RWL_WTG01_WS, Channel: "04", UOM: m/s, Multiplier: 1, OffsetTimeMinutes: 480, PointType: m_per_s}}
+              - {ptId: 1563015, channelId: ch_rwl_wtg01_rotor_rpm_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-01 rotor speed RPM, values: {"Point Alias": RWL_WTG01_RPM, Channel: "05", UOM: RPM, Multiplier: 1, OffsetTimeMinutes: 480, PointType: rpm}}
+              - {ptId: 1563016, channelId: ch_rwl_wtg01_state_10m, ptType: 2, timeZoneId: 13, interval: 10, description: WTG-01 turbine state, values: {"Point Alias": RWL_WTG01_STATE, Channel: "06", UOM: State, Multiplier: 1, OffsetTimeMinutes: 480, PointType: state}}
+              - {ptId: 1563021, channelId: ch_rwl_wtg02_kwh_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-02 active energy kWh, values: {"Point Alias": RWL_WTG02_KWH, Channel: "01", UOM: kWh, Multiplier: 1, OffsetTimeMinutes: 480, PointType: kWh}}
+              - {ptId: 1563022, channelId: ch_rwl_wtg02_kw_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-02 active power kW, values: {"Point Alias": RWL_WTG02_KW, Channel: "02", UOM: kW, Multiplier: 1, OffsetTimeMinutes: 480, PointType: kW}}
+              - {ptId: 1563023, channelId: ch_rwl_wtg02_possible_kw_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-02 possible power kW, values: {"Point Alias": RWL_WTG02_PKW, Channel: "03", UOM: kW, Multiplier: 1, OffsetTimeMinutes: 480, PointType: kW}}
+              - {ptId: 1563024, channelId: ch_rwl_wtg02_nacelle_wind_ms_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-02 nacelle wind speed m/s, values: {"Point Alias": RWL_WTG02_WS, Channel: "04", UOM: m/s, Multiplier: 1, OffsetTimeMinutes: 480, PointType: m_per_s}}
+              - {ptId: 1563025, channelId: ch_rwl_wtg02_rotor_rpm_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-02 rotor speed RPM, values: {"Point Alias": RWL_WTG02_RPM, Channel: "05", UOM: RPM, Multiplier: 1, OffsetTimeMinutes: 480, PointType: rpm}}
+              - {ptId: 1563026, channelId: ch_rwl_wtg02_state_10m, ptType: 2, timeZoneId: 13, interval: 10, description: WTG-02 turbine state, values: {"Point Alias": RWL_WTG02_STATE, Channel: "06", UOM: State, Multiplier: 1, OffsetTimeMinutes: 480, PointType: state}}
+              - {ptId: 1563031, channelId: ch_rwl_wtg03_kwh_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-03 active energy kWh, values: {"Point Alias": RWL_WTG03_KWH, Channel: "01", UOM: kWh, Multiplier: 1, OffsetTimeMinutes: 480, PointType: kWh}}
+              - {ptId: 1563032, channelId: ch_rwl_wtg03_kw_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-03 active power kW, values: {"Point Alias": RWL_WTG03_KW, Channel: "02", UOM: kW, Multiplier: 1, OffsetTimeMinutes: 480, PointType: kW}}
+              - {ptId: 1563033, channelId: ch_rwl_wtg03_possible_kw_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-03 possible power kW, values: {"Point Alias": RWL_WTG03_PKW, Channel: "03", UOM: kW, Multiplier: 1, OffsetTimeMinutes: 480, PointType: kW}}
+              - {ptId: 1563034, channelId: ch_rwl_wtg03_nacelle_wind_ms_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-03 nacelle wind speed m/s, values: {"Point Alias": RWL_WTG03_WS, Channel: "04", UOM: m/s, Multiplier: 1, OffsetTimeMinutes: 480, PointType: m_per_s}}
+              - {ptId: 1563035, channelId: ch_rwl_wtg03_rotor_rpm_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-03 rotor speed RPM, values: {"Point Alias": RWL_WTG03_RPM, Channel: "05", UOM: RPM, Multiplier: 1, OffsetTimeMinutes: 480, PointType: rpm}}
+              - {ptId: 1563036, channelId: ch_rwl_wtg03_state_10m, ptType: 2, timeZoneId: 13, interval: 10, description: WTG-03 turbine state, values: {"Point Alias": RWL_WTG03_STATE, Channel: "06", UOM: State, Multiplier: 1, OffsetTimeMinutes: 480, PointType: state}}
+              - {ptId: 1563041, channelId: ch_rwl_wtg04_kwh_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-04 active energy kWh, values: {"Point Alias": RWL_WTG04_KWH, Channel: "01", UOM: kWh, Multiplier: 1, OffsetTimeMinutes: 480, PointType: kWh}}
+              - {ptId: 1563042, channelId: ch_rwl_wtg04_kw_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-04 active power kW, values: {"Point Alias": RWL_WTG04_KW, Channel: "02", UOM: kW, Multiplier: 1, OffsetTimeMinutes: 480, PointType: kW}}
+              - {ptId: 1563043, channelId: ch_rwl_wtg04_possible_kw_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-04 possible power kW, values: {"Point Alias": RWL_WTG04_PKW, Channel: "03", UOM: kW, Multiplier: 1, OffsetTimeMinutes: 480, PointType: kW}}
+              - {ptId: 1563044, channelId: ch_rwl_wtg04_nacelle_wind_ms_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-04 nacelle wind speed m/s, values: {"Point Alias": RWL_WTG04_WS, Channel: "04", UOM: m/s, Multiplier: 1, OffsetTimeMinutes: 480, PointType: m_per_s}}
+              - {ptId: 1563045, channelId: ch_rwl_wtg04_rotor_rpm_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-04 rotor speed RPM, values: {"Point Alias": RWL_WTG04_RPM, Channel: "05", UOM: RPM, Multiplier: 1, OffsetTimeMinutes: 480, PointType: rpm}}
+              - {ptId: 1563046, channelId: ch_rwl_wtg04_state_10m, ptType: 2, timeZoneId: 13, interval: 10, description: WTG-04 turbine state, values: {"Point Alias": RWL_WTG04_STATE, Channel: "06", UOM: State, Multiplier: 1, OffsetTimeMinutes: 480, PointType: state}}
+              - {ptId: 1563051, channelId: ch_rwl_wtg05_kwh_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-05 active energy kWh, values: {"Point Alias": RWL_WTG05_KWH, Channel: "01", UOM: kWh, Multiplier: 1, OffsetTimeMinutes: 480, PointType: kWh}}
+              - {ptId: 1563052, channelId: ch_rwl_wtg05_kw_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-05 active power kW, values: {"Point Alias": RWL_WTG05_KW, Channel: "02", UOM: kW, Multiplier: 1, OffsetTimeMinutes: 480, PointType: kW}}
+              - {ptId: 1563053, channelId: ch_rwl_wtg05_possible_kw_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-05 possible power kW, values: {"Point Alias": RWL_WTG05_PKW, Channel: "03", UOM: kW, Multiplier: 1, OffsetTimeMinutes: 480, PointType: kW}}
+              - {ptId: 1563054, channelId: ch_rwl_wtg05_nacelle_wind_ms_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-05 nacelle wind speed m/s, values: {"Point Alias": RWL_WTG05_WS, Channel: "04", UOM: m/s, Multiplier: 1, OffsetTimeMinutes: 480, PointType: m_per_s}}
+              - {ptId: 1563055, channelId: ch_rwl_wtg05_rotor_rpm_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-05 rotor speed RPM, values: {"Point Alias": RWL_WTG05_RPM, Channel: "05", UOM: RPM, Multiplier: 1, OffsetTimeMinutes: 480, PointType: rpm}}
+              - {ptId: 1563056, channelId: ch_rwl_wtg05_state_10m, ptType: 2, timeZoneId: 13, interval: 10, description: WTG-05 turbine state, values: {"Point Alias": RWL_WTG05_STATE, Channel: "06", UOM: State, Multiplier: 1, OffsetTimeMinutes: 480, PointType: state}}
+              - {ptId: 1563061, channelId: ch_rwl_wtg06_kwh_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-06 active energy kWh, values: {"Point Alias": RWL_WTG06_KWH, Channel: "01", UOM: kWh, Multiplier: 1, OffsetTimeMinutes: 480, PointType: kWh}}
+              - {ptId: 1563062, channelId: ch_rwl_wtg06_kw_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-06 active power kW, values: {"Point Alias": RWL_WTG06_KW, Channel: "02", UOM: kW, Multiplier: 1, OffsetTimeMinutes: 480, PointType: kW}}
+              - {ptId: 1563063, channelId: ch_rwl_wtg06_possible_kw_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-06 possible power kW, values: {"Point Alias": RWL_WTG06_PKW, Channel: "03", UOM: kW, Multiplier: 1, OffsetTimeMinutes: 480, PointType: kW}}
+              - {ptId: 1563064, channelId: ch_rwl_wtg06_nacelle_wind_ms_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-06 nacelle wind speed m/s, values: {"Point Alias": RWL_WTG06_WS, Channel: "04", UOM: m/s, Multiplier: 1, OffsetTimeMinutes: 480, PointType: m_per_s}}
+              - {ptId: 1563065, channelId: ch_rwl_wtg06_rotor_rpm_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-06 rotor speed RPM, values: {"Point Alias": RWL_WTG06_RPM, Channel: "05", UOM: RPM, Multiplier: 1, OffsetTimeMinutes: 480, PointType: rpm}}
+              - {ptId: 1563066, channelId: ch_rwl_wtg06_state_10m, ptType: 2, timeZoneId: 13, interval: 10, description: WTG-06 turbine state, values: {"Point Alias": RWL_WTG06_STATE, Channel: "06", UOM: State, Multiplier: 1, OffsetTimeMinutes: 480, PointType: state}}
+              - {ptId: 1563071, channelId: ch_rwl_wtg07_kwh_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-07 active energy kWh, values: {"Point Alias": RWL_WTG07_KWH, Channel: "01", UOM: kWh, Multiplier: 1, OffsetTimeMinutes: 480, PointType: kWh}}
+              - {ptId: 1563072, channelId: ch_rwl_wtg07_kw_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-07 active power kW, values: {"Point Alias": RWL_WTG07_KW, Channel: "02", UOM: kW, Multiplier: 1, OffsetTimeMinutes: 480, PointType: kW}}
+              - {ptId: 1563073, channelId: ch_rwl_wtg07_possible_kw_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-07 possible power kW, values: {"Point Alias": RWL_WTG07_PKW, Channel: "03", UOM: kW, Multiplier: 1, OffsetTimeMinutes: 480, PointType: kW}}
+              - {ptId: 1563074, channelId: ch_rwl_wtg07_nacelle_wind_ms_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-07 nacelle wind speed m/s, values: {"Point Alias": RWL_WTG07_WS, Channel: "04", UOM: m/s, Multiplier: 1, OffsetTimeMinutes: 480, PointType: m_per_s}}
+              - {ptId: 1563075, channelId: ch_rwl_wtg07_rotor_rpm_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-07 rotor speed RPM, values: {"Point Alias": RWL_WTG07_RPM, Channel: "05", UOM: RPM, Multiplier: 1, OffsetTimeMinutes: 480, PointType: rpm}}
+              - {ptId: 1563076, channelId: ch_rwl_wtg07_state_10m, ptType: 2, timeZoneId: 13, interval: 10, description: WTG-07 turbine state, values: {"Point Alias": RWL_WTG07_STATE, Channel: "06", UOM: State, Multiplier: 1, OffsetTimeMinutes: 480, PointType: state}}
+              - {ptId: 1563081, channelId: ch_rwl_wtg08_kwh_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-08 active energy kWh, values: {"Point Alias": RWL_WTG08_KWH, Channel: "01", UOM: kWh, Multiplier: 1, OffsetTimeMinutes: 480, PointType: kWh}}
+              - {ptId: 1563082, channelId: ch_rwl_wtg08_kw_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-08 active power kW, values: {"Point Alias": RWL_WTG08_KW, Channel: "02", UOM: kW, Multiplier: 1, OffsetTimeMinutes: 480, PointType: kW}}
+              - {ptId: 1563083, channelId: ch_rwl_wtg08_possible_kw_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-08 possible power kW, values: {"Point Alias": RWL_WTG08_PKW, Channel: "03", UOM: kW, Multiplier: 1, OffsetTimeMinutes: 480, PointType: kW}}
+              - {ptId: 1563084, channelId: ch_rwl_wtg08_nacelle_wind_ms_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-08 nacelle wind speed m/s, values: {"Point Alias": RWL_WTG08_WS, Channel: "04", UOM: m/s, Multiplier: 1, OffsetTimeMinutes: 480, PointType: m_per_s}}
+              - {ptId: 1563085, channelId: ch_rwl_wtg08_rotor_rpm_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-08 rotor speed RPM, values: {"Point Alias": RWL_WTG08_RPM, Channel: "05", UOM: RPM, Multiplier: 1, OffsetTimeMinutes: 480, PointType: rpm}}
+              - {ptId: 1563086, channelId: ch_rwl_wtg08_state_10m, ptType: 2, timeZoneId: 13, interval: 10, description: WTG-08 turbine state, values: {"Point Alias": RWL_WTG08_STATE, Channel: "06", UOM: State, Multiplier: 1, OffsetTimeMinutes: 480, PointType: state}}
+              - {ptId: 1563091, channelId: ch_rwl_wtg09_kwh_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-09 active energy kWh, values: {"Point Alias": RWL_WTG09_KWH, Channel: "01", UOM: kWh, Multiplier: 1, OffsetTimeMinutes: 480, PointType: kWh}}
+              - {ptId: 1563092, channelId: ch_rwl_wtg09_kw_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-09 active power kW, values: {"Point Alias": RWL_WTG09_KW, Channel: "02", UOM: kW, Multiplier: 1, OffsetTimeMinutes: 480, PointType: kW}}
+              - {ptId: 1563093, channelId: ch_rwl_wtg09_possible_kw_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-09 possible power kW, values: {"Point Alias": RWL_WTG09_PKW, Channel: "03", UOM: kW, Multiplier: 1, OffsetTimeMinutes: 480, PointType: kW}}
+              - {ptId: 1563094, channelId: ch_rwl_wtg09_nacelle_wind_ms_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-09 nacelle wind speed m/s, values: {"Point Alias": RWL_WTG09_WS, Channel: "04", UOM: m/s, Multiplier: 1, OffsetTimeMinutes: 480, PointType: m_per_s}}
+              - {ptId: 1563095, channelId: ch_rwl_wtg09_rotor_rpm_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-09 rotor speed RPM, values: {"Point Alias": RWL_WTG09_RPM, Channel: "05", UOM: RPM, Multiplier: 1, OffsetTimeMinutes: 480, PointType: rpm}}
+              - {ptId: 1563096, channelId: ch_rwl_wtg09_state_10m, ptType: 2, timeZoneId: 13, interval: 10, description: WTG-09 turbine state, values: {"Point Alias": RWL_WTG09_STATE, Channel: "06", UOM: State, Multiplier: 1, OffsetTimeMinutes: 480, PointType: state}}
+              - {ptId: 1563101, channelId: ch_rwl_wtg10_kwh_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-10 active energy kWh, values: {"Point Alias": RWL_WTG10_KWH, Channel: "01", UOM: kWh, Multiplier: 1, OffsetTimeMinutes: 480, PointType: kWh}}
+              - {ptId: 1563102, channelId: ch_rwl_wtg10_kw_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-10 active power kW, values: {"Point Alias": RWL_WTG10_KW, Channel: "02", UOM: kW, Multiplier: 1, OffsetTimeMinutes: 480, PointType: kW}}
+              - {ptId: 1563103, channelId: ch_rwl_wtg10_possible_kw_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-10 possible power kW, values: {"Point Alias": RWL_WTG10_PKW, Channel: "03", UOM: kW, Multiplier: 1, OffsetTimeMinutes: 480, PointType: kW}}
+              - {ptId: 1563104, channelId: ch_rwl_wtg10_nacelle_wind_ms_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-10 nacelle wind speed m/s, values: {"Point Alias": RWL_WTG10_WS, Channel: "04", UOM: m/s, Multiplier: 1, OffsetTimeMinutes: 480, PointType: m_per_s}}
+              - {ptId: 1563105, channelId: ch_rwl_wtg10_rotor_rpm_10m, ptType: 1, timeZoneId: 13, interval: 10, description: WTG-10 rotor speed RPM, values: {"Point Alias": RWL_WTG10_RPM, Channel: "05", UOM: RPM, Multiplier: 1, OffsetTimeMinutes: 480, PointType: rpm}}
+              - {ptId: 1563106, channelId: ch_rwl_wtg10_state_10m, ptType: 2, timeZoneId: 13, interval: 10, description: WTG-10 turbine state, values: {"Point Alias": RWL_WTG10_STATE, Channel: "06", UOM: State, Multiplier: 1, OffsetTimeMinutes: 480, PointType: state}}
+          - gwNodeId: 560302
+            name: FIG-RIDGELINE-MET-MAST
+            isEnabled: true
+            points:
+              - {ptId: 1563201, channelId: ch_rwl_met_wind_ms_10m, ptType: 1, timeZoneId: 13, interval: 10, description: Met mast hub-height wind speed m/s, values: {"Point Alias": RWL_MET_WS50, Channel: "01", UOM: m/s, Multiplier: 1, OffsetTimeMinutes: 480, PointType: m_per_s}}
+              - {ptId: 1563202, channelId: ch_rwl_met_wind_direction_10m, ptType: 1, timeZoneId: 13, interval: 10, description: Met mast wind direction degrees, values: {"Point Alias": RWL_MET_WD, Channel: "02", UOM: deg, Multiplier: 1, OffsetTimeMinutes: 480, PointType: deg}}
+              - {ptId: 1563203, channelId: ch_rwl_met_air_temp_c_10m, ptType: 1, timeZoneId: 13, interval: 10, description: Met mast air temperature degC, values: {"Point Alias": RWL_MET_TA, Channel: "03", UOM: degC, Multiplier: 1, OffsetTimeMinutes: 480, PointType: degC}}
+              - {ptId: 1563204, channelId: ch_rwl_met_pressure_kpa_10m, ptType: 1, timeZoneId: 13, interval: 10, description: Met mast barometric pressure kPa, values: {"Point Alias": RWL_MET_BP, Channel: "04", UOM: kPa, Multiplier: 1, OffsetTimeMinutes: 480, PointType: kpa}}
+              - {ptId: 1563205, channelId: ch_rwl_met_air_density_10m, ptType: 1, timeZoneId: 13, interval: 10, description: Met mast air density kg/m3, values: {"Point Alias": RWL_MET_RHO, Channel: "05", UOM: kg/m3, Multiplier: 1, OffsetTimeMinutes: 480, PointType: kgm3}}
+              - {ptId: 1563206, channelId: ch_rwl_met_rh_10m, ptType: 1, timeZoneId: 13, interval: 10, description: Met mast relative humidity, values: {"Point Alias": RWL_MET_RH, Channel: "06", UOM: pct, Multiplier: 1, OffsetTimeMinutes: 480, PointType: pct}}
+
     - id: hmr_events_publish
       componentId: HmrEventsPublish
       executorKey: hmr.events.publish
@@ -2704,6 +3578,13 @@ scenarios:
     - duplicate_file_import
     - account_number_change
     - provider_rate_change
+    - wind_generation_interval
+    - generated_bills
+    - generator_bill_credit_transfer
+    - account_transferred_at_acquisition
+    - account_opened_mid_window
+    - turbine_outage
+    - expected_versus_actual_energy
   negative:
     - negative_bad_units
 

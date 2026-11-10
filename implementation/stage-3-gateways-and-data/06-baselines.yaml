@@ -1,0 +1,141 @@
+# Stage 3, step 6: Baselines (Database Administrator > Nodes > Point nodes; the Baseline group on the point's own
+# Definitions page). The 3 baseline point shells were created in Stage 2 (04-points.yaml), each under the same meter
+# as the point it baselines. Baseline For lists only sibling points with a commodity unit that already have a gateway
+# or a registered aggregate (BaselinePoints_Lookup), so this step waits for step 2. Enter it any time after step 2.
+stage: 3
+step: 6
+title: Baselines and weather forecast associations
+app: Database Administrator
+screen: Nodes > Point nodes (Baseline group)
+source:
+- data/eem/northlake-eem-metaworld-stage1b-v1.yaml (baselineTargets, weatherForecastAssociations)
+notes:
+- 'Open the baseline point (created in Stage 2), set Baseline Algorithm, tick Display baseline, then choose Baseline
+  For: the measured point this one baselines (the combo is scoped by the chosen algorithm, via BaselinePoints_Lookup).'
+- 'Baseline targets remain commodity points. Weather forecasts use the separate Association editor.'
+- 'Two algorithms, one of each kind the product seeds: Rolling Day Type Forecast (curBaselineCalc 7, a forecast that
+  creates data) on the Science Center electric and chilled-water baselines, and Average of Top 5 Days (curBaselineCalc
+  2, a curtailment baseline) on the Student Center demand baseline, which bids into Valley Electric District demand
+  response. Other baselines/forecasts need an outside engine and EnergyAI Baseline the EnergyAI service. Retired Metrix choices are unavailable for new assignments.'
+- 'PRODUCT FINDING 15: curBaselineCalc (the Baseline Algorithm list) has no editor in any client; every row is
+  database-only configuration.'
+- Baseline controls are shown for commodity points; weather points use Associations.
+- 'For weatherAssociations, open the observed source point, then Relationships > Associations. Select Weather forecast
+  and the matching forecast point. The observed point owns the link; neither point becomes derived or loses its gateway.'
+- 'Set the three observed wind points to Wind Speed and KSUU observed dew point to Dew Point as Stage 2 specifies.
+  Keep the existing point IDs, names, units and data. Only matching measurement types appear as association targets.'
+- 'There are twelve links: temperature, dew point, relative humidity and wind speed at each of the three stations.
+  The six wind direction and precipitation probability forecasts have no supported observation counterpart;
+  leave them independent. Create these links in the app after the Stage 2 point import and Stage 3 gateway binding.'
+- The generated baseline point inherits its definition and has no independent collector. The measured source keeps
+  its gateway; changing a Weather Forecast association never changes either endpoint's gateway or definition.
+- 'The 3 targets: Science Center Electric kWh Baseline (for the Science Center 15-minute delivered kWh point), Student
+  Center Demand kW Baseline (for the Student Center 15-minute demand point), Science Center Chilled Water Ton-Hours
+  Baseline (for the Science Center hourly chilled-water delivery point).'
+- 'Each record names the meter both points sit under, the baseline point to open, and the measured point to pick in
+  Baseline For.'
+records:
+- key: bl_nlu_science_electric_kwh_15m
+  installed:
+    pointId:
+  Meter: {Description: Science Center Electric Main, Meter Number: SYN-VED-M-0040002}
+  Point: Science Center Electric kWh Baseline
+  Baseline: {Baseline Algorithm: Rolling Day Type Forecast, Display baseline: true, Baseline For: Delivered kWh 15m}
+- key: bl_nlu_student_demand_kw_15m
+  installed:
+    pointId:
+  Meter: {Description: Student Center Electric Main, Meter Number: SYN-VED-M-0040004}
+  Point: Student Center Demand kW Baseline
+  Baseline: {Baseline Algorithm: Average of Top 5 Days, Display baseline: true, Baseline For: Demand kW 15m}
+- key: bl_nlu_science_chw_ton_hours_hourly
+  installed:
+    pointId:
+  Meter: {Description: Science Center Chilled Water, Meter Number: SYN-NTP-M-0070001}
+  Point: Science Center Chilled Water Ton-Hours Baseline
+  Baseline: {Baseline Algorithm: Rolling Day Type Forecast, Display baseline: true, Baseline For: Delivered Ton-Hours 60m}
+
+weatherAssociations:
+- key: weather_forecast_ksac
+  Meter: {Description: KSAC Sacramento Executive Airport, Meter Number: KSAC}
+  Source Point: KSAC Outside Air Temperature
+  Target Point: KSAC Forecast Temperature
+  Reason: Weather forecast
+  ReasonType: V
+  RelationshipKind: Association
+- key: weather_forecast_ksmf
+  Meter: {Description: KSMF Sacramento International Airport, Meter Number: KSMF}
+  Source Point: KSMF Outside Air Temperature
+  Target Point: KSMF Forecast Temperature
+  Reason: Weather forecast
+  ReasonType: V
+  RelationshipKind: Association
+- key: weather_forecast_ksuu
+  Meter: {Description: KSUU Travis Air Force Base, Meter Number: KSUU}
+  Source Point: KSUU Outside Air Temperature
+  Target Point: KSUU Forecast Temperature
+  Reason: Weather forecast
+  ReasonType: V
+  RelationshipKind: Association
+- key: weather_forecast_ksac_rh
+  Meter: {Description: KSAC Sacramento Executive Airport, Meter Number: KSAC}
+  Source Point: KSAC Relative Humidity
+  Target Point: KSAC Forecast Relative Humidity
+  Reason: Weather forecast
+  ReasonType: V
+  RelationshipKind: Association
+- key: weather_forecast_ksac_wind_mph
+  Meter: {Description: KSAC Sacramento Executive Airport, Meter Number: KSAC}
+  Source Point: KSAC Wind Speed
+  Target Point: KSAC Forecast Wind Speed
+  Reason: Weather forecast
+  ReasonType: V
+  RelationshipKind: Association
+- key: weather_forecast_ksmf_wind_kph
+  Meter: {Description: KSMF Sacramento International Airport, Meter Number: KSMF}
+  Source Point: KSMF Wind Speed
+  Target Point: KSMF Forecast Wind Speed
+  Reason: Weather forecast
+  ReasonType: V
+  RelationshipKind: Association
+- key: weather_forecast_ksuu_wind_knots
+  Meter: {Description: KSUU Travis Air Force Base, Meter Number: KSUU}
+  Source Point: KSUU Wind Speed
+  Target Point: KSUU Forecast Wind Speed
+  Reason: Weather forecast
+  ReasonType: V
+  RelationshipKind: Association
+- key: weather_forecast_ksuu_dewpoint_c
+  Meter: {Description: KSUU Travis Air Force Base, Meter Number: KSUU}
+  Source Point: KSUU Dew Point
+  Target Point: KSUU Forecast Dew Point
+  Reason: Weather forecast
+  ReasonType: V
+  RelationshipKind: Association
+- key: weather_forecast_ksac_dewpoint_f
+  Meter: {Description: KSAC Sacramento Executive Airport, Meter Number: KSAC}
+  Source Point: KSAC Dew Point
+  Target Point: KSAC Forecast Dew Point
+  Reason: Weather forecast
+  ReasonType: V
+  RelationshipKind: Association
+- key: weather_forecast_ksmf_dewpoint_c
+  Meter: {Description: KSMF Sacramento International Airport, Meter Number: KSMF}
+  Source Point: KSMF Dew Point
+  Target Point: KSMF Forecast Dew Point
+  Reason: Weather forecast
+  ReasonType: V
+  RelationshipKind: Association
+- key: weather_forecast_ksmf_rh
+  Meter: {Description: KSMF Sacramento International Airport, Meter Number: KSMF}
+  Source Point: KSMF Relative Humidity
+  Target Point: KSMF Forecast Relative Humidity
+  Reason: Weather forecast
+  ReasonType: V
+  RelationshipKind: Association
+- key: weather_forecast_ksuu_rh
+  Meter: {Description: KSUU Travis Air Force Base, Meter Number: KSUU}
+  Source Point: KSUU Relative Humidity
+  Target Point: KSUU Forecast Relative Humidity
+  Reason: Weather forecast
+  ReasonType: V
+  RelationshipKind: Association

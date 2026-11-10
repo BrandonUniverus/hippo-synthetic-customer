@@ -49,6 +49,7 @@ TARIFF_SHEETS = {
     "river-city-utilities": ("rcu", "#0E7C86", "#FFFFFF", "drop"),
     "northlake-thermal-plant": ("ntp", "#37474F", "#FFFFFF", "thermal"),
     "helios-onsite-solar": ("hos", "#F5A524", "#2B2742", "sun"),
+    "ridgeline-wind": ("rwl", "#2E6E5A", "#FFFFFF", "wind"),
 }
 
 # Owner teams follow the cover letter's "What's enclosed" table.
@@ -99,6 +100,7 @@ ICONS = {
     "drop": '<path d="M12 2.5S5.5 10 5.5 14.5a6.5 6.5 0 0 0 13 0C18.5 10 12 2.5 12 2.5z"/>',
     "thermal": '<path d="M10 3a2 2 0 0 1 4 0v10.3a4.5 4.5 0 1 1-4 0z"/>',
     "sun": '<circle cx="12" cy="12" r="4.2"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3M4.6 4.6l2.1 2.1M17.3 17.3l2.1 2.1M4.6 19.4l2.1-2.1M17.3 6.7l2.1-2.1"/>',
+    "wind": '<path d="M3 8.5h11a3 3 0 1 0-3-3M3 12.5h16a3 3 0 1 1-3 3M3 16.5h7"/>',
 }
 
 
@@ -331,7 +333,8 @@ def render_tariff_sheet(stem, markdown, links, context):
     heading = SHEET_TITLE.match(title)
     kind, provider, scope = (heading["kind"], heading["provider"], heading["scope"]) if heading else ("", title, "")
     codes = [match["code"] for block in blocks if block["kind"] == "heading" and (match := SCHEDULE_CODE.search(block["text"]))]
-    icon_svg = f'<svg viewBox="0 0 24 24" width="26" height="26" fill="{ink}" stroke="{ink}" stroke-width="{1.6 if icon == "sun" else 0}" stroke-linecap="round" aria-hidden="true">{ICONS[icon]}</svg>'
+    stroked = icon in ("sun", "wind")   # the wind mark is line work only, so it carries no fill
+    icon_svg = f'<svg viewBox="0 0 24 24" width="26" height="26" fill="{"none" if icon == "wind" else ink}" stroke="{ink}" stroke-width="{1.6 if stroked else 0}" stroke-linecap="round" aria-hidden="true">{ICONS[icon]}</svg>'
     parts = [
         f'<div class="sheet sheet-{palette}" id="sheet-{stem}">',
         f'<div class="sheet-band" style="background:{band};color:{ink}">',
@@ -505,7 +508,7 @@ def render_package(root=ROOT):
 STYLES = """:root{--nu-primary:#14263F;--nu-secondary:#C8A24A;--nu-tint:#EEF1F5;--cool-200:#DCE3EB;--warm-50:#FAF8F2;--warm-200:#E9E3D4;
 --ved-primary:#1C5FB0;--ved-tint:#E8F1FA;--ved-ink:#11457F;--sgu-primary:#C9551F;--sgu-tint:#F7ECE3;--sgu-ink:#A8420F;
 --rcu-primary:#0E7C86;--rcu-tint:#E4F2F2;--rcu-ink:#0A5860;--ntp-primary:#37474F;--ntp-tint:#ECEFF1;--ntp-ink:#2B373D;
---hos-primary:#F5A524;--hos-tint:#FEF4E2;--hos-ink:#8A5305;
+--hos-primary:#F5A524;--hos-tint:#FEF4E2;--hos-ink:#8A5305;--rwl-primary:#2E6E5A;--rwl-tint:#E6F0EC;--rwl-ink:#1F4F40;
 --font-nu:'Spectral',Georgia,'Times New Roman',serif;--font-ui:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;--font-mono:'IBM Plex Mono',ui-monospace,'SFMono-Regular',Menlo,monospace}
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
@@ -600,11 +603,13 @@ table.t.wide td{padding:6px 8px}
 .sheet-rcu .eff{background:var(--rcu-tint);color:var(--rcu-ink)}
 .sheet-ntp .eff{background:var(--ntp-tint);color:var(--ntp-ink)}
 .sheet-hos .eff{background:var(--hos-tint);color:var(--hos-ink)}
+.sheet-rwl .eff{background:var(--rwl-tint);color:var(--rwl-ink)}
 .sheet-ved table.t th{background:var(--ved-tint);color:var(--ved-ink);border-bottom-color:var(--ved-primary)}
 .sheet-sgu table.t th{background:var(--sgu-tint);color:var(--sgu-ink);border-bottom-color:var(--sgu-primary)}
 .sheet-rcu table.t th{background:var(--rcu-tint);color:var(--rcu-ink);border-bottom-color:var(--rcu-primary)}
 .sheet-ntp table.t th{background:var(--ntp-tint);color:var(--ntp-ink);border-bottom-color:var(--ntp-primary)}
 .sheet-hos table.t th{background:var(--hos-tint);color:var(--hos-ink);border-bottom-color:var(--hos-primary)}
+.sheet-rwl table.t th{background:var(--rwl-tint);color:var(--rwl-ink);border-bottom-color:var(--rwl-primary)}
 .tab-tag{display:inline-block;font:600 9.5px/1 var(--font-mono);color:#fff;background:var(--nu-primary);padding:4px 7px;vertical-align:middle;margin:-3px 9px 0 0;letter-spacing:.06em;text-transform:uppercase}
 .end-pad{padding-bottom:56px}
 .end{margin-top:16px;padding-top:20px;border-top:2px solid var(--nu-primary);position:relative;color:#5E5849;max-width:100%}

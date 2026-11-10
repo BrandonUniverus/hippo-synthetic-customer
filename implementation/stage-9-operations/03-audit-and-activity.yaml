@@ -1,0 +1,60 @@
+# Stage 9, step 3: Audit and activity trail (system-generated). Nothing is configured; this file lists the actions
+# to perform, through the normal apps, so rp_Audit and rp_ActivityTracker have rows once they are run.
+stage: 9
+step: 3
+title: Audit and activity trail
+app: Database Administrator, Web
+screen: (system-generated; no dedicated setup screen)
+source:
+- generators/documents/sources/implementation/dream-customer/phase6-operations-engagement-spec.md
+notes:
+- 'Verified: AuditConfig already has 12 Active=1 rows tracking Bill.BL_Amount/FiscalYear/Period/PeriodStart/
+  PeriodEnd, BillItem.BI_Amount/BI_Quantity, BillingAccount_Tbl.BA_BillingAccountNumber/Description/ProviderID, and
+  Meter.SM_Code/BA_BillingAccountID. Nothing to enable; AuditLog fills the moment one of those columns changes
+  (LogID, AuditID, KeyID, TableRowID, UserID, AsOfDate, PreviousValue, CurrentValue).'
+- 'Verified: rp_ActivityTracker (stored procedure) counts, per user or per company, Logins from UserLogin_Tbl and
+  Activity from GuiReportActivityLog (joined to GuiReports/GuiReportTypes, i.e. report views) between two dates.
+  There is nothing to configure; sign in and open reports as several users and the counts populate.'
+- 'CORRECTION: UserLogin_Tbl records a session once sign-in succeeds; it has no failure flag. casey.holt is
+  Inactive (Stage 1), so the "disabled-user failed-auth" case proves itself by ABSENCE -- no UserLogin_Tbl row, no
+  session -- not by a special failed-attempt row inside rp_ActivityTracker. If a separate identity/security audit
+  table records the rejected attempt (the installed database has a broader AuditEvent table used by SAML/SCIM
+  provisioning), that is a bonus signal, not something this report reads; do not chase it into a finding.'
+- 'quinn.roberts is Stage 1''s cross-company auditor: assign each company''s eem_audit_readonly copy and local
+  Points Read group. Northlake and Cedar Row also have eem_reports membership; Cedar Row has eem_sustainability_reports.
+  The exact company/group pairs are in 05-users.yaml. Sign in once and open a report scoped to each other company
+  to exercise cross-company access; Quinn has no rate-allocation administration grant.'
+- 'Cross-company prerequisite: Quinn''s Cedar Row and Thermal Plant assignments are marked Pending cross-company groups
+  in 05-users.yaml because the current membership save rejects additions outside the user''s home company. Keep this
+  cross-company acceptance case pending until a supported assignment path exists; sharing does not copy memberships.'
+- 'Added 2026-10-01 (Ridgeline Wind): the two university researchers read a site that belongs to another company, which
+  makes them the case worth watching in rp_ActivityTracker: their logins and report views are counted under their own
+  company, Northlake University (the report aggregates by user or by company), while the points they read belong to the
+  Northlake Thermal Plant. One record below exercises it; there is nothing to configure.'
+records:
+- key: bill_field_edits
+  action: "Open an existing Sierra Gas or Valley Electric bill in Bill Entry and change its amount by a cent, then
+    change a billing account's description by a word, then rename a meter's code and back. Three edits, three
+    AuditLog rows, spanning Bill/BillItem/BillingAccount/Meter."
+  performedBy: jordan.hale (Northlake University eem_company_setup, nlu_facilities_setup and nlu_points_admin)
+- key: normal_logins
+  action: "Sign in as 5-6 of the Stage 1 users spanning all three companies over a few different days in the
+    2024-2025 window, opening at least one report each visit."
+  performedBy: "samantha.ireland, jordan.hale, maya.chen, dana.okafor, avery.singh (a mix across NLU/CRA/NTP)"
+- key: disabled_user_failed_auth
+  action: "Attempt to sign in as casey.holt. It must be refused (Inactive); confirm no UserLogin_Tbl row is
+    created for the attempt."
+  performedBy: casey.holt (Stage 1, Inactive on purpose)
+- key: cross_company_auditor_views
+  action: "Sign in as quinn.roberts (Northlake University) and open a report scoped to Cedar Row Apartments, then
+    one scoped to the Northlake Thermal Plant, using each company's eem_audit_readonly copy and its local
+    Points Read group. This is rp_ActivityTracker's cross-company case."
+  performedBy: quinn.roberts
+- key: ridgeline_researcher_activity
+  action: "Sign in as elena.vasquez and kai.nakamura on a few different days and, each visit, run a Scatter Plot on two
+    Ridgeline points (one turbine's Nacelle Wind Speed 10m and Active Power kW 10m) or open a shared WTG power curve,
+    and open Points List once. Then sign in as quinn.roberts, run Activity Tracker for Northlake University over those
+    dates, and confirm both researchers show Logins and report views, none of them a bill report, and that the same
+    run for the Northlake Thermal Plant counts neither of them."
+  performedBy: "elena.vasquez and kai.nakamura (Northlake University, eem_ridgeline_research, Points granted in Stage 2);
+    quinn.roberts reads the result with his Northlake University eem_audit_readonly copy"

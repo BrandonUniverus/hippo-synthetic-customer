@@ -1,0 +1,144 @@
+manifestVersion: 1
+id: northlake_itemized_bills_v1
+customerScenarioId: demo_university_v1
+purpose: >
+  The itemized bills packet 0.4 adds for the Ridgeline Wind acquisition, rendered by
+  generators/render_bills.py into documents/utility-bills/ like every other file in
+  data/bills/. Every line is a fact: quantities, rates and amounts reconcile to the total,
+  and the rates are the provider files' own. The Valley Electric credit transfer appears on
+  two bills, once going out and once coming in, and must be counted once.
+
+# Each line: description, then quantity x rate = amount (rounded half-up to the cent), or a
+# bare amount for a transfer or a percentage line (percentOf names the line codes it applies to).
+# `code` is the provider's billCharges code (data/providers/<provider>.yaml).
+bills:
+  # ------------------------------------------------------------------ Valley Electric: generator account
+  - id: ved_ridgeline_generator_2024_07
+    file: documents/utility-bills/valley-electric-district/05-Valley-Electric-Ridgeline-Generator-First-Bill.pdf
+    providerId: valley_electric_district
+    accountId: ved_ridgeline_generator
+    title: Generator Account Statement
+    customer: Northlake Thermal Plant
+    accountNumber: SYN-VED-A-0010014
+    rateSchedules: [VED-GEN-IC, VED-BCT]
+    # Valley Electric cycle 1 reads on the 5th: a period runs from the 5th to the 4th and posts to the month it
+    # ends in (Stage 1 02-utility-providers.yaml). Service began July 1, so the first bill runs July 1 to August 4
+    # (35 days, the August 2024 period). Stage 5 enters a Valley Electric bill on its period end + 3 days.
+    billDate: 2024-08-06
+    dueDate: 2024-09-05
+    period: {start: 2024-07-01, end: 2024-08-04}
+    notice: >
+      Welcome. This account opened July 1, 2024 on the transfer of generator service from
+      Ridgeline Wind LLC, account SYN-VED-A-0019014, which closed June 30, 2024. Your first bill
+      runs from the opening read to your first scheduled read, 35 days.
+    meters:
+      - {meterNumber: SYN-VED-M-0040015, badge: VED-BADGE-0040015, multiplier: 12000, channel: Received (export), quantity: 2496612, unit: kWh, statedAs: 2496.612 MWh}
+      - {meterNumber: SYN-VED-M-0040015, badge: VED-BADGE-0040015, multiplier: 12000, channel: Delivered (station service), quantity: 4428, unit: kWh}
+      - {meterNumber: SYN-VED-M-0040015, badge: VED-BADGE-0040015, multiplier: 12000, channel: Reactive, quantity: 858948, unit: kVArh}
+    lines:
+      - {code: generator_customer_charge, description: Generator customer charge, quantity: 1, unit: month, rate: 285.00, amount: 285.00}
+      - {code: station_service_energy, description: Station service energy, quantity: 4428, unit: kWh, rate: 0.131, amount: 580.07}
+      - {code: reactive_power_charge, description: "Reactive power beyond power factor 0.95 (858,948 kVArh measured; 820,597 allowed)", quantity: 38351, unit: kVArh, rate: 0.0042, amount: 161.07}
+      - {code: generation_credit, description: Generation credit on export, quantity: 2496612, unit: kWh, rate: -0.0612, amount: -152792.65}
+      - {code: bct_credit_transferred, description: "Generation credit transferred under VED-BCT to SYN-VED-A-0010013 (Central Plant)", amount: 152792.65, transfer: {to: SYN-VED-A-0010013, appearsOn: ved_central_plant_2024_09}}
+      - {code: utility_users_tax, description: Utility users tax, percent: 5.0, percentOf: [generator_customer_charge, station_service_energy, reactive_power_charge], amount: 51.31}
+    total: 1077.45
+
+  - id: ved_ridgeline_generator_2025_01
+    file: documents/utility-bills/valley-electric-district/06-Valley-Electric-Ridgeline-Generator-Winter-Calm.pdf
+    providerId: valley_electric_district
+    accountId: ved_ridgeline_generator
+    title: Generator Account Statement
+    customer: Northlake Thermal Plant
+    accountNumber: SYN-VED-A-0010014
+    rateSchedules: [VED-GEN-IC, VED-BCT]
+    billDate: 2025-02-05        # the February 2025 period, January 5 to February 4
+    dueDate: 2025-03-07
+    period: {start: 2025-01-05, end: 2025-02-04}
+    notice: >
+      A still month: the turbines stood idle for long spells, so station service rose and the
+      export credit transferred to the Central Plant fell. Reactive energy stayed inside the
+      0.95 power-factor allowance, so there is no reactive charge.
+    meters:
+      - {meterNumber: SYN-VED-M-0040015, badge: VED-BADGE-0040015, multiplier: 12000, channel: Received (export), quantity: 418836, unit: kWh, statedAs: 418.836 MWh}
+      - {meterNumber: SYN-VED-M-0040015, badge: VED-BADGE-0040015, multiplier: 12000, channel: Delivered (station service), quantity: 46920, unit: kWh}
+      - {meterNumber: SYN-VED-M-0040015, badge: VED-BADGE-0040015, multiplier: 12000, channel: Reactive, quantity: 131664, unit: kVArh}
+    lines:
+      - {code: generator_customer_charge, description: Generator customer charge, quantity: 1, unit: month, rate: 285.00, amount: 285.00}
+      - {code: station_service_energy, description: Station service energy, quantity: 46920, unit: kWh, rate: 0.131, amount: 6146.52}
+      - {code: reactive_power_charge, description: "Reactive power beyond power factor 0.95 (131,664 kVArh measured; 137,665 allowed)", quantity: 0, unit: kVArh, rate: 0.0042, amount: 0.00}
+      - {code: generation_credit, description: Generation credit on export, quantity: 418836, unit: kWh, rate: -0.0612, amount: -25632.76}
+      - {code: bct_credit_transferred, description: "Generation credit transferred under VED-BCT to SYN-VED-A-0010013 (Central Plant)", amount: 25632.76, transfer: {to: SYN-VED-A-0010013, appearsOn: null}}
+      - {code: utility_users_tax, description: Utility users tax, percent: 5.0, percentOf: [generator_customer_charge, station_service_energy, reactive_power_charge], amount: 321.58}
+    total: 6753.10
+
+  # ------------------------------------------------------------------ Valley Electric: the benefiting account
+  - id: ved_central_plant_2024_09
+    file: documents/utility-bills/valley-electric-district/07-Valley-Electric-Central-Plant-Bill-Credit-Transfer.pdf
+    providerId: valley_electric_district
+    accountId: ved_central_plant
+    title: Electric Service Statement
+    customer: Northlake Thermal Plant
+    accountNumber: SYN-VED-A-0010013
+    rateSchedules: [VED-TOU-PRI, VED-BCT]
+    billDate: 2024-09-06        # the September 2024 period, August 5 to September 4
+    dueDate: 2024-10-07
+    period: {start: 2024-08-05, end: 2024-09-04}
+    notice: >
+      Your first renewable generation bill credit: the export billed on generating account
+      SYN-VED-A-0010014 (Ridgeline Substation) for July 1 to August 4, 2024, transferred under rider
+      VED-BCT. Each credit arrives one billing cycle after the generator bill that earned it.
+    meters:
+      - {meterNumber: SYN-VED-M-0040014, badge: VED-BADGE-0040014, multiplier: 1, channel: Delivered, quantity: 1512400, unit: kWh}
+      - {meterNumber: SYN-VED-M-0040014, badge: VED-BADGE-0040014, multiplier: 1, channel: Maximum 15-minute demand, quantity: 3240, unit: kW}
+    lines:
+      - {code: energy_peak, description: "Energy, on-peak (summer)", quantity: 412800, unit: kWh, rate: 0.214, amount: 88339.20}
+      - {code: energy_part_peak, description: "Energy, part-peak", quantity: 368400, unit: kWh, rate: 0.149, amount: 54891.60}
+      - {code: energy_off_peak, description: "Energy, off-peak", quantity: 731200, unit: kWh, rate: 0.098, amount: 71657.60}
+      - {code: demand_charge, description: "Demand, maximum 15-minute kW", quantity: 3240, unit: kW, rate: 21.90, amount: 70956.00}
+      - {code: facility_charge, description: Facility charge, quantity: 1, unit: month, rate: 410.00, amount: 410.00}
+      - {code: public_purpose_program, description: Public purpose program, percent: 1.5, percentOf: [energy_peak, energy_part_peak, energy_off_peak], amount: 3223.33}
+      - {code: bct_credit_received, description: "Renewable generation credit received under VED-BCT from SYN-VED-A-0010014 (export July 1 to August 4, 2024)", amount: -152792.65, transfer: {from: SYN-VED-A-0010014, leftOn: ved_ridgeline_generator_2024_07}}
+      - {code: bct_administrative_fee, description: VED-BCT administrative fee, quantity: 1, unit: month, rate: 12.50, amount: 12.50}
+      - {code: utility_users_tax, description: Utility users tax, percent: 5.0, percentOf: [energy_peak, energy_part_peak, energy_off_peak, demand_charge, facility_charge, public_purpose_program], amount: 14473.89}
+    total: 151171.47
+
+  # ------------------------------------------------------------------ Ridgeline Wind: the hand-made first statement
+  # Ridgeline accounting built July 2024 by hand from the SCADA export, before EEM. It is the
+  # acceptance sample for Bill Generation: the first generated statement must match it to the
+  # cent, which also fixes what the July 2024 turbine interval data must sum to.
+  - id: rwl_transfer_2024_07
+    file: documents/utility-bills/ridgeline-wind/01-Ridgeline-Wind-July-2024-Transfer-Statement-Manual.pdf
+    providerId: ridgeline_wind
+    accountId: rwl_ridgeline_transfer
+    title: Monthly Energy Transfer Statement
+    preparedBy: Ridgeline Wind accounting, by hand from the SCADA export
+    customer: Northlake Thermal Plant
+    accountNumber: SYN-RWL-G-0000001
+    rateSchedules: [RWL-XFER-2024]
+    billDate: 2024-08-02
+    dueDate: null                 # a journal, not a payable
+    period: {start: 2024-07-01, end: 2024-07-31}
+    notice: >
+      First statement since the plant bought Ridgeline Wind on July 1, 2024. Post as a
+      journal: debit 5150-WIND in Northlake Thermal Plant; no payment leaves the plant.
+    meters:
+      - {meterNumber: SYN-RWL-M-0110001, badge: RWL-WTG-01, multiplier: 1, channel: Generated, quantity: 238412, unit: kWh}
+      - {meterNumber: SYN-RWL-M-0110002, badge: RWL-WTG-02, multiplier: 1, channel: Generated, quantity: 233905, unit: kWh}
+      - {meterNumber: SYN-RWL-M-0110003, badge: RWL-WTG-03, multiplier: 1, channel: Generated, quantity: 229768, unit: kWh}
+      - {meterNumber: SYN-RWL-M-0110004, badge: RWL-WTG-04, multiplier: 1, channel: Generated, quantity: 226341, unit: kWh}
+      - {meterNumber: SYN-RWL-M-0110005, badge: RWL-WTG-05, multiplier: 1, channel: Generated, quantity: 224087, unit: kWh}
+      - {meterNumber: SYN-RWL-M-0110006, badge: RWL-WTG-06, multiplier: 1, channel: Generated, quantity: 225530, unit: kWh}
+      - {meterNumber: SYN-RWL-M-0110007, badge: RWL-WTG-07, multiplier: 1, channel: Generated, quantity: 222196, unit: kWh}
+      - {meterNumber: SYN-RWL-M-0110008, badge: RWL-WTG-08, multiplier: 1, channel: Generated, quantity: 219874, unit: kWh}
+      - {meterNumber: SYN-RWL-M-0110009, badge: RWL-WTG-09, multiplier: 1, channel: Generated, quantity: 217402, unit: kWh}
+      - {meterNumber: SYN-RWL-M-0110010, badge: RWL-WTG-10, multiplier: 1, channel: Generated, quantity: 213869, unit: kWh}
+    lines:
+      - {code: transfer_energy, description: "Transfer energy, ten turbine pad meters", quantity: 2251384, unit: kWh, rate: 0.058, amount: 130580.27}
+      - {code: research_credit, description: Wind Energy Research Lab site credit, quantity: 1, unit: month, rate: -1250.00, amount: -1250.00}
+    total: 129330.27
+    informational:                # not charged; what the expected-versus-actual goal starts from
+      - {label: Energy possible at the measured wind (turbine controllers), value: 2327960, unit: kWh}
+      - {label: Performance (generated over possible), value: 96.7, unit: "%"}
+      - {label: "Valley Electric export at the substation, July 2024 interval data (SYN-VED-M-0040015)", value: 2208612, unit: kWh}
+      - {label: Collection losses (turbine pads to substation), value: 1.9, unit: "%"}

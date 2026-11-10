@@ -1,0 +1,49 @@
+{
+  "version": 1,
+  "seed": 104729,
+  "time_zone": "America/Los_Angeles",
+  "supporting_history_start": "2023-12-01",
+  "first_posting_month": "2024-01",
+  "annual_price_growth": "0.03",
+  "annual_price_growth_start": 2026,
+  "tou": {
+    "summer_months": [6, 7, 8, 9],
+    "summer_peak": [[12, 18]],
+    "summer_part_peak": [[8, 12], [18, 22]],
+    "winter_part_peak": [[8, 22]]
+  },
+  "profiles": {
+    "electric_kw_per_sqft": 0.0005,
+    "electric_kw_by_building": {"central_plant": 2200},
+    "water_kgal_per_hour_per_100000_sqft": 0.5,
+    "gas_therms_per_hour_per_100000_sqft": 1.6,
+    "chilled_water_tons_per_100000_sqft": 150,
+    "steam_klb_per_hour_per_100000_sqft": 1.2,
+    "solar_capacity_kw_default": 100,
+    "solar_capacity_kw": {"hos_science_center": 420, "hos_student_center": 280, "hos_cedar_row_carport": 190},
+    "solar_output_factor": 0.55,
+    "solar_export_fraction": 0.16,
+    "wind_turbine_mean_kw": 350,
+    "wind_export_fraction": 0.98,
+    "apartment_electric_share": 0.75,
+    "electric_submeter_shares": {"lakeview_hall_laundry_electric": 0.08, "parking_structure_ev_chargers": 0.18},
+    "anchored_register_origin_fraction": 0.2,
+    "unanchored_register_origin": 0,
+    "fixed_plant_om_per_120000_sqft": 340
+  },
+  "events": {
+    "ridgeline_start": "2024-07-01",
+    "wtg07_outage_start": "2025-02-11",
+    "wtg07_outage_end_exclusive": "2025-04-23",
+    "helios_gap_start": "2025-03-08T09:00:00-08:00",
+    "helios_gap_end": "2025-03-09T16:30:00-07:00",
+    "helios_gap_estimated_kwh": "2140"
+  },
+  "notes": [
+    "Synthetic numerical assumptions, not customer facts or real future tariffs.",
+    "Existing source bills and measurements constrain the relevant periods.",
+    "The December 2023 extension supports January 2024 bill cycles only.",
+    "Stage 4's simplified analysis schedules remain unchanged.",
+    "Winter supplier part-peak was widened to 08:00-22:00 with user approval because the existing bill energy cannot fit 17:00-21:00 at its stated maximum demand."
+  ]
+}

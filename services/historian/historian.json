@@ -1,0 +1,30 @@
+{
+  "version": "northlake-historian-v1",
+  "database": "northlake-historian.accdb",
+  "table": "SyntheticIntervalReadings",
+  "timeZone": "America/Los_Angeles",
+  "historyStartLocal": "2024-01-01T00:00",
+  "refreshHours": 48,
+  "channels": [
+    {"channel": "ch_odbc_library_electric_kwh_30m", "historianTag": "LIB.ELEC.KWH.30M", "intervalMinutes": 30}
+  ],
+  "flags": [
+    {"key": "library-meter-exchange", "channels": ["ch_odbc_library_electric_kwh_30m"],
+     "startLocal": "2024-08-14T10:00", "endLocal": "2024-08-14T12:00",
+     "classification": "Substituted", "code": "SUB1", "method": "Manual", "reader": "facilities.energy",
+     "note": "Valley Electric swapped the Library meter on 14 August 2024. A facilities analyst entered these readings by hand."},
+    {"key": "historian-network-outage", "channels": ["ch_odbc_library_electric_kwh_30m"],
+     "startLocal": "2025-06-03T08:00", "endLocal": "2025-06-03T14:00",
+     "classification": "Estimated", "code": "EST1", "method": "Interpolated", "reader": "bms-historian",
+     "note": "The historian lost its link to the meter and interpolated between the readings either side."}
+  ],
+  "provisional": {"hours": 24, "classification": "Actual", "code": "PROV", "method": "Raw", "reader": "bms-historian",
+                  "note": "Readings in the last day are unvalidated. The code clears once the day has passed, so a re-read sends the same value with no code."},
+  "eem": {
+    "profile": {"DatabaseType": "ODBC", "OdbcType": "Microsoft Access Driver (*.mdb, *.accdb)",
+                "Options": "DBQ=C:\\ProgramData\\EEM Suite\\NorthLake\\Historian\\northlake-historian.accdb;ReadOnly=1"},
+    "nodeParameters": {"SourceClassificationName": "SourceClassification", "SourceCodeName": "SourceCode", "MetadataColumns": "Reader,Method,HistorianTag"},
+    "query": "SELECT [TimeStamp], [Value], SourceClassification, SourceCode, Reader, Method, HistorianTag FROM SyntheticIntervalReadings WHERE Channel = 'ch_odbc_library_electric_kwh_30m' AND [TimeStamp] > DateAdd('h', -48, CDate('|LastTimeStamp|')) ORDER BY UtcTimeStamp",
+    "note": "Access SQL: TimeStamp and Value are reserved words, so they are bracketed. The query re-reads the last 48 hours so the provisional code's removal reaches Energy Hippo; an unchanged repeat is a duplicate."
+  }
+}

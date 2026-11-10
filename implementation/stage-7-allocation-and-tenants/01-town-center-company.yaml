@@ -1,0 +1,165 @@
+# Stage 7, step 1: Northlake Town Center company (Database Administrator > Nodes > company node > Definitions
+# tab, plus Users & Groups). Same shape as Stage 1's 01-companies.yaml and 04-groups.yaml/05-users.yaml: a
+# company is a node, its Definitions tab pages unlock after the first save, and groups/users are separate
+# editors under the company. Town Center is the Phase 4 mixed-use property: a new commercial company added
+# after Stage 1's three (Northlake University 6, Cedar Row Apartments 3, Northlake Thermal Plant 5).
+stage: 7
+step: 1
+title: Northlake Town Center company
+app: Database Administrator
+screen: Nodes > company node > Definitions tab; Users & Groups > Groups; Users & Groups > Users
+source:
+- data/eem/northlake-town-center-v1.yaml
+- generators/documents/sources/implementation/dream-customer/phase4-tenant-rebilling-spec.md
+- documents/guides/tenant-and-lease-roster.pdf
+notes:
+- Enter Definitions first (name, archive interval, time zone, country, alarm defaults) and save; Levels, Company
+  Address, Company Contact and Bill Scenarios unlock after that first save, same order as Stage 1 step 1. Saving
+  creates the Actual bill scenario and a 1990-2013 fiscal calendar on its own; leave both.
+- Archive Interval 60 minutes and Pacific time match every other Northlake company so interval imports behave the
+  same way across the portfolio.
+- 'Levels: the four base types (Site, Location, Meter, Point) are fixed by the product. Town Center''s wording follows
+  Cedar Row''s pattern (a single property, not a campus of sites) rather than Northlake University''s.'
+- Company Address and Company Contact are invented for Town Center (assumed); no source names them, since neither
+  tenant-and-lease-roster.pdf nor northlake-town-center-v1.yaml gives Town Center a street address or a staff contact.
+- 'Bill Scenarios > Used adds two scenarios beyond Actual: Budget, so Step 4''s multi-component rate can be assigned
+  under both Actual (-1) and a non-actual scenario per the Phase 4 spec section D; and Bill Meter Reconciliation
+  (ScenarioTypeID 20, confirmed present in dbo.ScenarioType), which Step 7''s reconciliation fixture needs on the
+  Anchor Store meter.'
+- 'Town Center needs a vendor number with Valley Electric District once this company exists: go back to Database
+  Administrator > Utility Providers > Valley Electric District > Associated Companies (Stage 1 step 2''s screen)
+  and add Northlake Town Center with a new vendor number, e.g. VED-3005-TC # assumed. Not repeated here because
+  it is Stage 1''s editor, not this stage''s.'
+- 'Groups and users: the Phase 4 sources do not specify Town Center staff, so this file adds the minimum needed
+  to operate the property (one admin group, one property manager) on Stage 1''s shapes, marked # assumed throughout.
+  If the customer later supplies a real Town Center org chart, replace this record.'
+- Records marked kind 'Group (Users & Groups > Groups, Stage 1 shape)' were entered on that other editor; they sit
+  in this file because they belong to this step.
+- Records marked kind 'User (Users & Groups > Users, Stage 1 shape)' were entered on that other editor; they sit
+  in this file because they belong to this step.
+records:
+- key: northlake_town_center
+  installed:
+    companyId: null
+    recordedOn: null
+  Definitions:
+    Company Name: Northlake Town Center
+    Archive Interval: 60
+    Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+    Country: UNITED STATES
+    Alarm Settings:
+      Analog:
+      - Severity: Hi-Hi
+        Text: High-Alarm
+        Color: '#FF0000'
+      - Severity: Hi
+        Text: High-Warning
+        Color: '#FF8000'
+      - Severity: Normal
+        Text: Ret-Norm
+        Color: '#008040'
+      - Severity: Lo
+        Text: Low-Warning
+        Color: '#0098E1'
+      - Severity: Lo-Lo
+        Text: Low-Alarm
+        Color: '#0000FF'
+      Digital:
+      - State: 0
+        Color: '#000000'
+      - State: 1
+        Color: '#008000'
+      - State: 2
+        Color: '#FF0000'
+      - State: 3
+        Color: '#FC8040'
+  Levels:
+  - Level: 1
+    Description: Property
+    Type: Site
+    User Defined Field: Site Code
+    Icon: fa-store
+  - Level: 2
+    Description: Buildings
+    Type: Location
+    User Defined Field: Building Code
+    Icon: fa-building
+  - Level: 3
+    Description: Meter
+    Type: Meter
+    User Defined Field: Meter Tag
+    Icon: fa-diagram-project
+  - Level: 4
+    Description: Point
+    Type: Point
+    User Defined Field: Source Channel
+    Icon: fa-circle
+  Company Address:
+    Address: 2200 Riverfront Parkway
+    City: Sacramento
+    Region: CA
+    Postal Code: '95814'
+    Country: UNITED STATES
+    Latitude: 38.5825
+    Longitude: -121.4944
+  Company Contact:
+    First Name: Priya
+    Last Name: Nakamura
+    Title: Town Center Property Manager
+    Phone: 916-555-4700
+    Email: towncenter.ops@northlake.example.edu
+  Bill Scenarios:
+    Used:
+    - Actual
+    - Budget
+    - Bill Meter Reconciliation
+- key: tc_company_admins
+  installed:
+    groupId: null
+  kind: Group (Users & Groups > Groups, Stage 1 shape)
+  Group ID: tc_company_admins
+  Name: TC Company Admins
+  Company: Northlake Town Center
+  Permissions:
+    Admin Tabs:
+      Utility Accountant: Admin
+      GL Accounts: Admin
+      Bill Validation: Admin
+    Functions:
+      Bill Administration: Admin
+      Bill Entry Web and bill images: Edit
+    Points:
+      Node Scope: Northlake Town Center (root)
+      Level: Admin
+    Reports:
+      Tenant Rebilling: Admin
+      Utility Billing: Admin
+      User Module: Edit
+- key: tc_bill_entry
+  installed:
+    groupId: null
+  kind: Group (Users & Groups > Groups, Stage 1 shape)
+  Group ID: tc_bill_entry
+  Name: TC Bill Entry
+  Company: Northlake Town Center
+  Permissions:
+    Functions:
+      Bill Entry Web and bill images: Edit
+    Points:
+      Node Scope: Northlake Town Center (root)
+      Level: Read
+    Reports:
+      Utility Billing: Edit
+      User Module: Edit
+- key: priya_nakamura
+  installed:
+    userId: null
+  kind: User (Users & Groups > Users, Stage 1 shape)
+  User Name: priya.nakamura
+  Display Name: Priya Nakamura
+  Email: towncenter.ops@northlake.example.edu
+  Company: Northlake Town Center
+  Principal Type: Human
+  Authentication Policy: Default
+  Groups:
+  - tc_company_admins

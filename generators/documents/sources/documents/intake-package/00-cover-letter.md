@@ -7,7 +7,7 @@ prepared_by: Samantha Ireland, Director of Campus Operations
 
 **To:** Energy & Utility Management Implementation Team
 **From:** Samantha Ireland, Director of Campus Operations, Northlake University
-**Date:** September 14, 2026 — onboarding packet 0.3
+**Date:** October 1, 2026 — onboarding packet 0.4
 **Re:** Facilities, utility, and reporting data package for new energy management system setup
 **Planned coverage period:** January 1, 2024 – December 31, 2025
 **First interval delivery:** January 15, 2024 — Student Center electricity
@@ -26,21 +26,32 @@ meters, and measured points. We have intentionally **not** assumed any
 particular software model; please map our information into your system as part
 of the design phase and confirm the mapping back to us.
 
+**What changed in packet 0.4.** The Thermal Plant asked us to bring in
+**Ridgeline Wind**, the small wind company it bought on July 1, 2024 with
+university capital funding: ten turbines near Rio Vista whose output the plant
+buys at an internal transfer price, with Valley Electric metering the
+connection and crediting the export to the Central Plant's bill. The site is
+also our Wind Energy Research Lab. This revision adds the site, its accounts,
+meters and data feeds, a transfer price sheet, the Valley Electric generator
+schedules, four new users and the bills that show the new charges. Everything
+else is unchanged from packet 0.3.
+
 ## What's enclosed
 
 | # | Document | Owner team | Purpose |
 | --- | --- | --- | --- |
 | 1 | Facilities & Utility Overview | Facilities | Narrative of how we're organized |
 | 2 | Discovery Questionnaire (completed) | Campus Operations | Goals, scope, systems, success criteria |
-| 3 | Data Collection Workbook (26 tabs) + Facilities and Meter Register | Facilities / Finance | Current hierarchy, inventory, building service profiles, apartment submeters, measurement relationships, rollups and source mapping |
-| 4 | Rate Tariff Sheets (5 providers) | Finance | Our utility rate schedules (14 across the five providers) |
+| 3 | Data Collection Workbook (27 tabs) + Facilities and Meter Register | Facilities / Finance | Current hierarchy, inventory, building service profiles, apartment submeters, measurement relationships, rollups and source mapping |
+| 4 | Rate Tariff Sheets (6 providers) | Finance | Our utility rate schedules and agreements (17 across the six providers, Ridgeline's transfer price included) |
 | 5 | Chart of Accounts & GL Coding Guide | Finance / AP | How we want utility costs coded |
 | 6 | User Access Request | HR / IT | Who needs access and to what |
 | 7 | Tenant & Lease Roster | Housing / Property Mgmt | Sub-metered/allocated tenant spaces |
 | 8 | Sustainability Reporting Requirements | Sustainability Office | ENERGY STAR, emissions, targets |
 | 9 | Source System Inventory | IT / Facilities | Data feeds, formats, delivery cadence |
 | 10 | Student Center AcquiSuite delivery files | Facilities | Complete day, missing block and replacement readings with expected totals |
-| — | Illustrated utility bills, thermal allocations, solar invoices | Finance | Earlier examples; values require reconciliation before billing acceptance |
+| — | Utility bills, thermal allocations, solar invoices | Finance | Itemized sample statements on each provider's own read cycle, priced at the tariffs (replacing the earlier illustrations) |
+| — | Ridgeline bills: Valley Electric generator bills, a Central Plant bill with the transfer credit, the hand-made July 2024 transfer statement | Thermal Plant accounting | New in 0.4, itemized; the July statement is what EEM's generated statement must match |
 
 ## How we're organized (quick orientation)
 
@@ -50,7 +61,8 @@ of the design phase and confirm the mapping back to us.
 - **Northlake Thermal Plant** — our central plant (chilled water and steam), run
   as its own operating company with its own contact. It buys its own
   electricity, gas and water and allocates its cost to the campus buildings it
-  serves.
+  serves. Since July 2024 it also owns the **Ridgeline Wind Site**: ten 660 kW
+  turbines, a met mast and a substation near Rio Vista.
 - **Cedar Row Apartments** — nearby student housing (Cedar Row A and B, 124
   apartments), the Common House, and a solar carport with grounds. Each building
   is master-metered and we own an electric and a water submeter in every
@@ -69,6 +81,8 @@ of the design phase and confirm the mapping back to us.
 | Bill processing | Iris Morales / Nora Chen | Bill Entry / Bill Import |
 | Housing | Maya Chen | Cedar Row Property Manager |
 | Thermal plant (its own operating company) | Devon Brooks | Thermal Plant Manager |
+| Ridgeline Wind (the plant's wind company) | Mateo Alvarez | Ridgeline Wind Site Manager |
+| Wind Energy Research Lab | Elena Vasquez | Lab Director, Mechanical Engineering |
 | Sustainability | Leo Martinez | Sustainability Analyst |
 
 The **Contacts** tab in the Data Collection Workbook contains the full directory

@@ -1,0 +1,52 @@
+# Stage 10, step 2: restore verification (SQL Server > RESTORE DATABASE into a disposable instance, then the web
+# site and Database Administrator pointed at it). Not an EEM editor. Proves the Step 1 backup is a real, working
+# database, not just a file that exists.
+stage: 10
+step: 2
+title: Restore verification
+app: SQL Server, Web, Database Administrator
+screen: RESTORE DATABASE; then the normal report screens
+source:
+- implementation/stage-10-baseline/01-backup.yaml
+notes:
+- 'Disposable instance: restore under a new database name on the same SQL Server instance (EEMSuite_NorthlakeVerify),
+  never over EEMSuite_Northlake itself. Point a throwaway copy of the NorthLake ConfigFiles manifest at
+  EEMSuite_NorthlakeVerify and a spare port, so the verification app instance runs beside the real one rather than
+  replacing it; do not touch the running NorthLake services or their ConfigFiles.'
+- 'Restore command: RESTORE DATABASE [EEMSuite_NorthlakeVerify] FROM DISK = N''C:\Hippo\Backups\
+  EEMSuite_Northlake.stage10-final.<yyyyMMdd>.bak'' WITH MOVE, CHECKSUM, STATS = 10, REPLACE (use MOVE clauses for
+  the .mdf/.ldf logical names; check them with RESTORE FILELISTONLY first).'
+- 'Reconnect sources: after restore, gateway profiles in the verification instance point at their OWN scratch
+  Input/Working/Backup/Error folders (e.g. C:\Hippo\Verify\Gateways\..., never the real
+  C:\ProgramData\EEM Suite\NorthLake\Gateways paths), and the Energy Star task''s CustomerServer/PM credentials, if
+  connected in the real instance, are left blank in the verification config so no scoring calls are made against a
+  throwaway database. This is a read/render check, not a live-processing rehearsal.'
+- 'Once this step passes, EEMSuite_Northlake.stage10-final.<yyyyMMdd>.bak is PROMOTED: it replaces any earlier ad hoc
+  snapshot (including the pre-upgrade backup from 2026-09-14) as Northlake''s reference database -- the file every
+  future support or development restore starts from.'
+records:
+- key: restore_and_verify
+  restoreInto: EEMSuite_NorthlakeVerify (disposable, same SQL Server instance)
+  reconnect:
+  - "gateway profiles -> scratch Input/Working/Backup/Error folders under C:\\Hippo\\Verify\\Gateways"
+  - "Energy Star CustomerServer / PM credentials -> left blank (no external calls from a throwaway database)"
+  - "SMTP/mail relay -> left unset or pointed at a local sink, so no alarm/MFR mail actually sends"
+  reportChecklist:  # one representative report per stage/bucket, with the value to expect
+  - {report: Company node / Levels (Database Administrator), expect: "3 companies (6 Northlake University, 3 Cedar Row Apartments, 5 Northlake Thermal Plant), 4 base levels each"}
+  - {report: Utility Providers list, expect: "6 providers (1 Valley Electric District, 2 Sierra Gas Utility, 3 River City Utilities, 4 Northlake Thermal Plant, 5 Helios Onsite Solar, and Ridgeline Wind, added 2026-10-01)"}
+  - {report: rp_MonthlyEUI / BenchmarkRanking, expect: "the 12-building peer set ranked, Science Center (lab) highest EUI"}
+  - {report: GHGHistory, expect: "computed emissions per company, Scope 2 electric via eGRID CAMX and Scope 1 gas via Non-electric commodities"}
+  - {report: GHGVariance, expect: "non-zero 2024 vs 2025 variance from the dated factor values"}
+  - {report: ESPropertySetup / ESRatingHistory, expect: "13 properties; Lakeview Hall and Cedar Row Apartments carry a score once Portfolio Manager is connected, everyone else metrics only"}
+  - {report: WeatherRegression / RegressionSummary, expect: "4 regressions with R^2 in the ranges from Stage 8 step 5"}
+  - {report: ProjectDetail / ProjectSummary / ProjectFinance, expect: "the 5 projects (the WTG-07 Gearbox Replacement included) with their capital/incentive/event values from Stage 9 step 1"}
+  - {report: rp_AlarmDataMap, expect: "the 15 alarm definitions from Stage 9 step 2 (ten Ridgeline Turbine State alarms and the met mast high-wind alarm among them), with any raised/ack/resolved history that has occurred, WTG-07's 2025 Fault included"}
+  - {report: rp_Audit, expect: "the bill/account/meter field-edit rows from Stage 9 step 3"}
+  - {report: rp_ActivityTracker, expect: "login and report-view counts per user; casey.holt at zero; elena.vasquez and kai.nakamura with report views on Ridgeline points only"}
+  - {report: rp_TaskLog / rp_GatewayStatus, expect: "run history for the 12 scheduled tasks from Stage 9 step 4"}
+  - {report: MyFavoriteReports dashboards, expect: "Facility Operations, Executive Overview and Ridgeline Operations render their tiles"}
+  - {report: Bill Tracking (Ridgeline accounts), expect: "the generated July 2024 Ridgeline transfer statement at $129,330.27; the generator account's first bill (July 1 to August 4, 2024) at $1,077.45, its -$152,792.65 credit on the Central Plant's September 2024 bill and nowhere else"}
+  - {report: rp_HMRConfiguration, expect: "the Neptune and MVRS routes from Stage 9 step 7"}
+  - {report: my_imports, expect: "the two MyImport template uploads from Stage 9 step 7"}
+  cleanUp: "drop EEMSuite_NorthlakeVerify and its scratch folders once every row above matches; the real
+    EEMSuite_Northlake and its ProgramData folders are never touched by this step"

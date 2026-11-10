@@ -1,0 +1,97 @@
+# Stage 6, step 3: per-account GL and AP defaults (Utility Accountant tab > Billing Account > Definitions page,
+# Associated G/L Accounts section; and the Bill Validation Tests page for account-scoped overrides, entered in
+# Stage 5). Fields verified against BillAccountDefinitionsSectionView.xaml: Bill Service Type, Bill Entry Type,
+# Liability Account, Default Expense Account. Accounts are Stage 2 keys, referenced here by synthetic number.
+stage: 6
+step: 3
+title: Account GL defaults
+app: Database Administrator
+screen: Nodes > company node > Utility Accountant > billing account > Definitions
+source:
+- data/eem/northlake-ap-gl-v1.yaml
+- generators/northlake_packet.py (account_setup, read only)
+- documents/guides/chart-of-accounts-and-gl-guide.pdf
+notes:
+- 'Bill Service Type is Global_Type_Code Table_Code=''BA'', verified by direct query against
+  EEMSuite_Northlake: 0 No AP Upload, 1 AP Upload Only, 2 Bill Payment. This is three values, not the AP/GL
+  plan''s four (No Upload / AP / GL / AP and GL) - see the Stage 5 Findings. There is no GL-only or AP-and-GL
+  option; GL coding is the Liability Account and Default Expense Account fields below, present on every account
+  regardless of its Bill Service Type.'
+- 'Bill Entry Type is Global_Status_Code ''BA2'': 0 Bill Entry, 1 Bill Importer, 2 Bill Generation, 3 Bill
+  Allocation, 10 Other. It follows Stage 5''s entry method per account, with the Cedar Row company scope beating
+  the provider default: Valley Electric and River City accounts import (1) except at Cedar Row, where every
+  account is manual (0); Sierra Gas and Helios Solar accounts are manual everywhere (0); the Thermal Plant''s six
+  internal allocation "bills" use Bill Allocation (3); the Ridgeline transfer statement uses Bill Generation (2),
+  the one account whose bill EEM generates.'
+- 'Liability Account is 2000-AP on every account in its own company''s chart, including the two negative
+  controls below and Ridgeline''s GL-only transfer account - the AP/GL plan is explicit that the liability
+  account is set "on every account, including the ones that never upload."'
+- 'Default Expense Account is chosen by provider (generators/northlake_packet.py account_setup, read only):
+  Valley Electric -> 5100-ELEC, Sierra Gas -> 5110-GAS, River City -> 5120-WATER, Northlake Thermal Plant ->
+  5130-THERMAL (charged to the receiving company, Northlake University - see 01-gl-accounts.yaml), Helios Solar
+  -> 5140-SOLAR, Ridgeline Wind -> 5150-WIND (charged to the Thermal Plant company, the only company it bills).
+  All seven GL codes must already exist in that account''s own company''s chart (Step 1).'
+- 'Two Bill Service Type values are deliberately exercised beyond the default: River City''s Cedar Row B account
+  is the negative control (No AP Upload - it must never appear in an export, checked by
+  `blocked_by_validation`/`export_formats_registered` in checks.sql); the Thermal Plant''s six internal
+  allocations use Bill Payment, since they settle between Northlake companies rather than through a real vendor
+  AP voucher; Ridgeline''s transfer account, which is GL only, takes Bill Payment too (Stage 2) and is the one
+  that must also stay out of every AP file, checked by `ridgeline_gl_only` in checks.sql.'
+- 'Added 2026-10-01 (Ridgeline Wind): two accounts join the Thermal Plant company. SYN-VED-A-0010014 (Ridgeline
+  Substation / VED) is the Valley Electric generator account. It takes the Valley Electric defaults below (AP
+  Upload Only, Bill Importer, 2000-AP, 5100-ELEC); in the customer''s terms it is "AP and GL", the AP/GL plan''s
+  value for every account the plant company holds. SYN-RWL-G-0000001 (Ridgeline Turbine Field / RWL) is "GL
+  only": the chart-of-accounts guide calls the transfer statement "a journal between the plant and its own wind
+  company", with no payment leaving the plant. EEM has no GL-only Bill Service Type, so the account takes Bill
+  Payment (the plan''s "payment runs outside AP", as in Stage 2) with Bill Generation, 2000-AP and 5150-WIND; the
+  export builders, not this field, keep it out of AP files (04-ap-export-formats.yaml). The bill credit transfer
+  adds no coding to these defaults: the credit is coded once, on the Central Plant account where it lands
+  (SYN-VED-A-0010013, 5100-ELEC; 05-ap-approval-and-upload.yaml).'
+records:
+- key: ved_account_defaults
+  installed: {}
+  Provider: Valley Electric District
+  Default: {Bill Service Type: AP Upload Only, Bill Entry Type: Bill Importer, Liability Account: 2000-AP, Default Expense Account: 5100-ELEC}
+  Accounts (Northlake University, Bill Entry Type Bill Importer): [SYN-VED-A-0010001, SYN-VED-A-0010002, SYN-VED-A-0010003,
+    SYN-VED-A-0010004, SYN-VED-A-0010007, SYN-VED-A-0010008, SYN-VED-A-0010009, SYN-VED-A-0010010]
+  Accounts (Northlake Thermal Plant, Bill Entry Type Bill Importer): [SYN-VED-A-0010013, SYN-VED-A-0010014]  # 0010014 is the Ridgeline generator account, customer upload flag AP and GL
+  Accounts (Cedar Row Apartments, Bill Entry Type Bill Entry instead of Bill Importer): [SYN-VED-A-0010005,
+    SYN-VED-A-0010006, SYN-VED-A-0010011, SYN-VED-A-0010012]
+- key: sgu_account_defaults
+  installed: {}
+  Provider: Sierra Gas Utility
+  Default: {Bill Service Type: AP Upload Only, Bill Entry Type: Bill Entry, Liability Account: 2000-AP, Default Expense Account: 5110-GAS}
+  Accounts (Northlake University): [SYN-SGU-A-0020001, SYN-SGU-A-0020002, SYN-SGU-A-0020003, SYN-SGU-A-0020004,
+    SYN-SGU-A-0020005, SYN-SGU-A-0020006]
+  Accounts (Northlake Thermal Plant): [SYN-SGU-A-0020010]
+  Accounts (Cedar Row Apartments): [SYN-SGU-A-0020007, SYN-SGU-A-0020008, SYN-SGU-A-0020009]
+- key: rcu_account_defaults
+  installed: {}
+  Provider: River City Utilities
+  Default: {Bill Service Type: AP Upload Only, Bill Entry Type: Bill Importer, Liability Account: 2000-AP, Default Expense Account: 5120-WATER}
+  Accounts (Northlake University, Bill Entry Type Bill Importer): [SYN-RCU-A-0030001, SYN-RCU-A-0030005, SYN-RCU-A-0030006,
+    SYN-RCU-A-0030002, SYN-RCU-A-0030007, SYN-RCU-A-0030008, SYN-RCU-A-0030009, SYN-RCU-A-0030010, SYN-RCU-A-0030011,
+    SYN-RCU-A-0030012]
+  Accounts (Northlake Thermal Plant, Bill Entry Type Bill Importer): [SYN-RCU-A-0030017]
+  Accounts (Cedar Row Apartments, Bill Entry Type Bill Entry instead of Bill Importer): [SYN-RCU-A-0030003,
+    SYN-RCU-A-0030004, SYN-RCU-A-0030013, SYN-RCU-A-0030014, SYN-RCU-A-0030015, SYN-RCU-A-0030016]
+  Exception: {Account: SYN-RCU-A-0030004, Building: Cedar Row B, Bill Service Type: No AP Upload, Why: negative
+    control - this account must never reach an export file}
+- key: ntp_account_defaults
+  installed: {}
+  Provider: Northlake Thermal Plant
+  Default: {Bill Service Type: Bill Payment, Bill Entry Type: Bill Allocation, Liability Account: 2000-AP, Default Expense Account: 5130-THERMAL}
+  Accounts (all Northlake University): [SYN-NTP-C-0000001, SYN-NTP-C-0000002, SYN-NTP-C-0000003, SYN-NTP-C-0000004,
+    SYN-NTP-C-0000005, SYN-NTP-C-0000006]
+- key: hos_account_defaults
+  installed: {}
+  Provider: Helios Onsite Solar
+  Default: {Bill Service Type: AP Upload Only, Bill Entry Type: Bill Entry, Liability Account: 2000-AP, Default Expense Account: 5140-SOLAR}
+  Accounts (Northlake University): [SYN-HOS-P-0000001, SYN-HOS-P-0000002]
+  Accounts (Cedar Row Apartments): [SYN-HOS-P-0000003]
+- key: rwl_account_defaults
+  installed: {}
+  Provider: Ridgeline Wind
+  Default: {Bill Service Type: Bill Payment, Bill Entry Type: Bill Generation, Liability Account: 2000-AP, Default Expense Account: 5150-WIND}
+  Accounts (Northlake Thermal Plant): [SYN-RWL-G-0000001]
+  Customer upload flag: GL only

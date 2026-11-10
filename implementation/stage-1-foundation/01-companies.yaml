@@ -1,0 +1,157 @@
+# Stage 1, step 1: Companies (Database Administrator > Nodes > the company node > Definitions tab).
+# One record per company. Section keys are the Definitions tab's pages (Definitions, Levels, Company Address,
+# Company Contact, Bill Scenarios); alarm defaults sit on the Definitions page. The company editor's other tabs
+# (Users & Groups, Utility Accountant, GL Accounts, Bill Validation) and the Weather Stations page are later steps.
+stage: 1
+step: 1
+title: Companies
+app: Database Administrator
+screen: Nodes > company node > Definitions
+source:
+- data/scenarios/demo-university-v1.yaml
+- data/eem/northlake-eem-stage1-setup-v1.yaml
+- documents/intake-package/facilities-and-meter-register.pdf
+notes:
+- 'A company is a node: add it at the top of the Nodes tree, fill the Definitions page (name, archive interval,
+  time zone, country, alarm defaults) and save; the other pages unlock after the first save.'
+- Archive Interval is the default interval new points inherit; every Northlake company uses 60 minutes.
+- Saving a company creates the Actual bill scenario and a 1990-2013 fiscal calendar on its own. Leave both; Stage
+  1 step 3 adds 2024-2025.
+- 'Levels: the four base types (Site, Location, Meter, Point) are fixed by the product; the descriptions are the
+  owner''s wording per company. Icons are Font Awesome class names as the desktop icon picker saves them; its map pin
+  saves as fa-location-dot (fa-location is the crosshairs).'
+- 'Changed 2026-10-01 for Ridgeline Wind: the Thermal Plant''s Level 2 is Facilities, not Served Buildings. It now holds
+  the Central Plant, Ridgeline Turbine Field and Ridgeline Substation, and none of them is a building the plant serves.
+  Rename it on the installed company; the Central Plant node keeps its place and picks up the new label.'
+- Region is the two-letter state code; the editor pads it (RE_RegionCode is char(5)).
+- The System company (CompanyID -1, shown as Common) already exists and is never created.
+records:
+- key: northlake_university
+  installed:
+    companyId: 6
+    recordedOn: 2026-09-18
+  Definitions:
+    Company Name: Northlake University
+    Archive Interval: 60
+    Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+    Country: UNITED STATES
+    Alarm Settings:
+      Analog:
+      - {Severity: Hi-Hi, Text: High-Alarm, Color: '#FF0000'}
+      - {Severity: Hi, Text: High-Warning, Color: '#FF8000'}
+      - {Severity: Normal, Text: Ret-Norm, Color: '#008040'}
+      - {Severity: Lo, Text: Low-Warning, Color: '#0098E1'}
+      - {Severity: Lo-Lo, Text: Low-Alarm, Color: '#0000FF'}
+      Digital:
+      - {State: 0, Color: '#000000'}
+      - {State: 1, Color: '#008000'}
+      - {State: 2, Color: '#FF0000'}
+      - {State: 3, Color: '#FC8040'}
+  Levels:
+  - {Level: 1, Description: Site, Type: Site, User Defined Field: Site Code, Icon: fa-city}
+  - {Level: 2, Description: Buildings, Type: Location, User Defined Field: Building Code, Icon: fa-building-un}
+  - {Level: 3, Description: Meter, Type: Meter, User Defined Field: Meter Tag, Icon: fa-diagram-project}
+  - {Level: 4, Description: Point, Type: Point, User Defined Field: Source Channel, Icon: fa-circle}
+  Company Address:
+    Address: 4100 North Shore Drive
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.5352
+    Longitude: -121.4939
+  Company Contact:
+    First Name: Jordan
+    Last Name: Hale
+    Title: Facilities Systems Manager
+    Phone: 916-555-4100
+    Email: facilities.ops@northlake.example.edu
+  Bill Scenarios:
+    Used:
+    - Actual
+- key: cedar_row_apartments
+  installed:
+    companyId: 3
+    recordedOn: 2026-09-18
+  Definitions:
+    Company Name: Cedar Row Apartments
+    Archive Interval: 60
+    Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+    Country: UNITED STATES
+    Alarm Settings:
+      Analog:
+      - {Severity: Hi-Hi, Text: High-Alarm, Color: '#FF0000'}
+      - {Severity: Hi, Text: High-Warning, Color: '#FF8000'}
+      - {Severity: Normal, Text: Ret-Norm, Color: '#008040'}
+      - {Severity: Lo, Text: Low-Warning, Color: '#0098E1'}
+      - {Severity: Lo-Lo, Text: Low-Alarm, Color: '#0000FF'}
+      Digital:
+      - {State: 0, Color: '#000000'}
+      - {State: 1, Color: '#008000'}
+      - {State: 2, Color: '#FF0000'}
+      - {State: 3, Color: '#FC8040'}
+  Levels:
+  - {Level: 1, Description: Property, Type: Site, User Defined Field: Site Code, Icon: fa-location-dot}
+  - {Level: 2, Description: Buildings, Type: Location, User Defined Field: Building Code, Icon: fa-building}
+  - {Level: 3, Description: Meter, Type: Meter, User Defined Field: Meter Tag, Icon: fa-diagram-project}
+  - {Level: 4, Description: Point, Type: Point, User Defined Field: Source Channel, Icon: fa-circle}
+  Company Address:
+    Address: 1280 Cedar Row Lane
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.5472
+    Longitude: -121.4706
+  Company Contact:
+    First Name: Maya
+    Last Name: Chen
+    Title: Cedar Row Property Manager
+    Phone: 916-555-4200
+    Email: housing.ops@northlake.example.edu
+  Bill Scenarios:
+    Used:
+    - Actual
+- key: northlake_thermal_plant
+  installed:
+    companyId: 5
+    recordedOn: 2026-09-18
+  Definitions:
+    Company Name: Northlake Thermal Plant
+    Archive Interval: 60
+    Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+    Country: UNITED STATES
+    Alarm Settings:
+      Analog:
+      - {Severity: Hi-Hi, Text: High-Alarm, Color: '#FF0000'}
+      - {Severity: Hi, Text: High-Warning, Color: '#FF8000'}
+      - {Severity: Normal, Text: Ret-Norm, Color: '#008040'}
+      - {Severity: Lo, Text: Low-Warning, Color: '#0098E1'}
+      - {Severity: Lo-Lo, Text: Low-Alarm, Color: '#0000FF'}
+      Digital:
+      - {State: 0, Color: '#000000'}
+      - {State: 1, Color: '#008000'}
+      - {State: 2, Color: '#FF0000'}
+      - {State: 3, Color: '#FC8040'}
+  Levels:
+  - {Level: 1, Description: Plants, Type: Site, User Defined Field: Site Code, Icon: fa-building}
+  - {Level: 2, Description: Facilities, Type: Location, User Defined Field: Building Code, Icon: fa-location-dot}
+  - {Level: 3, Description: Meter, Type: Meter, User Defined Field: Meter Tag, Icon: fa-diagram-project}
+  - {Level: 4, Description: Point, Type: Point, User Defined Field: Source Channel, Icon: fa-circle}
+  Company Address:
+    Address: 4122 Plant Service Road
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.53725
+    Longitude: -121.49685
+  Company Contact:
+    First Name: Devon
+    Last Name: Brooks
+    Title: Thermal Plant Manager
+    Phone: 916-555-4500
+    Email: devon.brooks@northlake.example.edu
+  Bill Scenarios:
+    Used:
+    - Actual

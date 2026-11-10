@@ -1,0 +1,244 @@
+# Stage 12, scenario 4: a tenant's demand is read the day after its energy, and the energy read sets the bill.
+# Northlake Town Center leases a coffee kiosk in Market Hall from May 2025 and bills it from its own electric meter,
+# read by hand at the end of each month: the kWh dial and the maximum demand display. Some months the reader keys
+# the demand the next morning. A Meter Reads bill ends on the energy read's date, so that demand lands in the next
+# bill: one bill has no demand and the next has two. MVRS's Use Reading TimeStamp puts it back on the energy read.
+stage: 12
+step: 4
+title: Bill a tenant whose demand is read the day after its energy
+app: Database Administrator and Web
+screen: Nodes (meter, points, Tenant Rebill tab); RateModeler > Rate Edit; Handheld Meter Setup; Task Dashboard
+  (Northlake MVRS Gas Upload schedule, Run Bill Gen); Generated Bills
+source:
+- implementation/stage-7-allocation-and-tenants/02-town-center-hierarchy.yaml (tc_market_hall, billing account shape)
+- implementation/stage-7-allocation-and-tenants/06-tenant-bill-generation.yaml (Tenant Rebill tab fields and statuses)
+- implementation/stage-3-gateways-and-data/05-handheld-routes.yaml (read types electric_keyed and demand_keyed)
+- implementation/stage-3-gateways-and-data/03-workflows-and-tasks.yaml (schedule_mvrs_sierra_gas)
+- 'energyhippo: UtilityGenBillDates_Set.sql (Meter Reads bill dates), UtilityRates_LoadData.sql (the values a bill
+  takes), IntervalData_ApplyCalculated.sql (late data marks a bill for regeneration), Mvrs/MVRSGatewayComponent.cs
+  (Use Reading TimeStamp)'
+requires:
+- Stage 7 steps 1 and 2 entered (the Northlake Town Center company and Market Hall), and step 7's Run Bill Gen task.
+  The company's calendar must cover 2025; a company saved since September 2026 generates 1992 to next year.
+- Stage 3 Step 5 entered (the read types Northlake Keyed Electric 6D and Northlake Keyed Demand 10D2DC), and Stage 3
+  Step 3's Northlake MVRS Gas Upload schedule (disabled, run by hand, Use Reading TimeStamp false).
+- 'Round 6 needs the MVRS fix of November 9, 2026 in the installed build. Before it, a Northlake demand uploaded
+  without its energy read is never moved, whatever the setting: the gateway looked for a register in the unit
+  CurRead (Massport''s), and Northlake''s registers are in Reading.'
+- 'Upload files: the handheld simulator does not write demand registers yet (services/handheld README). Build each
+  upload from its round below: one MTR record for the kiosk meter (its MetaWorldID) and one RDG record per register,
+  each with its own read date and time, the energy register with its previous reading.'
+notes:
+- 'How the dates work. A Meter Reads bill (Bill Generation schedule MV) takes its dates from the meter''s energy
+  registers only, the handheld registers with a reading point: it runs from the day after the previous energy read
+  through this energy read''s date. A demand register has no reading point, so it never sets a date. The rate engine
+  then bills the values dated after the start date through the end of the end date. So a demand keyed on any later
+  day than its energy read belongs to the next bill, which takes the higher of two demands, while this one has none.
+  A demand keyed later on the same day is fine.'
+- 'It does not need a month boundary: an energy read on the 28th and a demand read on the 29th split the same way.
+  The rounds use month ends because that is how readers describe it.'
+- 'What fixes it: the MVRS schedule''s Use Reading TimeStamp. When on, every value of a meter in an upload takes the
+  time of the meter''s energy read. A demand uploaded on its own takes the meter''s newest energy read, from the same
+  run or an earlier one, but only when that read is newer than the meter''s last demand value; otherwise the demand
+  keeps its own time, so it never moves back onto the previous round. Northlake''s schedule has it off (Stage 3) and
+  so does Massport. Round 4 turns it on; the last step turns it off again unless Northlake keeps it.'
+- 'Massport shows the pattern: since 2024, 303 of 51,786 handheld demand values on meters with an energy register
+  were keyed one or more days after their energy read (183 the next day), and 2,226 of its meters bill by Meter Reads.'
+- 'Auto w/ Auto Regen, not Auto: the intake marks a bill for regeneration when a value lands inside its dates. In
+  round 6 the demand arrives after its energy read, possibly after Run Bill Gen (every 5 minutes) has made the
+  September bill; regeneration then adds it.'
+- 'A flat tenant rate keeps every expected line exact: Customer Charge 25.00 a bill, Energy 0.152 a kWh, Demand 14.80
+  a kW. Stage 4''s VED-TOU-GS prices energy by time of use, which a monthly read cannot split, and NL-STEP-Demand
+  bills demand as a block amount.'
+setup:
+- key: tc_kiosk_k1
+  Where: Database Administrator > Nodes > Northlake Town Center > Market Hall > add Meter
+  Definitions: {Description: Market Hall Kiosk K1, Type: Meter, Parent: tc_market_hall, Meter Tag: MKT-KIOSK1}
+  Meter Definitions: {Measure Type: Electricity, Meter Number: SYN-SUB-E-TCK1, Provider Meter Number: '',
+    Meter Multiplier: '', Billing Account: tc_kiosk_k1_ba, Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-04-30}
+  Area: {Value: 180, Unit: SqFt}
+  Notes: Coffee kiosk in the Market Hall concourse, lease from 2025-05-01. Own electric meter, read by hand monthly.
+  installed:
+    metaWorldId: null
+- key: tc_kiosk_k1_ba
+  Where: Market Hall Kiosk K1 > Meter Definitions > Billing Account > Add Billing Account
+  kind: Billing account (Utility Accountant tab, Stage 2 shape)
+  meter: tc_kiosk_k1
+  number: TC-MKT-KIOSK1
+  provider: null
+  typeCode: '0'
+  billTypeCode: 2 Bill Generation
+  notes: Bill Generation, not Allocation like the other Market Hall tenants, because its bills come from its own meter.
+- key: tc_kiosk_k1_register
+  Where: Market Hall Kiosk K1 > add Point
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Electricity,
+    Unit: KilowattHours - (kWh), Archive Interval: 1440, Index: ''}
+  Expected: EEM generates Register Reading Delta (kWh) under the meter.
+- key: tc_kiosk_k1_demand
+  Where: Market Hall Kiosk K1 > add Point
+  Point Definition: {Description: Max Demand kW, Reading Type: Analog, Measure Type: Electricity,
+    Unit: Kilowatt - (kW), Archive Interval: 1440, Index: ''}
+- key: tc_tenant_gs
+  Where: Database Administrator > RateModeler > Rate Edit, under Valley Electric District (as NL-STEP-Demand is)
+  Rate: {Rate Name: TC-TENANT-GS, Currency: US Dollar, Measure Type: Electricity,
+    Rate Categories: {Transmission: false, Distribution: true, Commodity: true}}
+  Rate Classes:
+  - Rate Class Name: All
+  Determinants:
+  - Charge Name: Customer Charge
+    Charge Type: 400 Fixed By Period
+    Units: Kilowatt Hours
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Effective Dates:
+    - {Effective Date: 2025-01-01, Value: 25.0}
+  - Charge Name: Energy
+    Charge Type: 200 Charge Period
+    Units: KilowattHours
+    Aggregation Rule: Summing
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Effective Dates:
+    - {Effective Date: 2025-01-01, Value: 0.152}
+  - Charge Name: Demand
+    Charge Type: 200 Charge Period
+    IsDemand: true
+    Units: Kilowatt
+    Aggregation Rule: Maximum
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Effective Dates:
+    - {Effective Date: 2025-01-01, Value: 14.8}
+  notes: Town Center's resale rate for its hand-read tenants (# assumed figures). Commodity Mapping as Stage 4 does
+    for VED-TOU-GS, Energy and Demand to the Electricity usage and demand commodity.
+- key: tc_kiosk_k1_billgen
+  Where: Market Hall Kiosk K1 > Tenant Rebill tab
+  Bill Scenarios:
+    Rate Configuration:
+    - {Rate: TC-TENANT-GS, Start Date: 2025-05-01, End Date: null, Bill: false, Scenario: Actual}
+  Bill Generation:
+    Assigned Rates: TC-TENANT-GS
+    Fiscal Start: {Year: 2025, Period: 5}
+    Fiscal End: {Year: 2025, Period: 11}
+    Schedule: MV (Meter Reads)
+    Status: Auto w/ Auto Regen
+    Available %: 100
+    Offset: 0
+  notes: Fiscal End 2025-11 leaves out the periods with no reads, as Ridgeline's row does (Stage 7 file 08).
+- key: tc_kiosk_k1_handheld
+  Where: Web > System Manager > Handheld Meter Setup, Northlake Town Center selected
+  Meter: {Cycle: '06', Route: TCTEN, Seq: 10, Enabled: 'Yes', Bill Code: '-',
+    Meter Text: Coffee kiosk meter in the Market Hall concourse closet. Key the kWh dial then the max demand display.}
+  Registers:
+  - {Prompt: KWH, Read Type: Northlake Keyed Electric 6D, Constant: 1, Channel: 1, Reading Point: Register Reading,
+    Consumption Point: Register Reading Delta}
+  - {Prompt: KW, Read Type: Northlake Keyed Demand 10D2DC, Constant: 1, Channel: 2, Reading Point: null,
+    Consumption Point: Max Demand kW}
+  Starting reading: {Register: KWH, Date: 2025-04-30, Value: 18420}
+  Expected: Route TCTEN on cycle 06 has one meter with two registers. Register Reading holds 18420 at 2025-04-30 00:00
+    with no usage; the demand register takes no starting reading.
+rounds:
+- key: may_same_visit
+  Use Reading TimeStamp: false
+  Uploads:
+  - Registers:
+    - {Prompt: KWH, Read: '2025-05-30 10:00', Reading: 20980, Previous: 18420}
+    - {Prompt: KW, Read: '2025-05-30 10:04', Reading: 14.50}
+  Expected:
+    Stored: Register Reading Delta 2560 and Max Demand kW 14.50, both on May 30.
+    Bill: {Period: 2025-05, From: 2025-05-01, To: 2025-05-30, kWh: 2560, Demand kW: 14.50, Customer Charge: 25.00,
+      Energy: 389.12, Demand: 214.60, Total: 628.72}
+- key: june_demand_next_morning
+  Use Reading TimeStamp: false
+  Uploads:
+  - Registers:
+    - {Prompt: KWH, Read: '2025-06-30 10:00', Reading: 23870, Previous: 20980}
+    - {Prompt: KW, Read: '2025-07-01 08:30', Reading: 17.80}
+  Expected:
+    Stored: Delta 2890 on June 30; Max Demand kW 17.80 on July 1 at 08:30, the time it was keyed.
+    Bill: {Period: 2025-06, From: 2025-05-31, To: 2025-06-30, kWh: 2890, Demand kW: none, Customer Charge: 25.00,
+      Energy: 439.28, Demand: 0.00, Total: 464.28}
+    Why: The bill ends on the energy read's date, June 30. The demand is dated July 1, so the June bill has none.
+- key: july_two_demands
+  Use Reading TimeStamp: false
+  Uploads:
+  - Registers:
+    - {Prompt: KWH, Read: '2025-07-31 10:00', Reading: 27190, Previous: 23870}
+    - {Prompt: KW, Read: '2025-07-31 10:04', Reading: 16.40}
+  Expected:
+    Bill: {Period: 2025-07, From: 2025-07-01, To: 2025-07-31, kWh: 3320, Demand kW: 17.80, Customer Charge: 25.00,
+      Energy: 504.64, Demand: 263.44, Total: 793.08}
+    Why: 'July holds two demands, June''s 17.80 (July 1) and July''s 16.40, and bills the higher: June''s peak is billed
+      in July.'
+- key: turn_on_reading_timestamp
+  Where: Web > Task Dashboard > Tasks, the MVRS task's schedule Northlake MVRS Gas Upload > Edit (schedule drawer)
+  Action: Turn Use Reading TimeStamp on and save. Leave the schedule disabled; keep running it with Run now.
+- key: august_same_upload
+  Use Reading TimeStamp: true
+  Uploads:
+  - Registers:
+    - {Prompt: KWH, Read: '2025-08-29 10:00', Reading: 30410, Previous: 27190}
+    - {Prompt: KW, Read: '2025-08-30 08:30', Reading: 16.90}
+  Expected:
+    Stored: Max Demand kW 16.90 on August 29 at 10:00, the energy read's time, not August 30.
+    Bill: {Period: 2025-08, From: 2025-08-01, To: 2025-08-29, kWh: 3220, Demand kW: 16.90, Customer Charge: 25.00,
+      Energy: 489.44, Demand: 250.12, Total: 764.56}
+- key: september_two_uploads
+  Use Reading TimeStamp: true
+  Uploads:
+  - Note: The energy read, returned on its own. Run now, and let Run Bill Gen make the September bill if it runs.
+    Registers:
+    - {Prompt: KWH, Read: '2025-09-30 10:00', Reading: 33280, Previous: 30410}
+  - Note: 'The next morning''s demand, in its own upload. Run now again once Register Reading shows 33280 on
+      September 30: the gateway reads the meter''s saved values when a run starts, and the intake saves the first
+      run''s readings a moment after that run ends.'
+    Registers:
+    - {Prompt: KW, Read: '2025-10-01 08:30', Reading: 15.10}
+  Expected:
+    Stored: Max Demand kW 15.10 on September 30 at 10:00. Its energy read is newer than its last demand (August 29),
+      so it is this round's.
+    Bill: {Period: 2025-09, From: 2025-08-30, To: 2025-09-30, kWh: 2870, Demand kW: 15.10, Customer Charge: 25.00,
+      Energy: 436.24, Demand: 223.48, Total: 684.72}
+    Without the November 9 fix: the demand stays on October 1 and goes to the October bill.
+- key: october_demand_before_energy
+  Use Reading TimeStamp: true
+  Uploads:
+  - Note: The demand, keyed on November 1 and returned first. Run now.
+    Registers:
+    - {Prompt: KW, Read: '2025-11-01 08:30', Reading: 13.20}
+  - Note: The October 31 energy read, returned late (the handheld was left in the truck). Run now again.
+    Registers:
+    - {Prompt: KWH, Read: '2025-10-31 10:00', Reading: 35860, Previous: 33280}
+  Expected:
+    Stored: Max Demand kW 13.20 stays on November 1 at 08:30. When it arrived, the meter's newest energy read
+      (September 30) was not newer than its last demand (also September 30), so this round's energy read was not
+      in yet and the demand kept its own time instead of moving onto September's read.
+    Bill: {Period: 2025-10, From: 2025-10-01, To: 2025-10-31, kWh: 2580, Demand kW: none, Customer Charge: 25.00,
+      Energy: 392.16, Demand: 0.00, Total: 417.16}
+    Why: The setting cannot fix a demand that arrives before its energy read; it only stops it landing in the wrong
+      round. The September bill keeps 15.10.
+- key: november_same_visit
+  Use Reading TimeStamp: true
+  Uploads:
+  - Registers:
+    - {Prompt: KWH, Read: '2025-11-28 10:00', Reading: 38200, Previous: 35860}
+    - {Prompt: KW, Read: '2025-11-28 10:04', Reading: 12.60}
+  Expected:
+    Bill: {Period: 2025-11, From: 2025-11-01, To: 2025-11-28, kWh: 2340, Demand kW: 13.20, Customer Charge: 25.00,
+      Energy: 355.68, Demand: 195.36, Total: 576.04}
+    Why: November holds October's 13.20 (November 1) and its own 12.60 (moved to 10:00), and bills the higher.
+- key: turn_off_reading_timestamp
+  Where: the same schedule drawer
+  Action: Turn Use Reading TimeStamp off again, unless Northlake is to keep it on; then also change Stage 3's
+    schedule_mvrs_sierra_gas to true so its checks expect it.
+verify:
+- 'Generated Bills ("#/reporting/GeneratedBills"), Northlake Town Center, Actual, 2025-05 to 2025-11: seven bills for
+  Market Hall Kiosk K1 with these dates and totals: May 05-01 to 05-30 628.72; June 05-31 to 06-30 464.28 (no demand);
+  July 07-01 to 07-31 793.08 (June''s 17.80 kW); August 08-01 to 08-29 764.56; September 08-30 to 09-30 684.72;
+  October 10-01 to 10-31 417.16 (no demand); November 11-01 to 11-28 576.04 (October''s 13.20 kW).'
+- The seven bills' kWh add up to the register's movement, 38200 - 18420 = 19780 kWh. Every kWh is billed once, whatever
+  the demand did.
+- 'Max Demand kW holds seven values: May 30 10:04, July 1 08:30, July 31 10:04 (all three with the setting off), then
+  August 29 10:00 and September 30 10:00 (moved), November 1 08:30 (kept), November 28 10:00 (same visit).'

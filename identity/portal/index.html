@@ -1,463 +1,570 @@
 <!doctype html>
 <html lang="en">
+{{- /*
+  The Northlake site: Facilities and Energy Services. Caddy serves this file as a
+  template (see identity/Caddyfile), so the links below read their targets from
+  the environment instead of hard-coding them:
+
+    EEMSUITE_APPLICATION_HOME_URL   the Energy Hippo instance, e.g. https://northlake.energyhippo.com/Hippo/
+    NORTHLAKE_EEM_PROVIDER_KEY      the Northlake provider key in Energy Hippo (SAML or OIDC)
+    NORTHLAKE_PUBLIC_DASHBOARD_ID   a public dashboard id; leave empty to hide the dashboard links
+    NORTHLAKE_SOURCES_URL           the utility pages, /utilities on this site by default
+
+  Every Energy Hippo link is an SP-initiated sign-in that lands on one page:
+  /Account/ExternalAutoLogin?provider=<key>&returnRoute=<encoded #/route>.
+*/ -}}
+{{- $eem := env "EEMSUITE_APPLICATION_HOME_URL" | trimSuffix "/" -}}
+{{- $provider := env "NORTHLAKE_EEM_PROVIDER_KEY" | default "northlake-saml-standard" -}}
+{{- $dashboard := env "NORTHLAKE_PUBLIC_DASHBOARD_ID" -}}
+{{- $sources := env "NORTHLAKE_SOURCES_URL" | default "/utilities" | trimSuffix "/" -}}
+{{- $sso := printf "%s/Account/ExternalAutoLogin?provider=%s&amp;returnRoute=" $eem $provider }}
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex, nofollow">
   <meta name="color-scheme" content="light">
-  <title>Northlake Synthetic Identity</title>
-  <meta name="theme-color" content="#1F3A5F">
+  <title>Facilities and Energy Services · Northlake University</title>
+  <meta name="theme-color" content="#14263F">
   <link rel="icon" href="/branding/northlake-mark.svg" type="image/svg+xml">
   <link rel="icon" href="/branding/favicon-32.png" type="image/png">
   <link rel="stylesheet" href="/branding/brand.css">
   <link rel="stylesheet" href="/branding/site.css">
   <style>
+    .wrap {
+      width: min(1180px, 100% - 48px);
+      margin: 0 auto;
+    }
+
+    .band {
+      padding: 64px 0;
+      border-bottom: 1px solid var(--nl-line);
+    }
+
+    .band-white {
+      background: var(--nl-white);
+    }
+
+    .band h2 {
+      font-size: clamp(26px, 3vw, 34px);
+    }
+
+    .section-lede {
+      max-width: 680px;
+      margin-top: 12px;
+      color: var(--nl-slate);
+      font-size: 17px;
+    }
+
+    /* Hero */
     .hero {
+      padding: 72px 0 64px;
+      border-bottom: 1px solid var(--nl-line);
+    }
+
+    .hero-grid {
       display: grid;
-      grid-template-columns: minmax(0, 1.08fr) minmax(360px, 0.92fr);
+      grid-template-columns: minmax(0, 1.25fr) minmax(300px, 0.75fr);
       align-items: start;
-      gap: clamp(40px, 7vw, 96px);
-      padding: 16px 0 48px;
+      gap: clamp(32px, 6vw, 88px);
     }
 
     .hero h1 {
-      max-width: 640px;
-      font-size: clamp(34px, 4.4vw, 52px);
-      line-height: 1.12;
+      max-width: 680px;
+      font-size: clamp(36px, 4.6vw, 56px);
+      line-height: 1.08;
       text-wrap: balance;
     }
 
-    .hero h1 span {
-      color: var(--nl-navy);
-      text-decoration: underline;
-      text-decoration-color: var(--nl-gold);
-      text-decoration-thickness: 4px;
-      text-underline-offset: 8px;
+    .hero h1::before {
+      display: block;
+      width: 56px;
+      height: 3px;
+      margin-bottom: 22px;
+      content: "";
+      background: var(--nl-gold);
     }
 
-    .lede {
+    .hero .lede {
       max-width: 620px;
-      margin-top: 24px;
+      margin-top: 22px;
       color: var(--nl-slate);
-      font-size: 17px;
+      font-size: 18px;
       line-height: 1.65;
-      text-wrap: pretty;
     }
 
     .actions {
       display: flex;
       flex-wrap: wrap;
       gap: 12px;
+      margin-top: 30px;
+    }
+
+    .hero-card {
+      padding: 26px 28px;
+    }
+
+    .hero-card h2 {
+      font-size: 22px;
+    }
+
+    .hero-card p {
+      margin-top: 10px;
+      color: var(--nl-slate);
+      font-size: 15px;
+    }
+
+    .hero-card a {
+      display: inline-block;
+      margin-top: 14px;
+      font-weight: 500;
+    }
+
+    /* Energy Hippo shortcuts */
+    .shortcut-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
       margin-top: 32px;
     }
 
-    .actions .button {
-      min-height: 48px;
-      padding: 0 22px;
+    .shortcut {
+      display: block;
+      padding: 22px 24px;
+      color: var(--nl-ink);
+      text-decoration: none;
+      transition: border-color 150ms ease;
     }
 
-    .action-note {
+    .shortcut:hover {
+      border-color: var(--nl-navy);
+      color: var(--nl-ink);
+    }
+
+    .shortcut h3 {
       display: flex;
-      align-items: flex-start;
-      gap: 9px;
-      max-width: 580px;
-      margin-top: 18px;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 18px;
+    }
+
+    .shortcut h3::after {
+      color: var(--nl-gold-ink);
+      content: "\2192";
+      font-weight: 400;
+    }
+
+    .shortcut p {
+      margin-top: 8px;
       color: var(--nl-slate);
-      font-size: 13px;
-      line-height: 1.55;
+      font-size: 15px;
     }
 
-    .action-note svg {
-      width: 16px;
-      height: 16px;
-      flex: 0 0 auto;
-      margin-top: 2px;
-      color: var(--nl-navy);
-    }
-
-    .flow-card {
-      padding: 32px;
-      border-top: 4px solid var(--nl-gold);
-    }
-
-    .flow-card h2 {
-      font-size: 24px;
-    }
-
-    .steps {
+    /* Campus energy */
+    .two-col {
       display: grid;
-      margin: 26px 0 0;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: clamp(32px, 6vw, 80px);
+      align-items: start;
+    }
+
+    .two-col p {
+      margin-top: 14px;
+      color: var(--nl-slate);
+      font-size: 16px;
+    }
+
+    .source-list {
+      margin: 0;
       padding: 0;
       list-style: none;
     }
 
-    .step {
-      position: relative;
+    .source-list li {
       display: grid;
-      grid-template-columns: 36px 1fr;
+      grid-template-columns: 150px minmax(0, 1fr);
       gap: 16px;
-      padding-bottom: 22px;
+      padding: 14px 0;
+      border-top: 1px solid var(--nl-line);
     }
 
-    .step:last-child {
-      padding-bottom: 0;
+    .source-list li:last-child {
+      border-bottom: 1px solid var(--nl-line);
     }
 
-    .step:not(:last-child)::after {
-      position: absolute;
-      top: 40px;
-      bottom: 4px;
-      left: 17px;
-      width: 1px;
-      content: "";
-      background: var(--nl-line);
-    }
-
-    .step-number {
-      display: grid;
-      z-index: 1;
-      width: 36px;
-      height: 36px;
-      place-items: center;
-      border: 1px solid var(--nl-gold);
-      color: var(--nl-gold-ink);
-      background: var(--nl-gold-tint);
-      font-size: 12px;
-      font-weight: 800;
-    }
-
-    .step-title {
-      margin: 6px 0 4px;
+    .source-list b {
       color: var(--nl-navy);
-      font-size: 15px;
-      font-weight: 700;
+      font-family: var(--nl-font-display);
+      font-size: 17px;
+      font-weight: 600;
     }
 
-    .step-description {
-      color: var(--nl-slate);
-      font-size: 13px;
-      line-height: 1.55;
-    }
-
-    .boundary {
-      display: flex;
-      gap: 12px;
-      margin-top: 26px;
-      padding: 14px 16px;
-      border: 1px solid var(--nl-line);
-      color: var(--nl-slate);
-      background: var(--nl-tint);
-      font-size: 12px;
-      line-height: 1.55;
-    }
-
-    .boundary svg {
-      width: 18px;
-      height: 18px;
-      flex: 0 0 auto;
-      color: var(--nl-navy);
-    }
-
-    .contract-card {
-      display: grid;
-      grid-template-columns: minmax(0, 1.05fr) minmax(380px, 0.95fr);
-      gap: clamp(32px, 6vw, 72px);
-      padding: clamp(28px, 4vw, 48px);
-    }
-
-    .contract-copy h2 {
-      max-width: 600px;
-      font-size: clamp(24px, 3vw, 32px);
-      line-height: 1.2;
-    }
-
-    .contract-description {
-      max-width: 620px;
-      margin-top: 16px;
+    .source-list span {
       color: var(--nl-slate);
       font-size: 15px;
-      line-height: 1.7;
     }
 
-    .contract-actions {
+    .muted-note {
+      color: var(--nl-slate);
+      font-style: italic;
+    }
+
+    /* Utility providers */
+    .provider-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 32px;
+    }
+
+    .provider {
+      display: grid;
+      grid-template-rows: 56px auto 1fr auto;
+      gap: 10px;
+      padding: 22px 24px;
+    }
+
+    .provider img {
+      display: block;
+      width: auto;
+      max-width: 100%;
+      height: 44px;
+      align-self: center;
+    }
+
+    .provider h3 {
+      font-size: 16px;
+    }
+
+    .provider p {
+      color: var(--nl-slate);
+      font-size: 14.5px;
+    }
+
+    .provider a {
+      font-size: 14.5px;
+      font-weight: 500;
+    }
+
+    .files-row {
       display: flex;
       flex-wrap: wrap;
-      gap: 12px;
-      margin-top: 24px;
-    }
-
-    .contract-note {
-      max-width: 620px;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px 32px;
       margin-top: 16px;
+      padding: 22px 24px;
+    }
+
+    .files-row h3 {
+      font-size: 16px;
+    }
+
+    .files-row p {
+      margin-top: 4px;
       color: var(--nl-slate);
-      font-size: 12px;
-      line-height: 1.6;
+      font-size: 14.5px;
     }
 
-    .contract-grid {
+    .files-row .actions {
+      margin-top: 0;
+    }
+
+    /* Documents */
+    .doc-columns {
       display: grid;
-      align-content: start;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 12px;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 32px;
+      margin-top: 28px;
+    }
+
+    .doc-columns h3 {
+      padding-bottom: 10px;
+      border-bottom: 3px solid var(--nl-gold);
+      font-size: 16px;
+    }
+
+    .doc-columns ul {
       margin: 0;
+      padding: 0;
+      list-style: none;
     }
 
-    .contract-item {
-      min-width: 0;
-      padding: 16px 18px;
-      border: 1px solid var(--nl-line);
-      background: var(--nl-tint);
+    .doc-columns li {
+      padding: 10px 0;
+      border-bottom: 1px solid var(--nl-line);
+      font-size: 15px;
     }
 
-    .contract-item-wide {
-      grid-column: 1 / -1;
+    .doc-columns small {
+      display: block;
+      color: var(--nl-slate);
+      font-size: 13px;
     }
 
-    .contract-item dt {
-      margin-bottom: 8px;
-      color: var(--nl-gold-ink);
-      font-size: 10px;
-      font-weight: 800;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-    }
-
-    .contract-item dd {
-      margin: 0;
-      overflow-wrap: anywhere;
-      color: var(--nl-ink);
-      font-family: var(--nl-font-mono);
-      font-size: 12px;
-      line-height: 1.55;
-    }
-
-    @media (max-width: 900px) {
-      .hero,
-      .contract-card {
+    @media (max-width: 960px) {
+      .hero-grid,
+      .two-col {
         grid-template-columns: 1fr;
       }
 
-      .flow-card {
-        max-width: 640px;
+      .shortcut-grid,
+      .provider-grid,
+      .doc-columns {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
       }
     }
 
-    @media (max-width: 600px) {
+    @media (max-width: 640px) {
+      .wrap {
+        width: calc(100% - 32px);
+      }
+
       .hero {
-        gap: 36px;
-        padding-bottom: 36px;
+        padding: 44px 0 40px;
       }
 
-      .actions {
-        display: grid;
+      .band {
+        padding: 44px 0;
       }
 
-      .flow-card,
-      .contract-card {
-        padding: 24px 20px;
-      }
-
-      .contract-grid {
+      .shortcut-grid,
+      .provider-grid,
+      .doc-columns {
         grid-template-columns: 1fr;
       }
 
-      .contract-item-wide {
-        grid-column: auto;
-      }
-
-      .contract-actions {
-        display: grid;
+      .source-list li {
+        grid-template-columns: 1fr;
+        gap: 4px;
       }
     }
   </style>
 </head>
 <body>
+  <div class="nl-topbar">
+    <div class="nl-topbar__inner">
+      <span>Northlake University · Sacramento, California</span>
+      <nav class="nl-topbar__links" aria-label="University">
+        <a href="mailto:servicedesk@northlake.example.edu">IT Service Desk</a>
+        <a href="/realms/northlake/account/">My NetID account</a>
+      </nav>
+    </div>
+  </div>
+
   <header class="nl-masthead">
     <div class="nl-masthead__inner">
       <div class="nl-masthead__brand">
         <a class="nl-lockup" href="/">
-          <img class="nl-lockup__image" src="/branding/northlake-logo-reversed.svg" alt="Northlake University" width="237" height="64">
+          <img class="nl-lockup__image" src="/brands/northlake/logo.svg" alt="Northlake University" width="238" height="64">
         </a>
-        <span class="nl-masthead__title">Single sign-on</span>
+        <span class="nl-masthead__title">Facilities and Energy Services</span>
       </div>
-      <span class="nl-masthead__chip">Local development provider</span>
+      <nav class="nl-masthead__nav" aria-label="Facilities and Energy Services">
+        <a href="#energy-hippo">Energy Hippo</a>
+        <a href="#campus-energy">Campus energy</a>
+        <a href="#utilities">Utilities</a>
+        <a href="/meter-reading/">Meter reading</a>
+        <a href="#documents">Documents</a>
+      </nav>
     </div>
   </header>
 
-  <main class="nl-main">
-    <div class="hero">
-      <section class="intro" aria-labelledby="page-title">
-        <p class="eyebrow">OIDC and SAML test provider</p>
-        <h1 id="page-title">Sign in once. Test either path with <span>Northlake.</span></h1>
-        <p class="lede">
-          Establish your Northlake identity session, then open EnergyHippo and
-          choose its OIDC or SAML third-party sign-in. Northlake supplies the
-          same users, groups, company IDs, and permission-profile intent through
-          both protocols so the relying application can be compared honestly.
-        </p>
-
-        <div class="actions">
-          <a
-            class="button button-primary"
-            href="/realms/northlake/account/"
-            target="_blank"
-            rel="noopener"
-            aria-describedby="new-tab-note"
-          >
-            Sign in to Northlake
-            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M14 5h5v5M19 5l-8 8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-              <path d="M18 13v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-            </svg>
-          </a>
-          <a class="button button-secondary" href="/open-energyhippo">
-            Open EnergyHippo
-            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M5 12h14M14 7l5 5-5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          </a>
-          <a class="button button-secondary" href="/configure">
-            Configure Northlake
-            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M4 7h6M14 7h6M4 17h10M18 17h2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-              <circle cx="12" cy="7" r="2" stroke="currentColor" stroke-width="1.8"/>
-              <circle cx="16" cy="17" r="2" stroke="currentColor" stroke-width="1.8"/>
-            </svg>
-          </a>
-        </div>
-        <p class="action-note" id="new-tab-note">
-          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.7"/>
-            <path d="M12 10v6M12 7.25v.1" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>
-          </svg>
-          Northlake opens in a new tab so this launchpad stays available. Sign
-          in there, return here, then continue to EnergyHippo.
-        </p>
-      </section>
-
-      <aside class="nl-card flow-card" aria-labelledby="flow-title">
-        <p class="card-kicker">Session handoff</p>
-        <h2 id="flow-title">How the repeat login works</h2>
-        <ol class="steps">
-          <li class="step">
-            <span class="step-number">01</span>
-            <div class="step-copy">
-              <p class="step-title">Authenticate with Northlake</p>
-              <p class="step-description">
-                Keycloak validates the user and creates the provider's browser
-                session.
-              </p>
-            </div>
-          </li>
-          <li class="step">
-            <span class="step-number">02</span>
-            <div class="step-copy">
-              <p class="step-title">Choose Northlake in EnergyHippo</p>
-              <p class="step-description">
-                EnergyHippo starts its selected OIDC authorization request or
-                SAML AuthnRequest and owns the complete callback validation.
-              </p>
-            </div>
-          </li>
-          <li class="step">
-            <span class="step-number">03</span>
-            <div class="step-copy">
-              <p class="step-title">Return without another password</p>
-              <p class="step-description">
-                Northlake reuses its SSO session, then returns either OIDC
-                tokens or a signed SAML response to the registered callback.
-              </p>
-            </div>
-          </li>
-        </ol>
-        <div class="boundary">
-          <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M7 10V8a5 5 0 0 1 10 0v2M6 10h12v9H6z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
-            <path d="M12 14v2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-          </svg>
-          <span>
-            This page never handles passwords or tokens. It only links the real
-            identity provider to the relying application's own login flow.
-          </span>
-        </div>
-      </aside>
-    </div>
-
-    <section class="saml-contract" aria-labelledby="saml-contract-title">
-      <div class="nl-card contract-card">
-        <div class="contract-copy">
-          <p class="card-kicker">SAML 2.0 provider ready</p>
-          <h2 id="saml-contract-title">Northlake is ready for the EnergyHippo service provider.</h2>
-          <p class="contract-description">
-            Keycloak returns a persistent NameID and the Northlake attribute set
-            in an HTTP-POST response. Both the outer response and assertion are
-            signed with RSA-SHA256; the focused verifier checks signatures,
-            issuer, audience, destination, recipient, time bounds, request
-            correlation, replay resistance, logout, and disabled users.
+  <main>
+    <section class="hero" aria-labelledby="page-title">
+      <div class="wrap hero-grid">
+        <div>
+          <p class="eyebrow">Campus energy management</p>
+          <h1 id="page-title">One record of every meter on campus</h1>
+          <p class="lede">
+            Electricity, gas, water, chilled water, steam, solar and wind for the
+            main campus, Cedar Row, the Central Plant and Ridgeline Wind, kept in
+            Energy Hippo. Staff sign in once with their NetID.
           </p>
-          <div class="contract-actions">
-            <a class="button button-primary" href="/realms/northlake/protocol/saml/descriptor">
-              Open SAML metadata
-            </a>
-            <a
-              class="button button-secondary"
-              href="/realms/northlake/protocol/saml/clients/eemsuite-web-saml-standard"
-              target="_blank"
-              rel="noopener"
-              aria-describedby="saml-launch-note"
-            >
-              Launch IdP-initiated SSO
-            </a>
+          <div class="actions">
+            <a class="button button-primary" href="{{$sso}}%23%2FHome">Open Energy Hippo</a>
+            {{- if $dashboard}}
+            <a class="button button-secondary" href="{{$eem}}/Public/Dashboard/{{$dashboard}}">Campus energy dashboard</a>
+            {{- end}}
           </div>
-          <p class="contract-note" id="saml-launch-note">
-            IdP-initiated SSO posts to the SAML client's current default ACS.
-            Use it after the EnergyHippo ACS is active and configured first, or
-            the browser will correctly report that the relying party is unavailable.
-          </p>
         </div>
+        <aside class="nl-card hero-card" aria-labelledby="signin-title">
+          <h2 id="signin-title">Signing in</h2>
+          <p>
+            Energy Hippo uses your Northlake NetID. If you are already signed in to
+            Northlake, the links on this page open Energy Hippo without asking for
+            your password again.
+          </p>
+          <a href="/realms/northlake/account/">Manage your NetID account</a>
+        </aside>
+      </div>
+    </section>
 
-        <dl class="contract-grid" aria-label="Northlake SAML service-provider contract">
-          <div class="contract-item contract-item-wide">
-            <dt>Service-provider entity ID</dt>
-            <dd>urn:energyhippo:eemsuite-web:saml:standard</dd>
+    <section class="band" id="energy-hippo" aria-labelledby="shortcuts-title">
+      <div class="wrap">
+        <p class="eyebrow">Energy Hippo</p>
+        <h2 id="shortcuts-title">Go straight to your work</h2>
+        <p class="section-lede">Each shortcut signs you in with your NetID and opens that page in Energy Hippo.</p>
+        <div class="shortcut-grid">
+          <a class="nl-card shortcut" href="{{$sso}}%23%2FHome">
+            <h3>Home</h3>
+            <p>Your Energy Hippo homepage and its dashboards.</p>
+          </a>
+          <a class="nl-card shortcut" href="{{$sso}}%23%2FMyFavoriteReports%2FIndex">
+            <h3>My reports</h3>
+            <p>The reports you have marked as favourites.</p>
+          </a>
+          <a class="nl-card shortcut" href="{{$sso}}%23%2FOverview%2FBillManagement">
+            <h3>Bills</h3>
+            <p>Bill entry, approval and history in one place.</p>
+          </a>
+          <a class="nl-card shortcut" href="{{$sso}}%23%2FBillEntry">
+            <h3>Enter a bill</h3>
+            <p>Key in a paper or PDF utility bill.</p>
+          </a>
+          <a class="nl-card shortcut" href="{{$sso}}%23%2FTaskDashboard">
+            <h3>Tasks</h3>
+            <p>Scheduled imports and meter reads, and how they ran.</p>
+          </a>
+          <a class="nl-card shortcut" href="{{$sso}}%23%2FMyImports">
+            <h3>My imports</h3>
+            <p>Files you have uploaded and what happened to them.</p>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <section class="band band-white" id="campus-energy" aria-labelledby="campus-title">
+      <div class="wrap two-col">
+        <div>
+          <p class="eyebrow">Campus energy</p>
+          <h2 id="campus-title">Where the campus gets its energy</h2>
+          <p>
+            Northlake buys electricity, gas and water from the utilities that serve
+            Sacramento, makes its own chilled water and steam at the Central Plant,
+            and generates power from rooftop solar and its own wind farm. Every
+            source is metered, and every meter reports to Energy Hippo.
+          </p>
+          {{- if $dashboard}}
+          <p><a class="button button-secondary" href="{{$eem}}/Public/Dashboard/{{$dashboard}}">Open the campus energy dashboard</a></p>
+          {{- else}}
+          <p class="muted-note">The public campus energy dashboard is coming soon.</p>
+          {{- end}}
+        </div>
+        <ul class="source-list">
+          <li><b>Electricity</b><span>Valley Electric District, with on-site solar from Helios and wind from Ridgeline.</span></li>
+          <li><b>Natural gas</b><span>Sierra Gas Utility, for heating, kitchens and the plant's boilers.</span></li>
+          <li><b>Water</b><span>River City Utilities, with sewer and stormwater on the same statement.</span></li>
+          <li><b>Chilled water</b><span>The Central Plant, allocated each month to the buildings it cools.</span></li>
+          <li><b>Steam</b><span>The Central Plant, allocated each month to the buildings it heats.</span></li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="band" id="utilities" aria-labelledby="utilities-title">
+      <div class="wrap">
+        <p class="eyebrow">Utilities</p>
+        <h2 id="utilities-title">Who serves the campus</h2>
+        <p class="section-lede">Statements, rate schedules and meter files from each provider.</p>
+        <div class="provider-grid">
+          <div class="nl-card provider">
+            <img src="/brands/valley-electric/logo.svg" alt="Valley Electric District">
+            <h3>Valley Electric District</h3>
+            <p>Public power for every campus building, the Central Plant and Cedar Row, and the grid connection for Ridgeline Wind.</p>
+            <a href="{{$sources}}/providers/valley-electric-district/">Bills and data</a>
           </div>
-          <div class="contract-item">
-            <dt>NameID</dt>
-            <dd>persistent</dd>
+          <div class="nl-card provider">
+            <img src="/brands/river-city/logo.svg" alt="River City Utilities">
+            <h3>River City Utilities</h3>
+            <p>The city's water, sewer and stormwater, on one statement per account.</p>
+            <a href="{{$sources}}/providers/river-city-utilities/">Bills and data</a>
           </div>
-          <div class="contract-item">
-            <dt>Response binding</dt>
-            <dd>HTTP-POST</dd>
+          <div class="nl-card provider">
+            <img src="/brands/sierra-gas/logo.svg" alt="Sierra Gas Utility">
+            <h3>Sierra Gas Utility</h3>
+            <p>Natural gas for heating, the Student Center kitchen and the plant's boilers.</p>
+            <a href="{{$sources}}/providers/sierra-gas-utility/">Bills and data</a>
           </div>
-          <div class="contract-item contract-item-wide">
-            <dt>Identity key</dt>
-            <dd>(IdP entity ID, persistent NameID)</dd>
+          <div class="nl-card provider">
+            <img src="/brands/helios/logo.svg" alt="Helios Onsite Solar">
+            <h3>Helios Onsite Solar</h3>
+            <p>Rooftop and carport solar on campus, sold to Northlake under a power purchase agreement.</p>
+            <a href="{{$sources}}/providers/helios-onsite-solar/">Bills and data</a>
           </div>
-          <div class="contract-item contract-item-wide">
-            <dt>Baseline signatures</dt>
-            <dd>Response + Assertion · RSA-SHA256</dd>
+          <div class="nl-card provider">
+            <img src="/brands/thermal-plant/logo.svg" alt="Northlake University, Central Plant Operations">
+            <h3>Central Plant Operations</h3>
+            <p>Our own plant: chilled water and steam for six buildings, allocated monthly.</p>
+            <a href="{{$sources}}/providers/northlake-thermal-plant/">Bills and data</a>
           </div>
-        </dl>
+          <div class="nl-card provider">
+            <img src="/brands/ridgeline-wind/logo.svg" alt="Ridgeline Wind">
+            <h3>Ridgeline Wind</h3>
+            <p>Ten turbines in the Montezuma Hills, owned by the Thermal Plant since July 2024.</p>
+            <a href="{{$sources}}/providers/ridgeline-wind/">Bills and data</a>
+          </div>
+        </div>
+        <div class="nl-card files-row">
+          <div>
+            <h3>Gateway and reference files</h3>
+            <p>Every published bill, tariff and meter file, by provider, year and month.</p>
+          </div>
+          <div class="actions">
+            <a class="button button-secondary" href="{{$sources}}/downloads/">Browse all files</a>
+            <a class="button button-quiet" href="{{$sources}}/catalog.json">Download catalog</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="band band-white" id="documents" aria-labelledby="documents-title">
+      <div class="wrap">
+        <p class="eyebrow">Documents</p>
+        <h2 id="documents-title">Guides and reference</h2>
+        <div class="doc-columns">
+          <div>
+            <h3>Guides</h3>
+            <ul>
+              <li><a href="/documents/guides/northlake-facilities-and-utility-overview.pdf">Facilities and utility overview</a><small>How the university organises properties, meters and billing</small></li>
+              <li><a href="/documents/guides/chart-of-accounts-and-gl-guide.pdf">Chart of accounts and GL guide</a><small>How utility costs are coded</small></li>
+              <li><a href="/documents/guides/sustainability-requirements.pdf">Sustainability requirements</a><small>Reporting, targets and emissions</small></li>
+              <li><a href="/documents/guides/tenant-and-lease-roster.pdf">Tenant and lease roster</a><small>Cedar Row and other tenants</small></li>
+            </ul>
+          </div>
+          <div>
+            <h3>Utility rate sheets</h3>
+            <ul>
+              <li><a href="/documents/rate-tariffs/valley-electric-district.pdf">Valley Electric District</a><small>Time-of-use general service</small></li>
+              <li><a href="/documents/rate-tariffs/river-city-utilities.pdf">River City Utilities</a><small>Water, sewer and stormwater</small></li>
+              <li><a href="/documents/rate-tariffs/sierra-gas-utility.pdf">Sierra Gas Utility</a><small>Firm natural gas service</small></li>
+              <li><a href="/documents/rate-tariffs/helios-onsite-solar.pdf">Helios Onsite Solar</a><small>Power purchase agreement</small></li>
+              <li><a href="/documents/rate-tariffs/northlake-thermal-plant.pdf">Northlake Thermal Plant</a><small>Internal cost allocation</small></li>
+              <li><a href="/documents/rate-tariffs/ridgeline-wind.pdf">Ridgeline Wind</a><small>Internal transfer price</small></li>
+            </ul>
+          </div>
+          <div>
+            <h3>Energy management project</h3>
+            <ul>
+              <li><a href="/documents/intake-package/Northlake%20Intake%20Package.html">Onboarding data package</a><small>Everything sent to the implementation team</small></li>
+              <li><a href="/documents/intake-package/00-cover-letter.pdf">Cover letter</a><small>From Campus Operations</small></li>
+              <li><a href="/documents/intake-package/facilities-and-meter-register.pdf">Facilities and meter register</a><small>Buildings, meters and channels</small></li>
+              <li><a href="/documents/intake-package/source-system-inventory.pdf">Source system inventory</a><small>Gateways, files and feeds</small></li>
+              <li><a href="/documents/intake-package/data-collection-workbook.xlsx">Data collection workbook</a><small>Spreadsheet</small></li>
+            </ul>
+          </div>
+        </div>
       </div>
     </section>
   </main>
 
   <footer class="nl-page-footer">
     <div class="nl-page-footer__inner">
-      <span>&copy; 2026 Northlake University &middot; Fictional university for local development</span>
-      <nav class="nl-page-footer__links" aria-label="Identity provider resources">
-        <a href="/configure">Configure provider</a>
-        <a href="/configure/oidc">Configure OIDC profiles</a>
-        <a href="/configure/saml">Configure SAML profiles</a>
-        <a href="/configure/scenarios">Configure two-realm scenarios</a>
-        <a href="https://customer.localtest.me:8443/customer/">Open customer browser lab</a>
-        <a href="/configure/users">Manage synthetic users</a>
-        <a href="/configure/groups">Manage synthetic groups</a>
-        <a href="/realms/northlake/account/">Account</a>
-        <a href="/admin/northlake/console/">Realm admin</a>
-        <a href="/realms/northlake/.well-known/openid-configuration">OIDC discovery</a>
-        <a href="/realms/northlake/protocol/saml/descriptor">SAML metadata</a>
-      </nav>
+      <span>Northlake University · 100 Synthetic Campus Drive, Sacramento, CA 95822 · A fictional university for local development</span>
+      <span class="nl-page-footer__links">
+        <a href="/configure">Identity lab</a>
+        <a href="https://customer.localtest.me:8443/customer/">Customer browser lab</a>
+        <a href="/brands/">Brand systems</a>
+      </span>
     </div>
   </footer>
 </body>

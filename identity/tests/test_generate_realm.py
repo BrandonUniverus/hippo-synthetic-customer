@@ -86,9 +86,9 @@ class GenerateRealmTests(unittest.TestCase):
     def test_expected_users_groups_and_disabled_case_are_generated(self) -> None:
         realm, connection = self._generate()
 
-        self.assertEqual(19, len(realm["users"]))
-        self.assertEqual(18, sum(user["enabled"] for user in realm["users"]))
-        self.assertEqual(27, len(realm["groups"]))
+        self.assertEqual(23, len(realm["users"]))
+        self.assertEqual(22, sum(user["enabled"] for user in realm["users"]))
+        self.assertEqual(29, len(realm["groups"]))
         self.assertTrue(
             all(user["realmRoles"] == ["default-roles-northlake"] for user in realm["users"])
         )
@@ -104,7 +104,7 @@ class GenerateRealmTests(unittest.TestCase):
             connection["realmSource"],
         )
         self.assertEqual(
-            {"total": 19, "enabled": 18, "local": 0},
+            {"total": 23, "enabled": 22, "local": 0},
             connection["userInventory"],
         )
 
@@ -589,7 +589,7 @@ class GenerateRealmTests(unittest.TestCase):
         self.assertEqual([], first_user["groups"])
         self.assertEqual(password, first_user["credentials"][0]["value"])
         self.assertEqual(
-            {"total": 20, "enabled": 19, "local": 1},
+            {"total": 24, "enabled": 23, "local": 1},
             first_connection["userInventory"],
         )
 
@@ -647,7 +647,7 @@ class GenerateRealmTests(unittest.TestCase):
         self.assertEqual(["/phase3_reviewers"], generated_user["groups"])
         self.assertEqual([], generated_user["attributes"]["eem_company_ids"])
         self.assertEqual([], generated_user["attributes"]["eem_permission_profiles"])
-        self.assertEqual({"total": 28, "local": 1}, first_connection["groupInventory"])
+        self.assertEqual({"total": 30, "local": 1}, first_connection["groupInventory"])
 
     def test_userinfo_claim_sources_include_groups_and_eem_shapes(self) -> None:
         realm, _ = self._generate()

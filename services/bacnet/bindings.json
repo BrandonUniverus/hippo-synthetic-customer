@@ -1,0 +1,41 @@
+{
+  "version": "northlake-bacnet-v2",
+  "broadcastPort": 47808,
+  "devices": [
+    {"deviceId": 530101, "legacyDeviceId": 5301001, "nodeId": 10, "name": "NTP-BACNET-SCIENCE-CHW", "unicastPort": 47820, "readPropertyMultiple": true, "objects": [
+      {"objectType": 2, "objectId": 1001, "pointId": 34, "channel": "ch_ntp_science_center_chw_ton_hours_hourly", "valueKey": "science_chw_ton_hours", "unit": "ton-hours", "intervalMinutes": 60},
+      {"objectType": 2, "objectId": 1002, "pointId": 35, "channel": "ch_ntp_science_center_chw_tons_hourly", "valueKey": "science_chw_tons", "unit": "tons", "intervalMinutes": 60}
+    ]},
+    {"deviceId": 530102, "legacyDeviceId": 5301002, "nodeId": 11, "name": "NTP-BACNET-RECREATION-CHW", "unicastPort": 47821, "readPropertyMultiple": true, "objects": [
+      {"objectType": 2, "objectId": 1001, "pointId": 37, "channel": "ch_ntp_recreation_center_chw_ton_hours_hourly", "valueKey": "recreation_chw_ton_hours", "unit": "ton-hours", "intervalMinutes": 60},
+      {"objectType": 2, "objectId": 1002, "pointId": 38, "channel": "ch_ntp_recreation_center_chw_tons_hourly", "valueKey": "recreation_chw_tons", "unit": "tons", "intervalMinutes": 60}
+    ]},
+    {"deviceId": 530103, "legacyDeviceId": 5301003, "nodeId": 12, "name": "NTP-BACNET-PLANT-HEADERS", "unicastPort": 47822, "readPropertyMultiple": false, "objects": [
+      {"objectType": 2, "objectId": 2001, "pointId": 448, "channel": "ch_ntp_plant_chw_ton_hours_hourly", "valueKey": "plant_chw_ton_hours", "unit": "ton-hours", "intervalMinutes": 60},
+      {"objectType": 2, "objectId": 2002, "pointId": 449, "channel": "ch_ntp_plant_chw_tons_hourly", "valueKey": "plant_chw_tons", "unit": "tons", "intervalMinutes": 60},
+      {"objectType": 2, "objectId": 2003, "pointId": 450, "channel": "ch_ntp_plant_steam_klb_hourly", "valueKey": "plant_steam_klb", "unit": "klb", "intervalMinutes": 60},
+      {"objectType": 2, "objectId": 2004, "pointId": 451, "channel": "ch_ntp_plant_steam_lb_per_hour_hourly", "valueKey": "plant_steam_lb_per_hour", "unit": "lb/hour", "intervalMinutes": 60},
+      {"objectType": 0, "objectId": 3001, "pointId": 452, "channel": "ch_ntp_plant_steam_header_psig_15m", "valueKey": "plant_steam_header_psig", "unit": "psig", "intervalMinutes": 15, "highLimit": "87.9"},
+      {"objectType": 2, "objectId": 2005, "pointId": 453, "channel": "ch_ntp_plant_condensate_kgal_hourly", "valueKey": "plant_condensate_kgal", "unit": "kgal", "intervalMinutes": 60}
+    ]}
+  ],
+  "statusScenarios": [
+    {"key": "science-chiller-override", "weekday": "Tuesday", "startLocal": "02:00", "endLocal": "04:00",
+     "valueKeys": ["science_chw_ton_hours", "science_chw_tons"], "overridden": true, "hold": true,
+     "note": "An operator overrides the Science Center chilled-water readings during weekly chiller maintenance."},
+    {"key": "recreation-flow-sensor-swap", "weekday": "Wednesday", "startLocal": "10:00", "endLocal": "11:00",
+     "valueKeys": ["recreation_chw_ton_hours", "recreation_chw_tons"], "outOfService": true, "hold": true,
+     "note": "The Recreation Center flow sensor is taken out of service for a weekly swap."},
+    {"key": "steam-header-transmitter-fault", "monthDay": 1, "startLocal": "06:00", "endLocal": "07:00",
+     "valueKeys": ["plant_steam_header_psig"], "reliability": "no-sensor", "eventState": "fault", "hold": true,
+     "note": "The steam header pressure transmitter is disconnected for monthly calibration."}
+  ],
+  "assumptions": {
+    "chilledWaterDistributionLossFraction": "0.05",
+    "steamDistributionLossFraction": "0.08",
+    "condensateReturnFraction": "0.75",
+    "condensatePoundsPerGallon": "8.34",
+    "steamHeaderMeanPsig": "85",
+    "steamHeaderVariationPsig": "3"
+  }
+}

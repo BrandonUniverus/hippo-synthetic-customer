@@ -1,0 +1,105 @@
+# Stage 4, step 4: Schedules (Database Administrator > Schedule, the left "Schedules" list).
+# A Schedule bundles one Season, one Holiday set and one Time of Use into the thing a charge picks in
+# 05-rates.yaml. Add the Schedule on the left list first, then go to each of the three tabs and use that
+# tab's own "Selected X" combo box to assign the season / holiday set / time-of-use to the schedule
+# currently selected on the left -- the app's own hint says this exactly: "Choose a schedule first, then
+# use each tab to select the season, holiday set, and time-of-use definition it should use."
+stage: 4
+step: 4
+title: Schedules
+app: Database Administrator
+screen: Schedule > Schedules
+source:
+- data/providers/valley-electric-district.yaml (seasons and periods)
+- data/providers/sierra-gas-utility.yaml (commodity winter and summer months)
+notes:
+- ScheduleID 0 "Annual All Hrs" already exists as the system default (Season 0, Holiday 0, TOU 0); needs no entry.
+- ScheduleID 1 already exists, named "VED-TOU-GS", created 2026-09-14, pointed at the placeholder Season 1 and TOU
+  1. 02-seasons.yaml and 03-time-of-use.yaml repurpose those two rows, so this step only renames the schedule to
+  "Summer Peak" and confirms its three tabs.
+- 'Reworked 2026-11-09: the real providers need seven schedules beside the system one. Five are Valley Electric''s
+  time-of-use periods (three in summer, two in winter), all on the Northlake Holidays set. Two are Sierra Gas''s
+  heating and non-heating seasons. The Rate Lab provider''s schedules are added to this file with its rates.'
+- 'Significance for the Valley Electric charges (05-rates.yaml), because of how the engine treats holidays
+  (01-holidays.yaml): the peak and part-peak charges must both leave holidays out, and only On Peak and Super On
+  Peak do. So peak is entered as Super On Peak, part-peak as On Peak, and off-peak as Off Peak. Mid Peak would be
+  the natural choice for part-peak, but a Mid Peak charge on a schedule with holidays counts the whole holiday, which
+  the off-peak charge also counts. Recorded as a product question.'
+- A schedule has no dates of its own. Changing a window later changes how every past period prices; a window
+  that changes from a date is a new time of use, schedule and charge (Stage 12).
+records:
+- key: sched_allhours
+  installed:
+    scheduleId: 0
+    note: existing system default, no entry
+  Schedules:
+    Schedule Name: Annual All Hrs
+    Season: Annual All Hrs
+    Holiday: No Holidays
+    Time of Use: All Hrs
+  Notes:
+  - Used for charges that do not vary by season or hour (facility charges, demand, riders, taxes).
+- key: sched_summer_peak
+  installed:
+    scheduleId: 1
+    note: renames existing ScheduleID 1 (was "VED-TOU-GS")
+  Schedules:
+    Schedule Name: Summer Peak
+    Season: VED Summer (Jun-Sep)
+    Holiday: Northlake Holidays
+    Time of Use: Summer Peak (Wkdy 12-18)
+  Significance on its charges: Super On Peak
+- key: sched_summer_part_peak
+  installed:
+    scheduleId: null
+  Schedules:
+    Schedule Name: Summer Part-Peak
+    Season: VED Summer (Jun-Sep)
+    Holiday: Northlake Holidays
+    Time of Use: Summer Part-Peak (Wkdy 8-12, 18-22)
+  Significance on its charges: On Peak
+- key: sched_summer_off_peak
+  installed:
+    scheduleId: null
+  Schedules:
+    Schedule Name: Summer Off-Peak
+    Season: VED Summer (Jun-Sep)
+    Holiday: Northlake Holidays
+    Time of Use: Summer Off-Peak (nights, weekends)
+  Significance on its charges: Off Peak
+- key: sched_winter_part_peak
+  installed:
+    scheduleId: null
+  Schedules:
+    Schedule Name: Winter Part-Peak
+    Season: VED Winter (Oct-May)
+    Holiday: Northlake Holidays
+    Time of Use: Winter Part-Peak (Wkdy 8-22)
+  Significance on its charges: On Peak
+- key: sched_winter_off_peak
+  installed:
+    scheduleId: null
+  Schedules:
+    Schedule Name: Winter Off-Peak
+    Season: VED Winter (Oct-May)
+    Holiday: Northlake Holidays
+    Time of Use: Winter Off-Peak (nights, weekends)
+  Significance on its charges: Off Peak
+- key: sched_gas_winter
+  installed:
+    scheduleId: null
+  Schedules:
+    Schedule Name: Gas Winter
+    Season: SGU Winter (Nov-Mar)
+    Holiday: No Holidays
+    Time of Use: All Hrs
+  Notes:
+  - Sierra Gas's heating-season commodity price; no hour split and no holidays (gas is billed on volume).
+- key: sched_gas_summer
+  installed:
+    scheduleId: null
+  Schedules:
+    Schedule Name: Gas Summer
+    Season: SGU Summer (Apr-Oct)
+    Holiday: No Holidays
+    Time of Use: All Hrs

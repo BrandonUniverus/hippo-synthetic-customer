@@ -1,0 +1,100 @@
+# Stage 9, step 6: Report delivery (Web, MFRDelivery modal: Reports / Recipients / Groups / Schedule tabs, opened
+# from a saved report's delivery action), plus the 13 new Database Administrator groups the deliveries recipient
+# picker resolves through. `kind` distinguishes a distribution group from a delivery.
+stage: 9
+step: 6
+title: Report delivery
+app: Web, Database Administrator
+screen: Users & Groups > Groups; MFRDelivery modal
+source:
+- generators/documents/sources/implementation/dream-customer/phase6-operations-engagement-spec.md
+- generators/documents/sources/implementation/dream-customer/product-gap-backlog.md (item 8)
+notes:
+- 'Verified two levels deep: the persisted table MFRDeliveryRecipient_TBL DOES have an Email column (alongside
+  RecipientKind/UserID/GroupID), so the data model can hold an email-only recipient -- but the picker DTO the web
+  view binds (MFRDeliveryRecipientsDTO, viewMFRDelivery.ts) only offers UserID/DisplayName/CompanyID rows sourced
+  from systemRecipients/systemGroups, with no free-text email input anywhere in the drawer. Backlog item 8 is
+  confirmed exactly as described: the column exists, the picker never writes to it. The two external addresses
+  the business wanted on the Weekly Cost Rollup delivery cannot be entered through the UI; recorded on that
+  delivery record below as blocked intent, not entered.'
+- 'SCALE DECISION: reaching 100+ recipients through individual Users would mean creating and maintaining 120+
+  person records for people who exist only to receive a PDF. Proposing instead a Northlake Portfolio group model:
+  one small Group per campus building/property, used purely as an MFR distribution list (it does not need to
+  grant any permission -- a Group with zero Admin/Function/Report grants is still a valid delivery recipient).
+  12 groups x ~10 users each = 120, comfortably over 100. This reuses the exact mechanism Stage 1 already used for
+  permission groups, just for a different purpose.'
+- 'Roster generation rule (not enumerated, per the brief): for each of the 12 Bldg Rep groups below, create 10
+  users named Building Rep <NNN> (NNN 001-120, sequential across the whole roster so no two groups repeat a
+  number), User Name bldgrep<NNN>, Email bldgrep<NNN>@northlake.example.edu, Company matching the group''s
+  company, Principal Type Human, Authentication Policy LocalAndFederated, member of exactly one group. Group 1
+  gets 001-010, group 2 gets 011-020, and so on through group 12 (111-120). The 13th group, NLU Finance
+  Distribution, is not part of the 100+ count and uses two already-installed Stage 1 users.'
+- A distribution-only group needs no permission tree entries; create it on Users & Groups > Groups, save, and
+  skip straight to adding it as an MFR recipient.
+- 'Added 2026-10-01 (Ridgeline Wind): a fourth delivery, the monthly Ridgeline performance report, to two individual
+  users, Mateo Alvarez (Northlake Thermal Plant) and Elena Vasquez (Northlake University). The delivery picker lists a
+  company''s users only to an administrator, and only the author''s own company unless the author is a system
+  administrator (DapperUserIdentityDTORepository.GetFrontendUsersAsync, behind UserEditor_RequireAccess), so a delivery
+  that crosses two companies has to be authored by a system administrator, who keeps their own copy of the saved report
+  (step 5). By default each recipient is rendered as themselves (MFRDelivery_TBL.ImpersonateReports off), so both must
+  be able to run the report: Use Analysis on the Ridgeline Wind Site, which both hold. The same author question stands
+  for the three deliveries above.'
+records:
+- {key: bldgrep_admin_hall, kind: distribution_group, installed: {groupId: }, "Users & Groups": {Company: Northlake University, "Group ID": bldgrep_admin_hall, Name: "Bldg Rep - Admin Hall", Roster: "001-010"}}
+- {key: bldgrep_science_center, kind: distribution_group, installed: {groupId: }, "Users & Groups": {Company: Northlake University, "Group ID": bldgrep_science_center, Name: "Bldg Rep - Science Center", Roster: "011-020"}}
+- {key: bldgrep_library, kind: distribution_group, installed: {groupId: }, "Users & Groups": {Company: Northlake University, "Group ID": bldgrep_library, Name: "Bldg Rep - Library", Roster: "021-030"}}
+- {key: bldgrep_student_center, kind: distribution_group, installed: {groupId: }, "Users & Groups": {Company: Northlake University, "Group ID": bldgrep_student_center, Name: "Bldg Rep - Student Center", Roster: "031-040"}}
+- {key: bldgrep_lakeview_hall, kind: distribution_group, installed: {groupId: }, "Users & Groups": {Company: Northlake University, "Group ID": bldgrep_lakeview_hall, Name: "Bldg Rep - Lakeview Hall", Roster: "041-050"}}
+- {key: bldgrep_recreation_center, kind: distribution_group, installed: {groupId: }, "Users & Groups": {Company: Northlake University, "Group ID": bldgrep_recreation_center, Name: "Bldg Rep - Recreation Center", Roster: "051-060"}}
+- {key: bldgrep_parking_structure, kind: distribution_group, installed: {groupId: }, "Users & Groups": {Company: Northlake University, "Group ID": bldgrep_parking_structure, Name: "Bldg Rep - Parking Structure", Roster: "061-070"}}
+- {key: bldgrep_central_plant, kind: distribution_group, installed: {groupId: }, "Users & Groups": {Company: Northlake Thermal Plant, "Group ID": bldgrep_central_plant, Name: "Bldg Rep - Central Plant", Roster: "071-080"}}
+- {key: bldgrep_facilities_mgmt, kind: distribution_group, installed: {groupId: }, "Users & Groups": {Company: Northlake University, "Group ID": bldgrep_facilities_mgmt, Name: "Bldg Rep - Facilities Management", Roster: "081-090"}}
+- {key: bldgrep_cedar_row_a, kind: distribution_group, installed: {groupId: }, "Users & Groups": {Company: Cedar Row Apartments, "Group ID": bldgrep_cedar_row_a, Name: "Bldg Rep - Cedar Row A", Roster: "091-100"}}
+- {key: bldgrep_cedar_row_b, kind: distribution_group, installed: {groupId: }, "Users & Groups": {Company: Cedar Row Apartments, "Group ID": bldgrep_cedar_row_b, Name: "Bldg Rep - Cedar Row B", Roster: "101-110"}}
+- {key: bldgrep_cedar_row_common, kind: distribution_group, installed: {groupId: }, "Users & Groups": {Company: Cedar Row Apartments, "Group ID": bldgrep_cedar_row_common, Name: "Bldg Rep - Cedar Row Common House", Roster: "111-120"}}
+- {key: nlu_finance_distribution, kind: distribution_group, installed: {groupId: }, "Users & Groups": {Company: Northlake University, "Group ID": nlu_finance_distribution, Name: "NLU Finance Distribution", Members: "samantha.ireland, morgan.patel"}, note: "a 13th group, not part of the 100+ count"}
+- key: monthly_building_energy_delivery
+  kind: delivery
+  installed:
+    mfrDeliveryId:
+  MFRDelivery:
+    Reports: Monthly Building Energy
+    Recipients: (none individual)
+    Groups: "the 12 Bldg Rep groups above (120 users)"
+    Schedule: "cron 0 7 1 * *"
+    Format: PDF
+  check: "delivery task log shows >=100 resolved recipients"
+- key: weekly_cost_rollup_delivery
+  kind: delivery
+  installed:
+    mfrDeliveryId:
+  MFRDelivery:
+    Reports: Weekly Cost Rollup
+    Recipients: "samantha.ireland, morgan.patel (individual)"
+    Groups: NLU Finance Distribution
+    Schedule: "cron 0 6 * * 1"
+    Format: PDF+Excel
+  externalRecipientsWanted: ["ap-review@northlake.example.edu", "budget-office@northlake.example.edu"]
+  externalRecipientsStatus: "BLOCKED -- no email-recipient field exists (backlog item 8); not entered"
+- key: daily_operations_delivery
+  kind: delivery
+  installed:
+    mfrDeliveryId:
+  MFRDelivery:
+    Reports: Daily Operations
+    Recipients: "jordan.hale, emerson.fox (individual)"
+    Groups: (none)
+    Schedule: "interval, every 24h at 06:00"
+    Format: PDF
+# ---- Ridgeline Wind ----
+- key: ridgeline_monthly_performance_delivery
+  kind: delivery
+  installed:
+    mfrDeliveryId:
+  MFRDelivery:
+    Reports: Ridgeline Monthly Performance
+    Recipients: "mateo.alvarez, elena.vasquez (individual)"
+    Groups: (none)
+    Schedule: "cron 0 7 2 * *"   # assumed: the 2nd, so the last month's final SCADA files are in and it does not queue with Monthly Building Energy (the 1st, 07:00)
+    Format: PDF+Excel   # assumed: Excel for the lab's own analysis
+  check: "delivery task log shows 2 resolved recipients, each sent a PDF and an Excel attachment"

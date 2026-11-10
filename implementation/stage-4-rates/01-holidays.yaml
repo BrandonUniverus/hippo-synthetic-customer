@@ -1,0 +1,84 @@
+# Stage 4, step 1: Holidays (Database Administrator > Schedule, Holidays tab).
+# Holiday sets are shared catalog entries: create them here, then pick one per Schedule bundle in
+# 04-schedules.yaml. A Schedule's own combo box is what assigns a holiday set to it, not this screen.
+stage: 4
+step: 1
+title: Holidays
+app: Database Administrator
+screen: Schedule > Holidays
+source:
+- data/providers/valley-electric-district.yaml (time-of-use tariffs)
+- services/sources/model.py holiday_dates (the six holidays the source bills treat as off-peak, by calendar rule)
+notes:
+- HolidayID 0 "No Holidays" already exists as the system default (IsSystem, verified in dbo.UtilityHoliday); it
+  needs no entry and stays the holiday choice for every Schedule that should not skip any day.
+- Add the holiday set on the combo box next to Selected Holiday (the Add button), then type its Holiday Set Name,
+  save, and use the Add Holiday toolbar button to add each date row below.
+- The grid takes one row per calendar date, not a recurrence rule, so each year is typed out. Four years, 2024 to
+  2027, 24 rows (reworked 2026-11-09; the set stopped at 2025, so every bill after that priced holidays as
+  ordinary weekdays). Adding a later year is a Stage 12 scenario.
+- These are the same six days the source model prices as off-peak, so a generated bill and the provider's bill
+  agree on which hours are peak.
+- 'How the engine uses a holiday (UtilityRates_LoadData): a charge whose Significance is On Peak or Super On Peak
+  skips every hour of a holiday. A charge with any other Significance counts every hour of a holiday, inside its
+  time-of-use window or not. So on a schedule with this set, only On Peak and Super On Peak charges leave holidays
+  out, and exactly one other charge per season should take them in (the off-peak one).'
+records:
+- key: nl_holidays
+  installed:
+    holidayId: null
+  Holidays:
+    Holiday Set Name: Northlake Holidays
+    Dates:
+    - Date: 2024-01-01
+      Description: New Year's Day
+    - Date: 2024-05-27
+      Description: Memorial Day
+    - Date: 2024-07-04
+      Description: Independence Day
+    - Date: 2024-09-02
+      Description: Labor Day
+    - Date: 2024-11-28
+      Description: Thanksgiving
+    - Date: 2024-12-25
+      Description: Christmas Day
+    - Date: 2025-01-01
+      Description: New Year's Day
+    - Date: 2025-05-26
+      Description: Memorial Day
+    - Date: 2025-07-04
+      Description: Independence Day
+    - Date: 2025-09-01
+      Description: Labor Day
+    - Date: 2025-11-27
+      Description: Thanksgiving
+    - Date: 2025-12-25
+      Description: Christmas Day
+    - Date: 2026-01-01
+      Description: New Year's Day
+    - Date: 2026-05-25
+      Description: Memorial Day
+    - Date: 2026-07-04
+      Description: Independence Day
+    - Date: 2026-09-07
+      Description: Labor Day
+    - Date: 2026-11-26
+      Description: Thanksgiving
+    - Date: 2026-12-25
+      Description: Christmas Day
+    - Date: 2027-01-01
+      Description: New Year's Day
+    - Date: 2027-05-31
+      Description: Memorial Day
+    - Date: 2027-07-04
+      Description: Independence Day
+    - Date: 2027-09-06
+      Description: Labor Day
+    - Date: 2027-11-25
+      Description: Thanksgiving
+    - Date: 2027-12-25
+      Description: Christmas Day
+  Notes:
+  - Six US holidays for each of 2024, 2025, 2026 and 2027.
+  - Applied to the five Valley Electric time-of-use Schedules in 04-schedules.yaml; the gas Schedules use the system
+    "No Holidays" set.

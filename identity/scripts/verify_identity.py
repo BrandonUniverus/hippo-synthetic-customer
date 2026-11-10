@@ -1256,7 +1256,7 @@ def _verify_admin(
 
     expected_user_inventory = profile.get(
         "userInventory",
-        {"total": 19, "enabled": 18, "local": 0},
+        {"total": 23, "enabled": 22, "local": 0},
     )
     if len(users) != expected_user_inventory["total"]:
         raise VerificationError(
@@ -1271,7 +1271,7 @@ def _verify_admin(
         )
     expected_group_inventory = profile.get(
         "groupInventory",
-        {"total": 27, "local": 0},
+        {"total": 29, "local": 0},
     )
     if len(groups) != expected_group_inventory["total"]:
         raise VerificationError(

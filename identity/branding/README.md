@@ -1,47 +1,45 @@
 # Northlake identity branding
 
-The Keycloak login pages, account console and realm administration console,
-the launchpad, the configuration pages and the customer browser lab all wear
-the same Northlake University identity. Northlake is a fictional university in
-a local development environment.
+The Northlake site, the Keycloak sign-in pages, the account and realm
+administration consoles, the configuration pages, the customer browser lab and
+the handheld simulator all wear the Northlake University identity. Northlake is
+a fictional university in a local development environment.
 
-Brand sources: `documents/brand/Brand Assets.dc.html`,
-`documents/brand/Login Mockup.dc.html` and
-`documents/brand/eem-application-branding.pdf`.
+The design system itself lives in [`brands/northlake/`](../../brands/README.md):
+its `tokens.css` holds every colour, type and spacing value, `fonts.css` the
+self-hosted Spectral and IBM Plex faces, and the logo files sit beside them.
+This folder holds the page chrome that uses it.
 
 ## Files
 
 | File | Purpose |
 | --- | --- |
-| `brand.css` | Palette tokens (`--nl-*`), the self-hosted Open Sans faces and the focus ring. Every surface loads it first. |
-| `site.css` | Shared page chrome for the launchpad, configuration pages and customer lab: masthead, buttons, fields, badges, notices, footer. |
+| `brand.css` | Imports `brands/northlake/fonts.css` and `tokens.css`, then maps the older `--nl-*` names these pages use onto the brand tokens, with fallbacks. Every surface loads it first. |
+| `site.css` | Shared page chrome for the site, configuration pages, customer lab and handheld: university bar, white masthead with the gold rule, buttons, fields, badges, notices, navy footer. |
 | `console.css` | PatternFly 5 overrides for the Keycloak account and administration consoles. |
-| `northlake-logo.svg`, `northlake-logo-reversed.svg` | Horizontal lockups (mark + wordmark) for light and navy backgrounds. The wordmark is outlined, so they render identically in `<img>`, favicons and email. |
-| `northlake-mark.svg`, `northlake-mark-reversed.svg` | The symbol alone. The roundel version doubles as the SVG favicon. |
-| `favicon-32.png` | PNG favicon fallback. |
-| `northlake-header-logo*.png` | Older raster lockups kept for anything that still needs a PNG. |
-| `fonts/` | Open Sans Regular, Semibold, Bold and ExtraBold (WOFF2, Apache 2.0, see `fonts/LICENSE.txt`). |
+| `northlake-mark.svg`, `northlake-mark-reversed.svg`, `favicon-32.png` | The symbol alone; the roundel version doubles as the SVG favicon. |
+| `northlake-logo.svg`, `northlake-logo-reversed.svg`, `northlake-header-logo*.png`, `fonts/` (Open Sans) | The previous Open Sans lockups and faces. The provider pages baked into the source image and the EEM portal kit in `documents/brand/` still use them; new pages use `brands/northlake/logo*.svg`. |
 
-Regenerate the outlined lockups after changing the wordmark geometry with
-`python generators/outline_brand_lockups.py` (needs `fonttools` and `brotli`).
-It writes the same two files to `documents/brand/images/custom/` and here.
+`brand.css` imports with relative paths (`../brands/northlake/...`), which
+resolve wherever this folder sits beside `brands/`: under Caddy (`/branding/`
+and `/brands/`), inside the Keycloak themes (`resources/branding` and
+`resources/brands`) and in the handheld image. A page served without the
+brands folder falls back to the literal values in `brand.css`.
 
-## Palette
-
-Navy `#1F3A5F` is the primary colour and the masthead. Gold `#C9A227` is the
-accent: the masthead rule, focus rings on navy controls, current-page markers
-and warning notices. Small gold-coloured text uses the darker `#806414` so it
-passes contrast on white. Slate `#5B6573` is secondary text, `#2B3340` body
-text, `#F5F6F8` the page canvas. Corners are square everywhere.
+Do not redefine the brand token names (`--primary`, `--line`, `--muted` and the
+rest, listed in `brands/README.md`) from `--nl-*` names in a page stylesheet:
+`brand.css` maps those names back, so the pair becomes circular and both values
+turn invalid.
 
 ## How the assets are served
 
-Caddy serves this directory at `/branding/` on both local hosts with
-`Cache-Control: no-cache`, so edits show up on the next refresh. Compose also
-mounts it into the three Keycloak theme types as `resources/branding`; keep the
-empty `resources/branding` mount-point directories under
-`identity/themes/northlake` so Docker Desktop can nest the mount inside the
-read-only theme directory.
+Caddy serves this directory at `/branding/` and `brands/` at `/brands/` on both
+local hosts with `Cache-Control: no-cache`, so edits show up on the next
+refresh. Compose mounts both into the three Keycloak theme types as
+`resources/branding` and `resources/brands`; keep the empty mount-point
+directories under `identity/themes/northlake/*/resources/` so Docker Desktop can
+nest the mounts inside the read-only theme directory. The handheld image copies
+this folder and `brands/northlake` at build time.
 
 ## Keycloak themes
 
@@ -49,18 +47,19 @@ read-only theme directory.
 realm by `generate_realm.py` (including the two lab realms). Existing realms can
 select `northlake` for Login, Account and Admin under Realm settings, Themes.
 
-- `login/` extends `keycloak.v2`. `template.ftl` owns the page chrome (masthead
-  with the lockup and the realm display name, card, help band, footer);
-  `footer.ftl` is the help band; `info.ftl` avoids the duplicated summary on
-  sign-out and similar pages; `messages/messages_en.properties` carries the
-  Northlake wording; `resources/css/northlake.css` styles every PatternFly 5
+- `login/` extends `keycloak.v2`. `template.ftl` owns the page chrome (white
+  masthead with the lockup and "Information Technology Services", card, help
+  band, navy footer naming the realm); `footer.ftl` is the help band;
+  `info.ftl` avoids the duplicated summary on sign-out and similar pages;
+  `messages/messages_en.properties` carries the Northlake wording ("Sign in
+  with your NetID"); `resources/css/northlake.css` styles every PatternFly 5
   page the parent theme renders (sign-in, password reset, forced password
   update, authenticator setup, one-time codes, passkeys, recovery codes,
   consent, errors, expired pages). Keep `template.ftl` in step with the parent
   when Keycloak is upgraded.
 - `account/` extends `keycloak.v3` and `admin/` extends `keycloak.v2`. Both are
-  configuration only: `console.css`, the reversed lockup as the masthead brand
-  and the favicon.
+  configuration only: `console.css`, the reversed lockup from
+  `brands/northlake` as the masthead brand, and the favicon.
 
 Compose starts Keycloak with theme caching and the gzip resource cache
 disabled, so template, message and stylesheet edits are live on refresh. Browsers

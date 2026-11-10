@@ -1,0 +1,79 @@
+# Stage 12, scenario 1: a handheld meter is replaced while the routes are running.
+# Cedar Row A unit 214's water meter stopped registering in October 2024. Maintenance set a new meter on
+# October 15. The old meter keeps its history and closes; the new one is a new meter node with its own register,
+# takes the old one's place on route CRAWTR, and starts from its own first reading. Nothing is booked as a rollover.
+stage: 12
+step: 1
+title: Replace a handheld meter
+app: Database Administrator and Web
+screen: Nodes > Meter nodes, Point nodes; Handheld Meter Setup; Task Manager (Cedar Row Submeter Water Route)
+source:
+- implementation/stage-2-hierarchy/03-meters.yaml (cedar_row_a_unit_214_water)
+- implementation/stage-2-hierarchy/04-points.yaml (ch_cedar_row_a_unit_214_water_register)
+- implementation/stage-3-gateways-and-data/05-handheld-routes.yaml (hmr_cedar_row_a_water_submeters)
+- implementation/stage-3-gateways-and-data/04-acceptance-runs.yaml (rollover: "does not prove meter replacement")
+requires:
+- Stage 3 Step 5 entered (route CRAWTR with unit 214 at sequence 350, starting reading 1350 kgal on 2024-01-01).
+- At least one handheld round on CRAWTR after January 2024 (Stage 3 Step 4 submeter batch or Stage 9).
+notes:
+- 'EEM has no replacement action for a handheld meter. A lower register on the SAME register point is read as a
+  rollover: usage = (10^digits - previous) + current, or the reading is held as implausible (more than 5x the
+  typical usage, or more than half the dial with no history), and for an accumulator register the reading itself
+  is held too. That is the wrong outcome for a replacement, and this scenario shows the right one: a new meter.'
+- 'Why a new meter node and not a reset of the old point: the old register''s history stays true to the old
+  meter, the new meter carries its own number and starting value, and the meter Status pages record when each
+  was in service (Closed - Ex / Open, as the Library electric exchange does in Stage 2).'
+- 'The unit''s October usage is the old meter''s last delta plus the new meter''s first: reports that sum the
+  unit''s meters get it right without any adjustment.'
+event:
+  Date: '2024-10-15'
+  Old meter: {Description: Cedar Row A Unit 214 Water, Meter Number: SYN-SUB-W-A214, Final reading: 1388}
+  New meter: {Description: Cedar Row A Unit 214 Water Replacement, Meter Number: SYN-SUB-W-A214R, First reading: 3}
+  Work order note: Register stopped turning between the September and October reads; meter replaced, seal 4471.
+steps:
+- key: final_read
+  Where: Task Manager, Cedar Row Submeter Water Route schedule (Run now)
+  Action: 'Deliver a one-meter Neptune file for unit 214 dated 2024-10-15 00:00 local with the old meter''s final
+    register, 1388 kgal, and run the saved schedule once (UseSqlValues false, previous register from the file).'
+  Expected: The old register point holds 1388 at 2024-10-15 07:00 UTC (midnight Pacific daylight time) and its Delta the usage since the previous read.
+- key: close_old_meter
+  Where: Database Administrator > Nodes > Cedar Row A Unit 214 Water > Status
+  Action: Add Closed - Ex as of 2024-10-15. Do not delete the meter or its points.
+- key: add_new_meter
+  Where: Database Administrator > Nodes > Cedar Row A (building) > add Meter
+  Meter Definition: {Description: Cedar Row A Unit 214 Water Replacement, Measure Type: Potable Water,
+    Meter Number: SYN-SUB-W-A214R, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-10-15}
+  Notes: Replaced SYN-SUB-W-A214 on 2024-10-15 (register stopped). Seal 4471.
+- key: add_new_register
+  Where: Database Administrator > Nodes > Cedar Row A Unit 214 Water Replacement > add Point
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Potable Water,
+    Unit: Thousands of Gallons - (kgal), Archive Interval: 1440, Index: ''}
+  Expected: EEM generates Register Reading Delta under the new meter.
+- key: swap_on_the_route
+  Where: Web > System Manager > Handheld Meter Setup, Cedar Row A selected
+  Action: 'Old meter: Actions > Remove from route (it is removed at once, after the confirmation). New meter:
+    Configure registers, then set Cycle 02, Route CRAWTR, Seq 350 and Meter Text as the old one had it. Register:
+    read type Northlake Keyed Water 10D, prompt KGAL, constant 1, Channel 1, Reading Point Register Reading,
+    Consumption Point Register Reading Delta. Save.'
+  Expected: 'CRAWTR still has 61 meters; the new meter is at 350, between units 213 (340) and 215 (360). A save
+    renumbers the route 10, 20, 30, so check the sequence after saving.'
+- key: new_starting_reading
+  Where: Handheld Meter Setup > Starting readings, Cedar Row A selected
+  Action: Set the date to October 15, 2024; the grid lists one register (the new meter's); key 3 and save.
+  Expected: The new register's first archive row is 3 at 2024-10-15 07:00 UTC, with no usage beside it.
+- key: next_round
+  Where: Task Manager, Cedar Row Submeter Water Route (Run now)
+  Action: 'Deliver the November 1, 2024 file with the NEW meter''s physical ID and prompt KGAL, register 9 kgal.'
+  Expected: 'Usage 6 kgal on the new Delta (9 - 3). No rollover, no held reading. A row keyed against the old
+    meter''s ID is unmatched (the old meter is off the route) and is reported, not stored.'
+verify:
+- 'Unit 214 from October 1 to November 1, 2024 = (1388 - the old meter''s October 1 read) + (9 - 3): the two meters
+  together, each in its own history.'
+- The route file exported after the swap lists the replacement meter at CRAWTR sequence 350 and not the old meter.
+- The old meter's Status shows Closed - Ex from 2024-10-15 and the new one Open from the same day.
+negativeCheck:
+  Action: 'Optional, on a restore only: key 3 on the OLD meter''s register as if no meter had been set.'
+  Expected: 'Held as an implausible rollover (it would book (10^10 - 1388) + 3 kgal): the import holds the usage and,
+    because the register is an accumulator, the reading too. Restore afterward.'

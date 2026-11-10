@@ -12,9 +12,9 @@ path from the repository root:
 | `sources/documents/brand/**/*.md` | `documents/brand/**/*.pdf` |
 | `sources/implementation/**/*.md` | `implementation/**/*.pdf` |
 
-The facilities and meter register, the source-system inventory and the gateway
-coverage have no Markdown source: `generators/northlake_packet.py` renders them
-straight from the packet.
+The facilities and meter register and the source-system inventory have no
+Markdown source: `generators/northlake_packet.py` renders them straight from the
+packet.
 
 ## Render
 

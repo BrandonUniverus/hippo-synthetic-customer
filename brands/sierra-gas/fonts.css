@@ -1,0 +1,9 @@
+/* Sierra Gas Utility faces, self-hosted. SIL Open Font License: see fonts/OFL-*.txt.
+   Latin-subset WOFF2 for pages; the TTF files beside them are for PDF renderers. */
+@font-face {
+  font-family: "Libre Franklin";
+  src: url("fonts/LibreFranklin-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}

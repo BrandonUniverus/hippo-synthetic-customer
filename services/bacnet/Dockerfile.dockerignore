@@ -1,0 +1,9 @@
+**
+!services/
+!services/bacnet/
+!services/bacnet/__init__.py
+!services/bacnet/producer.py
+!services/bacnet/bindings.json
+!services/bacnet/server/
+!services/bacnet/server/*.cs
+!services/bacnet/server/*.csproj

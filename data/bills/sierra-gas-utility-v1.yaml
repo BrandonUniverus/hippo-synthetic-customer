@@ -1,0 +1,127 @@
+manifestVersion: 1
+id: sierra_gas_utility_v1
+customerScenarioId: demo_university_v1
+purpose: >
+  The four Sierra Gas Utility sample bills, rendered by generators/render_bills.py into
+  documents/utility-bills/sierra-gas-utility/. They replace hand-made images whose meter and charge tables were
+  empty and whose periods ignored the provider's read cycle: every period here is one Stage 1 period of Sierra
+  Gas cycle 1, every line is priced from tariff SGU-GN-1, and the Student Center's estimated bill and its
+  corrected actual cover the same period, the second superseding the first.
+
+# Sierra Gas cycle 1 reads mid-month: a period runs from the 15th to the 14th and posts to the month it ends in
+# (Stage 1 02-utility-providers.yaml), and the commodity rate follows that month: winter, 1.142 per therm, for
+# November through March; summer, 0.876, for April through October. Stage 5 enters a Sierra Gas bill on its
+# period end + 5 days, so a statement is dated within five days of its period end; a correction is exempt and is
+# dated after the bill it replaces. Meter rows show the register in ccf; therms = round((present - previous) x 1.027).
+# Lines run in the tariff's order: customer charge, commodity, transport, the public purpose surcharge (1.5% of the
+# commodity and transport lines) and the utility users tax (5% of every line above it).
+bills:
+  # ------------------------------------------------------------------ Admin Hall: a standard spring bill
+  - id: sgu_admin_hall_2025_04
+    file: documents/utility-bills/sierra-gas-utility/01-Sierra-Gas-Admin-Hall-Standard-Spring.pdf
+    providerId: sierra_gas_utility
+    accountId: sgu_admin_hall
+    title: Gas Service Statement
+    customer: Northlake University
+    accountNumber: SYN-SGU-A-0020001
+    rateSchedules: [SGU-GN-1]
+    billDate: 2025-04-16        # the April 2025 period, March 15 to April 14
+    dueDate: 2025-05-16
+    period: {start: 2025-03-15, end: 2025-04-14}
+    notice: >
+      A standard monthly statement for a spring period. It ends April 14, so it posts to April and the summer
+      commodity rate of $0.876 per therm applies (the winter rate, $1.142, covers periods that post November
+      through March). Therms are the metered ccf times the 1.027 heating-value factor: 1,210 ccf read as 1,243
+      therms.
+    meters:
+      - {meterNumber: SYN-SGU-M-0050001, badge: SGU-SET-0050001, channel: Delivered (ccf), previous: 128447, present: 129657, readType: actual, factor: 1.027, quantity: 1243, unit: therms}
+    lines:
+      - {code: customer_charge, description: Customer charge, quantity: 1, unit: month, rate: 38.00, amount: 38.00}
+      - {code: gas_commodity, description: "Gas commodity, summer rate", quantity: 1243, unit: therms, rate: 0.876, amount: 1088.87}
+      - {code: gas_transport, description: Gas transport, quantity: 1243, unit: therms, rate: 0.214, amount: 266.00}
+      - {code: public_purpose_surcharge, description: Public purpose surcharge, percent: 1.5, percentOf: [gas_commodity, gas_transport], amount: 20.32}
+      - {code: utility_users_tax, description: Utility users tax, percent: 5.0, percentOf: [customer_charge, gas_commodity, gas_transport, public_purpose_surcharge], amount: 70.66}
+    total: 1483.85
+
+  # ------------------------------------------------------------------ Science Center: a winter heating bill
+  - id: sgu_science_center_2025_01
+    file: documents/utility-bills/sierra-gas-utility/02-Sierra-Gas-Science-Center-Winter-Heating.pdf
+    providerId: sierra_gas_utility
+    accountId: sgu_science_center
+    title: Gas Service Statement
+    customer: Northlake University
+    accountNumber: SYN-SGU-A-0020002
+    rateSchedules: [SGU-GN-1]
+    billDate: 2025-01-15        # the January 2025 period, December 15 to January 14
+    dueDate: 2025-02-14
+    period: {start: 2024-12-15, end: 2025-01-14}
+    notice: >
+      A heating-season statement. The period ends January 14, so it posts to January and the winter commodity
+      rate of $1.142 per therm applies. Gas use peaks with the heating-season load across the laboratory and HVAC
+      systems: 9,017 therms, or 291 therms a day over the 31 days.
+    meters:
+      - {meterNumber: SYN-SGU-M-0050002, badge: SGU-SET-0050002, channel: Delivered (ccf), previous: 2304118, present: 2312898, readType: actual, factor: 1.027, quantity: 9017, unit: therms}
+    lines:
+      - {code: customer_charge, description: Customer charge, quantity: 1, unit: month, rate: 38.00, amount: 38.00}
+      - {code: gas_commodity, description: "Gas commodity, winter rate", quantity: 9017, unit: therms, rate: 1.142, amount: 10297.41}
+      - {code: gas_transport, description: Gas transport, quantity: 9017, unit: therms, rate: 0.214, amount: 1929.64}
+      - {code: public_purpose_surcharge, description: Public purpose surcharge, percent: 1.5, percentOf: [gas_commodity, gas_transport], amount: 183.41}
+      - {code: utility_users_tax, description: Utility users tax, percent: 5.0, percentOf: [customer_charge, gas_commodity, gas_transport, public_purpose_surcharge], amount: 622.42}
+    total: 13070.88
+
+  # ------------------------------------------------------------------ Student Center: an estimated read, then its correction
+  # The estimated_then_corrected fixture (Stage 5): the kitchen gas meter was not read for the November 2024 period
+  # (October 15 to November 14). The estimate bills 620 therms; the corrected actual for the same period bills 585.
+  # The correction is dated after the December 14 read and, once entered, supersedes the estimate. The estimate's due
+  # date (December 18) falls after the correction's date, so the correction replaces it before it is payable.
+  - id: sgu_student_2024_11_estimated
+    file: documents/utility-bills/sierra-gas-utility/03-Sierra-Gas-Student-Center-Estimated-Read.pdf
+    providerId: sierra_gas_utility
+    accountId: sgu_student_center
+    title: Gas Service Statement (Estimated)
+    customer: Northlake University
+    accountNumber: SYN-SGU-A-0020004
+    rateSchedules: [SGU-GN-1]
+    billDate: 2024-11-18        # the November 2024 period, October 15 to November 14
+    dueDate: 2024-12-18
+    period: {start: 2024-10-15, end: 2024-11-14}
+    notice: >
+      The meter could not be read on its November 14 cycle date, so this period's use is estimated from prior
+      consumption and the kitchen baseload (dining hall ranges and water heating), and the two gas charges are
+      marked estimated. Sierra Gas will replace this statement with a corrected bill for the same period once the
+      meter has been read.
+    meters:
+      - {meterNumber: SYN-SGU-M-0050004, badge: SGU-SET-0050004, channel: Delivered (ccf), previous: 456310, present: 456914, readType: estimated, factor: 1.027, quantity: 620, unit: therms}
+    lines:
+      - {code: customer_charge, description: Customer charge, quantity: 1, unit: month, rate: 38.00, amount: 38.00}
+      - {code: gas_commodity, description: "Gas commodity, winter rate", quantity: 620, unit: therms, rate: 1.142, amount: 708.04, estimate: true}
+      - {code: gas_transport, description: Gas transport, quantity: 620, unit: therms, rate: 0.214, amount: 132.68, estimate: true}
+      - {code: public_purpose_surcharge, description: Public purpose surcharge, percent: 1.5, percentOf: [gas_commodity, gas_transport], amount: 12.61}
+      - {code: utility_users_tax, description: Utility users tax, percent: 5.0, percentOf: [customer_charge, gas_commodity, gas_transport, public_purpose_surcharge], amount: 44.57}
+    total: 935.90
+
+  - id: sgu_student_2024_11_corrected
+    file: documents/utility-bills/sierra-gas-utility/04-Sierra-Gas-Student-Center-Corrected-Actual.pdf
+    providerId: sierra_gas_utility
+    accountId: sgu_student_center
+    title: Corrected Gas Service Statement
+    customer: Northlake University
+    accountNumber: SYN-SGU-A-0020004
+    rateSchedules: [SGU-GN-1]
+    supersedes: sgu_student_2024_11_estimated
+    billDate: 2024-12-16        # after the December 14 read; a correction is exempt from the five-day entry lag
+    dueDate: 2025-01-15
+    period: {start: 2024-10-15, end: 2024-11-14}
+    notice: >
+      This statement replaces the estimated statement dated November 18, 2024 for the same period. The next
+      scheduled read, on December 14, 2024, gave the actual use: 585 therms, 35 fewer than the 620 estimated, so the
+      charges are $50.58 lower, $885.32 instead of $935.90.
+    meters:
+      - {meterNumber: SYN-SGU-M-0050004, badge: SGU-SET-0050004, channel: Delivered (ccf), previous: 456310, present: 456880, readType: actual, factor: 1.027, quantity: 585, unit: therms}
+    lines:
+      - {code: customer_charge, description: Customer charge, quantity: 1, unit: month, rate: 38.00, amount: 38.00}
+      - {code: gas_commodity, description: "Gas commodity, winter rate", quantity: 585, unit: therms, rate: 1.142, amount: 668.07}
+      - {code: gas_transport, description: Gas transport, quantity: 585, unit: therms, rate: 0.214, amount: 125.19}
+      - {code: public_purpose_surcharge, description: Public purpose surcharge, percent: 1.5, percentOf: [gas_commodity, gas_transport], amount: 11.90}
+      - {code: utility_users_tax, description: Utility users tax, percent: 5.0, percentOf: [customer_charge, gas_commodity, gas_transport, public_purpose_surcharge], amount: 42.16}
+    total: 885.32

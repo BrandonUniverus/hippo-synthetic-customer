@@ -1,0 +1,464 @@
+# Stage 5, step 3: Bills (Web SPA #/BillEntry -> Add Bill -> #/BillEntry/Editor/Details for manual accounts; the
+# imported series from 02-bill-importer-sources.yaml for VED and RCU). One monthly bill per account, 2024-01
+# through 2025-12 (24 bills), except the fixtures below, which shorten, split, duplicate or supersede that
+# series on purpose, and except the Ridgeline accounts: the Valley Electric generator account's first bill runs from
+# the 2024-07-01 opening to 2024-08-04 and it takes 17 bills (Aug-24 to Dec-25), and Ridgeline's own transfer
+# account takes none here (EEM generates it, Stage 7). Every bill follows its provider's Stage 1 read cycle and
+# posts to the month it ends in: Valley Electric reads on the 5th (5th to 4th), Sierra Gas and River City's Cedar
+# Row cycle on the 15th (15th to 14th), and River City's campus cycle, the Thermal Plant, Helios and Ridgeline close
+# with the calendar month. Every bill's Bill Items decompose per the bill-charge-line spec and reconcile to the bill
+# total. The sample bills (data/bills/*.yaml, rendered into documents/utility-bills/) are exact and the fixtures and
+# worked examples below quote them; the quantity for any other period is # assumed until Stage 3/4's interval and
+# meter-read data exists to read the real number off.
+stage: 5
+step: 3
+title: Bills
+app: Web SPA
+screen: '#/BillEntry -> Add Bill -> #/BillEntry/Editor/Details'
+source:
+- data/eem/northlake-bill-entry-v1.yaml
+- data/bills/*.yaml (every sample bill; northlake-itemized-bills-v1.yaml holds the Ridgeline-era four)
+- generators/documents/sources/implementation/dream-customer/bill-charge-line-spec.md
+- generators/documents/sources/implementation/dream-customer/phase1-substrate-extras.md
+- data/providers/*.yaml
+notes:
+- Accounts are referenced by synthetic account number (Stage 2 assigns the real BillingAccountID); meters by
+  scenario id and synthetic meter number. Look each one up in Stage 2's records before entering its bills.
+- 'Reconciliation rules (bill-charge-line-spec.md): non-informational lines sum to the bill total within $0.01;
+  a commodity''s consumption lines sum to the bill''s usage quantity; a tax line is a percent of the sum of the
+  lines before it; a credit line is negative; a zero-quantity line (a winter VED peak line, an empty water tier,
+  a Cedar Row stormwater line) is omitted rather than entered as zero.'
+- Entry method per provider follows data/eem/northlake-bill-entry-v1.yaml preferredEntry, with the Cedar Row
+  company scope beating the provider default - Valley Electric and River City import in every company, Cedar Row
+  included (02-bill-importer-sources.yaml, user nora.chen); Sierra Gas and Helios Solar are manual Bill Entry (user
+  iris.morales), except Cedar Row's own gas and PPA bills, which marcus.reed enters; Northlake Thermal Plant
+  allocations are manual (user keiko.tan).
+- 'The tariffs leave three riders "as applicable", and the sample bills fix them: Valley Electric''s
+  public_purpose_program is 1.5% of the energy lines, Sierra Gas''s public_purpose_surcharge is 1.5% of the commodity
+  and transport lines, and both utilities'' utility_users_tax is 5% of every line above it. fixed_oandm_allocation
+  (NTP) is the building''s share of fixed plant O&M, a bare amount. None has a rate parameter in the Phase 1 model
+  (Phase 2 rate engine). power_factor_adjustment appears on no sample bill.'
+- 'Added 2026-10-01 (Ridgeline Wind): the Valley Electric generator account SYN-VED-A-0010014 is a Valley Electric
+  import like the rest, but it opens with the acquisition. Valley Electric cycle 1 reads on the 5th, so a bill runs
+  from the 5th to the 4th and posts to the month it ends in (Stage 1): the generator''s first bill runs from the
+  opening, 2024-07-01, to 2024-08-04 (35 days, Aug-24), and its series is Aug-24 to Dec-25 (17 bills). The Central
+  Plant''s bills carry the VED-BCT lines from Sep-24. Ridgeline Wind''s own account SYN-RWL-G-0000001 is in no series
+  here: EEM generates its monthly (calendar-month) statement on the Ridgeline Farm Transfer Meter (Bill Generation,
+  written by the Run Bill Gen task when the month''s data completes; keiko.tan reviews) in
+  Stage 7, so the 51st billing account takes no bill in this stage. The itemized bills
+  (data/bills/northlake-itemized-bills-v1.yaml) are exact: the three Valley Electric ones are fixtures below, and the
+  hand-made July 2024 transfer statement is kept in rwl_generated_series as the acceptance reference for Stage 7.'
+- 'Changed 2026-10-02: the twenty older sample bills were hand-made images with empty tables, calendar-month periods
+  for cycle-reading providers, a 2026 plant statement and Helios''s 2024 rate on 2025 bills. Each is now generated
+  from data/bills/<provider>-v1.yaml on its provider''s cycle and at its tariff, under the same file name, and the
+  fixtures below quote them.'
+- 'The VED-BCT credit and fee are not taxable: on the Central Plant bills that carry them (from Sep-24) the utility
+  users tax is 5% of the lines before the credit, not of every line before it, so the tax-line rule above bends
+  there. The generator''s credit and its transfer cancel, so on its bills the plain rule still holds.'
+records:
+- key: ved_monthly_series
+  installed: {}
+  Series: 2024-01 to 2025-12, monthly, rate schedule VED-TOU-GS (VED-TOU-PRI for Central Plant, VED-AL-1 for the
+    two unmetered accounts); the 14th Valley Electric account, the Ridgeline generator, is ved_generator_series
+  Accounts:
+  - {Account: SYN-VED-A-0010001, Building: Admin Hall, Meter Type: monthly-only (three TOU registers)}
+  - {Account: SYN-VED-A-0010002, Building: Science Center, Meter Type: 'interval main (SYN-VED-M-0040002) and a monthly lab-wing register (SYN-VED-M-0040007, x40), both on each bill'}
+  - {Account: SYN-VED-A-0010003, Building: Library, Meter Type: monthly-only; see meter_replacement_fixture}
+  - {Account: SYN-VED-A-0010004, Building: Student Center, Meter Type: interval; see rate_change_boundary_fixture}
+  - {Account: SYN-VED-A-0010005, Building: Cedar Row A, Meter Type: monthly-only}
+  - {Account: SYN-VED-A-0010006, Building: Cedar Row B, Meter Type: monthly-only}
+  - {Account: SYN-VED-A-0010007, Building: Lakeview Hall, Meter Type: interval}
+  - {Account: SYN-VED-A-0010008, Building: Recreation and Aquatics Center, Meter Type: interval}
+  - {Account: SYN-VED-A-0010009, Building: Parking Structure, Meter Type: monthly-only}
+  - {Account: SYN-VED-A-0010010, Building: Campus Grounds, Meter Type: unmetered area lighting (VED-AL-1)}
+  - {Account: SYN-VED-A-0010011, Building: Cedar Row Common House, Meter Type: monthly-only}
+  - {Account: SYN-VED-A-0010012, Building: Cedar Row Carport and Grounds, Meter Type: unmetered area lighting (VED-AL-1)}
+  - {Account: SYN-VED-A-0010013, Building: Central Plant, Meter Type: 'interval, primary service (VED-TOU-PRI)', Note: VED-BCT lines from the Sep-24 bill; see ved_central_plant_bct_series}
+  Bill Items (summer worked example, the Science Center's Aug-24 bill, 2024-07-05 to 2024-08-04, exact, 02-Valley-Electric-Science-Center-Summer-Demand.pdf):
+  - {Description: energy_peak, Quantity: 16200, Unit: kWh, Rate: 0.241, Amount: 3904.20}
+  - {Description: energy_part_peak, Quantity: 17600, Unit: kWh, Rate: 0.168, Amount: 2956.80}
+  - {Description: energy_off_peak, Quantity: 21200, Unit: kWh, Rate: 0.112, Amount: 2374.40}
+  - {Description: demand_charge, Quantity: 268, Unit: kW, Rate: 18.40, Amount: 4931.20}  # main 206 plus lab wing 62
+  - {Description: facility_charge, Quantity: 1, Amount: 64.00}
+  - {Description: public_purpose_program, Percent of energy: 1.5, Amount: 138.53}
+  - {Description: utility_users_tax, Percent of subtotal: 5.0, Amount: 718.46}
+  Total: 15087.59
+  Note: Winter months for a monthly-only building (e.g. Admin Hall, Library, Cedar Row A/B) omit energy_peak and
+    read energy_part_peak/energy_off_peak from that meter's three TOU registers instead of interval data, as Admin
+    Hall's Apr-24 bill (2024-03-05 to 2024-04-04, $6,888.42, 01-Valley-Electric-Admin-Hall-Standard-Monthly.pdf) does.
+- key: ved_generator_series
+  installed: {}
+  Series: Aug-24 to Dec-25, monthly (17 bills), rate schedules VED-GEN-IC + VED-BCT, imported with the other Valley
+    Electric accounts (02-bill-importer-sources.yaml, user nora.chen). Valley Electric cycle 1 reads on the 5th, so a
+    bill runs from the 5th to the 4th and posts to the month it ends in. The account opened with the acquisition, so
+    its first bill runs from the opening, 2024-07-01, to 2024-08-04 (35 days, Aug-24) and the last is 2025-11-05 to
+    2025-12-04 (Dec-25); no bill exists before 2024-07-01, and the seller's account SYN-VED-A-0019014 closed
+    2024-06-30 and has no Northlake bills.
+  Accounts:
+  - {Account: SYN-VED-A-0010014, Building: Ridgeline Substation, Meter: SYN-VED-M-0040015, Meter Type: 'bidirectional interval (15-min received kWh, delivered kWh and kVArh; multiplier 12000)'}
+  Bill Items (line structure in bill order; the exact figures for the first bill and the 2025-01-05 to 2025-02-04 bill are the two generator fixtures below):
+  - {Description: generator_customer_charge, Quantity: 1, Unit: month, Rate: 285.00, Amount: 285.00}
+  - {Description: station_service_energy, Quantity: delivered kWh for the bill period, Unit: kWh, Rate: 0.131, Amount: quantity x rate}
+  - {Description: reactive_power_charge, Quantity: kVArh above the allowance (omit the line when zero), Unit: kVArh, Rate: 0.0042, Amount: quantity x rate}
+  - {Description: generation_credit, Quantity: exported kWh for the bill period, Unit: kWh, Rate: -0.0612, Amount: quantity x rate}
+  - {Description: bct_credit_transferred, Amount: the generation_credit amount with its sign reversed}
+  - {Description: utility_users_tax, Percent of subtotal: 5.0, Amount: 5% of the three charge lines}
+  Total: customer charge + station service + reactive + tax (the credit and its transfer cancel)
+  Allowance: exported kWh x 0.3286841 (the reactive-to-active ratio at power factor 0.95), rounded to the kVArh; billed kVArh = measured - allowance, never below zero
+  Note: >-
+    Quantities come off the meter's three 15-minute channels over each bill's own period (Stage 3, node
+    MV90-MDEF-VED-RIDGELINE). The first bill (2024-07-01 to 2024-08-04) and the 2025-01-05 to 2025-02-04 bill are
+    fixed by the two itemized fixtures below, so Stage 3's data must add up to them; the other fifteen bills are
+    assumed until that data exists. The bill is a small positive residue every period: the credit leaves with its
+    transfer line, so it is never a credit balance, and it moves with the wind (station service up and export down
+    in a calm period). WTG-07's gearbox outage (2025-02-11 to 2025-04-22) is already in that data: a lower export on
+    the three bills that cover it (Mar-25 to May-25) is lost production, not a billing error. Each bill's transfer
+    lands on the Central Plant bill one cycle later (ved_central_plant_bct_series).
+- key: ved_central_plant_bct_series
+  installed: {}
+  Series: Sep-24 to Dec-25 (16 bills), the Central Plant's own VED-TOU-PRI series (ved_monthly_series) plus VED-BCT,
+    the rider that makes it the benefiting account for SYN-VED-A-0010014. Each credit lands one billing cycle after the
+    generator bill that earned it, so the credit line and the fee line both start with the Sep-24 bill (2024-08-05 to
+    2024-09-04), the first bill that carries a credit.
+  Accounts:
+  - {Account: SYN-VED-A-0010013, Building: Central Plant, Generating Account: SYN-VED-A-0010014}
+  Bill Items (added to that period's VED-TOU-PRI lines, after public_purpose_program and before the tax line):
+  - {Description: bct_credit_received, Amount: minus the generator account bct_credit_transferred on the previous generator bill}  # Sep-24 to Dec-25, 16 bills
+  - {Description: bct_administrative_fee, Quantity: 1, Unit: month, Rate: 12.50, Amount: 12.50}  # assumed to start with the first credit-bearing bill (Sep-24), 16 bills; the rider is effective 2024-07-01, but the itemized Sep-24 bill is the first one printed
+  Note: >-
+    The credit is the previous generator bill's export credit to the cent: the first generator bill (2024-07-01 to
+    2024-08-04, Aug-24) lands on the Sep-24 bill, the Nov-25 generator bill on the Dec-25 bill. The Dec-25 generator
+    bill's credit (2025-11-05 to 2025-12-04) has no bill to land on inside the window (it would post to Jan-26, after
+    the last bill this stage enters), so it stays in transit. The VED-BCT lines are not taxable:
+    utility_users_tax is 5% of the energy, demand, facility and public purpose lines only. The first credit (Sep-24)
+    is about half of that bill's $303,964.12 of charges, so Bill Validation's cost-change test will likely flag it;
+    that is correct for a new credit, not a data error, so review it and add no override.
+- key: sgu_monthly_series
+  installed: {}
+  Series: 2024-01 to 2025-12, monthly, rate schedule SGU-GN-1 (SGU-GL-1 for Central Plant)
+  Accounts:
+  - {Account: SYN-SGU-A-0020001, Building: Admin Hall}
+  - {Account: SYN-SGU-A-0020002, Building: Science Center}
+  - {Account: SYN-SGU-A-0020003, Building: Library, Note: see late_bill_fixture}
+  - {Account: SYN-SGU-A-0020004, Building: Student Center, Note: see estimated_then_corrected_fixture}
+  - {Account: SYN-SGU-A-0020005, Building: Lakeview Hall}
+  - {Account: SYN-SGU-A-0020006, Building: Recreation and Aquatics Center}
+  - {Account: SYN-SGU-A-0020007, Building: Cedar Row A}
+  - {Account: SYN-SGU-A-0020008, Building: Cedar Row B}
+  - {Account: SYN-SGU-A-0020009, Building: Cedar Row Common House}
+  - {Account: SYN-SGU-A-0020010, Building: Central Plant, Rate Schedule: SGU-GL-1}
+  Bill Items (summer-rate worked example, Admin Hall's Apr-25 bill, 2025-03-15 to 2025-04-14, exact, 01-Sierra-Gas-Admin-Hall-Standard-Spring.pdf; 1,210 CCF x 1.027 = 1,243 therms):
+  - {Description: customer_charge, Quantity: 1, Amount: 38.00}
+  - {Description: gas_commodity, Quantity: 1243, Unit: therms, Rate: 0.876, Amount: 1088.87}
+  - {Description: gas_transport, Quantity: 1243, Unit: therms, Rate: 0.214, Amount: 266.00}
+  - {Description: public_purpose_surcharge, Percent of commodity and transport: 1.5, Amount: 20.32}
+  - {Description: utility_users_tax, Percent of subtotal: 5.0, Amount: 70.66}
+  Total: 1483.85
+  Seasonal rate note: gas_commodity uses the winter rate (1.142/therm) when the period posts to November through
+    March and the summer rate (0.876/therm) otherwise, by the month the period ends in (the Science Center's Jan-25
+    bill, 2024-12-15 to 2025-01-14, is winter, 02-Sierra-Gas-Science-Center-Winter-Heating.pdf, $13,070.88).
+- key: rcu_monthly_series
+  installed: {}
+  Series: 2024-01 to 2025-12, monthly; every account carries RCU-W-TIER + RCU-S-VOL (water + sewer); Cedar Row
+    accounts omit the stormwater line; five buildings also carry a second, fire-service-only account on RCU-FIRE;
+    Campus Grounds and Cedar Row Carport and Grounds are irrigation-only on RCU-IRR (no sewer). Confirm each
+    account's exact rate-schedule assignment against Stage 2's meter records before entering its first bill.
+  Accounts:
+  - {Account: SYN-RCU-A-0030001, Building: Admin Hall, Rate Schedule: RCU-W-TIER + RCU-S-VOL + RCU-SW-ERU}
+  - {Account: SYN-RCU-A-0030005, Building: Science Center, Rate Schedule: RCU-W-TIER + RCU-S-VOL + RCU-SW-ERU}
+  - {Account: SYN-RCU-A-0030006, Building: Library, Rate Schedule: RCU-W-TIER + RCU-S-VOL + RCU-SW-ERU}
+  - {Account: SYN-RCU-A-0030002, Building: Student Center, Rate Schedule: RCU-W-TIER + RCU-S-VOL + RCU-SW-ERU}
+  - {Account: SYN-RCU-A-0030007, Building: Lakeview Hall, Rate Schedule: RCU-W-TIER + RCU-S-VOL + RCU-SW-ERU}
+  - {Account: SYN-RCU-A-0030008, Building: Recreation and Aquatics Center, Rate Schedule: RCU-W-TIER + RCU-S-VOL + RCU-SW-ERU}
+  - {Account: SYN-RCU-A-0030009, Building: Campus Grounds, Rate Schedule: RCU-IRR}  # assumed
+  - {Account: SYN-RCU-A-0030010, Building: Admin Hall (fire service), Rate Schedule: RCU-FIRE}  # assumed
+  - {Account: SYN-RCU-A-0030011, Building: Science Center (fire service), Rate Schedule: RCU-FIRE}  # assumed
+  - {Account: SYN-RCU-A-0030012, Building: Lakeview Hall (fire service), Rate Schedule: RCU-FIRE}  # assumed
+  - {Account: SYN-RCU-A-0030003, Building: Cedar Row A, Rate Schedule: RCU-W-TIER + RCU-S-VOL, Note: 'see
+      account_number_change_fixture and the Previous Account Number on this account''s Definitions page (July 2024 renewal)'}
+  - {Account: SYN-RCU-A-0030004, Building: Cedar Row B, Rate Schedule: RCU-W-TIER + RCU-S-VOL}
+  - {Account: SYN-RCU-A-0030013, Building: Cedar Row A (fire service), Rate Schedule: RCU-FIRE}
+  - {Account: SYN-RCU-A-0030014, Building: Cedar Row B (fire service), Rate Schedule: RCU-FIRE}  # assumed
+  - {Account: SYN-RCU-A-0030015, Building: Cedar Row Common House, Rate Schedule: RCU-W-TIER + RCU-S-VOL}
+  - {Account: SYN-RCU-A-0030016, Building: Cedar Row Carport and Grounds, Rate Schedule: RCU-IRR}  # assumed
+  - {Account: SYN-RCU-A-0030017, Building: Central Plant, Rate Schedule: RCU-W-TIER + RCU-S-VOL + RCU-SW-ERU}
+  Bill Items (worked example, Admin Hall's Feb-25 bill, 2025-02-01 to 2025-02-28, 2-inch meter, 18 ERU, exact, 01-River-City-Admin-Hall-Combined-Utility.pdf; reads 1,284 to 1,524 = 240 kgal):
+  - {Description: water_meter_charge, Quantity: 1, Unit: 2in meter, Amount: 96.00}
+  - {Description: water_tier1, Quantity: 50, Unit: kgal, Rate: 4.85, Amount: 242.50}
+  - {Description: water_tier2, Quantity: 150, Unit: kgal, Rate: 6.40, Amount: 960.00}
+  - {Description: water_tier3, Quantity: 40, Unit: kgal, Rate: 8.15, Amount: 326.00}
+  - {Description: sewer_base, Quantity: 1, Amount: 28.50}
+  - {Description: sewer_volume, Quantity: 240, Unit: kgal, Rate: 7.95, Amount: 1908.00}
+  - {Description: stormwater_eru, Quantity: 18, Unit: ERU, Rate: 11.20, Amount: 201.60}
+  Total: 3762.60
+  Other sample bills: the Student Center's Feb-25 (4-inch meter, 22 ERU, 520 kgal, $8,479.40) and Cedar Row B's
+    Feb-25 route read on cycle 2 (2025-01-15 to 2025-02-14, 140 kgal, no stormwater, $2,128.00).
+  Note: Fire-service and irrigation accounts (RCU-FIRE, RCU-IRR) are a single fixed line per month (line charge
+    by pipe size, or a volume charge with no sewer) and are not decomposed further here.
+- key: ntp_monthly_series
+  installed: {}
+  Series: 2024-01 to 2025-12, monthly internal allocation, entered as a bill (account_kind internal_cost_center)
+  Accounts:
+  - {Account: SYN-NTP-C-0000001, Building: Science Center, Lines: chilled_water_consumption + chilled_water_demand
+      + steam_consumption (a steam meter too, SYN-NTP-M-0070101; no steam line in a summer month) + fixed_oandm_allocation
+      (340.00), Note: see 01-bill-validation-rules.yaml ntp_science_center_override}
+  - {Account: SYN-NTP-C-0000002, Building: Admin Hall, Lines: steam_consumption + fixed_oandm_allocation (240.00)}
+  - {Account: SYN-NTP-C-0000003, Building: Library, Lines: steam_consumption + fixed_oandm_allocation}
+  - {Account: SYN-NTP-C-0000004, Building: Student Center, Lines: steam_consumption + fixed_oandm_allocation (270.00)}
+  - {Account: SYN-NTP-C-0000005, Building: Lakeview Hall, Lines: steam_consumption + fixed_oandm_allocation}
+  - {Account: SYN-NTP-C-0000006, Building: Recreation and Aquatics Center, Lines: chilled_water_consumption +
+      chilled_water_demand + fixed_oandm_allocation}
+  Bill Items (summer cooling worked example, the Science Center's Jul-24 allocation, exact, 02-Northlake-Thermal-Science-Center-Summer-Cooling.pdf):
+  - {Description: chilled_water_consumption, Quantity: 180860, Unit: ton-hours, Rate: 0.168, Amount: 30384.48}
+  - {Description: chilled_water_demand, Quantity: 542, Unit: tons, Rate: 9.50, Amount: 5149.00}  # the month's hourly peak, 2024-07-18 15:00
+  - {Description: fixed_oandm_allocation, Amount: 340.00}
+  Total: 35873.48
+  Note: No utility_users_tax line - an internal allocation is not a taxed utility purchase, and no due date - it is
+    a journal. The other plant samples are the Science Center's Mar-25 (chilled water and steam, $22,760.92), Admin
+    Hall's Jan-25 (steam only, $8,561.20) and the Student Center's Nov-24 (steam, $6,120.40).
+- key: hos_monthly_series
+  installed: {}
+  Series: 2024-01 to 2025-12, monthly PPA invoice, rate schedule HOS-PPA-2024 (ppaEnergy escalates 2.0%/year
+    starting 2025)
+  Accounts:
+  - {Account: SYN-HOS-P-0000001, Building: Science Center}
+  - {Account: SYN-HOS-P-0000002, Building: Student Center}
+  - {Account: SYN-HOS-P-0000003, Building: Cedar Row Carport and Grounds}
+  Bill Items (worked example, the Science Center's Feb-25 statement at the 2025 rate, exact, 01-Helios-Science-Center-Solar-PPA.pdf):
+  - {Description: ppa_energy, Quantity: 41820, Unit: kWh, Rate: 0.12138, Amount: 5076.11}
+  - {Description: net_metering_credit, Quantity: 6540, Unit: kWh, Rate: -0.092, Amount: -601.68}
+  - {Description: rec_transfer, Quantity: 42, Unit: REC, Amount: 0.00, Informational: true}
+  Total: 4474.43
+  Note: 2024 bills use 0.119; 2025 bills the escalated ppa_energy rate (0.119 * 1.02 = 0.12138); the net-metering
+    credit does not escalate, and the rec_transfer line never counts toward the total. Helios prints its own avoided
+    CO2e (0.209 kg per kWh generated); it is Helios's figure, not Northlake's (Stage 8).
+- key: rwl_generated_series
+  installed: {}
+  Series: 2024-07 to 2025-12, monthly (18 statements), rate schedule RWL-XFER-2024. Not entered in this stage - EEM
+    generates each statement on the Ridgeline Farm Transfer Meter, whose one point aggregates the ten turbine pad
+    meters (Bill Generation, written by the Run Bill Gen task; keiko.tan reviews), in Stage 7.
+  Accounts:
+  - {Account: SYN-RWL-G-0000001, Building: Ridgeline Turbine Field, Entry: generated by EEM in Stage 7 - no bill is entered here}
+  Bill Items (what every generated statement carries):
+  - {Description: transfer_energy, Quantity: kWh summed over the ten pad meters for the month, Unit: kWh, Rate: 0.058, Amount: quantity x rate}
+  - {Description: research_credit, Quantity: 1, Unit: month, Rate: -1250.00, Amount: -1250.00}
+  Acceptance Reference: documents/utility-bills/ridgeline-wind/01-Ridgeline-Wind-July-2024-Transfer-Statement-Manual.pdf (hand-made by Ridgeline accounting from the SCADA export, July 2024)
+  Turbine kWh WTG-01 to WTG-10 (July 2024): 238412 / 233905 / 229768 / 226341 / 224087 / 225530 / 222196 / 219874 / 217402 / 213869
+  Bill Items (July 2024):
+  - {Description: transfer_energy, Quantity: 2251384, Unit: kWh, Rate: 0.058, Amount: 130580.27}
+  - {Description: research_credit, Quantity: 1, Unit: month, Rate: -1250.00, Amount: -1250.00}
+  Total (July 2024): 129330.27
+  Informational (not charged):
+  - {Label: Energy possible at the measured wind (turbine controllers), Value: 2327960, Unit: kWh}
+  - {Label: Performance (generated over possible), Value: 96.7, Unit: '%'}
+  - {Label: 'Valley Electric export at the substation, July 2024 interval data (SYN-VED-M-0040015)', Value: 2208612, Unit: kWh}
+  - {Label: Collection losses (turbine pads to substation), Value: 1.9, Unit: '%'}
+  Rule: >-
+    Stage 7's first generated statement (July 2024, a calendar month) must match the hand-made one to the cent:
+    2,251,384 kWh at $0.058 less the $1,250.00 research credit is $129,330.27. The ten July turbine sums above fix what
+    Stage 3's 10-minute data must add up to, and the Valley Electric export to compare them with is the interconnection
+    meter's July 2024 interval data, 2,208,612 kWh (collection losses 1.9%). The generator account's first bill runs
+    to 2024-08-04 and states 2,496,612 kWh (generator_first_bill_fixture), so the interval data for August 1 to 4 must
+    export the 288,000 kWh in between.
+- key: meter_replacement_fixture
+  installed: {}
+  Fixture: meter_replacement
+  Account: SYN-VED-A-0010003 (Library)
+  Period: 2024-08-05 to 2024-09-04
+  Posts To: Sep-24
+  Invoice Date: 2024-09-05
+  Due Date: 2024-10-07
+  Entered On: 2024-09-07  # period end + 3 days
+  Bill Items (one bill; each item carries its meter and that meter's own read period, BI_PeriodStart and BI_PeriodEnd):
+  - {Meter: SYN-VED-M-0040003 (old), Item Period: 2024-08-05 to 2024-08-14, Description: energy_peak, Quantity: 1090, Unit: kWh, Rate: 0.241, Amount: 262.69, Reads: 118420 to 119510}
+  - {Meter: SYN-VED-M-0040003 (old), Item Period: 2024-08-05 to 2024-08-14, Description: energy_part_peak, Quantity: 1560, Unit: kWh, Rate: 0.168, Amount: 262.08, Reads: 142075 to 143635}
+  - {Meter: SYN-VED-M-0040003 (old), Item Period: 2024-08-05 to 2024-08-14, Description: energy_off_peak, Quantity: 2510, Unit: kWh, Rate: 0.112, Amount: 281.12, Reads: 251880 to 254390}
+  - {Meter: SYN-VED-M-0040103 (new), Item Period: 2024-08-15 to 2024-09-04, Description: energy_peak, Quantity: 2260, Unit: kWh, Rate: 0.241, Amount: 544.66, Reads: 0 to 2260}
+  - {Meter: SYN-VED-M-0040103 (new), Item Period: 2024-08-15 to 2024-09-04, Description: energy_part_peak, Quantity: 3230, Unit: kWh, Rate: 0.168, Amount: 542.64, Reads: 0 to 3230}
+  - {Meter: SYN-VED-M-0040103 (new), Item Period: 2024-08-15 to 2024-09-04, Description: energy_off_peak, Quantity: 5310, Unit: kWh, Rate: 0.112, Amount: 594.72, Reads: 0 to 5310}
+  - {Meter: SYN-VED-M-0040103 (new), Item Period: 2024-08-05 to 2024-09-04, Description: demand_charge, Quantity: 124, Unit: kW, Rate: 18.40, Amount: 2281.60}  # the higher meter's demand (the old meter read 118 kW)
+  - {Meter: SYN-VED-M-0040103 (new), Item Period: 2024-08-05 to 2024-09-04, Description: facility_charge, Quantity: 1, Amount: 64.00}
+  - {Meter: SYN-VED-M-0040103 (new), Item Period: 2024-08-05 to 2024-09-04, Description: public_purpose_program, Percent of energy: 1.5, Amount: 37.32}
+  - {Meter: SYN-VED-M-0040103 (new), Item Period: 2024-08-05 to 2024-09-04, Description: utility_users_tax, Percent of subtotal: 5.0, Amount: 243.54}
+  Total: 5114.37
+  Rule: >-
+    One Valley Electric bill covers the cycle (03-Valley-Electric-Library-Meter-Replacement.pdf, which prints each
+    time-of-use period's kWh of both meters on one line). Entered as one bill whose items carry each meter's own read
+    period, the two meters' periods meet with no gap and no overlap, 15,960 kWh in all, so rp_MonthlyEUI and the
+    rollups see one cycle of usage, not two.
+- key: estimated_then_corrected_fixture
+  installed: {}
+  Fixture: estimated_bill_correction
+  Account: SYN-SGU-A-0020004 (Student Center)
+  Period: 2024-10-15 to 2024-11-14  # Sierra Gas reads on the 15th; posts to Nov-24 (winter rate)
+  Estimated Bill (03-Sierra-Gas-Student-Center-Estimated-Read.pdf, invoice 2024-11-18, due 2024-12-18, entered 2024-11-19; 604 CCF estimated x 1.027 = 620 therms):
+  - {Description: customer_charge, Amount: 38.00}
+  - {Description: gas_commodity, Quantity: 620, Unit: therms, Rate: 1.142, Amount: 708.04, Estimate: true}
+  - {Description: gas_transport, Quantity: 620, Unit: therms, Rate: 0.214, Amount: 132.68, Estimate: true}
+  - {Description: public_purpose_surcharge, Percent of commodity and transport: 1.5, Amount: 12.61}
+  - {Description: utility_users_tax, Percent of subtotal: 5.0, Amount: 44.57}
+  Estimated Total: 935.90
+  Corrected Bill (04-Sierra-Gas-Student-Center-Corrected-Actual.pdf, same period, invoice 2024-12-16 after the next read, due 2025-01-15, entered 2024-12-17; 570 CCF actual x 1.027 = 585 therms):
+  - {Description: customer_charge, Amount: 38.00}
+  - {Description: gas_commodity, Quantity: 585, Unit: therms, Rate: 1.142, Amount: 668.07}
+  - {Description: gas_transport, Quantity: 585, Unit: therms, Rate: 0.214, Amount: 125.19}
+  - {Description: public_purpose_surcharge, Percent of commodity and transport: 1.5, Amount: 11.90}
+  - {Description: utility_users_tax, Percent of subtotal: 5.0, Amount: 42.16}
+  Corrected Total: 885.32  # 50.58 below the estimate
+  Note: >-
+    Mark the two gas lines' Bill Items grid Estimate checkbox on the first bill only. Confirm on screen
+    whether the Bill Entry editor exposes a "supersedes"/reference-bill link back to the estimated bill (the Bill
+    table carries a refBillID column) or whether the correction is entered as a second, independent bill for the
+    same period distinguished only by its Notes - record which one was used, once tried.
+- key: duplicate_import_fixture
+  installed: {}
+  Fixture: duplicate_file_import
+  Account: River City's Northlake Main Campus combined file delivered 2024-09-04, the campus accounts' Aug-24 bills (cycle 1, 2024-08-01 to 2024-08-31)
+  Rule: import that file (02-bill-importer-sources.yaml rcu_import_source) a second time on purpose, as River City
+    delivered it twice (the customer's known event of 2024-09-04 and the River City tariff sheet); the Workspace must
+    show each campus account's water, sewer and stormwater lines once after the second import, not twice (Admin Hall,
+    SYN-RCU-A-0030001, is the account to read). The Cedar Row accounts are on cycle 2 and in another file.
+- key: account_number_change_fixture
+  installed: {}
+  Fixture: account_number_change
+  Account: SYN-RCU-A-0030003 (Cedar Row A), previously SYN-RCU-A-0030103 until the July 2024 lease renewal
+  Period: 2024-08-15 to 2024-09-14  # River City cycle 2; posts to Sep-24
+  Invoice Date: 2024-09-18
+  Due Date: 2024-10-09
+  Bill Items (03-River-City-Cedar-Row-A-Account-Renewal.pdf; reads 2,090 to 2,220 = 130 kgal, 58 of 60 apartments occupied):
+  - {Description: water_meter_charge, Quantity: 1, Unit: 3in meter, Amount: 168.00}
+  - {Description: water_tier1, Quantity: 50, Unit: kgal, Rate: 4.85, Amount: 242.50}
+  - {Description: water_tier2, Quantity: 80, Unit: kgal, Rate: 6.40, Amount: 512.00}
+  - {Description: sewer_base, Amount: 28.50}
+  - {Description: sewer_volume, Quantity: 130, Unit: kgal, Rate: 7.95, Amount: 1033.50}
+  Total: 1984.50
+  Rule: a bill under the new number after the renewal; the account's history carries straight through it, and the
+    Previous Account Number on its Definitions page (Stage 2) links the old number, so reports show one account.
+- key: late_bill_fixture
+  installed: {}
+  Fixture: late_bill
+  Account: SYN-SGU-A-0020003 (Library)
+  Rule: enter the 23 monthly bills 2024-01 through 2025-11 on the same schedule as sgu_monthly_series; do not
+    enter a 2025-12 bill. With no current-period bill and the account's usual ~5-day entry lag past, the account
+    is more than 5 days overdue as of the stage's as-of date and appears in rp_LateBills.
+- key: rate_change_boundary_fixture
+  installed: {}
+  Fixture: provider_rate_change
+  Account: SYN-VED-A-0010004 (Student Center)
+  Bills:
+  - {Period: 2024-11-05 to 2024-12-04, Posts To: Dec-24, Rate Schedule: VED-TOU-GS, energy_part_peak Rate: 0.168,
+      energy_off_peak Rate: 0.112, demand_charge Rate: 18.40, facility_charge: 64.00}  # winter: no energy_peak
+  - {Period: 2024-12-05 to 2025-01-04, Posts To: Jan-25, Rate Schedule: VED-TOU-GS to 2024-12-31 and VED-TOU-GS-FY25 from 2025-01-01}
+  - {Period: 2025-01-05 to 2025-02-04, Posts To: Feb-25, Rate Schedule: VED-TOU-GS-FY25, energy_part_peak Rate: 0.179,
+      energy_off_peak Rate: 0.118, demand_charge Rate: 19.75, facility_charge: 67.50}
+  Jan-25 Bill Items (04-Valley-Electric-Student-Center-FY2025-Rate-Change.pdf, invoice 2025-01-06, due 2025-02-05):
+  - {Description: energy_part_peak, Item Period: 2024-12-05 to 2024-12-31, Quantity: 14600, Unit: kWh, Rate: 0.168, Amount: 2452.80}
+  - {Description: energy_off_peak, Item Period: 2024-12-05 to 2024-12-31, Quantity: 17920, Unit: kWh, Rate: 0.112, Amount: 2007.04}
+  - {Description: demand_charge, Item Period: 2024-12-05 to 2024-12-31, Quantity: 135.87, Unit: kW, Rate: 18.40, Amount: 2500.01}  # 27/31 of the cycle's 156 kW
+  - {Description: facility_charge, Item Period: 2024-12-05 to 2024-12-31, Quantity: 0.871, Unit: month, Rate: 64.00, Amount: 55.74}
+  - {Description: energy_part_peak, Item Period: 2025-01-01 to 2025-01-04, Quantity: 1350, Unit: kWh, Rate: 0.179, Amount: 241.65}
+  - {Description: energy_off_peak, Item Period: 2025-01-01 to 2025-01-04, Quantity: 2770, Unit: kWh, Rate: 0.118, Amount: 326.86}
+  - {Description: demand_charge, Item Period: 2025-01-01 to 2025-01-04, Quantity: 20.13, Unit: kW, Rate: 19.75, Amount: 397.57}  # 4/31 of 156 kW
+  - {Description: facility_charge, Item Period: 2025-01-01 to 2025-01-04, Quantity: 0.129, Unit: month, Rate: 67.50, Amount: 8.71}
+  - {Description: public_purpose_program, Percent of energy: 1.5, Amount: 75.43}
+  - {Description: utility_users_tax, Percent of subtotal: 5.0, Amount: 403.29}
+  Jan-25 Total: 8469.10
+  Rule: Valley Electric's FY2025 rates apply to service from 2025-01-01, and its 5th-to-4th cycle puts January 1
+    inside the Jan-25 bill. That bill is priced in two parts - energy by the date it was used, demand and the facility
+    charge prorated by days (27/31 and 4/31) - so the rate step shows inside one bill rather than between two. EEM's
+    rate engine splits a straddling period by date the same way (UtilityRate_Exec.sql:508-513), so a Stage 4 test of
+    this bill should reproduce it once Stage 4's VED-TOU-GS prices winter energy at the tariff's own part-peak and
+    off-peak rates (it does not yet). Every VED account's Jan-25 bill straddles the step the same way (the Ridgeline
+    generator account is on VED-GEN-IC and has no FY2025 step).
+- key: generator_first_bill_fixture
+  installed: {}
+  Fixture: account_opened_mid_window
+  Account: SYN-VED-A-0010014 (Ridgeline Substation); the account was transferred at the acquisition, not newly created
+  Period: 2024-07-01 to 2024-08-04
+  Posts To: Aug-24 (35 days, from the opening read to the end of the first scheduled period)
+  Invoice Date: 2024-08-06
+  Due Date: 2024-09-05
+  Entered On: 2024-08-07  # period end + 3 days (05-approval.yaml), after the invoice date
+  Meter Summary (SYN-VED-M-0040015, multiplier 12000):
+  - {Channel: Received (export), Quantity: 2496612, Unit: kWh, Stated As: 2496.612 MWh}
+  - {Channel: Delivered (station service), Quantity: 4428, Unit: kWh}
+  - {Channel: Reactive, Quantity: 858948, Unit: kVArh}
+  Bill Items:
+  - {Description: generator_customer_charge, Quantity: 1, Unit: month, Rate: 285.00, Amount: 285.00}
+  - {Description: station_service_energy, Quantity: 4428, Unit: kWh, Rate: 0.131, Amount: 580.07}
+  - {Description: reactive_power_charge, Quantity: 38351, Unit: kVArh, Rate: 0.0042, Amount: 161.07}  # 858,948 measured less 820,597 allowed
+  - {Description: generation_credit, Quantity: 2496612, Unit: kWh, Rate: -0.0612, Amount: -152792.65}
+  - {Description: bct_credit_transferred, Amount: 152792.65}  # to SYN-VED-A-0010013, where it lands on the Sep-24 bill
+  - {Description: utility_users_tax, Percent of subtotal: 5.0, Amount: 51.31}  # 5% of the customer charge, station service and reactive lines
+  Total: 1077.45
+  Rule: >-
+    The first bill after the acquisition (documents/utility-bills/valley-electric-district/05-Valley-Electric-Ridgeline-Generator-First-Bill.pdf).
+    Valley Electric cycle 1 reads on the 5th, so service that began on July 1 is billed to the end of the Aug-24
+    period, 35 days; at 35 days it sits inside the 26-to-36-day period-length tests (13 and 14). No bill exists for
+    this account before 2024-07-01, so checks.sql expects 17 bills, not 24. The 2,496,612 kWh export credit leaves the
+    bill as bct_credit_transferred and lands on SYN-VED-A-0010013 one billing cycle later
+    (central_plant_credit_transfer_fixture); what the generator account still pays is the $1,077.45 residue. The
+    statement prints the export as 2,496.612 MWh beside the kWh, the interval channel is kWh, and the credit line is
+    dollars only on entry (02-bill-importer-sources.yaml).
+- key: generator_winter_calm_fixture
+  installed: {}
+  Fixture: bill_credit_transfer
+  Account: SYN-VED-A-0010014 (Ridgeline Substation)
+  Period: 2025-01-05 to 2025-02-04
+  Posts To: Feb-25 (31 days)
+  Invoice Date: 2025-02-05
+  Due Date: 2025-03-07
+  Entered On: 2025-02-07  # period end + 3 days (05-approval.yaml), after the invoice date
+  Meter Summary (SYN-VED-M-0040015, multiplier 12000):
+  - {Channel: Received (export), Quantity: 418836, Unit: kWh, Stated As: 418.836 MWh}
+  - {Channel: Delivered (station service), Quantity: 46920, Unit: kWh}
+  - {Channel: Reactive, Quantity: 131664, Unit: kVArh}
+  Bill Items:
+  - {Description: generator_customer_charge, Quantity: 1, Unit: month, Rate: 285.00, Amount: 285.00}
+  - {Description: station_service_energy, Quantity: 46920, Unit: kWh, Rate: 0.131, Amount: 6146.52}
+  - {Description: reactive_power_charge, Quantity: 0, Unit: kVArh, Rate: 0.0042, Amount: 0.00}  # printed at zero, omitted on entry: 131,664 kVArh measured is inside the 137,665 allowed
+  - {Description: generation_credit, Quantity: 418836, Unit: kWh, Rate: -0.0612, Amount: -25632.76}
+  - {Description: bct_credit_transferred, Amount: 25632.76}  # to SYN-VED-A-0010013, where it lands on the Mar-25 bill
+  - {Description: utility_users_tax, Percent of subtotal: 5.0, Amount: 321.58}  # 5% of the customer charge and station service lines
+  Total: 6753.10
+  Rule: >-
+    A calm bill (documents/utility-bills/valley-electric-district/06-Valley-Electric-Ridgeline-Generator-Winter-Calm.pdf):
+    the turbines stood idle for long spells, so station service is more than ten times the first bill's (46,920
+    against 4,428 kWh), the export credit is about a sixth of it (418,836 against 2,496,612 kWh, the first bill
+    covering 35 days to this one's 31) and the reactive charge drops out. The bill is still a positive residue
+    ($6,753.10), now more than six times the first bill's $1,077.45. This pair is the range the validation override
+    on this account covers (01-bill-validation-rules.yaml, ved_ridgeline_generator_override). The $25,632.76 transfer
+    lands on the Central Plant's Mar-25 bill (2025-02-05 to 2025-03-04), which the bills file does not itemize.
+- key: central_plant_credit_transfer_fixture
+  installed: {}
+  Fixture: bill_credit_transfer
+  Account: SYN-VED-A-0010013 (Central Plant), the benefiting account
+  Period: 2024-08-05 to 2024-09-04
+  Posts To: Sep-24 (31 days)
+  Invoice Date: 2024-09-06
+  Due Date: 2024-10-07
+  Entered On: 2024-09-07  # period end + 3 days (05-approval.yaml), after the invoice date
+  Meter Summary (SYN-VED-M-0040014, multiplier 1):
+  - {Channel: Delivered, Quantity: 1512400, Unit: kWh}
+  - {Channel: Maximum 15-minute demand, Quantity: 3240, Unit: kW}
+  Bill Items:
+  - {Description: energy_peak, Quantity: 412800, Unit: kWh, Rate: 0.214, Amount: 88339.20}
+  - {Description: energy_part_peak, Quantity: 368400, Unit: kWh, Rate: 0.149, Amount: 54891.60}
+  - {Description: energy_off_peak, Quantity: 731200, Unit: kWh, Rate: 0.098, Amount: 71657.60}
+  - {Description: demand_charge, Quantity: 3240, Unit: kW, Rate: 21.90, Amount: 70956.00}
+  - {Description: facility_charge, Quantity: 1, Unit: month, Rate: 410.00, Amount: 410.00}
+  - {Description: public_purpose_program, Percent of subtotal: 1.5, Amount: 3223.33}  # 1.5% of the three energy lines
+  - {Description: bct_credit_received, Amount: -152792.65}  # from SYN-VED-A-0010014, the export billed 2024-07-01 to 2024-08-04
+  - {Description: bct_administrative_fee, Quantity: 1, Unit: month, Rate: 12.50, Amount: 12.50}
+  - {Description: utility_users_tax, Percent of subtotal: 5.0, Amount: 14473.89}  # 5% of the six lines above the credit; the credit and the fee are not taxed
+  Total: 151171.47
+  Rule: >-
+    The first VED-BCT credit (documents/utility-bills/valley-electric-district/07-Valley-Electric-Central-Plant-Bill-Credit-Transfer.pdf).
+    Counted once: the credit is the generation_credit on the first generator bill, SYN-VED-A-0010014 for 2024-07-01
+    to 2024-08-04 (-152,792.65), which left that bill as bct_credit_transferred (+152,792.65,
+    generator_first_bill_fixture) and lands here, one billing cycle later and sign reversed, as bct_credit_received
+    (-152,792.65). Across the two accounts the credit is taken once, not twice: the generator bill nets to its small
+    residue and this bill carries the credit. Every other bill follows the same rule, the credit on a Central Plant
+    bill equalling the transfer on the generator bill for the period before it, to the cent (checks.sql
+    bct_credit_counted_once). The energy lines add up to the meter's 1,512,400 kWh. The fee is assumed to start with
+    this bill, the first to carry a credit.

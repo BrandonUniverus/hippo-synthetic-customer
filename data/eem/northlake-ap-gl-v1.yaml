@@ -2,7 +2,7 @@ manifestVersion: 1
 id: northlake_ap_gl_v1
 customerScenarioId: demo_university_v1
 stage: 3
-roadmapPhase: 3            # implementation/dream-customer/phase3-ap-gl-validation-spec.pdf
+roadmapPhase: 3            # now Stage 6: implementation/stage-6-financial/stage-6-financial.pdf
 displayName: Northlake AP / GL / Validation Entry Plan
 purpose: >
   How the Phase 3 financial data gets into EEM through the UI: GL chart, account
@@ -17,8 +17,8 @@ entryUI:
   apRun: { app: Web SPA, screen: "#/reporting/APApprovalAndUpload", action: "approve valid bills -> Preview/Create Interface File (pick format)" }
 
 sourceReferences:
-  designSpec: implementation/dream-customer/phase3-ap-gl-validation-spec.pdf
-  productBacklog: implementation/dream-customer/product-gap-backlog.pdf
+  stageChapter: implementation/stage-6-financial/stage-6-financial.pdf
+  productFindings: implementation/product-findings.pdf
 
 glChart:                    # GLAccountsView; Account Type: 0 Assets, 1 Expenses, 2 Liabilities
   - { code: 5100-ELEC, type: 1, desc: Electricity expense }
@@ -26,12 +26,18 @@ glChart:                    # GLAccountsView; Account Type: 0 Assets, 1 Expenses
   - { code: 5120-WATER, type: 1, desc: Water/sewer/stormwater expense }
   - { code: 5130-THERMAL, type: 1, desc: Chilled water / steam allocation }
   - { code: 5140-SOLAR, type: 1, desc: Solar PPA expense }
+  - { code: 5150-WIND, type: 1, desc: Ridgeline wind energy transfer }
   - { code: 2000-AP, type: 2, desc: Accounts payable control }
 
-accountUploadFlags:        # Billing Account "Bill Service Type" (Global_Type_Code 'BA'): No Upload, AP, GL, AP and GL
+# The customer's interface flags. EEM's Bill Service Type (Global_Type_Code 'BA') has only 0 No AP Upload,
+# 1 AP Upload Only and 2 Bill Payment, so Stage 2 enters AP and "AP and GL" as AP Upload Only, GL ("payment runs
+# outside AP") as Bill Payment and No Upload as No AP Upload; the GL side of "AP and GL" is Stage 6's GL defaults.
+accountUploadFlags:        # Billing Account "Bill Service Type", in the customer's terms: No Upload, AP, GL, AP and GL
   default: AP              # most accounts are paid through AP
   rules:                   # first match wins, in order; every code is exercised
     - { match: {providerId: valley_electric_district, companyId: northlake_university}, value: AP and GL, why: campus electric exercises the GL journal alongside the AP payment }
+    # Before the plant rule: that rule's value also matches every account the plant company holds.
+    - { match: {providerId: ridgeline_wind}, value: GL, why: the transfer is a journal between the plant and its own wind company; no payment leaves the company }
     - { match: {providerId: northlake_thermal_plant}, value: AP and GL, why: internal allocations post to the GL and settle between companies }
     - { match: {providerId: helios_onsite_solar}, value: GL, why: PPA statements post to the GL; payment runs outside AP }
     - { match: {accountId: rcu_cedar_row_b}, value: No Upload, why: negative control - this account must never reach an export file }
@@ -45,6 +51,7 @@ glAccountDefaults:         # Billing Account "Associated G/L Accounts"; codes co
     river_city_utilities: 5120-WATER
     northlake_thermal_plant: 5130-THERMAL
     helios_onsite_solar: 5140-SOLAR
+    ridgeline_wind: 5150-WIND
 
 billValidationRules:       # BillValidationView; modes 1 Bill Save + 2 Batch Test
   entries:
@@ -59,6 +66,11 @@ billValidationRules:       # BillValidationView; modes 1 Bill Save + 2 Batch Tes
     - { accountId: sgu_student_center, family: usage_change_pct, state: "Off", why: the estimated read and its corrected actual are a deliberate swing }
     - { accountId: rcu_cedar_row_a, family: period_length, state: "Off", why: the July 2024 account renewal produces one short period }
     - { accountId: ntp_science_center, family: cost_max, state: "On", absolute: "$250,000", why: an internal allocation never approaches the global ceiling }
+    # The Ridgeline generator account keeps none of its export credit, so each bill is a small residue that swings
+    # hundreds of percent with the wind ($1,077.45 in summer, $6,753.10 in a still winter month). The percent threshold
+    # is a tinyint (at most 255%, product finding 54), so the two change tests are switched off rather than raised.
+    - { accountId: ved_ridgeline_generator, family: cost_change_pct, state: "Off", why: "a residue bill: the export credit leaves for the Central Plant, and what remains swings over 500% with the wind" }
+    - { accountId: ved_ridgeline_generator, family: usage_change_pct, state: "Off", why: "station service swings over 900% between a windy summer and a still winter" }
   inheritance: "every other account inherits the company setting, and the company inherits Global; an account row is written only where it differs"
 
   fixtures:
@@ -78,7 +90,7 @@ trackBDeferred:
   - { backlogItem: 4, what: "accruals (open accrual + reversal pair, 2300/2301)", reason: "no UI/API at all" }
 
 expectedAssertions:
-  ref: implementation/dream-customer/phase3-ap-gl-validation-spec.pdf#expectedassertions
+  ref: implementation/stage-6-financial/checks.sql
   keyChecks:
     - Type_Code=0 account never exports; 1/3 accounts do
     - running export_ap / export_ap2 produces one ExportFile each, traceable to bills

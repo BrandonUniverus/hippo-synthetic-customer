@@ -1,0 +1,62 @@
+# Stage 8, step 6: Benchmarks (EUI and cost-intensity over the building peer set).
+# VERIFIED: 9 system benchmark definitions (wh_Benchmark, CompanyID -1) already ship with the product, including
+# the three this stage needs (use-per-area, spend-per-area, CO2-per-area). Nothing to enter for those. What is
+# confirmed still missing is a screen to define a NEW, company-specific benchmark; that is the actual product
+# finding, not the absence of any benchmark at all.
+stage: 8
+step: 6
+title: Benchmarks
+app: none for this step (the built-in definitions below need no entry; a custom one has no screen)
+screen: BenchmarkRanking / MonthlyEUI / PerformanceSnapshot reports read wh_Benchmark
+source:
+- generators/documents/sources/implementation/dream-customer/phase5-sustainability-analytics-spec.md
+- generators/documents/sources/implementation/dream-customer/product-gap-backlog.md (item 7)
+notes:
+- 'Verified 2026-09-18, wh_Benchmark: 9 system rows exist at CompanyID -1 (available to every company): Average
+  price, Spend per Day, Use per day, Spend per area (S_A_SpendPerArea), Use per area (U_A_UsePerArea), CO2 per area
+  (C_A_CO2PerArea), CO2 per day, Load Factor, Demand per Area. "Use per area" and "Spend per area" already are the
+  EUI and cost-intensity benchmarks this stage needs (usage/spend per square foot of the node''s Floor Area value
+  from Stage 2); "CO2 per area" is the GHG-intensity benchmark, and only needs Stage 8 steps 1-3''s GHG data to
+  have something to divide.'
+- 'Verified 2026-09-18: BenchmarksController.cs exposes only GetBenchmarks and GetBenchmarkControls, both
+  [HttpGet]; there is no POST/PUT anywhere in the Benchmarks stack (IBenchmarksService/BenchmarksService/
+  DapperBenchmarksRepository), so a company cannot add its OWN benchmark (a different formula, a named peer set,
+  a saved target value) beside these 9. Backlog item 7 is confirmed still open for that narrower case; it is not
+  the case that Northlake has no benchmarks to report against.'
+- The peer set for the three built-ins is whatever nodes BenchmarkRanking/MonthlyEUI/PerformanceSnapshot are run
+  over; it exists already because every building has a Floor Area value from Stage 2 (checks.sql building_areas)
+  and interval/bill usage from Stages 3-5. Run those reports over the 7 Northlake Main Campus buildings + 3 Cedar
+  Row buildings (the Central Plant is excluded as a utility, not an occupied building) once Stage 8 steps 1-5 are
+  in.
+- 'Added 2026-10-01 (Ridgeline Wind): the Ridgeline Wind Site stays out of the peer set, as the Central Plant does. Its
+  two nodes carry no floor area (Stage 2), so the per-area benchmarks (Use per area, Spend per area, CO2 per area,
+  Demand per Area) have nothing to divide. Two traps if it were run: the per-day benchmarks (Use per day, Spend per Day,
+  Load Factor) would report the turbines'' generation as use, since nothing marks it as generation (PRODUCT FINDING
+  44), and CO2 per area takes its emissions from the GHG data (rp_BenchMark.sql:218, wh_GetReportData.sql:456),
+  where the turbines are excluded and the avoided emissions are not. The wind farm''s own target, generated energy
+  over the energy the wind made possible, per turbine and for the farm, is not one of the nine built-ins and no
+  screen can add a tenth (finding 9); it belongs to the calculated-point and Radar scorecard goals (findings 41
+  and 47).'
+- Nothing to enter in the product for this step.
+records:
+- key: site_eui_builtin
+  name: Use per area (U_A_UsePerArea)
+  formula: usage quantity / Area
+  peerSet: "7 Northlake Main Campus buildings + 3 Cedar Row buildings"
+  expect: "Science Center (lab) highest, Library/Admin Hall lowest, matching lab vs. office/library load intensity"
+- key: cost_intensity_builtin
+  name: Spend per area (S_A_SpendPerArea)
+  formula: bill amount / Area
+  peerSet: same as Use per area
+- key: ghg_intensity_builtin
+  name: CO2 per area (C_A_CO2PerArea)
+  formula: CO2 (lb) / Area
+  peerSet: same as Use per area
+  dependsOn: Stage 8 steps 1-3 (GHG History must be populated first)
+- key: custom_benchmark_finding
+  what: "a company-specific benchmark (e.g. a named EUI target with a saved value to beat) has no create screen"
+  status: confirmed open, product backlog item 7
+- key: ridgeline_not_in_peer_set
+  what: "the Ridgeline Wind Site (a generating site with no floor area) is not a benchmark peer, and its wind-farm target is not a benchmark"
+  peerSet: none
+  status: excluded by choice of nodes; nothing to enter

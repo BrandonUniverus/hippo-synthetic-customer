@@ -1,0 +1,86 @@
+/* ==========================================================================
+   Valley Electric District: design tokens
+
+   Character: a public power district serving the Sacramento valley. Civic,
+   plain-spoken and dependable; a customer portal people use to pay a bill or
+   check an outage. Bright district blue with valley green, Public Sans.
+   ========================================================================== */
+:root {
+  /* Colour: brand ------------------------------------------------------- */
+  --primary: #1D5FAF;          /* District Blue: buttons, header strip, links (bills keep their blue) */
+  --primary-strong: #164A8A;
+  --on-primary: #FFFFFF;
+  --accent: #5E9E2F;           /* Valley Green: the furrow in the mark, rules, "green power" */
+  --accent-ink: #3F6E1C;       /* green for text on white */
+  --on-accent: #0F2208;
+  --support: #F2B01E;          /* Outage amber: outage and safety banners only */
+
+  /* Colour: neutrals ---------------------------------------------------- */
+  --ink: #13202E;
+  --muted: #4F5D6C;
+  --canvas: #F2F6FA;
+  --surface: #FFFFFF;
+  --tint: #E6EFF9;
+  --line: #CCD8E5;
+  --line-strong: #8EA2B8;
+  --link: #1D5FAF;
+  --heading-ink: #13202E;      /* headings are ink */
+
+  /* Colour: status ------------------------------------------------------ */
+  --positive: #3F6E1C;
+  --negative: #B3261E;
+  --caution: #8A5A00;
+  --positive-tint: #EDF5E6;
+  --negative-tint: #FBECEB;
+  --caution-tint: #FDF3DC;
+
+  /* Page chrome --------------------------------------------------------- */
+  --topbar-bg: #13202E;        /* "Report an outage" strip */
+  --topbar-ink: #FFFFFF;
+  --header-bg: #FFFFFF;
+  --header-ink: #13202E;
+  --header-rule: #1D5FAF;
+  --footer-bg: #13202E;
+  --footer-ink: #D6E1EE;
+
+  /* Type ---------------------------------------------------------------- */
+  --font-display: "Public Sans", "Segoe UI", Arial, sans-serif;
+  --font-text: "Public Sans", "Segoe UI", Arial, sans-serif;
+  --font-mono: "Public Sans", "Segoe UI", Arial, sans-serif;   /* tabular figures, no mono face */
+  --weight-display: 800;
+  --weight-strong: 700;
+  --tracking-display: -0.02em;
+  --case-heading: none;
+  --case-label: none;
+  --case-button: none;
+  --size-h1: 40px;
+  --size-h2: 28px;
+  --size-h3: 20px;
+  --size-body: 16px;
+  --size-small: 14px;
+  --size-label: 14px;
+  --leading-body: 1.55;
+
+  /* Space: 8-point, standard ----------------------------------------- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 40px;
+  --space-8: 64px;
+  --content-width: 1200px;
+
+  /* Shape --------------------------------------------------------------- */
+  --radius: 4px;             /* buttons, fields and cards: a consumer portal */
+  --rule: 1px;
+  --rule-accent: 4px;
+
+  /* Logo use ------------------------------------------------------------ */
+  --logo-height: 40px;
+  --logo-min-height: 24px;
+  /* Clear space: half the tile's width. Full-colour logo on white; reversed
+     (white tile edge, white wordmark) on District Blue or the dark strip.
+     The tile alone is the app icon and favicon. */
+}

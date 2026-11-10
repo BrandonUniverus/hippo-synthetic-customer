@@ -1,0 +1,53 @@
+# Stage 3, step 1: Database checkpoint (SQL Server > BACKUP DATABASE).
+# One full backup of EEMSuite_Northlake, taken before anything in this stage is entered: the way back if gateway
+# entry goes wrong. Decided 2026-11-05: Stage 3 takes no second, configured-empty backup. Northlake is backed up
+# later, once it works end to end, and the step 4 acceptance runs use an order that needs no restore. This is not
+# an EEM editor: run the commands with sqlcmd or SQL Server Management Studio as a sysadmin on the database server.
+stage: 3
+step: 1
+title: Database checkpoint
+app: SQL Server (sqlcmd or Management Studio)
+screen: BACKUP DATABASE
+source:
+- generators/documents/sources/implementation/northlake-onboarding-ui-checklist.md (sections 4 and 6, retired into this stage)
+- documents/intake-package/sample-data/acquisuite/acquisuite-sample-handover.pdf
+notes:
+- 'Server facts verified on the owner''s machine: instance BVirtualPC (connect as localhost), SQL Server 17.0.1135.8,
+  database EEMSuite_Northlake in the SIMPLE recovery model (so a full backup is the whole checkpoint; there is no log
+  chain), default backup folder C:\Hippo\Databases\Backups (SERVERPROPERTY InstanceDefaultBackupPath).'
+- 'msdb already has one backup history row for this database: a COPY_ONLY backup named
+  EEMSuite_Northlake.before-upgrade.20260914.bak taken 2026-09-14 at C:\Hippo\Backups\ (an ad hoc path outside the
+  instance default, from the pre-upgrade snapshot, unrelated to Northlake).'
+- COPY_ONLY keeps the checkpoint out of any backup chain the instance may get later. CHECKSUM and RESTORE VERIFYONLY prove the
+  file is readable before anything depends on it.
+- 'A restore replaces the running database, so before every restore stop what holds connections to it: the Windows service
+  EEMSuite Task Service (Northlake) (EEMSuite-Northlake-Service) and the Northlake site in IIS, which hosts the web and the
+  API. Open connections otherwise block the restore. Start both again afterwards.'
+- 'A database backup does not contain gateway workspace files. Record the RootDirectory trees listed in
+  02-gateways.yaml beside any backup: Input, Working, Archive, Error and Output, plus the Fake StateFilePath. If a RootDirectory is left blank, the installed default is
+  InstanceDataPath/TaskData/<family>/<GatewayId>. Restore or reset the matching workspace state before replaying
+  a delivery. GatewayCaches and Scheduler state are also outside the SQL backup. The older shared GatewayOutput
+  directory may remain from earlier setup; new built-in workflows place output in their own workspace.'
+- The file name carries the stage, the checkpoint name and the date; Stage 10 takes the reference backup with the same naming
+  rule.
+- 'Decided 2026-11-05: no configured-empty backup in Stage 3 (its record is removed). The next backup is taken once
+  Northlake works end to end.'
+records:
+- key: stage3_entry
+  installed:
+    backupFile: C:\Hippo\Databases\Backups\EEMSuite_Northlake_stage3-entry_20261005.bak
+    takenOn: 2026-10-05
+    backupSetName: Northlake Stage 3 entry
+  Taken when: Before step 2. Stage 2 checks are green; nothing from Stage 3 has been entered.
+  Database: EEMSuite_Northlake
+  Backup folder: C:\Hippo\Databases\Backups   # verified: SERVERPROPERTY('InstanceDefaultBackupPath') on the owner's machine
+  File name: EEMSuite_Northlake_stage3-entry_<yyyyMMdd>.bak
+  Command: |
+    BACKUP DATABASE [EEMSuite_Northlake]
+      TO DISK = N'C:\Hippo\Databases\Backups\EEMSuite_Northlake_stage3-entry_<yyyyMMdd>.bak'
+      WITH COPY_ONLY, INIT, CHECKSUM, COMPRESSION, STATS = 10,
+           NAME = N'Northlake Stage 3 entry';
+    RESTORE VERIFYONLY
+      FROM DISK = N'C:\Hippo\Databases\Backups\EEMSuite_Northlake_stage3-entry_<yyyyMMdd>.bak'
+      WITH CHECKSUM;
+  Restored by: Nobody in the normal course of the stage. Restore it only to start Stage 3 over.

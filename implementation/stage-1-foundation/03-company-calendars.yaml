@@ -1,0 +1,111 @@
+# Stage 1, step 3: Company Calendar (web, Administration > Company Calendar, #/CompanyCalendar).
+# 24 monthly fiscal periods per company, 2024-01 to 2025-12, are the ones Northlake's bills use. Bills post to a
+# fiscal period; a bill whose period has no row is rejected, which Stage 5 uses on purpose with a bill keyed with
+# its year transposed (2052 for 2025), a year no calendar reaches.
+stage: 1
+step: 3
+title: Company calendars
+app: Web
+screen: Administration > Company Calendar (#/CompanyCalendar)
+source:
+- data/eem/northlake-company-calendar-v1.yaml
+- documents/guides/chart-of-accounts-and-gl-guide.pdf
+notes:
+- 'Saving a company creates its calendar: the installed companies already run from 1990 to 2026 (Northlake University)
+  or 2027 (Cedar Row Apartments and the Thermal Plant), because Company_Save generates periods through next year. Leave
+  them, and check that the 2024 and 2025 periods below match; add any that are missing.'
+- 'Do not remove later years to make a rejection happen: EEM keeps generating the calendar through next year. Stage 5
+  proves the ''Fiscal Year/Period NOT found'' rejection with a bill keyed with its year transposed (2052 for 2025).'
+- Fiscal year equals calendar year for every Northlake company; quarters are calendar quarters.
+- The System company (Common) needs no calendar.
+records:
+- key: northlake_university
+  installed:
+    companyId: 6
+  Company: Northlake University
+  Calendar Type: Standard (calendar year)
+  Periods:
+  - {Period: 1, Year: 2024, Start Date: 2024-01-01, End Date: 2024-01-31, Quarter: 1, Period Name: Jan-2024}
+  - {Period: 2, Year: 2024, Start Date: 2024-02-01, End Date: 2024-02-29, Quarter: 1, Period Name: Feb-2024}
+  - {Period: 3, Year: 2024, Start Date: 2024-03-01, End Date: 2024-03-31, Quarter: 1, Period Name: Mar-2024}
+  - {Period: 4, Year: 2024, Start Date: 2024-04-01, End Date: 2024-04-30, Quarter: 2, Period Name: Apr-2024}
+  - {Period: 5, Year: 2024, Start Date: 2024-05-01, End Date: 2024-05-31, Quarter: 2, Period Name: May-2024}
+  - {Period: 6, Year: 2024, Start Date: 2024-06-01, End Date: 2024-06-30, Quarter: 2, Period Name: Jun-2024}
+  - {Period: 7, Year: 2024, Start Date: 2024-07-01, End Date: 2024-07-31, Quarter: 3, Period Name: Jul-2024}
+  - {Period: 8, Year: 2024, Start Date: 2024-08-01, End Date: 2024-08-31, Quarter: 3, Period Name: Aug-2024}
+  - {Period: 9, Year: 2024, Start Date: 2024-09-01, End Date: 2024-09-30, Quarter: 3, Period Name: Sep-2024}
+  - {Period: 10, Year: 2024, Start Date: 2024-10-01, End Date: 2024-10-31, Quarter: 4, Period Name: Oct-2024}
+  - {Period: 11, Year: 2024, Start Date: 2024-11-01, End Date: 2024-11-30, Quarter: 4, Period Name: Nov-2024}
+  - {Period: 12, Year: 2024, Start Date: 2024-12-01, End Date: 2024-12-31, Quarter: 4, Period Name: Dec-2024}
+  - {Period: 1, Year: 2025, Start Date: 2025-01-01, End Date: 2025-01-31, Quarter: 1, Period Name: Jan-2025}
+  - {Period: 2, Year: 2025, Start Date: 2025-02-01, End Date: 2025-02-28, Quarter: 1, Period Name: Feb-2025}
+  - {Period: 3, Year: 2025, Start Date: 2025-03-01, End Date: 2025-03-31, Quarter: 1, Period Name: Mar-2025}
+  - {Period: 4, Year: 2025, Start Date: 2025-04-01, End Date: 2025-04-30, Quarter: 2, Period Name: Apr-2025}
+  - {Period: 5, Year: 2025, Start Date: 2025-05-01, End Date: 2025-05-31, Quarter: 2, Period Name: May-2025}
+  - {Period: 6, Year: 2025, Start Date: 2025-06-01, End Date: 2025-06-30, Quarter: 2, Period Name: Jun-2025}
+  - {Period: 7, Year: 2025, Start Date: 2025-07-01, End Date: 2025-07-31, Quarter: 3, Period Name: Jul-2025}
+  - {Period: 8, Year: 2025, Start Date: 2025-08-01, End Date: 2025-08-31, Quarter: 3, Period Name: Aug-2025}
+  - {Period: 9, Year: 2025, Start Date: 2025-09-01, End Date: 2025-09-30, Quarter: 3, Period Name: Sep-2025}
+  - {Period: 10, Year: 2025, Start Date: 2025-10-01, End Date: 2025-10-31, Quarter: 4, Period Name: Oct-2025}
+  - {Period: 11, Year: 2025, Start Date: 2025-11-01, End Date: 2025-11-30, Quarter: 4, Period Name: Nov-2025}
+  - {Period: 12, Year: 2025, Start Date: 2025-12-01, End Date: 2025-12-31, Quarter: 4, Period Name: Dec-2025}
+- key: cedar_row_apartments
+  installed:
+    companyId: 3
+  Company: Cedar Row Apartments
+  Calendar Type: Standard (calendar year)
+  Periods:
+  - {Period: 1, Year: 2024, Start Date: 2024-01-01, End Date: 2024-01-31, Quarter: 1, Period Name: Jan-2024}
+  - {Period: 2, Year: 2024, Start Date: 2024-02-01, End Date: 2024-02-29, Quarter: 1, Period Name: Feb-2024}
+  - {Period: 3, Year: 2024, Start Date: 2024-03-01, End Date: 2024-03-31, Quarter: 1, Period Name: Mar-2024}
+  - {Period: 4, Year: 2024, Start Date: 2024-04-01, End Date: 2024-04-30, Quarter: 2, Period Name: Apr-2024}
+  - {Period: 5, Year: 2024, Start Date: 2024-05-01, End Date: 2024-05-31, Quarter: 2, Period Name: May-2024}
+  - {Period: 6, Year: 2024, Start Date: 2024-06-01, End Date: 2024-06-30, Quarter: 2, Period Name: Jun-2024}
+  - {Period: 7, Year: 2024, Start Date: 2024-07-01, End Date: 2024-07-31, Quarter: 3, Period Name: Jul-2024}
+  - {Period: 8, Year: 2024, Start Date: 2024-08-01, End Date: 2024-08-31, Quarter: 3, Period Name: Aug-2024}
+  - {Period: 9, Year: 2024, Start Date: 2024-09-01, End Date: 2024-09-30, Quarter: 3, Period Name: Sep-2024}
+  - {Period: 10, Year: 2024, Start Date: 2024-10-01, End Date: 2024-10-31, Quarter: 4, Period Name: Oct-2024}
+  - {Period: 11, Year: 2024, Start Date: 2024-11-01, End Date: 2024-11-30, Quarter: 4, Period Name: Nov-2024}
+  - {Period: 12, Year: 2024, Start Date: 2024-12-01, End Date: 2024-12-31, Quarter: 4, Period Name: Dec-2024}
+  - {Period: 1, Year: 2025, Start Date: 2025-01-01, End Date: 2025-01-31, Quarter: 1, Period Name: Jan-2025}
+  - {Period: 2, Year: 2025, Start Date: 2025-02-01, End Date: 2025-02-28, Quarter: 1, Period Name: Feb-2025}
+  - {Period: 3, Year: 2025, Start Date: 2025-03-01, End Date: 2025-03-31, Quarter: 1, Period Name: Mar-2025}
+  - {Period: 4, Year: 2025, Start Date: 2025-04-01, End Date: 2025-04-30, Quarter: 2, Period Name: Apr-2025}
+  - {Period: 5, Year: 2025, Start Date: 2025-05-01, End Date: 2025-05-31, Quarter: 2, Period Name: May-2025}
+  - {Period: 6, Year: 2025, Start Date: 2025-06-01, End Date: 2025-06-30, Quarter: 2, Period Name: Jun-2025}
+  - {Period: 7, Year: 2025, Start Date: 2025-07-01, End Date: 2025-07-31, Quarter: 3, Period Name: Jul-2025}
+  - {Period: 8, Year: 2025, Start Date: 2025-08-01, End Date: 2025-08-31, Quarter: 3, Period Name: Aug-2025}
+  - {Period: 9, Year: 2025, Start Date: 2025-09-01, End Date: 2025-09-30, Quarter: 3, Period Name: Sep-2025}
+  - {Period: 10, Year: 2025, Start Date: 2025-10-01, End Date: 2025-10-31, Quarter: 4, Period Name: Oct-2025}
+  - {Period: 11, Year: 2025, Start Date: 2025-11-01, End Date: 2025-11-30, Quarter: 4, Period Name: Nov-2025}
+  - {Period: 12, Year: 2025, Start Date: 2025-12-01, End Date: 2025-12-31, Quarter: 4, Period Name: Dec-2025}
+- key: northlake_thermal_plant
+  installed:
+    companyId: 5
+  Company: Northlake Thermal Plant
+  Calendar Type: Standard (calendar year)
+  Periods:
+  - {Period: 1, Year: 2024, Start Date: 2024-01-01, End Date: 2024-01-31, Quarter: 1, Period Name: Jan-2024}
+  - {Period: 2, Year: 2024, Start Date: 2024-02-01, End Date: 2024-02-29, Quarter: 1, Period Name: Feb-2024}
+  - {Period: 3, Year: 2024, Start Date: 2024-03-01, End Date: 2024-03-31, Quarter: 1, Period Name: Mar-2024}
+  - {Period: 4, Year: 2024, Start Date: 2024-04-01, End Date: 2024-04-30, Quarter: 2, Period Name: Apr-2024}
+  - {Period: 5, Year: 2024, Start Date: 2024-05-01, End Date: 2024-05-31, Quarter: 2, Period Name: May-2024}
+  - {Period: 6, Year: 2024, Start Date: 2024-06-01, End Date: 2024-06-30, Quarter: 2, Period Name: Jun-2024}
+  - {Period: 7, Year: 2024, Start Date: 2024-07-01, End Date: 2024-07-31, Quarter: 3, Period Name: Jul-2024}
+  - {Period: 8, Year: 2024, Start Date: 2024-08-01, End Date: 2024-08-31, Quarter: 3, Period Name: Aug-2024}
+  - {Period: 9, Year: 2024, Start Date: 2024-09-01, End Date: 2024-09-30, Quarter: 3, Period Name: Sep-2024}
+  - {Period: 10, Year: 2024, Start Date: 2024-10-01, End Date: 2024-10-31, Quarter: 4, Period Name: Oct-2024}
+  - {Period: 11, Year: 2024, Start Date: 2024-11-01, End Date: 2024-11-30, Quarter: 4, Period Name: Nov-2024}
+  - {Period: 12, Year: 2024, Start Date: 2024-12-01, End Date: 2024-12-31, Quarter: 4, Period Name: Dec-2024}
+  - {Period: 1, Year: 2025, Start Date: 2025-01-01, End Date: 2025-01-31, Quarter: 1, Period Name: Jan-2025}
+  - {Period: 2, Year: 2025, Start Date: 2025-02-01, End Date: 2025-02-28, Quarter: 1, Period Name: Feb-2025}
+  - {Period: 3, Year: 2025, Start Date: 2025-03-01, End Date: 2025-03-31, Quarter: 1, Period Name: Mar-2025}
+  - {Period: 4, Year: 2025, Start Date: 2025-04-01, End Date: 2025-04-30, Quarter: 2, Period Name: Apr-2025}
+  - {Period: 5, Year: 2025, Start Date: 2025-05-01, End Date: 2025-05-31, Quarter: 2, Period Name: May-2025}
+  - {Period: 6, Year: 2025, Start Date: 2025-06-01, End Date: 2025-06-30, Quarter: 2, Period Name: Jun-2025}
+  - {Period: 7, Year: 2025, Start Date: 2025-07-01, End Date: 2025-07-31, Quarter: 3, Period Name: Jul-2025}
+  - {Period: 8, Year: 2025, Start Date: 2025-08-01, End Date: 2025-08-31, Quarter: 3, Period Name: Aug-2025}
+  - {Period: 9, Year: 2025, Start Date: 2025-09-01, End Date: 2025-09-30, Quarter: 3, Period Name: Sep-2025}
+  - {Period: 10, Year: 2025, Start Date: 2025-10-01, End Date: 2025-10-31, Quarter: 4, Period Name: Oct-2025}
+  - {Period: 11, Year: 2025, Start Date: 2025-11-01, End Date: 2025-11-30, Quarter: 4, Period Name: Nov-2025}
+  - {Period: 12, Year: 2025, Start Date: 2025-12-01, End Date: 2025-12-31, Quarter: 4, Period Name: Dec-2025}

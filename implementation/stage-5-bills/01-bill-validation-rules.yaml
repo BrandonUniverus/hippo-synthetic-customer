@@ -1,0 +1,99 @@
+# Stage 5, step 1: Bill Validation rules (Database Administrator > Nodes > company node > Bill Validation tab).
+# Entered before any bill in 03-bills.yaml so the deliberate-failure fixtures actually fire when those bills are
+# saved. The screen has two tabs, Bill Save and Batch Test (BillValidationType 1 and 2); Northlake uses Bill Save
+# only. "Validation for" picks Global Defaults or a company; "Settings for" then picks that scope's own settings,
+# its Validation Groups, one Group, or one Billing Account. The Test Name, Commodity, effective value and unit
+# columns are locked from the product's own 47-row test catalog (BillValidation, verified against
+# EEMSuite_Northlake); only State, Percent and Amount are editable, and only where the scope you picked is not
+# read-only.
+stage: 5
+step: 1
+title: Bill Validation rules
+app: Database Administrator
+screen: Nodes > company node > Bill Validation
+source:
+- data/eem/northlake-ap-gl-v1.yaml
+- generators/documents/sources/implementation/dream-customer/phase3-ap-gl-validation-spec.md
+- data/bills/northlake-itemized-bills-v1.yaml
+notes:
+- 'Test catalog verified against the installed BillValidation table (47 rows, BV_TestID 1-47) and
+  BillValidationLabel (validation label / description / message per test). The six families the AP/GL plan
+  names map to real tests: cost_change_pct = BV_TestID 21 ("Large change in total cost as compared to preceding
+  bill"); cost_max = 23 ("Total bill cost exceeds the maximum for this billing account"); usage_change_pct = 25
+  ("Large change in meter usage in current bill vs. preceding bill"); usage_floor = 28 ("Total meter usage is
+  less than the expected minimum"), one row per commodity; period_length = 13 ("...exceeds the maximum") and 14
+  ("...less than expected minimum"); presence = 41 ("Meter not open prior to end of billing period") and 42
+  ("Meter closed prior to end of billing period"), the two tests closest to "required fields / active account."'
+- 'BillValidationTargetKind (verified in Models/Companies/BillValidationTargetKind.cs): a company''s "Settings
+  for" opens CompanyDefaults, GroupManager, one Group, or one Account. The five account overrides below use
+  Settings for > Account, so each is entered on that one billing account and nothing else.'
+- Global Defaults' State options are Enabled or Off; a company or account row's State options are Inherit,
+  Enabled or Disabled. Leaving a row on Inherit is how "every other account inherits the company setting, and
+  the company inherits Global" happens - nothing is entered for the accounts not listed here.
+- Percent and Amount are only editable on the row whose scope you are actually on; every other cell on that row
+  (Effective, Test Name, Commodity, the other check's description, Unit, Color) is locked from the catalog, shown
+  with a padlock and a tooltip - do not try to change them.
+- Enter this step signed in as a company administrator with the target company's eem_company_setup copy and
+  local Points scope from Stage 1. The Administrator user setting is separate from membership of that shared
+  group; bill-entry-only users do not hold the Bill Validation function.
+- 'Added 2026-10-01 (Ridgeline Wind): a fifth account override, on the Valley Electric generator account
+  SYN-VED-A-0010014. It keeps none of its export credit, so its bill is a small residue that moves with the wind,
+  and its only usage line, station service, does too: the two change-from-last-bill tests (21 and 25) would flag
+  most bills, and an open alert holds an ordinary AP bill out of the approval queue (Stage 6). The percent column
+  is a tinyint (255 at most) and the two itemized bills differ by +527% in cost and +960% in usage, so the tests
+  are turned off for that one account rather than raised. The 1,000 kWh usage floor and every other test stay on.'
+records:
+- key: global_defaults
+  installed: {}
+  Validation for: Global Defaults
+  Bill Save:
+  - {Test Name: Large change in total cost as compared to preceding bill, Commodity: All, State: Enabled, Percent: 35, Amount (floor): 1000}
+  - {Test Name: Total bill cost exceeds the maximum for this billing account, Commodity: All, State: Enabled, Amount: 1000000}
+  - {Test Name: Large change in meter usage in current bill vs. preceding bill, Commodity: All, State: Enabled, Percent: 40}
+  - {Test Name: Total meter usage is less than the expected minimum, Commodity: Electric, State: Enabled, Amount: 1000, Unit: kWh}
+  - {Test Name: Total meter usage is less than the expected minimum, Commodity: Natural Gas, State: Enabled, Amount: 100, Unit: therms}
+  - {Test Name: Total meter usage is less than the expected minimum, Commodity: Water, State: Enabled, Amount: 100, Unit: kgal}
+  - {Test Name: Billing period length exceeds expected maximum for this billing account, Commodity: All, State: Enabled, Amount: 36}
+  - {Test Name: Billing period length less than expected minimum for this billing account, Commodity: All, State: Enabled, Amount: 26}
+  - {Test Name: Meter not open prior to end of billing period, Commodity: All, State: Enabled}
+  - {Test Name: Meter closed prior to end of billing period, Commodity: All, State: Enabled}
+- key: ved_science_center_override
+  installed: {}
+  Validation for: Northlake University
+  Settings for: 'Account: SYN-VED-A-0010002 (Science Center, Valley Electric District)'
+  Bill Save:
+  - {Test Name: Large change in total cost as compared to preceding bill, State: Enabled, Percent: 60}
+  # why: lab and exhaust loads swing far past the 35% campus threshold (data/eem/northlake-ap-gl-v1.yaml)
+- key: sgu_student_center_override
+  installed: {}
+  Validation for: Northlake University
+  Settings for: 'Account: SYN-SGU-A-0020004 (Student Center, Sierra Gas Utility)'
+  Bill Save:
+  - {Test Name: Large change in meter usage in current bill vs. preceding bill, State: Disabled}
+  # why: the estimated read and its corrected actual are a deliberate swing
+- key: rcu_cedar_row_a_override
+  installed: {}
+  Validation for: Cedar Row Apartments
+  Settings for: 'Account: SYN-RCU-A-0030003 (Cedar Row A, River City Utilities)'
+  Bill Save:
+  - {Test Name: Billing period length less than expected minimum for this billing account, State: Disabled}
+  # why: the July 2024 account renewal produces one short period
+- key: ntp_science_center_override
+  installed: {}
+  Validation for: Northlake Thermal Plant
+  Settings for: 'Account: SYN-NTP-C-0000001 (Science Center allocation, Northlake Thermal Plant)'
+  Bill Save:
+  - {Test Name: Total bill cost exceeds the maximum for this billing account, State: Enabled, Amount: 250000}
+  # why: an internal allocation never approaches the global ceiling
+- key: ved_ridgeline_generator_override
+  installed: {}
+  Validation for: Northlake Thermal Plant
+  Settings for: 'Account: SYN-VED-A-0010014 (Ridgeline Substation, Valley Electric District)'
+  Bill Save:
+  - {Test Name: Large change in total cost as compared to preceding bill, State: Disabled}
+  - {Test Name: Large change in meter usage in current bill vs. preceding bill, State: Disabled}
+  # why: the generator account keeps none of its export credit, so its bill is a small residue ($1,077.45 on the windy
+  # first bill, 2024-07-01 to 2024-08-04; $6,753.10 on the still bill for 2025-01-05 to 2025-02-04) and its station
+  # service moves with the wind (4,428 kWh, then 46,920 kWh); +527% and +960% are past what the percent column can
+  # hold (255), and an open alert would hold the bill out of the AP queue. Test 28's 1,000 kWh usage floor stays on,
+  # and at 35 days the first bill is inside the 26-to-36-day period tests (data/bills/northlake-itemized-bills-v1.yaml)

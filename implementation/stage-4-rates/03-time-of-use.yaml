@@ -1,0 +1,77 @@
+# Stage 4, step 3: Time of Use (Database Administrator > Schedule, Time of Use tab).
+# Each entry is a 7-day x 24-hour grid painted with the Fill/Clear tools (or All/All Off, then Fill the
+# exceptions). Time of Use definitions are shared catalog entries picked per Schedule in 04-schedules.yaml.
+stage: 4
+step: 3
+title: Time of use
+app: Database Administrator
+screen: Schedule > Time of Use
+source:
+- data/providers/valley-electric-district.yaml (VED-TOU-GS and VED-TOU-PRI seasons and periods)
+- services/sources/assumptions.json (tou: summer_peak 12-18, summer_part_peak 8-12 and 18-22, winter_part_peak 8-22)
+- services/sources/model.py tou (weekends and holidays are off-peak)
+notes:
+- 'Reworked 2026-11-09 to the tariff''s three periods. Before, part-peak was folded into off-peak, which
+  over-priced the Central Plant''s September 2024 test by $39,743.08. Summer has peak, part-peak and off-peak;
+  winter has part-peak and off-peak. Weekends are off-peak all day in both seasons.'
+- UtilityTOUID 0 "All Hrs" already exists as the system default (every cell on); it needs no entry and is what
+  the all-hours Schedule and the two gas Schedules use.
+- UtilityTOUID 1 already exists, named "Peak Hours", created 2026-09-14 alongside UtilitySchedule 1. Its painted
+  pattern is not the tariff's peak window. This step repurposes it (rename, repaint).
+- 'Paint with All Off first, then Fill the block: Monday to Friday only, the stated hours, the starting hour
+  included and the ending hour not (12:00-18:00 lights hours 12, 13, 14, 15, 16, 17).'
+- 'An off-peak definition is every hour its season''s other definitions leave: paint it with All On, then Clear
+  the Monday to Friday blocks the peak and part-peak entries fill. The three summer grids together, and the two
+  winter grids together, must light every hour of the week exactly once.'
+- The grid is only on or off. Whether its hours are peak, part-peak or off-peak is the Significance of the charge
+  that uses the schedule (05-rates.yaml), named here for traceability.
+- 'Not settled until the first rate test: the engine reads a value into the hour it ends in. The source model puts
+  a 15-minute value ending at 12:00 in the hour before (part-peak). If the two disagree, a test total will be off by
+  the edge intervals, and the grids shift by one hour.'
+records:
+- key: summer_peak
+  installed:
+    utilityTOUId: 1
+    note: reuses existing UtilityTOUID 1, "Peak Hours" (created 2026-09-14); rename and repaint
+  Time of Use:
+    Time of Use Name: Summer Peak (Wkdy 12-18)
+    Grid: All Off, then Fill Monday-Friday, hours 12-17 inclusive (12:00 PM-6:00 PM)
+    Hours lit: 30
+  Notes:
+  - The tariff's peak period.
+- key: summer_part_peak
+  installed:
+    utilityTOUId: null
+  Time of Use:
+    Time of Use Name: Summer Part-Peak (Wkdy 8-12, 18-22)
+    Grid: All Off, then Fill Monday-Friday, hours 8-11 inclusive (8:00 AM-12:00 PM) and hours 18-21 inclusive (6:00 PM-10:00 PM)
+    Hours lit: 40
+  Notes:
+  - The tariff's part-peak period, in two blocks around the peak.
+- key: summer_off_peak
+  installed:
+    utilityTOUId: null
+  Time of Use:
+    Time of Use Name: Summer Off-Peak (nights, weekends)
+    Grid: All On, then Clear Monday-Friday, hours 8-21 inclusive (8:00 AM-10:00 PM)
+    Hours lit: 98
+  Notes:
+  - Weekday nights 10:00 PM-8:00 AM and all of Saturday and Sunday.
+- key: winter_part_peak
+  installed:
+    utilityTOUId: null
+  Time of Use:
+    Time of Use Name: Winter Part-Peak (Wkdy 8-22)
+    Grid: All Off, then Fill Monday-Friday, hours 8-21 inclusive (8:00 AM-10:00 PM)
+    Hours lit: 70
+  Notes:
+  - Winter has no peak period.
+- key: winter_off_peak
+  installed:
+    utilityTOUId: null
+  Time of Use:
+    Time of Use Name: Winter Off-Peak (nights, weekends)
+    Grid: All On, then Clear Monday-Friday, hours 8-21 inclusive (8:00 AM-10:00 PM)
+    Hours lit: 98
+  Notes:
+  - The same grid as Summer Off-Peak; kept as its own entry so each season's set reads complete on its own.

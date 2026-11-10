@@ -1,0 +1,65 @@
+# Stage 6, step 5: AP approval and upload (Web SPA #/reporting/APApprovalAndUpload). The approval queue and the
+# validation-alert block are usable today; the actual "Create Interface File" run is blocked - see 04-ap-export-
+# formats.yaml and the Findings below. Enter and check everything up to that point; do not fabricate a file the
+# screen cannot actually produce.
+stage: 6
+step: 5
+title: AP approval and upload
+app: Web SPA
+screen: '#/reporting/APApprovalAndUpload'
+source:
+- data/eem/northlake-ap-gl-v1.yaml
+- generators/documents/sources/implementation/dream-customer/phase3-ap-gl-validation-spec.md
+- documents/guides/chart-of-accounts-and-gl-guide.pdf
+notes:
+- Eligible bills are Status_Code 2 (QC Approval, Stage 5 Step 5) on an account whose Bill Service Type is AP
+  Upload Only or Bill Payment (03-account-gl-defaults.yaml) - a No AP Upload account (River City Cedar Row B)
+  never appears in this queue at all, approved or not, and neither does the GL-only Ridgeline transfer account
+  (SYN-RWL-G-0000001), although its Bill Service Type, Bill Payment, is one the queue otherwise admits.
+- A bill with an open BillValidation_Tbl row (an unresolved failure against a Bill Save test, 01-bill-validation-
+  rules.yaml) is excluded from the approval queue even if its Status_Code is already 2, per the chart-of-
+  accounts guide's own AP setup note ("a bill with an open validation alert must be held from export").
+- 'Added 2026-10-01 (Ridgeline Wind): Ridgeline puts three rules on this screen. (1) The transfer statement EEM
+  generates for SYN-RWL-G-0000001 is GL only, "a journal between the plant and its own wind company", with no
+  payment leaving the plant (chart-of-accounts guide, AP setup), so it never appears in an AP queue or file, even
+  after QC Approval, and only the GL journal format carries it (04-ap-export-formats.yaml). (2) The Valley
+  Electric generator account, SYN-VED-A-0010014, "pays only its own small charges", so its bill is an ordinary AP
+  bill. (3) Its export credit moves to the Central Plant account (the bill credit transfer), so the guide''s rule
+  applies, "code the credit once, where it lands": on the Central Plant bill, coded 5100-ELEC, while the generator
+  bill''s own credit and transferred lines net to zero.'
+records:
+- key: approval_queue
+  installed: {}
+  Action: 'Open #/reporting/APApprovalAndUpload, filter to Northlake University, and select the QC-Approved,
+    AP-eligible bills for a given period (e.g. every 2024-06 bill on an AP Upload Only or Bill Payment account).'
+  Format: export_ap2 (target - see Findings; the picker is empty in this instance today)
+  Expected File: one ExportFile row per run, one ExportLog row per bill, advancing each bill's status to G/L
+    Upload once a format actually runs.
+- key: blocked_by_validation_example
+  installed: {}
+  Purpose: prove an open validation alert holds a bill out of the queue.
+  Account: SYN-VED-A-0010008 (Recreation and Aquatics Center)
+  Bills: {November 2024 Total: 5800.00, December 2024 Total: 8200.00}  # assumed, illustrative
+  Result: December 2024's cost change is 41.4%, over the Global 35% threshold and the $1000 floor (BV_TestID
+    21), so rp_BillValidation shows an open alert on it; even after it is marked Status_Code 2, it must not
+    appear in the approval queue until the alert is resolved or the bill is corrected.
+- key: ridgeline_transfer_gl_only_example
+  installed: {}
+  Purpose: prove the GL-only transfer statement never reaches an AP queue or an AP file.
+  Account: SYN-RWL-G-0000001 (Ridgeline Turbine Field / RWL, Northlake Thermal Plant; Bill Payment, Bill Generation)
+  Bills: {July 2024 Total: 129330.27}  # the statement EEM generates; it must match the hand-made sample to the cent
+  Result: even after the statement is marked Status_Code 2, it does not appear in the approval queue for any AP
+    format, and no AP-type ExportLog row ever names it (checks.sql ridgeline_gl_only); no AP file line is written
+    under vendor RWL-INTERNAL.
+  Carried by (target): the GL journal only, one balanced pair of 129330.27, 5150-WIND against 2000-AP  # assumed - the pairing follows nl_gl_journal's balanced debit/credit pairs
+- key: ridgeline_bill_credit_transfer_example
+  installed: {}
+  Purpose: prove the generator's bill is an ordinary AP bill and the bill credit transfer is coded once, where it lands.
+  Accounts: {Generator: SYN-VED-A-0010014 (Ridgeline Substation / VED), Beneficiary: SYN-VED-A-0010013 (Central Plant / VED)}
+  Bills: {Generator first bill Total: 1077.45, Central Plant September 2024 Total: 151171.47}
+  Result: the generator's first bill (2024-07-01..2024-08-04, ved_ridgeline_generator_2024_07) is eligible once approved
+    and pays 1077.45 (285.00 + 580.07 + 161.07 + 51.31), every line coded 5100-ELEC; its generation credit (-152792.65)
+    and the transferred line (+152792.65) net to 0.00, so no credit leaves with it. The Central Plant's September 2024
+    bill (2024-08-05..2024-09-04, ved_central_plant_2024_09) carries the credit as its received line (-152792.65), coded
+    5100-ELEC, the only place the credit reaches the GL; the three lines net to -152792.65 (checks.sql
+    ridgeline_bct_coded_once).

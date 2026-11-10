@@ -2,15 +2,13 @@
    fields, badges, notices, footer) comes from /branding/site.css; this file
    owns the page layouts. Square corners throughout. */
 
+/* --surface, --line, --line-strong and --muted come from
+   brands/northlake/tokens.css (through brand.css). Redefining them here from the
+   --nl-* names would be circular, because brand.css maps those names back. */
 :root {
   --nl-content-width: 1440px;
-  --surface: var(--nl-white);
   --surface-soft: var(--nl-tint);
-  --line: var(--nl-line);
-  --line-strong: var(--nl-line-strong);
   --text: var(--nl-ink);
-  --muted: var(--nl-slate);
-  --accent: var(--nl-navy);
   --danger: var(--nl-danger);
   --success: var(--nl-success);
 }
@@ -101,7 +99,7 @@ h2 {
 }
 
 .legacy-profile {
-  border-left: 3px solid var(--line-strong);
+  border: 1px solid var(--line);
   background: var(--surface-soft);
 }
 
@@ -233,10 +231,8 @@ textarea {
 
 .status-list dt {
   color: var(--muted);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: 12.5px;
+  font-weight: 600;
 }
 
 .status-list dd {
@@ -346,7 +342,7 @@ pre {
 .user-row[aria-pressed="true"],
 .group-row[aria-pressed="true"] {
   background: var(--nl-gold-tint);
-  box-shadow: inset 4px 0 0 var(--nl-gold);
+  box-shadow: inset 0 0 0 1px var(--nl-gold);
 }
 
 .user-row:focus-visible,
@@ -422,7 +418,6 @@ pre {
   margin-top: 24px;
   padding: 20px;
   border: 1px solid var(--success);
-  border-left-width: 4px;
   background: var(--nl-success-tint);
 }
 
@@ -526,10 +521,8 @@ pre {
 
 .claim-grid span {
   color: var(--muted);
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-size: 12.5px;
+  font-weight: 600;
 }
 
 .claim-grid pre {
@@ -583,6 +576,100 @@ pre {
 
 .diff-output code {
   color: var(--nl-navy);
+}
+
+/* Test the provider (moved from the old launchpad) ------------------------------ */
+.test-provider {
+  margin-top: 48px;
+  padding-top: 32px;
+  border-top: 1px solid var(--line);
+}
+
+.test-provider h2 {
+  font-size: clamp(24px, 2.6vw, 30px);
+}
+
+.test-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px;
+  margin-top: 22px;
+}
+
+.test-card {
+  padding: 26px 28px;
+}
+
+.test-card h3 {
+  margin-bottom: 12px;
+  font-size: 18px;
+}
+
+.test-steps {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding-left: 22px;
+  font-size: 15px;
+}
+
+.test-steps a {
+  display: inline-block;
+  margin-top: 4px;
+}
+
+.test-note {
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.test-contract {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0 0;
+}
+
+.test-contract div {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  gap: 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  background: var(--surface-soft);
+}
+
+.test-contract dt {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.test-contract dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-family: var(--nl-font-mono);
+  font-size: 12.5px;
+}
+
+.test-provider .actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.test-links {
+  margin-top: 18px;
+  font-size: 14px;
+}
+
+@media (max-width: 900px) {
+  .test-grid,
+  .test-contract div {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 /* Footer ---------------------------------------------------------------------- */

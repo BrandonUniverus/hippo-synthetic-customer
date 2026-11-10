@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Northlake brand systems</title>
+  <link rel="icon" href="northlake/mark.svg" type="image/svg+xml">
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; color: #16191d; background: #f4f5f6; font: 15px/1.55 system-ui, "Segoe UI", Arial, sans-serif; }
+    header { padding: 24px 24px 8px; max-width: 1240px; margin: 0 auto; }
+    h1 { margin: 0 0 6px; font-size: 24px; }
+    p { margin: 0 0 10px; color: #3b4048; max-width: 900px; }
+    code { font-family: ui-monospace, Consolas, monospace; font-size: 13px; background: #e9ebee; padding: 1px 4px; }
+    main { display: grid; grid-template-columns: repeat(auto-fill, minmax(560px, 1fr)); gap: 20px; padding: 12px 24px 32px; max-width: 1240px; margin: 0 auto; }
+    section { background: #fff; border: 1px solid #d9dce0; }
+    section h2 { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 0; padding: 10px 14px; font-size: 15px; border-bottom: 1px solid #d9dce0; }
+    section h2 span { font-weight: 400; font-size: 13px; }
+    section h2 a { color: #0b57d0; margin-left: 10px; }
+    iframe { display: block; width: 100%; height: 860px; border: 0; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Northlake brand systems</h1>
+    <p>Northlake University and the six organisations that serve it. Each one is a folder here: <code>tokens.css</code> (colours, type, spacing, corners, logo use), <code>fonts.css</code> with its self-hosted fonts, and <code>logo.svg</code>, <code>logo-reversed.svg</code> and <code>mark.svg</code>. Every brand uses the same token names, so a page written once changes its whole look when it loads another brand's files.</p>
+    <p>Edit a <code>tokens.css</code> and refresh to see it below. After changing lettering or fonts, run <code>python brands/tools/build_logos.py</code>. See <code>brands/README.md</code>.</p>
+  </header>
+  <main id="brands"></main>
+  <script>
+    const brands = [
+      ["northlake", "Northlake University"], ["valley-electric", "Valley Electric District"],
+      ["river-city", "River City Utilities"], ["sierra-gas", "Sierra Gas Utility"],
+      ["helios", "Helios Onsite Solar"], ["thermal-plant", "Northlake Thermal Plant"],
+      ["ridgeline-wind", "Ridgeline Wind"]
+    ];
+    document.getElementById("brands").innerHTML = brands.map(([id, name]) =>
+      `<section><h2>${name}<span><a href="${id}/tokens.css">tokens.css</a><a href="${id}/logo.svg">logo</a><a href="preview.html?brand=${id}">open</a></span></h2>` +
+      `<iframe src="preview.html?brand=${id}" title="${name} preview" loading="lazy"></iframe></section>`).join("");
+  </script>
+</body>
+</html>

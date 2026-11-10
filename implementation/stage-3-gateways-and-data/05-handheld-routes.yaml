@@ -1,0 +1,750 @@
+# Stage 3, step 5. Configuration first; the controlled import exercises run in Step 4.
+# Entered on the web's Handheld Meter Setup page (System Manager): its Read Types page for the catalog, its routes
+# view for meters and registers (paste 05-handheld-meters.csv, generated from this file), and its Starting readings
+# view for each register's first value.
+stage: 3
+step: 5
+title: Handheld meter reading routes
+app: Web
+screen: Handheld Read Types (#/HandheldMeterReadTypes); Handheld Meter Setup (#/HandheldMeterSetup), routes and Starting readings views; Handheld Meter Reading Export
+source:
+- Database/EEMSuite/Tables/HMR_Meter.sql
+- Database/EEMSuite/Tables/HMR_Reading.sql
+- Database/EEMSuite/Tables/HMR_ReadType.sql
+- Database/EEMSuite/Procs/HMR_Setup_Save.sql
+- Database/EEMSuite/Procs/HMR_ReadType_SaveBatch.sql
+- src/Web/EEMSuite.Web/frontend/src/scripts/hippo/views/handheldMeterSetup/handheldSetupPaste.ts (the paste's column names)
+- Database/EEMSuite/Procs/HMR_PointNode_Get.sql
+- Database/EEMSuite/Procs/HMR_HDLData.sql
+- implementation/stage-2-hierarchy/04-points.yaml
+- implementation/stage-3-gateways-and-data/02-gateways.yaml
+- implementation/stage-3-gateways-and-data/handheld-test-environment.md
+notes:
+- 'HMR_Meter assigns a physical meter to a cycle and route. Its MetaWorldID is the meter hierarchy ID,
+  not either point node ID. HMR_Reading is channel configuration, not dated observations.'
+- 'The permanent scope is 192 meters and 204 registers on ten routes (eleven cycle and route pairs, because one
+  Cedar Row C meter sits on a mistyped cycle). The first five routes are the 132 single-register meters of
+  November 5: two utility masters, 60 Cedar Row A apartments plus its house, 64 Cedar Row B apartments plus its
+  house, and the four sewer-credit deduct meters. Each record''s Meters lists every meter and the existing points
+  to pick for it; the apartment templates use the real unit numbers, not 1..60 or 1..64.'
+- 'The five routes added on 2026-11-07 are there to learn the handheld settings, each for a different reason:
+  CRCWTR (Cedar Row C, 50 meters keyed badly by the installer, as delivered); IRRIG (four irrigation meters read in
+  ccf in season, the easy one); CHECK (two utility meters whose register needs a meter constant, x40 and x3.0367);
+  SWGR (one switchgear meter with ten registers, six through a Delta and four demand reads); GEN (three
+  generators with two registers each, run hours and diesel gallons). They use nine read types between them.'
+- 'Cedar Row C is built badly on purpose, the way the installer keyed it, and stays that way until the Stage 12
+  scenario fixes it with bulk edit: floors 1 and 2 got 8-dial gallon meters and floors 3 and 4 6-dial ccf meters
+  (two read types, two prompts and two units on one route); the route runs floor by floor from the top in unit
+  order, so the reader crosses between the west and east meter banks on every floor and walks back to the laundry
+  room at the end; unit 412 was keyed on cycle 20 instead of 02, so the route file carries it as a one-meter route
+  on cycle 20 and a reader who loads cycle 02 never sees it; the laundry meter was saved disabled, so the route file
+  leaves it out; and every meter text was copied from Cedar Row B''s.'
+- 'Three kinds of register. An accumulator: Reading Point is the Stage 2 register and Consumption Point its
+  generated Delta. An Analog register (the generators'' run hours): Reading Point is an Analog register point and
+  Consumption Point a separate Analog usage point, because EEM makes an Accumulator only in an Energy or Volume unit
+  or one with a rate unit, and Hour is neither; it is the pattern Massport uses for every handheld register. A demand
+  read (read type Demand read Y: the switchgear''s kW, on-peak kW, kVA and power factor) has no Reading Point; its
+  value is stored as read on its Analog point, and it takes no starting reading.'
+- 'The register points already exist. Select Register Reading as Reading Point and its generated
+  Register Reading Delta as Consumption Point. Resolve that pair by PtRelatedData_TBL ReasonType D;
+  the channel keys are model keys, not points to create or names to type.'
+- 'Cycle is at most 2 characters, Route at most 6, Bill Code at most 1, Text Prompt at most 4, and
+  Meter Text at most 100. Cycle/route values below are Northlake assumptions, independent of utility
+  billing cycles. Channel is required by the editor/save procedure even for a text upload.'
+- 'The incoming file matches the physical meter MetaWorldID plus Text Prompt (KGAL or THRM).
+  HMR_PointNode_Get currently loads all configured handheld channels regardless of GatewayId;
+  separate gateway profiles and roots identify deliveries but do not isolate the HMR configuration.
+  Keep each delivery limited to its intended meters and verify unmatched-file behavior in acceptance.'
+- 'Neptune and MVRS use the existing reusable tasks. MVRS publishes its HMR events in the same workflow;
+  Neptune does not publish the same HMR log stream. Do not add a separate HMR publisher task.'
+- 'High Warning and Low Warning (added 2026-11-09) are whole-number limits, assumed: the customer packet gives none.
+  Each route carries one pair, and the registers of CHECK, SWGR and GEN carry their own. Three cases stay on purpose:
+  Cedar Row C has none (its installer left them empty), the switchgear''s power factor has none, and irrigation, run
+  hours and fuel have a Low of 0. EEM stores the two values on the register; nothing in this stage reads them back.'
+- 'Northlake on 2026-11-05: the three read types a SQL script had inserted were deleted so the Handheld Read
+  Types page creates them; HMR_ReadType, HMR_Meter and HMR_Reading are all empty.'
+- 'The source service currently excludes handheld protocols. The acceptance uploads below still need
+  generating from resolved Northlake IDs. A route export is outbound device configuration, not an upload
+  that can simply be fed back to the collector.'
+- 'The optional handheld simulator design is agreed in handheld-test-environment.md. First demonstrate
+  the two master routes with controlled integer kgal/therm readings and Constant 1. This is not the
+  retained source-history scale: fractional registers, gas conversion, export field limits, and both
+  HMR/accumulator delta calculations must be resolved before historical population or apartment rollout.'
+- 'A two-route simulator pilot needs no checkpoint (Stage 3 takes none after the entry backup); its readings stay
+  in the two masters'' history. The simulator never restores Northlake.'
+
+readTypes:
+# Enter these on the page's Read types and save them together. A customer catalog, one type per meter model; the
+# format fields follow the supplied Massport research (water 65, gas 88, kWh 10, kW 13). Codes 70, 71 and 72 are new
+# Northlake codes: an MVRS read type table is the customer's own. New Northlake identities, no Massport row IDs.
+# Page fields: Description, Dials (NumDials), Decimals (NumDecimals), Read type code, Read direction, Demand read,
+# ERT type, Truncation factor.
+- key: water_keyed
+  Description: Northlake Keyed Water 10D
+  ERTType:
+  NumDials: 10
+  NumDecimals: 0
+  ReadTypeCode: '65'
+  ReadDirection: L
+  DemandRead: N
+  TruncationFactor: 0
+- key: gas_keyed
+  Description: Northlake Keyed Gas 6D
+  ERTType:
+  NumDials: 6
+  NumDecimals: 0
+  ReadTypeCode: '88'
+  ReadDirection: L
+  DemandRead: N
+  TruncationFactor: 0
+- key: demand_keyed
+  Description: Northlake Keyed Demand 10D2DC
+  ERTType:
+  NumDials: 10
+  NumDecimals: 2
+  ReadTypeCode: '13'
+  ReadDirection: L
+  DemandRead: Y
+  TruncationFactor: 0
+# ---- Added 2026-11-07 with the five new routes ----
+- key: water_gal_8d
+  Description: Northlake Keyed Water 8D Gallons
+  ERTType:
+  NumDials: 8
+  NumDecimals: 0
+  ReadTypeCode: '65'
+  ReadDirection: L
+  DemandRead: N
+  TruncationFactor: 0
+- key: water_ccf_6d
+  Description: Northlake Keyed Water 6D CCF
+  ERTType:
+  NumDials: 6
+  NumDecimals: 0
+  ReadTypeCode: '65'
+  ReadDirection: L
+  DemandRead: N
+  TruncationFactor: 0
+- key: electric_keyed
+  Description: Northlake Keyed Electric 6D
+  ERTType:
+  NumDials: 6
+  NumDecimals: 0
+  ReadTypeCode: '10'
+  ReadDirection: L
+  DemandRead: N
+  TruncationFactor: 0
+- key: pf_keyed
+  Description: Northlake Keyed Power Factor 3D2DC
+  ERTType:
+  NumDials: 3
+  NumDecimals: 2
+  ReadTypeCode: '72'
+  ReadDirection: L
+  DemandRead: Y
+  TruncationFactor: 0
+- key: hours_keyed
+  Description: Northlake Keyed Hours 6D
+  ERTType:
+  NumDials: 6
+  NumDecimals: 0
+  ReadTypeCode: '70'
+  ReadDirection: L
+  DemandRead: N
+  TruncationFactor: 0
+- key: fuel_keyed
+  Description: Northlake Keyed Fuel 7D Gallons
+  ERTType:
+  NumDials: 7
+  NumDecimals: 0
+  ReadTypeCode: '71'
+  ReadDirection: L
+  DemandRead: N
+  TruncationFactor: 0
+
+setup:
+- 'Create the three handheld gateways in Configuration Tool before their schedules: first the
+  parameterless Handheld Meter Reading Gateway type on Gateway Types, then the three profiles in
+  02-gateways.yaml with that type and no nodes. Configuration Tool requires a type; the Neptune and
+  MVRS components never read it. The Stage 3 gateway_type_assignments check confirms all three.'
+- 'Finish the three disabled schedules in 03-workflows-and-tasks.yaml once their gateway profiles
+  exist. Keep the normal RootDirectory-only setup and leave UseSqlValues=false for the baseline runs.'
+- 'Read types: Web > System Manager > Handheld Meter Setup (the page takes over the HMR Configuration menu entry
+  before this step), More > Read types. Add the nine read types above and save them together.'
+- 'Meters and registers: choose Northlake University, Cedar Row Apartments and Northlake Thermal Plant in the
+  location tree and show All meters, so all 192 meters are listed. More > Paste from Excel: open
+  05-handheld-meters.csv in a text editor (Excel turns cycles 01 to 05 and tamper code 00 into 1 to 5 and 0), copy
+  all of it and paste it into the card. The file has one row per register, 204 rows: a meter with several
+  registers has one row for each, told apart by its prompt. Each row fills its meter''s cycle, route, sequence,
+  enabled flag, bill code and meter text and the register''s read type, prompt, constant, channel, tamper code, high and low
+  warning, Reading Point and Consumption Point; the four demand reads leave Reading Point empty. Save the paste once; it is all or nothing
+  and names any rejected row.'
+- 'Starting readings, in two passes, Cedar Row C first. (1) Choose only Cedar Row C, switch to Starting readings,
+  set the date to September 1, 2025, open 05-handheld-starting-readings-2025-09-01.txt in a text editor, copy all
+  50 lines, click the first row''s Starting reading, paste and save. (2) Choose the three companies again, set the
+  date to January 1, 2024 and paste 05-handheld-starting-readings-2024-01-01.txt (150 lines) the same way. Each file
+  is in the grid''s own order (cycle, route, sequence, prompt), so it lines up only when the grid lists exactly that
+  many registers with no starting reading, 50 and then 150. If it lists a different number, stop and check which
+  register already has a reading. Demand reads take none and are not listed.'
+- 'Run the handheld sections of checks.sql: all nine read types and all 204 registers must match, 213 checks.
+  Correct a wrong mapping before supplying any handheld file. Do not correct Cedar Row C''s route: its mistakes are
+  the expected configuration until the Stage 12 scenario.'
+- 'Route export and import exercises belong to Step 4, after Steps 5 and 6; the starting readings are
+  the only values entered here.'
+
+startingReadings:
+  Read date: '2024-01-01'
+  Notes:
+  - 'Each value is saved on the register''s Reading point at the start of that local day, as its first reading;
+    no usage is booked for it. The page accepts one only for a register that has no reading yet.'
+  - 'A record''s Starting reading is one number for a single meter, or First and Step along its route in
+    sequence order. The masters'' 12000 kgal and 1000 therms are the opening values the Step 4 handheld pack
+    builds on; the submeters'' values are the previous registers its February batch reads from.'
+  - 'A meter with its own Registers gives each accumulator register its own Starting reading. Cedar Row C''s two
+    records carry their own Starting date, 2025-09-01, the day its new meters were set, so their values are small.'
+  - 'generators/stage_check_data.py writes 05-handheld-starting-readings-<date>.txt, one value per line for each
+    date in the Starting readings grid''s order: 150 values for 2024-01-01 and 50 for 2025-09-01.'
+
+records:
+# Gateway: the 02-gateways.yaml handheld gateway whose upload files carry these meters (its schedule picks it).
+# Meters: each physical meter to assign, and the two existing Stage 2 points to pick in Configure Meter:
+#   Reading Point = the register, Consumption Point = its generated delta. channel and relatedReadingChannel
+#   are recipe keys only; you never type them.
+# HMR_Meter is the meter's place on its route (cycle, route, sequence); HMR_Reading is its register.
+# Starting reading: the register's first value (startingReadings above). 05-handheld-meters.csv holds all of it.
+- key: hmr_cedar_row_b_water_master
+  Gateway: gw_neptune_river_city_water
+  count: 1
+  Starting reading: 12000
+  Meters:
+  - Company: Cedar Row Apartments
+    Meter: {Description: Cedar Row B Water Master, Meter Number: SYN-RCU-M-0060004}
+    Reading Point: Register Reading
+    Consumption Point: Register Reading Delta
+    channel: ch_rcu_cedar_row_b_water_kgal_route
+    relatedReadingChannel: ch_rcu_cedar_row_b_water_register
+  HMR_Meter:
+    Cycle: '02'
+    Route Number: CRBMW
+    Enabled: true
+    First Read Sequence: 10
+    Read Sequence Increment: 10
+    Bill Code: '-'
+    Meter Text: Cedar Row B master water register. Record the cumulative kgal value.
+  HMR_Reading:
+    Read Type: water_keyed
+    Meter Constant: 1
+    Text Prompt: KGAL
+    Channel: 1
+    ERT Id:
+    Tamper Code: '00'
+    High Warning: 600
+    Low Warning: 50
+- key: hmr_student_center_gas_master
+  Gateway: gw_mvrs_sierra_gas
+  count: 1
+  Starting reading: 1000
+  Meters:
+  - Company: Northlake University
+    Meter: {Description: Student Center Kitchen Gas, Meter Number: SYN-SGU-M-0050004}
+    Reading Point: Register Reading
+    Consumption Point: Register Reading Delta
+    channel: ch_sgu_student_center_therms_route
+    relatedReadingChannel: ch_sgu_student_center_gas_register
+  HMR_Meter:
+    Cycle: '01'
+    Route Number: SCGAS
+    Enabled: true
+    First Read Sequence: 10
+    Read Sequence Increment: 10
+    Bill Code: '-'
+    Meter Text: Student Center kitchen gas register. Record the cumulative therm value.
+  HMR_Reading:
+    Read Type: gas_keyed
+    Meter Constant: 1
+    Text Prompt: THRM
+    Channel: 1
+    ERT Id:
+    Tamper Code: '00'
+    High Warning: 3000
+    Low Warning: 100
+- key: hmr_cedar_row_a_water_submeters
+  Gateway: gw_neptune_cedar_row_submeters
+  count: 61
+  Starting reading: {First: 1010, Step: 10}
+  # House first (sequence 10), then units 101..120,201..220,301..320 (20..610).
+  Meters:
+  - Company: Cedar Row Apartments
+    Meter: {Description: Cedar Row A Water House, Meter Number: SYN-SUB-W-AH}
+    Reading Point: Register Reading
+    Consumption Point: Register Reading Delta
+    channel: ch_cedar_row_a_house_water_kgal_route
+    relatedReadingChannel: ch_cedar_row_a_house_water_register
+  - pointTemplate: true  # one meter per unit: 101-120, 201-220, 301-320
+    Company: Cedar Row Apartments
+    Meter pattern: {Description: "Cedar Row A Unit {unit} Water", Meter Number: "SYN-SUB-W-A{unit}"}
+    Reading Point: Register Reading
+    Consumption Point: Register Reading Delta
+    count: 60
+    channelPattern: ch_cedar_row_a_unit_{unit}_water_kgal_route for unit in 101..120,201..220,301..320
+    relatedReadingChannelPattern: ch_cedar_row_a_unit_{unit}_water_register
+  HMR_Meter:
+    Cycle: '02'
+    Route Number: CRAWTR
+    Enabled: true
+    First Read Sequence: 10
+    Read Sequence Increment: 10
+    Bill Code: '-'
+    Meter Text: Cedar Row A water submeter. Confirm the unit on the meter before reading.
+  HMR_Reading:
+    Read Type: water_keyed
+    Meter Constant: 1
+    Text Prompt: KGAL
+    Channel: 1
+    ERT Id:
+    Tamper Code: '00'
+    High Warning: 60
+    Low Warning: 1
+- key: hmr_cedar_row_b_water_submeters
+  Gateway: gw_neptune_cedar_row_submeters
+  count: 65
+  Starting reading: {First: 1620, Step: 10}
+  # House first (sequence 10), then units 101..116,201..216,301..316,401..416 (20..650).
+  Meters:
+  - Company: Cedar Row Apartments
+    Meter: {Description: Cedar Row B Water House, Meter Number: SYN-SUB-W-BH}
+    Reading Point: Register Reading
+    Consumption Point: Register Reading Delta
+    channel: ch_cedar_row_b_house_water_kgal_route
+    relatedReadingChannel: ch_cedar_row_b_house_water_register
+  - pointTemplate: true  # one meter per unit: 101-116, 201-216, 301-316, 401-416
+    Company: Cedar Row Apartments
+    Meter pattern: {Description: "Cedar Row B Unit {unit} Water", Meter Number: "SYN-SUB-W-B{unit}"}
+    Reading Point: Register Reading
+    Consumption Point: Register Reading Delta
+    count: 64
+    channelPattern: ch_cedar_row_b_unit_{unit}_water_kgal_route for unit in 101..116,201..216,301..316,401..416
+    relatedReadingChannelPattern: ch_cedar_row_b_unit_{unit}_water_register
+  HMR_Meter:
+    Cycle: '02'
+    Route Number: CRBWTR
+    Enabled: true
+    First Read Sequence: 10
+    Read Sequence Increment: 10
+    Bill Code: '-'
+    Meter Text: Cedar Row B water submeter. Confirm the unit on the meter before reading.
+  HMR_Reading:
+    Read Type: water_keyed
+    Meter Constant: 1
+    Text Prompt: KGAL
+    Channel: 1
+    ERT Id:
+    Tamper Code: '00'
+    High Warning: 60
+    Low Warning: 1
+- key: hmr_campus_deduct_meters
+  Gateway: gw_neptune_river_city_water
+  count: 4
+  Starting reading: {First: 100, Step: 100}
+  # The four sewer-credit deduct meters: water that never reaches the sewer, read monthly by Facilities and
+  # submitted for the River City sewer credit. Three companies, so the setup sheet needs all three.
+  Meters:
+  - Company: Northlake University
+    Meter: {Description: Student Center Kitchen Sewer Deduct, Meter Number: SYN-DED-W-SC01}
+    Reading Point: Register Reading
+    Consumption Point: Register Reading Delta
+    channel: ch_student_center_kitchen_deduct_kgal_monthly
+    relatedReadingChannel: ch_student_center_kitchen_deduct_register
+  - Company: Northlake University
+    Meter: {Description: Recreation Center Pool Fill Deduct, Meter Number: SYN-DED-W-RC01}
+    Reading Point: Register Reading
+    Consumption Point: Register Reading Delta
+    channel: ch_recreation_center_pool_fill_kgal_monthly
+    relatedReadingChannel: ch_recreation_center_pool_fill_register
+  - Company: Northlake Thermal Plant
+    Meter: {Description: Central Plant Cooling Tower Deduct, Meter Number: SYN-DED-W-CP01}
+    Reading Point: Register Reading
+    Consumption Point: Register Reading Delta
+    channel: ch_ntp_plant_cooling_tower_deduct_kgal_monthly
+    relatedReadingChannel: ch_ntp_plant_cooling_tower_deduct_register
+  - Company: Cedar Row Apartments
+    Meter: {Description: Common House Pool Fill Deduct, Meter Number: SYN-DED-W-CH01}
+    Reading Point: Register Reading
+    Consumption Point: Register Reading Delta
+    channel: ch_cedar_row_common_house_pool_fill_kgal_monthly
+    relatedReadingChannel: ch_cedar_row_common_house_pool_fill_register
+  HMR_Meter:
+    Cycle: '03'
+    Route Number: DEDUCT
+    Enabled: true
+    First Read Sequence: 10
+    Read Sequence Increment: 10
+    Bill Code: '-'
+    Meter Text: Sewer-credit deduct meter. Facilities reads it monthly for the River City sewer credit.
+  HMR_Reading:
+    Read Type: water_keyed
+    Meter Constant: 1
+    Text Prompt: KGAL
+    Channel: 1
+    ERT Id:
+    Tamper Code: '00'
+    High Warning: 150
+    Low Warning: 5
+# ---- Added 2026-11-07: five routes to learn the handheld settings ----
+# Cedar Row C, route CRCWTR, as the installer keyed it (see notes). Two records because the building has two meter
+# batches; both are one route. A meter's HMR_Meter overrides the record's route fields for that meter only.
+- key: hmr_cedar_row_c_upper_floors
+  Gateway: gw_neptune_cedar_row_submeters
+  count: 24
+  Starting date: '2025-09-01'
+  Starting reading: {First: 2, Step: 1}
+  # Floor 4 then floor 3, in unit order: sequences 10..240. Unit 412 keeps its sequence (120) but on cycle 20.
+  Meters:
+  - pointTemplate: true  # units 401-411
+    Company: Cedar Row Apartments
+    Meter pattern: {Description: "Cedar Row C Unit {unit} Water", Meter Number: "SYN-SUB-W-C{unit}"}
+    Reading Point: Register Reading
+    Consumption Point: Register Reading Delta
+    count: 11
+    channelPattern: ch_cedar_row_c_unit_{unit}_water_ccf_route for unit in 401..411
+    relatedReadingChannelPattern: ch_cedar_row_c_unit_{unit}_water_register
+  - Company: Cedar Row Apartments
+    Meter: {Description: Cedar Row C Unit 412 Water, Meter Number: SYN-SUB-W-C412}
+    Reading Point: Register Reading
+    Consumption Point: Register Reading Delta
+    HMR_Meter: {Cycle: '20'}  # the installer's typo for 02
+    channel: ch_cedar_row_c_unit_412_water_ccf_route
+    relatedReadingChannel: ch_cedar_row_c_unit_412_water_register
+  - pointTemplate: true  # units 301-312
+    Company: Cedar Row Apartments
+    Meter pattern: {Description: "Cedar Row C Unit {unit} Water", Meter Number: "SYN-SUB-W-C{unit}"}
+    Reading Point: Register Reading
+    Consumption Point: Register Reading Delta
+    count: 12
+    channelPattern: ch_cedar_row_c_unit_{unit}_water_ccf_route for unit in 301..312
+    relatedReadingChannelPattern: ch_cedar_row_c_unit_{unit}_water_register
+  HMR_Meter:
+    Cycle: '02'
+    Route Number: CRCWTR
+    Enabled: true
+    First Read Sequence: 10
+    Read Sequence Increment: 10
+    Bill Code: '-'
+    Meter Text: Cedar Row B water submeter. Confirm the unit on the meter before reading.
+  HMR_Reading:
+    Read Type: water_ccf_6d
+    Meter Constant: 1
+    Text Prompt: CCF
+    Channel: 1
+    ERT Id:
+    Tamper Code: '00'
+    High Warning:
+    Low Warning:
+- key: hmr_cedar_row_c_lower_floors
+  Gateway: gw_neptune_cedar_row_submeters
+  count: 26
+  Starting date: '2025-09-01'
+  Starting reading: {First: 40, Step: 5}
+  # Floor 2 then floor 1, then the house and the laundry, although the laundry room is where the route starts:
+  # sequences 250..500. The laundry meter was saved disabled.
+  Meters:
+  - pointTemplate: true  # units 201-212
+    Company: Cedar Row Apartments
+    Meter pattern: {Description: "Cedar Row C Unit {unit} Water", Meter Number: "SYN-SUB-W-C{unit}"}
+    Reading Point: Register Reading
+    Consumption Point: Register Reading Delta
+    count: 12
+    channelPattern: ch_cedar_row_c_unit_{unit}_water_gal_route for unit in 201..212
+    relatedReadingChannelPattern: ch_cedar_row_c_unit_{unit}_water_register
+  - pointTemplate: true  # units 101-112
+    Company: Cedar Row Apartments
+    Meter pattern: {Description: "Cedar Row C Unit {unit} Water", Meter Number: "SYN-SUB-W-C{unit}"}
+    Reading Point: Register Reading
+    Consumption Point: Register Reading Delta
+    count: 12
+    channelPattern: ch_cedar_row_c_unit_{unit}_water_gal_route for unit in 101..112
+    relatedReadingChannelPattern: ch_cedar_row_c_unit_{unit}_water_register
+  - Company: Cedar Row Apartments
+    Meter: {Description: Cedar Row C Water House, Meter Number: SYN-SUB-W-CH}
+    Reading Point: Register Reading
+    Consumption Point: Register Reading Delta
+    channel: ch_cedar_row_c_house_water_gal_route
+    relatedReadingChannel: ch_cedar_row_c_house_water_register
+  - Company: Cedar Row Apartments
+    Meter: {Description: Cedar Row C Laundry Water, Meter Number: SYN-SUB-W-CL}
+    Reading Point: Register Reading
+    Consumption Point: Register Reading Delta
+    HMR_Meter: {Enabled: false}  # saved disabled, so the route file leaves it out
+    channel: ch_cedar_row_c_laundry_water_gal_route
+    relatedReadingChannel: ch_cedar_row_c_laundry_water_register
+  HMR_Meter:
+    Cycle: '02'
+    Route Number: CRCWTR
+    Enabled: true
+    First Read Sequence: 250
+    Read Sequence Increment: 10
+    Bill Code: '-'
+    Meter Text: Cedar Row B water submeter. Confirm the unit on the meter before reading.
+  HMR_Reading:
+    Read Type: water_gal_8d
+    Meter Constant: 1
+    Text Prompt: GAL
+    Channel: 1
+    ERT Id:
+    Tamper Code: '00'
+    High Warning:
+    Low Warning:
+# Irrigation, route IRRIG: River City bills these four meters; Facilities reads them in ccf from April to October.
+- key: hmr_irrigation_check_reads
+  Gateway: gw_neptune_river_city_water
+  count: 4
+  Starting reading: {First: 3100, Step: 1400}
+  Meters:
+  - Company: Northlake University
+    Meter: {Description: Campus Grounds Irrigation North Quad, Meter Number: SYN-RCU-M-0060009}
+    Reading Point: Register Reading
+    Consumption Point: Register Reading Delta
+    channel: ch_rcu_irrigation_north_quad_ccf_route
+    relatedReadingChannel: ch_rcu_irrigation_north_quad_register
+  - Company: Northlake University
+    Meter: {Description: Campus Grounds Irrigation South Fields, Meter Number: SYN-RCU-M-0060010}
+    Reading Point: Register Reading
+    Consumption Point: Register Reading Delta
+    channel: ch_rcu_irrigation_south_fields_ccf_route
+    relatedReadingChannel: ch_rcu_irrigation_south_fields_register
+  - Company: Northlake University
+    Meter: {Description: Campus Grounds Irrigation Athletics, Meter Number: SYN-RCU-M-0060011}
+    Reading Point: Register Reading
+    Consumption Point: Register Reading Delta
+    channel: ch_rcu_irrigation_athletics_ccf_route
+    relatedReadingChannel: ch_rcu_irrigation_athletics_register
+  - Company: Cedar Row Apartments
+    Meter: {Description: Cedar Row Landscape Irrigation, Meter Number: SYN-RCU-M-0060018}
+    Reading Point: Register Reading
+    Consumption Point: Register Reading Delta
+    channel: ch_rcu_cedar_row_irrigation_ccf_route
+    relatedReadingChannel: ch_rcu_cedar_row_irrigation_register
+  HMR_Meter:
+    Cycle: '04'
+    Route Number: IRRIG
+    Enabled: true
+    First Read Sequence: 10
+    Read Sequence Increment: 10
+    Bill Code: '-'
+    Meter Text: Irrigation check read. Record the ccf register and note any zone left running.
+  HMR_Reading:
+    Read Type: water_ccf_6d
+    Meter Constant: 1
+    Text Prompt: CCF
+    Channel: 1
+    ERT Id:
+    Tamper Code: '00'
+    High Warning: 900
+    Low Warning: 0
+# Utility check reads, route CHECK: the two Stage 2 daily registers that read a raw dial. The reader keys the dial;
+# the meter constant books billed units on the Delta (x40 current-transformer ratio, x3.0367 pressure factor), the
+# same factors as the two meters' Meter Multiplier. Each meter's single register is written out, because they differ.
+- key: hmr_utility_check_reads
+  Gateway: gw_mvrs_sierra_gas
+  count: 2
+  Meters:
+  - Company: Northlake University
+    Meter: {Description: Science Center Electric Lab Wing, Meter Number: SYN-VED-M-0040007}
+    Registers:
+    - {Text Prompt: KWH, Read Type: electric_keyed, Meter Constant: 40, Channel: 1, Reading Point: Register Reading,
+       Consumption Point: Register Reading Delta, Starting reading: 48210,
+       channel: ch_ved_science_center_lab_wing_kwh_route, relatedReadingChannel: ch_ved_science_center_lab_wing_register,
+       High Warning: 5000, Low Warning: 500}
+  - Company: Northlake Thermal Plant
+    Meter: {Description: Central Plant Boiler Gas, Meter Number: SYN-SGU-M-0050010}
+    Registers:
+    - {Text Prompt: CCF, Read Type: gas_keyed, Meter Constant: 3.0367, Channel: 1, Reading Point: Register Reading,
+       Consumption Point: Register Reading Delta, Starting reading: 15320,
+       channel: ch_sgu_central_plant_boiler_gas_ccf_route, relatedReadingChannel: ch_sgu_central_plant_boiler_gas_register,
+       High Warning: 4000, Low Warning: 100}
+  HMR_Meter:
+    Cycle: '01'
+    Route Number: CHECK
+    Enabled: true
+    First Read Sequence: 10
+    Read Sequence Increment: 10
+    Bill Code: '-'
+    Meter Text: Utility check read. Key the raw dial. The constant applies the meter multiplier.
+  HMR_Reading:
+    Read Type: electric_keyed
+    Meter Constant: 1
+    Text Prompt: KWH
+    Channel: 1
+    ERT Id:
+    Tamper Code: '00'
+    High Warning:
+    Low Warning:
+# Switchgear, route SWGR: one meter, ten display registers on channels 1 to 10. The time-of-use registers add up
+# to the total (98,400 + 121,700 + 192,500 = 412,600 kWh), and kVAh exceeds kWh, as a power factor below 1 requires.
+- key: hmr_central_plant_switchgear
+  Gateway: gw_mvrs_sierra_gas
+  count: 1
+  Meters:
+  - Company: Northlake Thermal Plant
+    Meter: {Description: Central Plant Main Switchgear, Meter Number: SYN-SUB-E-CPSWGR}
+    Registers:
+    - {Text Prompt: KWH, Read Type: electric_keyed, Channel: 1, Reading Point: kWh Delivered Register,
+       Consumption Point: kWh Delivered Register Delta, Starting reading: 412600,
+       channel: ch_swgr_kwh_delivered_route, relatedReadingChannel: ch_swgr_kwh_delivered_register,
+       High Warning: 700000, Low Warning: 200000}
+    - {Text Prompt: KWHP, Read Type: electric_keyed, Channel: 2, Reading Point: On-Peak kWh Register,
+       Consumption Point: On-Peak kWh Register Delta, Starting reading: 98400,
+       channel: ch_swgr_on_peak_kwh_route, relatedReadingChannel: ch_swgr_on_peak_kwh_register,
+       High Warning: 200000, Low Warning: 50000}
+    - {Text Prompt: KWHM, Read Type: electric_keyed, Channel: 3, Reading Point: Mid-Peak kWh Register,
+       Consumption Point: Mid-Peak kWh Register Delta, Starting reading: 121700,
+       channel: ch_swgr_mid_peak_kwh_route, relatedReadingChannel: ch_swgr_mid_peak_kwh_register,
+       High Warning: 250000, Low Warning: 60000}
+    - {Text Prompt: KWHO, Read Type: electric_keyed, Channel: 4, Reading Point: Off-Peak kWh Register,
+       Consumption Point: Off-Peak kWh Register Delta, Starting reading: 192500,
+       channel: ch_swgr_off_peak_kwh_route, relatedReadingChannel: ch_swgr_off_peak_kwh_register,
+       High Warning: 350000, Low Warning: 90000}
+    - {Text Prompt: KVRH, Read Type: electric_keyed, Channel: 5, Reading Point: kVArh Register,
+       Consumption Point: kVArh Register Delta, Starting reading: 187300,
+       channel: ch_swgr_kvarh_route, relatedReadingChannel: ch_swgr_kvarh_register,
+       High Warning: 300000, Low Warning: 50000}
+    - {Text Prompt: KVAH, Read Type: electric_keyed, Channel: 6, Reading Point: kVAh Register,
+       Consumption Point: kVAh Register Delta, Starting reading: 453900,
+       channel: ch_swgr_kvah_route, relatedReadingChannel: ch_swgr_kvah_register,
+       High Warning: 750000, Low Warning: 200000}
+    - {Text Prompt: KW, Read Type: demand_keyed, Channel: 7, Reading Point: null, Consumption Point: Max Demand kW,
+       channel: ch_swgr_max_demand_kw_route, usageChannel: ch_swgr_max_demand_kw,
+       High Warning: 1800, Low Warning: 600}
+    - {Text Prompt: KWP, Read Type: demand_keyed, Channel: 8, Reading Point: null, Consumption Point: On-Peak Max Demand kW,
+       channel: ch_swgr_on_peak_max_demand_kw_route, usageChannel: ch_swgr_on_peak_max_demand_kw,
+       High Warning: 1800, Low Warning: 500}
+    - {Text Prompt: KVA, Read Type: demand_keyed, Channel: 9, Reading Point: null, Consumption Point: Max Demand kVA,
+       channel: ch_swgr_max_demand_kva_route, usageChannel: ch_swgr_max_demand_kva,
+       High Warning: 2000, Low Warning: 650}
+    - {Text Prompt: PF, Read Type: pf_keyed, Channel: 10, Reading Point: null, Consumption Point: Power Factor at Max Demand,
+       channel: ch_swgr_power_factor_route, usageChannel: ch_swgr_power_factor}
+  HMR_Meter:
+    Cycle: '03'
+    Route Number: SWGR
+    Enabled: true
+    First Read Sequence: 10
+    Read Sequence Increment: 10
+    Bill Code: '-'
+    Meter Text: Main switchgear check meter. Scroll the display and key all ten registers.
+  HMR_Reading:
+    Read Type: electric_keyed
+    Meter Constant: 1
+    Text Prompt: KWH
+    Channel: 1
+    ERT Id:
+    Tamper Code: '00'
+    High Warning:
+    Low Warning:
+# Emergency generators, route GEN: two registers each, the run-hour meter and the diesel fuel totalizer. Run hours are
+# an Analog register with its own Analog usage point (Hour cannot be an Accumulator's unit); fuel is an Accumulator.
+- key: hmr_emergency_generators
+  Gateway: gw_mvrs_sierra_gas
+  count: 3
+  Meters:
+  - Company: Northlake University
+    Meter: {Description: Library Emergency Generator, Meter Number: SYN-GEN-LIB01}
+    Registers:
+    - {Text Prompt: RUN, Read Type: hours_keyed, Channel: 1, Reading Point: Run Hours Register,
+       Consumption Point: Run Hours, Starting reading: 1186,
+       channel: ch_gen_library_run_hours_route, relatedReadingChannel: ch_gen_library_run_hours_register,
+       usageChannel: ch_gen_library_run_hours,
+       High Warning: 40, Low Warning: 0}
+    - {Text Prompt: FUEL, Read Type: fuel_keyed, Channel: 2, Reading Point: Fuel Register,
+       Consumption Point: Fuel Register Delta, Starting reading: 23840,
+       channel: ch_gen_library_fuel_route, relatedReadingChannel: ch_gen_library_fuel_register,
+       High Warning: 400, Low Warning: 0}
+  - Company: Northlake University
+    Meter: {Description: Science Center Emergency Generator, Meter Number: SYN-GEN-SCI01}
+    Registers:
+    - {Text Prompt: RUN, Read Type: hours_keyed, Channel: 1, Reading Point: Run Hours Register,
+       Consumption Point: Run Hours, Starting reading: 942,
+       channel: ch_gen_science_center_run_hours_route, relatedReadingChannel: ch_gen_science_center_run_hours_register,
+       usageChannel: ch_gen_science_center_run_hours,
+       High Warning: 40, Low Warning: 0}
+    - {Text Prompt: FUEL, Read Type: fuel_keyed, Channel: 2, Reading Point: Fuel Register,
+       Consumption Point: Fuel Register Delta, Starting reading: 17410,
+       channel: ch_gen_science_center_fuel_route, relatedReadingChannel: ch_gen_science_center_fuel_register,
+       High Warning: 400, Low Warning: 0}
+  - Company: Northlake Thermal Plant
+    Meter: {Description: Central Plant Emergency Generator, Meter Number: SYN-GEN-CP01}
+    Registers:
+    - {Text Prompt: RUN, Read Type: hours_keyed, Channel: 1, Reading Point: Run Hours Register,
+       Consumption Point: Run Hours, Starting reading: 2731,
+       channel: ch_gen_central_plant_run_hours_route, relatedReadingChannel: ch_gen_central_plant_run_hours_register,
+       usageChannel: ch_gen_central_plant_run_hours,
+       High Warning: 40, Low Warning: 0}
+    - {Text Prompt: FUEL, Read Type: fuel_keyed, Channel: 2, Reading Point: Fuel Register,
+       Consumption Point: Fuel Register Delta, Starting reading: 61250,
+       channel: ch_gen_central_plant_fuel_route, relatedReadingChannel: ch_gen_central_plant_fuel_register,
+       High Warning: 400, Low Warning: 0}
+  HMR_Meter:
+    Cycle: '05'
+    Route Number: GEN
+    Enabled: true
+    First Read Sequence: 10
+    Read Sequence Increment: 10
+    Bill Code: '-'
+    Meter Text: Standby generator. Key the run-hour meter and then the fuel totalizer.
+  HMR_Reading:
+    Read Type: hours_keyed
+    Meter Constant: 1
+    Text Prompt: RUN
+    Channel: 1
+    ERT Id:
+    Tamper Code: '00'
+    High Warning:
+    Low Warning:
+
+openingReadings:
+  configuration: Entering the routes adds no observation rows; the Step 5 starting readings are the first.
+  baseline: 'UseSqlValues=false uses the previous register in the returned file. Supply a known,
+    nonzero previous register, not the initial AnalogData zero/1901 value.'
+  databaseMode: 'Exercise UseSqlValues=true only after a baseline import is persisted and visible
+    in point history and the runtime latest value. Use a separate run so the runtime snapshot is fresh.'
+  arithmetic: 'Register usage = (current - previous) * multiplier. A lower current register invokes
+    rollover logic; it is not an automatic meter-replacement/reset workflow.'
+
+export:
+  Screen: '#/HandheldMeterReadingExport'
+  Expected permanent meters: 192
+  Expected permanent reading channels: 204
+  Expected cycles: ['01', '02', '03', '04', '05', '20']
+  Expected routes: [SCGAS, CHECK, CRBMW, CRAWTR, CRBWTR, CRCWTR, DEDUCT, SWGR, IRRIG, GEN]
+  Verify:
+  - All physical meter IDs, channel prompts, read types, sequences and previous register values.
+  - Filtering the grid does not filter the downloaded export; verify the complete file.
+  - Export disables assignments on cycle '99'; none of the Northlake routes use that cycle.
+  - 'The route file carries only enabled meters, 191: the Cedar Row C laundry meter is not in it. Cycle 20 holds one
+    route, CRCWTR, with the single meter of Cedar Row C unit 412; cycle 02''s CRCWTR has 48.'
+  - The switchgear's meter record lists ten readings, its four demand reads first (the export orders demand reads first, then by prompt).
+  - Save the generated file as evidence; configuration success is not proof of import success.
+
+acceptanceOnly:
+  # Temporary, and deferred until a backup exists to restore afterward; excluded from the permanent 192 meters.
+  # Exercises the no-register / demand branch without changing Stage 2's point inventory.
+  directDemand:
+    Company: Northlake University
+    Meter: {Description: Student Center Electric Main, Meter Number: SYN-VED-M-0040004}
+    Point: {Channel: ch_ved_student_center_kw_15m, Description: Demand kW 15m}
+    Cycle: '90'
+    Route Number: TSTDMD
+    Read Sequence: 10
+    Enabled: true
+    Bill Code: '-'
+    Read Type: demand_keyed
+    Text Prompt: KW
+    Channel: 1
+    Reading Point:
+    Meter Constant: 1
+    ERT Id:
+    Tamper Code: '00'
+    Constraint: 'Create through the app only in the controlled HMR acceptance run, with every
+      acquisition schedule disabled. The point remains assigned to AcquiSuite; do not change its
+      gateway binding. Run it only on a restore of a later backup, and restore again afterward, so the
+      temporary assignment and synthetic demand observation cannot enter the real Northlake history.'
+  Runs: 04-acceptance-runs.yaml handheldAcceptance

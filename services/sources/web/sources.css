@@ -1,0 +1,39 @@
+/* Provider colors follow generators/render_bills.py and the intake tariff sheets.
+   Shared typography, cards, buttons, fields and page chrome come from site.css.
+   The Northlake site serves this file at /utilities/assets/sources.css, so an
+   edit shows there on refresh; the bundle's own copy changes with the next
+   source release. */
+.ved { --provider-color: #1c5fb0; }
+.sgu { --provider-color: #c9551f; }
+.rcu { --provider-color: #0e7c86; }
+.ntp { --provider-color: #37474f; }
+.hos { --provider-color: #f5a524; }
+.rwl { --provider-color: #2e6e5a; }
+.source-main { display: grid; gap: 30px; padding-bottom: 64px; }
+.provider-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+.provider-card { position: relative; display: grid; gap: 18px; padding: 30px 24px 24px; color: var(--nl-ink); text-decoration: none; }
+.provider-card:hover { color: var(--nl-ink); border-color: var(--nl-line-strong); }
+.provider-card h2 { font-size: 21px; }
+.provider-band { position: absolute; inset: 0 0 auto; height: 3px; background: var(--provider-color, var(--nl-navy)); }
+.provider-open { color: var(--nl-navy); font-weight: 600; }
+.catalog-card, .files-heading { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.catalog-card { padding: 26px; }
+.catalog-card h2 { margin-bottom: 8px; font-size: 22px; }
+.actions, .month-list { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.month-list .button { padding: 7px 12px; font-size: 13px; }
+.breadcrumbs { color: var(--nl-slate); font-size: 14px; }
+.files-card { overflow: hidden; border-top: 3px solid var(--provider-color, var(--nl-navy)); }
+.files-heading { padding: 22px 24px; }
+.files-heading h2 { font-size: 22px; }
+.files-heading span { color: var(--nl-slate); font-size: 14px; }
+.table-scroll { overflow: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { padding: 13px 20px; text-align: left; border-top: 1px solid var(--nl-line); }
+th { background: var(--nl-tint); color: var(--nl-ink); font-weight: 600; }
+td:first-child { overflow-wrap: anywhere; }
+td:last-child { white-space: nowrap; text-align: right; }
+tbody tr:hover { background: var(--nl-canvas); }
+.empty-state { padding: 16px 24px 28px; }
+.pagination { justify-content: flex-end; }
+@media (max-width: 980px) { .provider-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .catalog-card { align-items: flex-start; flex-direction: column; } }
+@media (max-width: 620px) { .provider-grid { grid-template-columns: 1fr; } .files-heading { align-items: flex-start; flex-direction: column; gap: 8px; } .nl-masthead__chip { display: none; } }

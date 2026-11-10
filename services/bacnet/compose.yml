@@ -1,0 +1,42 @@
+name: northlake-bacnet
+services:
+  values:
+    image: ${NORTHLAKE_IMAGE_PREFIX:-}hippo-northlake-bacnet-values:${NORTHLAKE_IMAGE_TAG:-local}
+    build:
+      context: ../..
+      dockerfile: services/bacnet/Dockerfile
+      target: values
+      args:
+        SOURCE_IMAGE: ${NORTHLAKE_SOURCE_IMAGE:-hippo-northlake-sources:local}
+    restart: unless-stopped
+    volumes:
+      - bacnet-state:/state
+    healthcheck:
+      test: ["CMD", "python", "-m", "services.bacnet.producer", "--state", "/state", "--health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+  server:
+    image: ${NORTHLAKE_IMAGE_PREFIX:-}hippo-northlake-bacnet:${NORTHLAKE_IMAGE_TAG:-local}
+    build:
+      context: ../..
+      dockerfile: services/bacnet/Dockerfile
+      target: server
+    # Native Linux deployment: discovery requires the BACnet broadcast domain.
+    # Windows/Docker Desktop deployment uses Run-NorthlakeBacnet.ps1 instead.
+    network_mode: host
+    command: ["/app/bindings.json", "/state", "${NORTHLAKE_BACNET_IP:-}"]
+    restart: unless-stopped
+    depends_on:
+      values:
+        condition: service_healthy
+    volumes:
+      - bacnet-state:/state
+    healthcheck:
+      test: ["CMD", "dotnet", "Northlake.Bacnet.dll", "/app/bindings.json", "/state", "0.0.0.0", "--health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+volumes:
+  bacnet-state:

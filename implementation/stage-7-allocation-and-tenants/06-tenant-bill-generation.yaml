@@ -1,0 +1,999 @@
+# Stage 7, step 6: two screens that finish the tenant-billing story. Database Administrator's Tenant Rebill
+# tab (Nodes > meter node > Tenant Rebill) assigns each Town Center tenant meter its rate, its Bill
+# Generation type/schedule, and the reconciliation flag. The web Bill Allocation Configuration screen (same
+# screen as file 04, method 2 again) then does Cedar Row's residential case: 124 apartments, two commodities,
+# no resident ever sees a utility bill. Two editors in one file because they are one story — file 04 already
+# covers Town Center's 7-method showcase, and Cedar Row's 248 detail rows are the "big repetitive list" this
+# stage's version of Stage 1's Cedar Row submeter count, so it gets its own file rather than bloating file 04.
+stage: 7
+step: 6
+title: Tenant bill generation types and Cedar Row residential allocation
+app: Database Administrator (records) + Web (cedarRowAllocationConfigs)
+screen: Nodes > meter node > Tenant Rebill tab; "#/reporting/BillAllocationConfiguration"
+source:
+- generators/documents/sources/implementation/dream-customer/phase4-tenant-rebilling-spec.md
+- documents/guides/tenant-and-lease-roster.pdf
+- data/scenarios/demo-university-v1.yaml
+notes:
+- 'OPEN since the Stage 4 rework of 2026-11-09: the three rates this file assigns (NL-STEP-Demand, NL-RES-Tiered and
+  NL-MULTI-Commodity) are no longer in Stage 4''s 05-rates.yaml. The first two moved, unchanged, to
+  stage-4-rates/08-rate-lab.yaml, which is not ready to enter; NL-MULTI-Commodity was never defined anywhere. The
+  tenant rates need a home (the Rate Lab, or rates of Town Center''s own) before this step can be entered.'
+- 'Tenant Rebill tab fields (src/Apps/EEMSuite.Apps.DatabaseAdministrator/Views/Controls/TenantRebillView.xaml):
+  the Bill Scenarios sub-tab''s Rate Configuration grid has Rate, Start Date, End Date and a Bill checkbox whose
+  backing field is EnableBillReconcilliation (note the product''s own spelling); its Point Assignment grid excludes
+  points from rebilling. The Bill Generation sub-tab''s grid has Assigned Rates, Fiscal Start, Fiscal End, Schedule,
+  Status (the generation type), Available % and Offset. Status values are the 4 dbo.BillGenerationType rows: 1 Off,
+  2 Manual, 3 Auto, 4 Auto w/ Auto Regen (confirmed against both the Northlake and reference databases). The Bill
+  Generation grid''s row is backed by dbo.UtilityMeterRatesBillGen (MetaWorldID, BillScenarioID, FiscalStart, FiscalEnd,
+  BillGenStatusID, BillGenReconDataSourceID, BillGenScheduleCode, DataThreshold, OffsetDays — confirmed by column),
+  one row per meter per Bill Scenario; the reconciliation source (file 07) is a column on this same row, not a separate
+  screen.'
+- Every rate below must exist first (Stage 2/Rate Modeler); NL-STEP-Demand is purpose-built for a Town Center anchor
+  per data/eem/northlake-rates-v1.yaml ("fires type 210 + 600"). Assign it under both the Actual (-1) scenario and
+  Budget (file 01) per Phase 4 spec section D's "assign under both Actual and a non-actual scenario."
+- 'Cedar Row: Valley Electric bills Cedar Row A/B Electric Master and River City bills Cedar Row A/B Water Master;
+  no resident is ever billed directly (tenant-and-lease-roster.pdf). The 4 configs below are Method 2, Fully Submetered,
+  same screen and mechanic as file 04''s Tower-Main config, just at real scale: every apartment''s own submeter
+  (data/scenarios/demo-university-v1.yaml, SYN-SUB-E-* / SYN-SUB-W-*) is a candidate; the engine computes each apartment''s
+  Allocation % from its own interval/route consumption when Process Meter Allocations runs (file 07), so no percentage
+  is typed for any of the 248 rows below.'
+- House submeters (Cedar Row A/B Electric House, Cedar Row A/B Water House) are not candidates — their usage is
+  recovered as overhead per the Phase 4 spec, not charged to one apartment. This file sets Overhead % = 2 uniformly
+  on every apartment row rather than repeating it 248 times below; type the same value into every row's Overhead
+  % column. The real percentage should be recomputed each period from the house submeter's actual reading against
+  the master (a later refinement, not this stage's job).
+- Sewer is billed on the water submeter's usage capped at each apartment's winter average; that cap is a rate-engine
+  rule (Phase 2), not a Bill Allocation Configuration field, so it is not modeled on this screen.
+- 'Reconciliation: each Cedar Row master meter''s Tenant Rebill tab gets its real utility rate (already assigned
+  by whichever stage enters Cedar Row''s rates) with Bill (EnableBillReconcilliation) turned on, so rp_BillReconciliation
+  can compare the submetered total against the master bill (file 07).'
+- Records marked kind 'Cedar Row allocation config (#/reporting/BillAllocationConfiguration)' were entered on that
+  other editor; they sit in this file because they belong to this step.
+records:
+- key: tc_anchor_store_billgen
+  Node: Anchor Store meter (file 02, tc_anchor_store)
+  Bill Scenarios:
+    Rate Configuration:
+    - Rate: NL-STEP-Demand
+      Start Date: 2024-01-01
+      End Date: null
+      Bill: false
+      Scenario: Actual
+    - Rate: NL-STEP-Demand
+      Start Date: 2024-01-01
+      End Date: null
+      Bill: false
+      Scenario: Budget
+  Bill Generation:
+    Assigned Rates: NL-STEP-Demand
+    Fiscal Start:
+      Year: 2024
+      Period: 1
+    Fiscal End:
+      Year: 9999
+      Period: 12
+    Schedule: CC (Company Calendar)
+    Status: 'Off'
+    Available %: 100
+    Offset: 0
+  notes: Generation type 1, Off — demonstrates a tenant meter that is fully configured but never generates a bill
+    on its own (its charge, if any, comes only from file 04's Bill Allocation Configuration).
+- key: tc_food_court_billgen
+  Node: Food Court meter (file 02, tc_food_court)
+  Bill Scenarios:
+    Rate Configuration:
+    - Rate: NL-STEP-Demand
+      Start Date: 2024-01-01
+      End Date: null
+      Bill: false
+      Scenario: Actual
+  Bill Generation:
+    Assigned Rates: NL-STEP-Demand
+    Fiscal Start:
+      Year: 2024
+      Period: 1
+    Fiscal End:
+      Year: 9999
+      Period: 12
+    Schedule: CC (Company Calendar)
+    Status: Manual
+    Available %: 100
+    Offset: 0
+  notes: Generation type 2, Manual — a bill is generated only when someone runs generation for this meter by hand;
+    nothing produces it on a schedule.
+- key: tc_inline_shop_1_billgen
+  Node: In-line Shop 1 meter (file 02, tc_inline_shop_1)
+  Bill Scenarios:
+    Rate Configuration:
+    - Rate: NL-STEP-Demand
+      Start Date: 2024-01-01
+      End Date: null
+      Bill: false
+      Scenario: Actual
+  Bill Generation:
+    Assigned Rates: NL-STEP-Demand
+    Fiscal Start:
+      Year: 2024
+      Period: 1
+    Fiscal End:
+      Year: 9999
+      Period: 12
+    Schedule: CC (Company Calendar)
+    Status: Auto
+    Available %: 100
+    Offset: 0
+  notes: Generation type 3, Auto — the Run Bill Gen task (step 7; UtilityGenBill_Create, not Job_BillAllocation, which
+    is Bill Allocation) creates the missing-period bill for this meter every period on its own once the period's
+    interval data is complete to Available %.
+- key: tc_inline_shop_2_billgen
+  Node: In-line Shop 2 meter (file 02, tc_inline_shop_2)
+  Bill Scenarios:
+    Rate Configuration:
+    - Rate: NL-STEP-Demand
+      Start Date: 2024-01-01
+      End Date: null
+      Bill: false
+      Scenario: Actual
+  Bill Generation:
+    Assigned Rates: NL-STEP-Demand
+    Fiscal Start:
+      Year: 2024
+      Period: 1
+    Fiscal End:
+      Year: 9999
+      Period: 12
+    Schedule: CC (Company Calendar)
+    Status: Auto w/ Auto Regen
+    Available %: 100
+    Offset: 0
+  notes: Generation type 4, Auto w/ Auto Regen — regenerates this meter's bill automatically whenever new allocated/interval
+    data arrives for an already-billed period, not just missing periods.
+- key: cedar_row_a_electric_master_tenantrebill
+  Node: Cedar Row A Electric Master meter (Stage 2)
+  Bill Scenarios:
+    Rate Configuration:
+    - Rate: NL-RES-Tiered
+      Start Date: 2024-01-01
+      End Date: null
+      Bill: true
+      Scenario: Actual
+  notes: Bill (EnableBillReconcilliation) on. This is the master the 60 apartment electric submeters reconcile back
+    to (file 07).
+- key: cedar_row_a_water_master_tenantrebill
+  Node: Cedar Row A Water Master meter (Stage 2)
+  Bill Scenarios:
+    Rate Configuration:
+    - Rate: NL-MULTI-Commodity
+      Start Date: 2024-01-01
+      End Date: null
+      Bill: true
+      Scenario: Actual
+  notes: Bill on; River City's water/sewer/stormwater commodity map lives on this rate (NL-MULTI-Commodity, data/eem/northlake-rates-v1.yaml).
+- key: cedar_row_b_electric_master_tenantrebill
+  Node: Cedar Row B Electric Master meter (Stage 2)
+  Bill Scenarios:
+    Rate Configuration:
+    - Rate: NL-RES-Tiered
+      Start Date: 2024-01-01
+      End Date: null
+      Bill: true
+      Scenario: Actual
+  notes: Same as Cedar Row A's electric master, Bill on.
+- key: cedar_row_b_water_master_tenantrebill
+  Node: Cedar Row B Water Master meter (Stage 2)
+  Bill Scenarios:
+    Rate Configuration:
+    - Rate: NL-MULTI-Commodity
+      Start Date: 2024-01-01
+      End Date: null
+      Bill: true
+      Scenario: Actual
+  notes: Same as Cedar Row A's water master, Bill on.
+- key: cedar_row_a_electric_allocation
+  installed:
+    billAllocationConfigId: null
+  kind: Cedar Row allocation config (#/reporting/BillAllocationConfiguration)
+  Master Meter: Cedar Row A Electric Master
+  Commodity: Electric
+  Method: Fully Submetered Space
+  Effective From:
+    Fiscal Year Start: 2024
+    Fiscal Period Start: 1
+    Fiscal Year End: 9999
+    Fiscal Period End: 12
+  Combine Overhead: false
+  Add Allocated Meters:
+  - order: 1
+    unit: '101'
+    meter: Cedar Row A Unit 101 Electric
+  - order: 2
+    unit: '102'
+    meter: Cedar Row A Unit 102 Electric
+  - order: 3
+    unit: '103'
+    meter: Cedar Row A Unit 103 Electric
+  - order: 4
+    unit: '104'
+    meter: Cedar Row A Unit 104 Electric
+  - order: 5
+    unit: '105'
+    meter: Cedar Row A Unit 105 Electric
+  - order: 6
+    unit: '106'
+    meter: Cedar Row A Unit 106 Electric
+  - order: 7
+    unit: '107'
+    meter: Cedar Row A Unit 107 Electric
+  - order: 8
+    unit: '108'
+    meter: Cedar Row A Unit 108 Electric
+  - order: 9
+    unit: '109'
+    meter: Cedar Row A Unit 109 Electric
+  - order: 10
+    unit: '110'
+    meter: Cedar Row A Unit 110 Electric
+  - order: 11
+    unit: '111'
+    meter: Cedar Row A Unit 111 Electric
+  - order: 12
+    unit: '112'
+    meter: Cedar Row A Unit 112 Electric
+  - order: 13
+    unit: '113'
+    meter: Cedar Row A Unit 113 Electric
+  - order: 14
+    unit: '114'
+    meter: Cedar Row A Unit 114 Electric
+  - order: 15
+    unit: '115'
+    meter: Cedar Row A Unit 115 Electric
+  - order: 16
+    unit: '116'
+    meter: Cedar Row A Unit 116 Electric
+  - order: 17
+    unit: '117'
+    meter: Cedar Row A Unit 117 Electric
+  - order: 18
+    unit: '118'
+    meter: Cedar Row A Unit 118 Electric
+  - order: 19
+    unit: '119'
+    meter: Cedar Row A Unit 119 Electric
+  - order: 20
+    unit: '120'
+    meter: Cedar Row A Unit 120 Electric
+  - order: 21
+    unit: '201'
+    meter: Cedar Row A Unit 201 Electric
+  - order: 22
+    unit: '202'
+    meter: Cedar Row A Unit 202 Electric
+  - order: 23
+    unit: '203'
+    meter: Cedar Row A Unit 203 Electric
+  - order: 24
+    unit: '204'
+    meter: Cedar Row A Unit 204 Electric
+  - order: 25
+    unit: '205'
+    meter: Cedar Row A Unit 205 Electric
+  - order: 26
+    unit: '206'
+    meter: Cedar Row A Unit 206 Electric
+  - order: 27
+    unit: '207'
+    meter: Cedar Row A Unit 207 Electric
+  - order: 28
+    unit: '208'
+    meter: Cedar Row A Unit 208 Electric
+  - order: 29
+    unit: '209'
+    meter: Cedar Row A Unit 209 Electric
+  - order: 30
+    unit: '210'
+    meter: Cedar Row A Unit 210 Electric
+  - order: 31
+    unit: '211'
+    meter: Cedar Row A Unit 211 Electric
+  - order: 32
+    unit: '212'
+    meter: Cedar Row A Unit 212 Electric
+  - order: 33
+    unit: '213'
+    meter: Cedar Row A Unit 213 Electric
+  - order: 34
+    unit: '214'
+    meter: Cedar Row A Unit 214 Electric
+  - order: 35
+    unit: '215'
+    meter: Cedar Row A Unit 215 Electric
+  - order: 36
+    unit: '216'
+    meter: Cedar Row A Unit 216 Electric
+  - order: 37
+    unit: '217'
+    meter: Cedar Row A Unit 217 Electric
+  - order: 38
+    unit: '218'
+    meter: Cedar Row A Unit 218 Electric
+  - order: 39
+    unit: '219'
+    meter: Cedar Row A Unit 219 Electric
+  - order: 40
+    unit: '220'
+    meter: Cedar Row A Unit 220 Electric
+  - order: 41
+    unit: '301'
+    meter: Cedar Row A Unit 301 Electric
+  - order: 42
+    unit: '302'
+    meter: Cedar Row A Unit 302 Electric
+  - order: 43
+    unit: '303'
+    meter: Cedar Row A Unit 303 Electric
+  - order: 44
+    unit: '304'
+    meter: Cedar Row A Unit 304 Electric
+  - order: 45
+    unit: '305'
+    meter: Cedar Row A Unit 305 Electric
+  - order: 46
+    unit: '306'
+    meter: Cedar Row A Unit 306 Electric
+  - order: 47
+    unit: '307'
+    meter: Cedar Row A Unit 307 Electric
+  - order: 48
+    unit: '308'
+    meter: Cedar Row A Unit 308 Electric
+  - order: 49
+    unit: '309'
+    meter: Cedar Row A Unit 309 Electric
+  - order: 50
+    unit: '310'
+    meter: Cedar Row A Unit 310 Electric
+  - order: 51
+    unit: '311'
+    meter: Cedar Row A Unit 311 Electric
+  - order: 52
+    unit: '312'
+    meter: Cedar Row A Unit 312 Electric
+  - order: 53
+    unit: '313'
+    meter: Cedar Row A Unit 313 Electric
+  - order: 54
+    unit: '314'
+    meter: Cedar Row A Unit 314 Electric
+  - order: 55
+    unit: '315'
+    meter: Cedar Row A Unit 315 Electric
+  - order: 56
+    unit: '316'
+    meter: Cedar Row A Unit 316 Electric
+  - order: 57
+    unit: '317'
+    meter: Cedar Row A Unit 317 Electric
+  - order: 58
+    unit: '318'
+    meter: Cedar Row A Unit 318 Electric
+  - order: 59
+    unit: '319'
+    meter: Cedar Row A Unit 319 Electric
+  - order: 60
+    unit: '320'
+    meter: Cedar Row A Unit 320 Electric
+  notes: 60 apartments, Overhead % = 2 on every row (see the header note on Cedar Row A Electric House).
+- key: cedar_row_a_water_allocation
+  installed:
+    billAllocationConfigId: null
+  kind: Cedar Row allocation config (#/reporting/BillAllocationConfiguration)
+  Master Meter: Cedar Row A Water Master
+  Commodity: Water
+  Method: Fully Submetered Space
+  Effective From:
+    Fiscal Year Start: 2024
+    Fiscal Period Start: 1
+    Fiscal Year End: 9999
+    Fiscal Period End: 12
+  Combine Overhead: false
+  Add Allocated Meters:
+  - order: 1
+    unit: '101'
+    meter: Cedar Row A Unit 101 Water
+  - order: 2
+    unit: '102'
+    meter: Cedar Row A Unit 102 Water
+  - order: 3
+    unit: '103'
+    meter: Cedar Row A Unit 103 Water
+  - order: 4
+    unit: '104'
+    meter: Cedar Row A Unit 104 Water
+  - order: 5
+    unit: '105'
+    meter: Cedar Row A Unit 105 Water
+  - order: 6
+    unit: '106'
+    meter: Cedar Row A Unit 106 Water
+  - order: 7
+    unit: '107'
+    meter: Cedar Row A Unit 107 Water
+  - order: 8
+    unit: '108'
+    meter: Cedar Row A Unit 108 Water
+  - order: 9
+    unit: '109'
+    meter: Cedar Row A Unit 109 Water
+  - order: 10
+    unit: '110'
+    meter: Cedar Row A Unit 110 Water
+  - order: 11
+    unit: '111'
+    meter: Cedar Row A Unit 111 Water
+  - order: 12
+    unit: '112'
+    meter: Cedar Row A Unit 112 Water
+  - order: 13
+    unit: '113'
+    meter: Cedar Row A Unit 113 Water
+  - order: 14
+    unit: '114'
+    meter: Cedar Row A Unit 114 Water
+  - order: 15
+    unit: '115'
+    meter: Cedar Row A Unit 115 Water
+  - order: 16
+    unit: '116'
+    meter: Cedar Row A Unit 116 Water
+  - order: 17
+    unit: '117'
+    meter: Cedar Row A Unit 117 Water
+  - order: 18
+    unit: '118'
+    meter: Cedar Row A Unit 118 Water
+  - order: 19
+    unit: '119'
+    meter: Cedar Row A Unit 119 Water
+  - order: 20
+    unit: '120'
+    meter: Cedar Row A Unit 120 Water
+  - order: 21
+    unit: '201'
+    meter: Cedar Row A Unit 201 Water
+  - order: 22
+    unit: '202'
+    meter: Cedar Row A Unit 202 Water
+  - order: 23
+    unit: '203'
+    meter: Cedar Row A Unit 203 Water
+  - order: 24
+    unit: '204'
+    meter: Cedar Row A Unit 204 Water
+  - order: 25
+    unit: '205'
+    meter: Cedar Row A Unit 205 Water
+  - order: 26
+    unit: '206'
+    meter: Cedar Row A Unit 206 Water
+  - order: 27
+    unit: '207'
+    meter: Cedar Row A Unit 207 Water
+  - order: 28
+    unit: '208'
+    meter: Cedar Row A Unit 208 Water
+  - order: 29
+    unit: '209'
+    meter: Cedar Row A Unit 209 Water
+  - order: 30
+    unit: '210'
+    meter: Cedar Row A Unit 210 Water
+  - order: 31
+    unit: '211'
+    meter: Cedar Row A Unit 211 Water
+  - order: 32
+    unit: '212'
+    meter: Cedar Row A Unit 212 Water
+  - order: 33
+    unit: '213'
+    meter: Cedar Row A Unit 213 Water
+  - order: 34
+    unit: '214'
+    meter: Cedar Row A Unit 214 Water
+  - order: 35
+    unit: '215'
+    meter: Cedar Row A Unit 215 Water
+  - order: 36
+    unit: '216'
+    meter: Cedar Row A Unit 216 Water
+  - order: 37
+    unit: '217'
+    meter: Cedar Row A Unit 217 Water
+  - order: 38
+    unit: '218'
+    meter: Cedar Row A Unit 218 Water
+  - order: 39
+    unit: '219'
+    meter: Cedar Row A Unit 219 Water
+  - order: 40
+    unit: '220'
+    meter: Cedar Row A Unit 220 Water
+  - order: 41
+    unit: '301'
+    meter: Cedar Row A Unit 301 Water
+  - order: 42
+    unit: '302'
+    meter: Cedar Row A Unit 302 Water
+  - order: 43
+    unit: '303'
+    meter: Cedar Row A Unit 303 Water
+  - order: 44
+    unit: '304'
+    meter: Cedar Row A Unit 304 Water
+  - order: 45
+    unit: '305'
+    meter: Cedar Row A Unit 305 Water
+  - order: 46
+    unit: '306'
+    meter: Cedar Row A Unit 306 Water
+  - order: 47
+    unit: '307'
+    meter: Cedar Row A Unit 307 Water
+  - order: 48
+    unit: '308'
+    meter: Cedar Row A Unit 308 Water
+  - order: 49
+    unit: '309'
+    meter: Cedar Row A Unit 309 Water
+  - order: 50
+    unit: '310'
+    meter: Cedar Row A Unit 310 Water
+  - order: 51
+    unit: '311'
+    meter: Cedar Row A Unit 311 Water
+  - order: 52
+    unit: '312'
+    meter: Cedar Row A Unit 312 Water
+  - order: 53
+    unit: '313'
+    meter: Cedar Row A Unit 313 Water
+  - order: 54
+    unit: '314'
+    meter: Cedar Row A Unit 314 Water
+  - order: 55
+    unit: '315'
+    meter: Cedar Row A Unit 315 Water
+  - order: 56
+    unit: '316'
+    meter: Cedar Row A Unit 316 Water
+  - order: 57
+    unit: '317'
+    meter: Cedar Row A Unit 317 Water
+  - order: 58
+    unit: '318'
+    meter: Cedar Row A Unit 318 Water
+  - order: 59
+    unit: '319'
+    meter: Cedar Row A Unit 319 Water
+  - order: 60
+    unit: '320'
+    meter: Cedar Row A Unit 320 Water
+  notes: 60 apartments; sewer rides the same water submeter reading (rate-side cap, see header notes), Overhead
+    % = 2 on every row (Cedar Row A Water House).
+- key: cedar_row_b_electric_allocation
+  installed:
+    billAllocationConfigId: null
+  kind: Cedar Row allocation config (#/reporting/BillAllocationConfiguration)
+  Master Meter: Cedar Row B Electric Master
+  Commodity: Electric
+  Method: Fully Submetered Space
+  Effective From:
+    Fiscal Year Start: 2024
+    Fiscal Period Start: 1
+    Fiscal Year End: 9999
+    Fiscal Period End: 12
+  Combine Overhead: false
+  Add Allocated Meters:
+  - order: 1
+    unit: '101'
+    meter: Cedar Row B Unit 101 Electric
+  - order: 2
+    unit: '102'
+    meter: Cedar Row B Unit 102 Electric
+  - order: 3
+    unit: '103'
+    meter: Cedar Row B Unit 103 Electric
+  - order: 4
+    unit: '104'
+    meter: Cedar Row B Unit 104 Electric
+  - order: 5
+    unit: '105'
+    meter: Cedar Row B Unit 105 Electric
+  - order: 6
+    unit: '106'
+    meter: Cedar Row B Unit 106 Electric
+  - order: 7
+    unit: '107'
+    meter: Cedar Row B Unit 107 Electric
+  - order: 8
+    unit: '108'
+    meter: Cedar Row B Unit 108 Electric
+  - order: 9
+    unit: '109'
+    meter: Cedar Row B Unit 109 Electric
+  - order: 10
+    unit: '110'
+    meter: Cedar Row B Unit 110 Electric
+  - order: 11
+    unit: '111'
+    meter: Cedar Row B Unit 111 Electric
+  - order: 12
+    unit: '112'
+    meter: Cedar Row B Unit 112 Electric
+  - order: 13
+    unit: '113'
+    meter: Cedar Row B Unit 113 Electric
+  - order: 14
+    unit: '114'
+    meter: Cedar Row B Unit 114 Electric
+  - order: 15
+    unit: '115'
+    meter: Cedar Row B Unit 115 Electric
+  - order: 16
+    unit: '116'
+    meter: Cedar Row B Unit 116 Electric
+  - order: 17
+    unit: '201'
+    meter: Cedar Row B Unit 201 Electric
+  - order: 18
+    unit: '202'
+    meter: Cedar Row B Unit 202 Electric
+  - order: 19
+    unit: '203'
+    meter: Cedar Row B Unit 203 Electric
+  - order: 20
+    unit: '204'
+    meter: Cedar Row B Unit 204 Electric
+  - order: 21
+    unit: '205'
+    meter: Cedar Row B Unit 205 Electric
+  - order: 22
+    unit: '206'
+    meter: Cedar Row B Unit 206 Electric
+  - order: 23
+    unit: '207'
+    meter: Cedar Row B Unit 207 Electric
+  - order: 24
+    unit: '208'
+    meter: Cedar Row B Unit 208 Electric
+  - order: 25
+    unit: '209'
+    meter: Cedar Row B Unit 209 Electric
+  - order: 26
+    unit: '210'
+    meter: Cedar Row B Unit 210 Electric
+  - order: 27
+    unit: '211'
+    meter: Cedar Row B Unit 211 Electric
+  - order: 28
+    unit: '212'
+    meter: Cedar Row B Unit 212 Electric
+  - order: 29
+    unit: '213'
+    meter: Cedar Row B Unit 213 Electric
+  - order: 30
+    unit: '214'
+    meter: Cedar Row B Unit 214 Electric
+  - order: 31
+    unit: '215'
+    meter: Cedar Row B Unit 215 Electric
+  - order: 32
+    unit: '216'
+    meter: Cedar Row B Unit 216 Electric
+  - order: 33
+    unit: '301'
+    meter: Cedar Row B Unit 301 Electric
+  - order: 34
+    unit: '302'
+    meter: Cedar Row B Unit 302 Electric
+  - order: 35
+    unit: '303'
+    meter: Cedar Row B Unit 303 Electric
+  - order: 36
+    unit: '304'
+    meter: Cedar Row B Unit 304 Electric
+  - order: 37
+    unit: '305'
+    meter: Cedar Row B Unit 305 Electric
+  - order: 38
+    unit: '306'
+    meter: Cedar Row B Unit 306 Electric
+  - order: 39
+    unit: '307'
+    meter: Cedar Row B Unit 307 Electric
+  - order: 40
+    unit: '308'
+    meter: Cedar Row B Unit 308 Electric
+  - order: 41
+    unit: '309'
+    meter: Cedar Row B Unit 309 Electric
+  - order: 42
+    unit: '310'
+    meter: Cedar Row B Unit 310 Electric
+  - order: 43
+    unit: '311'
+    meter: Cedar Row B Unit 311 Electric
+  - order: 44
+    unit: '312'
+    meter: Cedar Row B Unit 312 Electric
+  - order: 45
+    unit: '313'
+    meter: Cedar Row B Unit 313 Electric
+  - order: 46
+    unit: '314'
+    meter: Cedar Row B Unit 314 Electric
+  - order: 47
+    unit: '315'
+    meter: Cedar Row B Unit 315 Electric
+  - order: 48
+    unit: '316'
+    meter: Cedar Row B Unit 316 Electric
+  - order: 49
+    unit: '401'
+    meter: Cedar Row B Unit 401 Electric
+  - order: 50
+    unit: '402'
+    meter: Cedar Row B Unit 402 Electric
+  - order: 51
+    unit: '403'
+    meter: Cedar Row B Unit 403 Electric
+  - order: 52
+    unit: '404'
+    meter: Cedar Row B Unit 404 Electric
+  - order: 53
+    unit: '405'
+    meter: Cedar Row B Unit 405 Electric
+  - order: 54
+    unit: '406'
+    meter: Cedar Row B Unit 406 Electric
+  - order: 55
+    unit: '407'
+    meter: Cedar Row B Unit 407 Electric
+  - order: 56
+    unit: '408'
+    meter: Cedar Row B Unit 408 Electric
+  - order: 57
+    unit: '409'
+    meter: Cedar Row B Unit 409 Electric
+  - order: 58
+    unit: '410'
+    meter: Cedar Row B Unit 410 Electric
+  - order: 59
+    unit: '411'
+    meter: Cedar Row B Unit 411 Electric
+  - order: 60
+    unit: '412'
+    meter: Cedar Row B Unit 412 Electric
+  - order: 61
+    unit: '413'
+    meter: Cedar Row B Unit 413 Electric
+  - order: 62
+    unit: '414'
+    meter: Cedar Row B Unit 414 Electric
+  - order: 63
+    unit: '415'
+    meter: Cedar Row B Unit 415 Electric
+  - order: 64
+    unit: '416'
+    meter: Cedar Row B Unit 416 Electric
+  notes: 64 apartments, Overhead % = 2 on every row (Cedar Row B Electric House).
+- key: cedar_row_b_water_allocation
+  installed:
+    billAllocationConfigId: null
+  kind: Cedar Row allocation config (#/reporting/BillAllocationConfiguration)
+  Master Meter: Cedar Row B Water Master
+  Commodity: Water
+  Method: Fully Submetered Space
+  Effective From:
+    Fiscal Year Start: 2024
+    Fiscal Period Start: 1
+    Fiscal Year End: 9999
+    Fiscal Period End: 12
+  Combine Overhead: false
+  Add Allocated Meters:
+  - order: 1
+    unit: '101'
+    meter: Cedar Row B Unit 101 Water
+  - order: 2
+    unit: '102'
+    meter: Cedar Row B Unit 102 Water
+  - order: 3
+    unit: '103'
+    meter: Cedar Row B Unit 103 Water
+  - order: 4
+    unit: '104'
+    meter: Cedar Row B Unit 104 Water
+  - order: 5
+    unit: '105'
+    meter: Cedar Row B Unit 105 Water
+  - order: 6
+    unit: '106'
+    meter: Cedar Row B Unit 106 Water
+  - order: 7
+    unit: '107'
+    meter: Cedar Row B Unit 107 Water
+  - order: 8
+    unit: '108'
+    meter: Cedar Row B Unit 108 Water
+  - order: 9
+    unit: '109'
+    meter: Cedar Row B Unit 109 Water
+  - order: 10
+    unit: '110'
+    meter: Cedar Row B Unit 110 Water
+  - order: 11
+    unit: '111'
+    meter: Cedar Row B Unit 111 Water
+  - order: 12
+    unit: '112'
+    meter: Cedar Row B Unit 112 Water
+  - order: 13
+    unit: '113'
+    meter: Cedar Row B Unit 113 Water
+  - order: 14
+    unit: '114'
+    meter: Cedar Row B Unit 114 Water
+  - order: 15
+    unit: '115'
+    meter: Cedar Row B Unit 115 Water
+  - order: 16
+    unit: '116'
+    meter: Cedar Row B Unit 116 Water
+  - order: 17
+    unit: '201'
+    meter: Cedar Row B Unit 201 Water
+  - order: 18
+    unit: '202'
+    meter: Cedar Row B Unit 202 Water
+  - order: 19
+    unit: '203'
+    meter: Cedar Row B Unit 203 Water
+  - order: 20
+    unit: '204'
+    meter: Cedar Row B Unit 204 Water
+  - order: 21
+    unit: '205'
+    meter: Cedar Row B Unit 205 Water
+  - order: 22
+    unit: '206'
+    meter: Cedar Row B Unit 206 Water
+  - order: 23
+    unit: '207'
+    meter: Cedar Row B Unit 207 Water
+  - order: 24
+    unit: '208'
+    meter: Cedar Row B Unit 208 Water
+  - order: 25
+    unit: '209'
+    meter: Cedar Row B Unit 209 Water
+  - order: 26
+    unit: '210'
+    meter: Cedar Row B Unit 210 Water
+  - order: 27
+    unit: '211'
+    meter: Cedar Row B Unit 211 Water
+  - order: 28
+    unit: '212'
+    meter: Cedar Row B Unit 212 Water
+  - order: 29
+    unit: '213'
+    meter: Cedar Row B Unit 213 Water
+  - order: 30
+    unit: '214'
+    meter: Cedar Row B Unit 214 Water
+  - order: 31
+    unit: '215'
+    meter: Cedar Row B Unit 215 Water
+  - order: 32
+    unit: '216'
+    meter: Cedar Row B Unit 216 Water
+  - order: 33
+    unit: '301'
+    meter: Cedar Row B Unit 301 Water
+  - order: 34
+    unit: '302'
+    meter: Cedar Row B Unit 302 Water
+  - order: 35
+    unit: '303'
+    meter: Cedar Row B Unit 303 Water
+  - order: 36
+    unit: '304'
+    meter: Cedar Row B Unit 304 Water
+  - order: 37
+    unit: '305'
+    meter: Cedar Row B Unit 305 Water
+  - order: 38
+    unit: '306'
+    meter: Cedar Row B Unit 306 Water
+  - order: 39
+    unit: '307'
+    meter: Cedar Row B Unit 307 Water
+  - order: 40
+    unit: '308'
+    meter: Cedar Row B Unit 308 Water
+  - order: 41
+    unit: '309'
+    meter: Cedar Row B Unit 309 Water
+  - order: 42
+    unit: '310'
+    meter: Cedar Row B Unit 310 Water
+  - order: 43
+    unit: '311'
+    meter: Cedar Row B Unit 311 Water
+  - order: 44
+    unit: '312'
+    meter: Cedar Row B Unit 312 Water
+  - order: 45
+    unit: '313'
+    meter: Cedar Row B Unit 313 Water
+  - order: 46
+    unit: '314'
+    meter: Cedar Row B Unit 314 Water
+  - order: 47
+    unit: '315'
+    meter: Cedar Row B Unit 315 Water
+  - order: 48
+    unit: '316'
+    meter: Cedar Row B Unit 316 Water
+  - order: 49
+    unit: '401'
+    meter: Cedar Row B Unit 401 Water
+  - order: 50
+    unit: '402'
+    meter: Cedar Row B Unit 402 Water
+  - order: 51
+    unit: '403'
+    meter: Cedar Row B Unit 403 Water
+  - order: 52
+    unit: '404'
+    meter: Cedar Row B Unit 404 Water
+  - order: 53
+    unit: '405'
+    meter: Cedar Row B Unit 405 Water
+  - order: 54
+    unit: '406'
+    meter: Cedar Row B Unit 406 Water
+  - order: 55
+    unit: '407'
+    meter: Cedar Row B Unit 407 Water
+  - order: 56
+    unit: '408'
+    meter: Cedar Row B Unit 408 Water
+  - order: 57
+    unit: '409'
+    meter: Cedar Row B Unit 409 Water
+  - order: 58
+    unit: '410'
+    meter: Cedar Row B Unit 410 Water
+  - order: 59
+    unit: '411'
+    meter: Cedar Row B Unit 411 Water
+  - order: 60
+    unit: '412'
+    meter: Cedar Row B Unit 412 Water
+  - order: 61
+    unit: '413'
+    meter: Cedar Row B Unit 413 Water
+  - order: 62
+    unit: '414'
+    meter: Cedar Row B Unit 414 Water
+  - order: 63
+    unit: '415'
+    meter: Cedar Row B Unit 415 Water
+  - order: 64
+    unit: '416'
+    meter: Cedar Row B Unit 416 Water
+  notes: 64 apartments; sewer rides the same water submeter reading, Overhead % = 2 on every row (Cedar Row B Water
+    House). 60 + 60 + 64 + 64 = 248 apartment submeter rows across the 4 configs above, matching Stage 2's 248 owned
+    Cedar Row submeters.

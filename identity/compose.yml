@@ -54,6 +54,10 @@ services:
       - ./branding:/opt/keycloak/themes/northlake/login/resources/branding:ro
       - ./branding:/opt/keycloak/themes/northlake/account/resources/branding:ro
       - ./branding:/opt/keycloak/themes/northlake/admin/resources/branding:ro
+      # The brand systems; branding/brand.css imports ../brands/northlake/*.
+      - ../brands:/opt/keycloak/themes/northlake/login/resources/brands:ro
+      - ../brands:/opt/keycloak/themes/northlake/account/resources/brands:ro
+      - ../brands:/opt/keycloak/themes/northlake/admin/resources/brands:ro
     networks:
       - identity-backend
 
@@ -159,6 +163,14 @@ services:
       IDENTITY_HOST: ${IDENTITY_HOST:-localhost}
       NORTHLAKE_CUSTOMER_HOST: ${NORTHLAKE_CUSTOMER_HOST:-customer.localtest.me}
       EEMSUITE_APPLICATION_HOME_URL: ${EEMSUITE_APPLICATION_HOME_URL:-https://localdev.energyhippo.com/Hippo/}
+      # Read by the Northlake site (portal/index.html, a Caddy template).
+      NORTHLAKE_EEM_PROVIDER_KEY: ${NORTHLAKE_EEM_PROVIDER_KEY:-northlake-saml-standard}
+      NORTHLAKE_PUBLIC_DASHBOARD_ID: ${NORTHLAKE_PUBLIC_DASHBOARD_ID:-}
+      NORTHLAKE_SOURCES_URL: ${NORTHLAKE_SOURCES_URL:-/utilities}
+      # Where the site's /utilities/ and /meter-reading/ pages come from: the
+      # source bundle's web service and the handheld, published on the host.
+      NORTHLAKE_SOURCES_UPSTREAM: ${NORTHLAKE_SOURCES_UPSTREAM:-host.docker.internal:18081}
+      NORTHLAKE_HANDHELD_UPSTREAM: ${NORTHLAKE_HANDHELD_UPSTREAM:-host.docker.internal:18082}
     ports:
       - "${IDENTITY_BIND_ADDRESS:-127.0.0.1}:${IDENTITY_HTTPS_PORT:-8443}:8443"
     depends_on:
@@ -172,6 +184,9 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - ./portal:/srv/northlake-portal:ro
       - ./branding:/srv/northlake-branding:ro
+      - ../brands:/srv/brands:ro
+      - ../documents:/srv/northlake-documents:ro
+      - ../services/sources/web:/srv/northlake-sources-web:ro
       - caddy-data:/data
       - caddy-config:/config
     networks:

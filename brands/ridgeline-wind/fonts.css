@@ -1,0 +1,12 @@
+/* Ridgeline Wind faces. Archivo is self-hosted (SIL Open Font License: see
+   fonts/OFL-archivo.txt); SCADA values use IBM Plex Mono from the Northlake folder. */
+@import url("../northlake/fonts.css");
+
+@font-face {
+  font-family: "Archivo";
+  src: url("fonts/Archivo-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-stretch: 62% 125%;
+  font-display: swap;
+}

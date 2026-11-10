@@ -1,0 +1,58 @@
+# Stage 10, step 1: the final full backup (SQL Server > BACKUP DATABASE). Not an EEM editor; run with sqlcmd or SQL
+# Server Management Studio as a sysadmin on the database server. Mirrors the conventions of Stage 3's entry backup
+# (implementation/stage-3-gateways-and-data/01-checkpoint.yaml) but lands in the dedicated archival folder rather
+# than the instance's scratch backup folder, and is kept, not restored-over.
+stage: 10
+step: 1
+title: Final backup
+app: SQL Server (sqlcmd or Management Studio)
+screen: BACKUP DATABASE
+source:
+- implementation/stage-3-gateways-and-data/01-checkpoint.yaml
+notes:
+- 'Server facts (same as Stage 3, re-verified): instance BVirtualPC (connect as localhost), SQL Server
+  17.0.1135.8, database EEMSuite_Northlake, SIMPLE recovery model (a full backup is the whole checkpoint; no log
+  chain to also capture). Verified in msdb.dbo.backupset: the only existing backup at C:\Hippo\Backups\ is
+  EEMSuite_Northlake.before-upgrade.20260914.bak (2026-09-14, type D full), so this stage''s file follows that
+  same dot-separated naming rule in that same folder, distinct from Stage 3''s underscore-separated names in the
+  instance''s own default backup path (C:\Hippo\Databases\Backups).'
+- This is the ONE backup this stage keeps permanently; it becomes Northlake's reference database from here on
+  (step 2). Do not mark it COPY_ONLY the way Stage 3's scratch entry backup is -- it is meant to start a real
+  backup lineage, not stay outside one.
+- 'A database backup does not carry: the application binaries or version, the repo state the implementation was
+  authored against, the gateway input/working/backup/error folders and their output/state files (Stage 3''s own
+  note: C:\ProgramData\EEM Suite\NorthLake\Gateways and \GatewayOutput), or any externally-held configuration
+  (ProgramData ConfigFiles\{Manifest}.json runtime settings, the ENERGY STAR CustomerServer System Constant and
+  the Energy Star task''s PM credentials once Stage 8 step 4 connects them, SMTP/mail relay settings, any
+  Configuration Tool System Constants). All of that is recorded beside the .bak file, not inside it.'
+records:
+- key: stage10_final
+  installed:
+    backupFile:
+    takenOn:
+    backupSetName: Northlake Stage 10 final
+  Taken when: All of Stages 1-9 are entered and every check in every stage's checks.sql is green.
+  Database: EEMSuite_Northlake
+  Backup folder: C:\Hippo\Backups\
+  File name: EEMSuite_Northlake.stage10-final.<yyyyMMdd>.bak
+  Command: |
+    BACKUP DATABASE [EEMSuite_Northlake]
+      TO DISK = N'C:\Hippo\Backups\EEMSuite_Northlake.stage10-final.<yyyyMMdd>.bak'
+      WITH INIT, CHECKSUM, COMPRESSION, STATS = 10,
+           NAME = N'Northlake Stage 10 final';
+    RESTORE VERIFYONLY
+      FROM DISK = N'C:\Hippo\Backups\EEMSuite_Northlake.stage10-final.<yyyyMMdd>.bak'
+      WITH CHECKSUM;
+  KeepBeside:
+    applicationVersion: 7.0.0.4005
+    instanceName: NorthLake
+    repoCommit: "the energyhippo commit the installed app was built from at backup time (git rev-parse HEAD on that worktree)"
+    gatewayInputDirectories: "C:\\ProgramData\\EEM Suite\\NorthLake\\Gateways (every profile's Input/Working/Backup/Error
+      folders) and C:\\ProgramData\\EEM Suite\\NorthLake\\GatewayOutput -- copy both trees beside the .bak, they are not
+      inside it"
+    externalServiceSettings:
+    - "ProgramData ConfigFiles\\{Manifest}.json runtime configuration (per Northlake convention, edited directly, not
+      via appsettings)"
+    - "ENERGY STAR: the CustomerServer System Constant value and the Energy Star task's PMUsername/PMAccountPassword
+      parameters (Stage 8 step 4), once a sandbox/real Portfolio Manager account is connected"
+    - "any SMTP/mail relay settings the Alarm Mail Service and MFR delivery tasks use to actually send mail"

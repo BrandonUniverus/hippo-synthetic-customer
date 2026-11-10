@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import io
 import posixpath
+import re
 import sys
 from datetime import date
 from functools import lru_cache
@@ -38,10 +39,10 @@ FOLDER_DEFAULTS = {
     "documents/guides": {"document_type": "Operating guide"},
     "documents/rate-tariffs": {"department": "Finance and Accounts Payable", "document_type": "Rate tariff sheet"},
     "documents/brand": {"department": "IT and Communications", "document_type": "EEM portal brand kit"},
-    "implementation": {"department": "Energy Hippo implementation", "prepared_by": "Energy Hippo implementation team"},
-    "implementation/dream-customer": {"document_type": "Dream customer plan"},
+    "implementation": {"department": "Energy Hippo implementation", "prepared_by": "Energy Hippo implementation team", "document_type": "Implementation plan"},
     "implementation/briefs": {"document_type": "Design brief"},
 }
+STAGE_FOLDER = re.compile(r"^implementation/stage-(\d+)-[a-z0-9-]+/")
 
 
 @lru_cache
@@ -58,6 +59,9 @@ def defaults_for(pdf: str, root: Path = ROOT) -> dict[str, str]:
     for folder in sorted(FOLDER_DEFAULTS, key=len):
         if pdf.startswith(folder + "/"):
             values.update(FOLDER_DEFAULTS[folder])
+    stage = STAGE_FOLDER.match(pdf)
+    if stage:
+        values["document_type"] = f"Implementation guide, stage {int(stage.group(1))}"
     return values
 
 

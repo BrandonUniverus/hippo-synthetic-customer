@@ -1,0 +1,758 @@
+# Stage 7, step 2: Northlake Town Center hierarchy (Database Administrator > Nodes tree). One record per
+# node, in tree order: Property > Buildings > Meters > Points, then Billing Accounts (the Add Billing Account
+# dialog opened from a meter). Shape follows Stage 2's node conventions (Definitions/Address/Area/Meter
+# Definitions/Point Definitions pages) — Stage 2 is being written in parallel; its own YAML is not committed
+# yet, so meters and points here are new Town Center nodes only and do not depend on Stage 2's IDs. Every
+# tenant space is a real Meter-level node even where it has no physical device, because Bill Allocation
+# details point at a Metaworld ID with a Billing Account, not at a bare tenant name.
+stage: 7
+step: 2
+title: Town Center site, buildings, meters, points and billing accounts
+app: Database Administrator
+screen: Nodes > (Property / Location / Meter / Point) node > Definitions, Address, Area, Meter Definitions, Point
+  Definitions; Add Billing Account dialog from a Meter node
+source:
+- data/eem/northlake-town-center-v1.yaml
+- documents/guides/tenant-and-lease-roster.pdf
+- generators/documents/sources/implementation/dream-customer/phase4-tenant-rebilling-spec.md
+notes:
+- 'Order inside the tree: add the Property node under Northlake Town Center (Stage 7 step 1), save, then each Building
+  (Location), save, then each Meter under its building, save, then each Meter''s Point. A Billing Account must exist
+  before a meter can be attached to one, so run the Add Billing Account dialog first for each row in billingAccounts
+  below, then set BA_BillingAccountID on the matching meter.'
+- 'Two meter kinds appear here: a master meter (real utility interval + monthly bill from Valley Electric District,
+  Type Code 1 AP Upload Only, Bill Type Importer) and an allocation meter (a tenant space with no physical device
+  — no Point Definitions page needed — that exists only to hold a Billing Account, Bill Type Allocation, so it can
+  appear as a row in a Bill Allocation Configuration Detail grid). Floor 1-4, Bldg A/B/C and Substation 1/2 are
+  a third kind: an owned submeter with a real interval point but no utility bill of its own (Bill Type Allocation,
+  no provider), matching Cedar Row''s owned-submeter pattern from Stage 2.'
+- Vendor numbers for Town Center's four Valley Electric District accounts are assigned on the Utility Providers
+  > Associated Companies page (Stage 1 step 2), e.g. VED-3005-TC through VED-3008-TC.
+- Floor area values (Area tab) are entered in SqFt on every tenant-space node used by the Building Areas method
+  (file 04) so that method has something to divide by; other tenant spaces get an area value too so the WUI fail-reason
+  fixture (file 05) has a real "has area" baseline to contrast against.
+- All synthetic meter numbers are new and assumed, in Valley Electric District's existing format (SYN-VED-M-#######,
+  see data/providers/valley-electric-district.yaml) since Town Center buys its electricity from the same provider
+  as the rest of the portfolio.
+- Records marked kind 'Billing account (Utility Accountant tab, Stage 2 shape)' were entered on that other editor;
+  they sit in this file because they belong to this step.
+records:
+- key: tc_property
+  installed:
+    metaWorldId: null
+  Definitions:
+    Description: Northlake Town Center
+    Type: Site
+    Site Code: TC
+  Address:
+    Address: 2200 Riverfront Parkway
+    City: Sacramento
+    Region: CA
+    Postal Code: '95814'
+    Country: UNITED STATES
+    Latitude: 38.5825
+    Longitude: -121.4944
+- key: tc_market_hall
+  installed:
+    metaWorldId: null
+  Definitions:
+    Description: Market Hall
+    Type: Location
+    Building Code: MKT
+    Parent: tc_property
+  Address:
+    Address: 2210 Riverfront Parkway
+    City: Sacramento
+    Region: CA
+    Postal Code: '95814'
+  Area:
+    Value: 84000
+    Unit: SqFt
+- key: tc_office_tower
+  installed:
+    metaWorldId: null
+  Definitions:
+    Description: Office Tower
+    Type: Location
+    Building Code: TWR
+    Parent: tc_property
+  Address:
+    Address: 2240 Riverfront Parkway
+    City: Sacramento
+    Region: CA
+    Postal Code: '95814'
+  Area:
+    Value: 96000
+    Unit: SqFt
+- key: tc_campus_annex
+  installed:
+    metaWorldId: null
+  Definitions:
+    Description: Campus Annex
+    Type: Location
+    Building Code: ANX
+    Parent: tc_property
+  Address:
+    Address: 2260 Riverfront Parkway
+    City: Sacramento
+    Region: CA
+    Postal Code: '95814'
+  Area:
+    Value: 54000
+    Unit: SqFt
+- key: tc_substation_feed
+  installed:
+    metaWorldId: null
+  Definitions:
+    Description: Substation Feed
+    Type: Location
+    Building Code: SUB
+    Parent: tc_property
+  Address:
+    Address: 2280 Riverfront Parkway
+    City: Sacramento
+    Region: CA
+    Postal Code: '95814'
+- key: tc_property_total_bldg
+  installed:
+    metaWorldId: null
+  Definitions:
+    Description: Property Total
+    Type: Location
+    Building Code: TOTAL
+    Parent: tc_property
+  notes: Holds only the Property Total cost-center meter (method 6's aggregation target); no address, no meters
+    of its own besides that one.
+- key: tc_market_main
+  installed:
+    metaWorldId: null
+    meterId: null
+    billingAccountId: null
+  Definitions:
+    Description: Mall-Main
+    Type: Meter
+    Parent: tc_market_hall
+    Meter Tag: MKT-MAIN
+  Meter Definitions:
+    Measure Type: Electric
+    Synthetic Meter Number: SYN-VED-M-3005001
+    Provider: Valley Electric District
+    Billing Account: tc_market_main_ba
+    Bill Cycle: 1
+  Point Definitions:
+  - Description: Mall-Main kWh 60m
+    Point Type: Accumulator
+    Measure Type: Electric
+    Unit: kWh
+    Interval: 60
+- key: tc_anchor_store
+  installed:
+    metaWorldId: null
+    meterId: null
+    billingAccountId: null
+  Definitions:
+    Description: Anchor Store
+    Type: Meter
+    Parent: tc_market_hall
+    Meter Tag: MKT-ANCHOR
+  Meter Definitions:
+    Billing Account: tc_anchor_store_ba
+    notes: allocation-only meter, no provider, no synthetic meter number
+  Area:
+    Value: 28000
+    Unit: SqFt
+- key: tc_food_court
+  installed:
+    metaWorldId: null
+    meterId: null
+    billingAccountId: null
+  Definitions:
+    Description: Food Court
+    Type: Meter
+    Parent: tc_market_hall
+    Meter Tag: MKT-FOODCOURT
+  Meter Definitions:
+    Billing Account: tc_food_court_ba
+    notes: allocation-only meter
+  Area:
+    Value: 12000
+    Unit: SqFt
+- key: tc_inline_shop_1
+  installed:
+    metaWorldId: null
+    meterId: null
+    billingAccountId: null
+  Definitions:
+    Description: In-line Shop 1
+    Type: Meter
+    Parent: tc_market_hall
+    Meter Tag: MKT-SHOP1
+  Meter Definitions:
+    Billing Account: tc_inline_shop_1_ba
+    notes: allocation-only meter
+  Area:
+    Value: 2200
+    Unit: SqFt
+- key: tc_inline_shop_2
+  installed:
+    metaWorldId: null
+    meterId: null
+    billingAccountId: null
+  Definitions:
+    Description: In-line Shop 2
+    Type: Meter
+    Parent: tc_market_hall
+    Meter Tag: MKT-SHOP2
+  Meter Definitions:
+    Billing Account: tc_inline_shop_2_ba
+    notes: allocation-only meter
+  Area:
+    Value: 1800
+    Unit: SqFt
+- key: tc_inline_shop_3
+  installed:
+    metaWorldId: null
+    meterId: null
+    billingAccountId: null
+  Definitions:
+    Description: In-line Shop 3
+    Type: Meter
+    Parent: tc_market_hall
+    Meter Tag: MKT-SHOP3
+  Meter Definitions:
+    Billing Account: tc_inline_shop_3_ba
+    notes: allocation-only meter
+  Area:
+    Value: 2600
+    Unit: SqFt
+- key: tc_inline_shop_4
+  installed:
+    metaWorldId: null
+    meterId: null
+    billingAccountId: null
+  Definitions:
+    Description: In-line Shop 4
+    Type: Meter
+    Parent: tc_market_hall
+    Meter Tag: MKT-SHOP4
+  Meter Definitions:
+    Billing Account: tc_inline_shop_4_ba
+    notes: allocation-only meter
+  Area:
+    Value: 2000
+    Unit: SqFt
+- key: tc_common_area
+  installed:
+    metaWorldId: null
+    meterId: null
+    billingAccountId: null
+  Definitions:
+    Description: Common Area
+    Type: Meter
+    Parent: tc_market_hall
+    Meter Tag: MKT-COMMON
+  Meter Definitions:
+    Billing Account: tc_common_area_ba
+    notes: allocation-only meter
+  Area:
+    Value: 35400
+    Unit: SqFt
+- key: tc_tower_main
+  installed:
+    metaWorldId: null
+    meterId: null
+    billingAccountId: null
+  Definitions:
+    Description: Tower-Main
+    Type: Meter
+    Parent: tc_office_tower
+    Meter Tag: TWR-MAIN
+  Meter Definitions:
+    Measure Type: Electric
+    Synthetic Meter Number: SYN-VED-M-3006001
+    Provider: Valley Electric District
+    Billing Account: tc_tower_main_ba
+    Bill Cycle: 1
+  Point Definitions:
+  - Description: Tower-Main kWh 60m
+    Point Type: Accumulator
+    Measure Type: Electric
+    Unit: kWh
+    Interval: 60
+- key: tc_floor_1
+  installed:
+    metaWorldId: null
+    meterId: null
+    billingAccountId: null
+  Definitions:
+    Description: Floor 1
+    Type: Meter
+    Parent: tc_office_tower
+    Meter Tag: TWR-FL1
+  Meter Definitions:
+    Measure Type: Electric
+    Synthetic Meter Number: SYN-VED-M-3006002
+    Billing Account: tc_floor_1_ba
+    notes: owned submeter, no provider bill
+  Area:
+    Value: 22000
+    Unit: SqFt
+  Point Definitions:
+  - Description: Floor 1 Submeter kWh 60m
+    Point Type: Accumulator
+    Measure Type: Electric
+    Unit: kWh
+    Interval: 60
+- key: tc_floor_2
+  installed:
+    metaWorldId: null
+    meterId: null
+    billingAccountId: null
+  Definitions:
+    Description: Floor 2
+    Type: Meter
+    Parent: tc_office_tower
+    Meter Tag: TWR-FL2
+  Meter Definitions:
+    Measure Type: Electric
+    Synthetic Meter Number: SYN-VED-M-3006003
+    Billing Account: tc_floor_2_ba
+    notes: owned submeter, no provider bill
+  Area:
+    Value: 22000
+    Unit: SqFt
+  Point Definitions:
+  - Description: Floor 2 Submeter kWh 60m
+    Point Type: Accumulator
+    Measure Type: Electric
+    Unit: kWh
+    Interval: 60
+- key: tc_floor_3
+  installed:
+    metaWorldId: null
+    meterId: null
+    billingAccountId: null
+  Definitions:
+    Description: Floor 3
+    Type: Meter
+    Parent: tc_office_tower
+    Meter Tag: TWR-FL3
+  Meter Definitions:
+    Measure Type: Electric
+    Synthetic Meter Number: SYN-VED-M-3006004
+    Billing Account: tc_floor_3_ba
+    notes: owned submeter, no provider bill
+  Area:
+    Value: 22000
+    Unit: SqFt
+  Point Definitions:
+  - Description: Floor 3 Submeter kWh 60m
+    Point Type: Accumulator
+    Measure Type: Electric
+    Unit: kWh
+    Interval: 60
+- key: tc_floor_4
+  installed:
+    metaWorldId: null
+    meterId: null
+    billingAccountId: null
+  Definitions:
+    Description: Floor 4
+    Type: Meter
+    Parent: tc_office_tower
+    Meter Tag: TWR-FL4
+  Meter Definitions:
+    Measure Type: Electric
+    Synthetic Meter Number: SYN-VED-M-3006005
+    Billing Account: tc_floor_4_ba
+  Area:
+    Value: 22000
+    Unit: SqFt
+  Point Definitions:
+  - Description: Floor 4 Submeter kWh 60m
+    Point Type: Accumulator
+    Measure Type: Electric
+    Unit: kWh
+    Interval: 60
+  notes: Floor 4's submeter is entered here and used by file 04's FY2024 Fully Submetered config; the chapter's
+    Method 3 story removes it from service starting FY2025 (nothing to delete in this file, just do not include
+    Floor 4 in that later config's detail rows).
+- key: tc_landlord_house
+  installed:
+    metaWorldId: null
+    meterId: null
+    billingAccountId: null
+  Definitions:
+    Description: Landlord/House
+    Type: Meter
+    Parent: tc_office_tower
+    Meter Tag: TWR-HOUSE
+  Meter Definitions:
+    Billing Account: tc_landlord_house_ba
+    notes: allocation-only meter, no submeter of its own; receives Office Tower's unmetered remainder
+  Area:
+    Value: 8000
+    Unit: SqFt
+- key: tc_annex_main
+  installed:
+    metaWorldId: null
+    meterId: null
+    billingAccountId: null
+  Definitions:
+    Description: Annex-Main
+    Type: Meter
+    Parent: tc_campus_annex
+    Meter Tag: ANX-MAIN
+  Meter Definitions:
+    Measure Type: Electric
+    Synthetic Meter Number: SYN-VED-M-3007001
+    Provider: Valley Electric District
+    Billing Account: tc_annex_main_ba
+    Bill Cycle: 1
+  Point Definitions:
+  - Description: Annex-Main kWh 60m
+    Point Type: Accumulator
+    Measure Type: Electric
+    Unit: kWh
+    Interval: 60
+  - Description: Annex-Main kW 60m
+    Point Type: Analog
+    Measure Type: Electric
+    Unit: kW
+    Interval: 60
+- key: tc_bldg_a
+  installed:
+    metaWorldId: null
+    meterId: null
+    billingAccountId: null
+  Definitions:
+    Description: Bldg A
+    Type: Meter
+    Parent: tc_campus_annex
+    Meter Tag: ANX-A
+  Meter Definitions:
+    Measure Type: Electric
+    Synthetic Meter Number: SYN-VED-M-3007002
+    Billing Account: tc_bldg_a_ba
+  Area:
+    Value: 16000
+    Unit: SqFt
+  Point Definitions:
+  - Description: Bldg A Submeter kWh 60m
+    Point Type: Accumulator
+    Measure Type: Electric
+    Unit: kWh
+    Interval: 60
+  - Description: Bldg A Submeter kW 60m
+    Point Type: Analog
+    Measure Type: Electric
+    Unit: kW
+    Interval: 60
+- key: tc_bldg_b
+  installed:
+    metaWorldId: null
+    meterId: null
+    billingAccountId: null
+  Definitions:
+    Description: Bldg B
+    Type: Meter
+    Parent: tc_campus_annex
+    Meter Tag: ANX-B
+  Meter Definitions:
+    Measure Type: Electric
+    Synthetic Meter Number: SYN-VED-M-3007003
+    Billing Account: tc_bldg_b_ba
+  Area:
+    Value: 18000
+    Unit: SqFt
+  Point Definitions:
+  - Description: Bldg B Submeter kWh 60m
+    Point Type: Accumulator
+    Measure Type: Electric
+    Unit: kWh
+    Interval: 60
+  - Description: Bldg B Submeter kW 60m
+    Point Type: Analog
+    Measure Type: Electric
+    Unit: kW
+    Interval: 60
+- key: tc_bldg_c
+  installed:
+    metaWorldId: null
+    meterId: null
+    billingAccountId: null
+  Definitions:
+    Description: Bldg C
+    Type: Meter
+    Parent: tc_campus_annex
+    Meter Tag: ANX-C
+  Meter Definitions:
+    Measure Type: Electric
+    Synthetic Meter Number: SYN-VED-M-3007004
+    Billing Account: tc_bldg_c_ba
+  Area:
+    Value: 20000
+    Unit: SqFt
+  Point Definitions:
+  - Description: Bldg C Submeter kWh 60m
+    Point Type: Accumulator
+    Measure Type: Electric
+    Unit: kWh
+    Interval: 60
+  - Description: Bldg C Submeter kW 60m
+    Point Type: Analog
+    Measure Type: Electric
+    Unit: kW
+    Interval: 60
+- key: tc_substation_master
+  installed:
+    metaWorldId: null
+    meterId: null
+    billingAccountId: null
+  Definitions:
+    Description: Substation-Master
+    Type: Meter
+    Parent: tc_substation_feed
+    Meter Tag: SUB-MAIN
+  Meter Definitions:
+    Measure Type: Electric
+    Synthetic Meter Number: SYN-VED-M-3008001
+    Provider: Valley Electric District
+    Billing Account: tc_substation_master_ba
+    Bill Cycle: 1
+  Point Definitions:
+  - Description: Substation-Master kWh 60m
+    Point Type: Accumulator
+    Measure Type: Electric
+    Unit: kWh
+    Interval: 60
+- key: tc_substation_1
+  installed:
+    metaWorldId: null
+    meterId: null
+    billingAccountId: null
+  Definitions:
+    Description: Substation 1
+    Type: Meter
+    Parent: tc_substation_feed
+    Meter Tag: SUB-1
+  Meter Definitions:
+    Measure Type: Electric
+    Synthetic Meter Number: SYN-VED-M-3008002
+    Billing Account: tc_substation_1_ba
+  Point Definitions:
+  - Description: Substation 1 Submeter kWh 60m
+    Point Type: Accumulator
+    Measure Type: Electric
+    Unit: kWh
+    Interval: 60
+- key: tc_substation_2
+  installed:
+    metaWorldId: null
+    meterId: null
+    billingAccountId: null
+  Definitions:
+    Description: Substation 2
+    Type: Meter
+    Parent: tc_substation_feed
+    Meter Tag: SUB-2
+  Meter Definitions:
+    Measure Type: Electric
+    Synthetic Meter Number: SYN-VED-M-3008003
+    Billing Account: tc_substation_2_ba
+  Point Definitions:
+  - Description: Substation 2 Submeter kWh 60m
+    Point Type: Accumulator
+    Measure Type: Electric
+    Unit: kWh
+    Interval: 60
+- key: tc_property_total
+  installed:
+    metaWorldId: null
+    meterId: null
+    billingAccountId: null
+  Definitions:
+    Description: Property Total
+    Type: Meter
+    Parent: tc_property_total_bldg
+    Meter Tag: TC-TOTAL
+  Meter Definitions:
+    Billing Account: tc_property_total_ba
+    notes: 'aggregation target only: no provider, no point, receives the sum of every other Town Center tenant bill
+      (file 03, method 6)'
+- key: tc_market_main_ba
+  installed: {}
+  kind: Billing account (Utility Accountant tab, Stage 2 shape)
+  meter: tc_market_main
+  number: SYN-VED-A-3005001
+  provider: Valley Electric District
+  typeCode: 1 AP Upload Only
+  billTypeCode: 1 Importer
+- key: tc_anchor_store_ba
+  installed: {}
+  kind: Billing account (Utility Accountant tab, Stage 2 shape)
+  meter: tc_anchor_store
+  number: TC-MKT-ANCHOR
+  provider: null
+  typeCode: '0'
+  billTypeCode: 3 Allocation
+- key: tc_food_court_ba
+  installed: {}
+  kind: Billing account (Utility Accountant tab, Stage 2 shape)
+  meter: tc_food_court
+  number: TC-MKT-FOODCOURT
+  provider: null
+  typeCode: '0'
+  billTypeCode: 3 Allocation
+- key: tc_inline_shop_1_ba
+  installed: {}
+  kind: Billing account (Utility Accountant tab, Stage 2 shape)
+  meter: tc_inline_shop_1
+  number: TC-MKT-SHOP1
+  provider: null
+  typeCode: '0'
+  billTypeCode: 3 Allocation
+- key: tc_inline_shop_2_ba
+  installed: {}
+  kind: Billing account (Utility Accountant tab, Stage 2 shape)
+  meter: tc_inline_shop_2
+  number: TC-MKT-SHOP2
+  provider: null
+  typeCode: '0'
+  billTypeCode: 3 Allocation
+- key: tc_inline_shop_3_ba
+  installed: {}
+  kind: Billing account (Utility Accountant tab, Stage 2 shape)
+  meter: tc_inline_shop_3
+  number: TC-MKT-SHOP3
+  provider: null
+  typeCode: '0'
+  billTypeCode: 3 Allocation
+- key: tc_inline_shop_4_ba
+  installed: {}
+  kind: Billing account (Utility Accountant tab, Stage 2 shape)
+  meter: tc_inline_shop_4
+  number: TC-MKT-SHOP4
+  provider: null
+  typeCode: '0'
+  billTypeCode: 3 Allocation
+- key: tc_common_area_ba
+  installed: {}
+  kind: Billing account (Utility Accountant tab, Stage 2 shape)
+  meter: tc_common_area
+  number: TC-MKT-COMMON
+  provider: null
+  typeCode: '0'
+  billTypeCode: 3 Allocation
+- key: tc_tower_main_ba
+  installed: {}
+  kind: Billing account (Utility Accountant tab, Stage 2 shape)
+  meter: tc_tower_main
+  number: SYN-VED-A-3006001
+  provider: Valley Electric District
+  typeCode: 1 AP Upload Only
+  billTypeCode: 1 Importer
+- key: tc_floor_1_ba
+  installed: {}
+  kind: Billing account (Utility Accountant tab, Stage 2 shape)
+  meter: tc_floor_1
+  number: TC-TWR-FL1
+  provider: null
+  typeCode: '0'
+  billTypeCode: 3 Allocation
+- key: tc_floor_2_ba
+  installed: {}
+  kind: Billing account (Utility Accountant tab, Stage 2 shape)
+  meter: tc_floor_2
+  number: TC-TWR-FL2
+  provider: null
+  typeCode: '0'
+  billTypeCode: 3 Allocation
+- key: tc_floor_3_ba
+  installed: {}
+  kind: Billing account (Utility Accountant tab, Stage 2 shape)
+  meter: tc_floor_3
+  number: TC-TWR-FL3
+  provider: null
+  typeCode: '0'
+  billTypeCode: 3 Allocation
+- key: tc_floor_4_ba
+  installed: {}
+  kind: Billing account (Utility Accountant tab, Stage 2 shape)
+  meter: tc_floor_4
+  number: TC-TWR-FL4
+  provider: null
+  typeCode: '0'
+  billTypeCode: 3 Allocation
+- key: tc_landlord_house_ba
+  installed: {}
+  kind: Billing account (Utility Accountant tab, Stage 2 shape)
+  meter: tc_landlord_house
+  number: TC-TWR-HOUSE
+  provider: null
+  typeCode: '0'
+  billTypeCode: 3 Allocation
+- key: tc_annex_main_ba
+  installed: {}
+  kind: Billing account (Utility Accountant tab, Stage 2 shape)
+  meter: tc_annex_main
+  number: SYN-VED-A-3007001
+  provider: Valley Electric District
+  typeCode: 1 AP Upload Only
+  billTypeCode: 1 Importer
+- key: tc_bldg_a_ba
+  installed: {}
+  kind: Billing account (Utility Accountant tab, Stage 2 shape)
+  meter: tc_bldg_a
+  number: TC-ANX-A
+  provider: null
+  typeCode: '0'
+  billTypeCode: 3 Allocation
+- key: tc_bldg_b_ba
+  installed: {}
+  kind: Billing account (Utility Accountant tab, Stage 2 shape)
+  meter: tc_bldg_b
+  number: TC-ANX-B
+  provider: null
+  typeCode: '0'
+  billTypeCode: 3 Allocation
+- key: tc_bldg_c_ba
+  installed: {}
+  kind: Billing account (Utility Accountant tab, Stage 2 shape)
+  meter: tc_bldg_c
+  number: TC-ANX-C
+  provider: null
+  typeCode: '0'
+  billTypeCode: 3 Allocation
+- key: tc_substation_master_ba
+  installed: {}
+  kind: Billing account (Utility Accountant tab, Stage 2 shape)
+  meter: tc_substation_master
+  number: SYN-VED-A-3008001
+  provider: Valley Electric District
+  typeCode: 1 AP Upload Only
+  billTypeCode: 1 Importer
+- key: tc_substation_1_ba
+  installed: {}
+  kind: Billing account (Utility Accountant tab, Stage 2 shape)
+  meter: tc_substation_1
+  number: TC-SUB-1
+  provider: null
+  typeCode: '0'
+  billTypeCode: 3 Allocation
+- key: tc_substation_2_ba
+  installed: {}
+  kind: Billing account (Utility Accountant tab, Stage 2 shape)
+  meter: tc_substation_2
+  number: TC-SUB-2
+  provider: null
+  typeCode: '0'
+  billTypeCode: 3 Allocation
+- key: tc_property_total_ba
+  installed: {}
+  kind: Billing account (Utility Accountant tab, Stage 2 shape)
+  meter: tc_property_total
+  number: TC-PROPERTY-TOTAL
+  provider: null
+  typeCode: '0'
+  billTypeCode: 3 Allocation

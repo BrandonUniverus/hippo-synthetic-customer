@@ -20,8 +20,11 @@ and confirm back.
   account that must not be able to sign in.
 - One internal auditor (Quinn Roberts) needs **read-only visibility across all
   properties**.
+- Ridgeline Wind staff work **only on the Ridgeline site**, and the university's
+  wind researchers may **read** the Ridgeline site, which belongs to the Thermal
+  Plant, but nothing else of the plant and no bills.
 
-## Core users (≈19)
+## Core users (≈23)
 
 | Name | Title | Property | Needs to… |
 | --- | --- | --- | --- |
@@ -44,10 +47,16 @@ and confirm back.
 | Avery Singh | EEM Database Administrator | Implementation/Support | System DB admin |
 | Morgan Patel | Implementation Consultant | Implementation/Support | App setup validation |
 | Taylor Bennett | Support Analyst | Implementation/Support | Read-only support |
+| Mateo Alvarez | Ridgeline Wind Site Manager | Thermal Plant (Ridgeline) | Maintain turbine meters and points, watch turbine alarms; view plant reports |
+| Renee Castillo | Wind Turbine Technician | Thermal Plant (Ridgeline) | Maintain turbine meters and points on the **Ridgeline site only** |
+| Elena Vasquez | Wind Energy Research Lab Director | Northlake University | **Read** the Ridgeline site's data and analysis reports; no bills |
+| Kai Nakamura | Graduate Research Assistant | Northlake University | Same as Elena Vasquez |
 
 Note: Dana Okafor demonstrates **building-level access** — she should see only
 Science Center, not the rest of campus. Quinn Roberts demonstrates **cross-
-property read-only** access.
+property read-only** access. Mateo Alvarez and Renee Castillo can change data,
+but only on one site. Elena Vasquez and Kai Nakamura combine the two: university
+staff reading one site that belongs to another company.
 
 ## Scheduled-report recipients (≈120)
 

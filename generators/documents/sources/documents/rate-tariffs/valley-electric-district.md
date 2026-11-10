@@ -69,6 +69,50 @@ Accounts on this schedule: Campus Grounds (Campus Grounds Area Lighting, 48
 fixtures) and Cedar Row Carport and Grounds (Cedar Row Parking Lighting, 20
 fixtures).
 
+## Schedule: Generator Interconnection Service (VED-GEN-IC)
+
+Our Ridgeline Wind Site connects to Valley Electric at its substation at 34.5
+kV. One revenue meter records both directions in 15-minute intervals:
+**received** is the farm's export, **delivered** is station service drawn while
+the turbines are idle, and reactive energy is recorded for the power-factor
+charge. The meter multiplier is 12,000 (300:1 potential transformers, 200:5
+current transformers). The bill states export in **MWh**.
+
+**Effective Jul 1, 2024 – Dec 31, 2025**
+
+| Charge | Basis | Rate |
+| --- | --- | --- |
+| Generator customer charge | per month | $285.00 |
+| Station service energy | per kWh delivered | $0.131 |
+| Reactive power | per kVArh beyond power factor 0.95 | $0.0042 |
+| Generation credit | per kWh received (export) | −$0.0612 |
+
+Account on this schedule: Ridgeline Substation (Northlake Thermal Plant),
+account SYN-VED-A-0010014, meter Ridgeline Interconnection Meter. Valley
+Electric opened it on July 1, 2024, when the plant bought Ridgeline Wind; the
+seller's account was SYN-VED-A-0019014. It reads with our other accounts on the
+5th, so its first bill ran from the opening read to August 4 (35 days).
+
+## Rider: Renewable Generation Bill Credit Transfer (VED-BCT)
+
+The generation credit is not kept on the generator account. Each month the whole
+credit moves to one benefiting account, the Central Plant's primary service,
+where it reduces that bill.
+
+**Effective Jul 1, 2024 – Dec 31, 2025**
+
+| Charge | Basis | Rate |
+| --- | --- | --- |
+| Credit transfer | the generator account's generation credit | 100% |
+| Administrative fee | per benefiting account per month | $12.50 |
+
+Generating account SYN-VED-A-0010014 (Ridgeline Substation); benefiting account
+SYN-VED-A-0010013 (Central Plant). Each credit lands one billing cycle later:
+the generator account's first bill (July 1 to August 4, 2024) is credited on
+the Central Plant's bill for August 5 to September 4. The same dollars appear on
+both bills, as a transfer out on the generator bill and as a credit received on
+the Central Plant bill; count them once.
+
 **Notes for setup:**
 - We would also like two analysis-only electric rates modeled: a **real-time /
   index price option** (priced on an hourly market price) and a **large-demand

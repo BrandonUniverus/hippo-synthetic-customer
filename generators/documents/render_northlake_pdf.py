@@ -202,7 +202,10 @@ def inline_markup(value: str, resolve_link: LinkResolver | None = None, text_fon
         else:
             href = resolve_link(target) if resolve_link else None
             if href and href.partition("#")[0].lower().endswith(".pdf"):
-                href = "pdf:" + href.partition("#")[0]
+                # A relative URI action: Acrobat, Chrome, Edge and Sumatra all follow it from the
+                # PDF's own folder. ReportLab's "pdf:" scheme would emit a GoToR action instead,
+                # which browser viewers ignore. Fragments are dropped; viewers do not share a syntax.
+                href = href.partition("#")[0]
         inner = emphasis(label)
         if not href:
             return keep(inner)

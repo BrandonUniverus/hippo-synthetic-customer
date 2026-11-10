@@ -216,6 +216,33 @@ permissionProfiles:
     restrictions:
       - read_only
 
+  - id: wind_operations
+    displayName: Wind Operations
+    intent: Maintain the Ridgeline Wind site's turbine meters and points, watch turbine state and alarms, and view generation reports.
+    capabilities:
+      - plant_assets.view
+      - plant_meters.manage
+      - points.manage
+      - alarms.acknowledge
+      - interval_status.view
+      - reports.view
+    restrictions:
+      - node_scope_only
+      - no_billing_setup
+
+  - id: research_analyst
+    displayName: Research Analyst
+    intent: Read one site's interval data and analysis reports for research, with no bills, costs or setup.
+    capabilities:
+      - hierarchy.view
+      - points.view
+      - reports.view
+      - report_exports.create
+    restrictions:
+      - read_only
+      - node_scope_only
+      - no_bill_access
+
 systemCompany:
   id: system
   companyId: -1
@@ -339,9 +366,9 @@ companies:
     displayName: Northlake Thermal Plant
     companyType: internal_service_company
     scope:
-      sites: [northlake_central_plant]
-      buildings: [central_plant]
-      providers: [northlake_thermal_plant, valley_electric_district, sierra_gas_utility, river_city_utilities]
+      sites: [northlake_central_plant, ridgeline_wind_site]
+      buildings: [central_plant, ridgeline_turbine_field, ridgeline_substation]
+      providers: [northlake_thermal_plant, valley_electric_district, sierra_gas_utility, river_city_utilities, ridgeline_wind]
     groups:
       - id: ntp_company_admins
         displayName: Thermal Plant Company Admins
@@ -358,11 +385,21 @@ companies:
       - id: ntp_reports
         displayName: Thermal Plant Reports
         permissionProfiles: [report_viewer]
-        users: [devon.brooks, riley.santos, leo.martinez]
+        users: [devon.brooks, riley.santos, leo.martinez, mateo.alvarez]
       - id: ntp_audit_readonly
         displayName: Thermal Plant Audit Read Only
         permissionProfiles: [audit_readonly]
         users: [quinn.roberts]
+      - id: ntp_wind_ops
+        displayName: Ridgeline Wind Operations
+        permissionProfiles: [wind_operations]
+        nodeScope: [ridgeline_wind_site]     # node scope at Modify, inside the company: the Science Center fixture one level up
+        users: [mateo.alvarez, renee.castillo]
+      - id: ntp_wind_research
+        displayName: Ridgeline Wind Research Access
+        permissionProfiles: [research_analyst]
+        nodeScope: [ridgeline_wind_site]     # cross-company AND node-scoped: university researchers read one plant site
+        users: [elena.vasquez, kai.nakamura]
 
 users:
   - id: samantha.ireland
@@ -519,14 +556,47 @@ users:
     expectedToLogin: false
     reason: Disabled-user permission regression case.
 
+  # Ridgeline Wind (acquired by the Thermal Plant 2024-07-01) and the university's Wind Energy Research Lab.
+  - id: mateo.alvarez
+    username: mateo.alvarez
+    displayName: Mateo Alvarez
+    email: mateo.alvarez@northlake.example.edu
+    title: Ridgeline Wind Site Manager
+    primaryCompanyId: northlake_thermal_plant
+    status: active
+
+  - id: renee.castillo
+    username: renee.castillo
+    displayName: Renee Castillo
+    email: renee.castillo@northlake.example.edu
+    title: Wind Turbine Technician
+    primaryCompanyId: northlake_thermal_plant
+    status: active
+
+  - id: elena.vasquez
+    username: elena.vasquez
+    displayName: Elena Vasquez
+    email: elena.vasquez@northlake.example.edu
+    title: Associate Professor of Mechanical Engineering, Wind Energy Research Lab Director
+    primaryCompanyId: northlake_university
+    status: active
+
+  - id: kai.nakamura
+    username: kai.nakamura
+    displayName: Kai Nakamura
+    email: kai.nakamura@northlake.example.edu
+    title: Graduate Research Assistant, Wind Energy Research Lab
+    primaryCompanyId: northlake_university
+    status: active
+
 validationExpectations:
   counts:
     companiesToCreate: 3
     systemCompanyContexts: 1
     securityContexts: 4
-    groups: 27
-    users: 19
-    activeUsers: 18
+    groups: 29
+    users: 23
+    activeUsers: 22
     disabledUsers: 1
   rules:
     - Every active user belongs to at least one group.
@@ -539,3 +609,5 @@ validationExpectations:
     - At least one user has cross-company read-only audit access.
     - At least one system-company user has DB admin access through CompanyID -1.
     - At least one group is scoped to a building subset within its company (intra-company node scope).
+    - At least one node-scoped group grants Modify, not only Read (Ridgeline Wind Operations).
+    - At least one group gives users of another company read-only access to a single site (cross-company node scope).

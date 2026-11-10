@@ -1,0 +1,1309 @@
+# Stage 3, step 3: complete task-entry values and prerequisites; do not start collection.
+stage: 3
+step: 3
+title: Workflows and tasks
+app: Configuration Tool for task definitions/defaults/targets; Web for schedules and runs
+screen: Configuration Tool > Tasks (Northlake Gateways); Web > Tasks > Library > Add schedule; Workflow Designer for Fake
+  Gateway
+source:
+- Installed EEMSuite_Northlake Workflow/WorkflowVersion definitions, verified 2026-11-03
+- src/Tasks/EEMSuite.Tasks.Components/BuiltInWorkflows/*.json
+- src/Tasks/EEMSuite.Tasks.Gateways/Fake/FakeGatewayComponent.cs
+- src/Domain/Services/EEMSuite.Domain.Services/Admin/Tasks/CronToWindowsTriggerCompiler.cs
+- Task_Tbl, TaskItems, TaskSchedules, TaskParams and TaskParamsDefault (installed schema)
+- src/Web/EEMSuite.Web/frontend/src/scripts/hippo/views/taskDashboard/taskLibraryView.ts
+- src/Domain/Services/EEMSuite.Domain.Services/Admin/Tasks/TaskParameterDescriptorService.cs
+- services/sources/README.md and the published contracts/source-model.json
+- services/bacnet/bindings.json and the Windows collector-client protocol probe, verified 2026-11-04
+notes:
+- 'Create one reusable task per workflow from tasks below. Enter Default parameters in Configuration Tool and
+  leave GatewayId, RootDirectory and other schedule-specific defaults blank, including required fields. Add
+  one BVirtualPC execution target with Run as profile blank. In Web > Tasks > Library, create each schedules entry
+  under its Task, give it the exact Schedule name, and enter Parameters as schedule overrides.'
+- GatewayId is a named picker. On each schedule, select its Gateway name; the numeric value is an installed
+  lookup hint, not an ID to copy between installations. Leave the GatewayId default blank
+  on reusable tasks. Keep existing execution targets; hidden legacy gateway metadata does not override the scheduled GatewayId.
+- 'File workspaces use only the explicit RootDirectory below. Leave InputDirectory, WorkingDirectory,
+  ArchiveDirectory, ErrorDirectory and OutputDirectory overrides blank in both task defaults and schedules.
+  They resolve to Input, Working, Archive, Error and Output below the root. Use an override only when that folder
+  must be elsewhere. Keep Northlake roots explicit even though installed gateways can default to InstanceDataPath/TaskData/family/GatewayId.'
+- Blank task defaults are intentional, even on required fields; each schedule supplies its run-specific values.
+  A null required schedule input is an unresolved prerequisite, never a value to paste. BACnet LocalIpAddress needs the Workers IPv4 interface on the BACnet network;
+  the gateway uses UDP 47808. The companion services/bacnet emulator is verified on BVirtualPC Ethernet 3,
+  172.21.29.4. Recheck that interface address if the host network changes; the collector discovers the devices
+  locally, so leave each BACnet node's BBMD Address and BBMD UDP Port blank.
+- Use the current workflow version. Do not pin a Northlake task to an older definition that bypasses the checked
+  publication pipeline.
+- 'Create 11 reusable tasks using ten built-in workflows and the custom Fake Gateway workflow, with 16 disabled
+  schedules. MV90 has two schedules, NOAA has current and history, FIG has three, and Neptune has two.
+  Required means a value must exist when the schedule runs; it does not require a task default. All parameter
+  fields must remain visible so the schedule editor can supply or override them.'
+- Create every schedule disabled. After Steps 3, 5 and 6 are configured, Step 4 may run selected tasks manually.
+  Recurring enablement is a later explicit action, never part of saving these tasks.
+- Choose a current or future Start in Pacific for schedule registration. The old 2024 dates describe sample/history
+  data, not when to register a running schedule. Data ranges are set on the collector, such as NOAA HistoryStartUtc
+  and Fake StartTimestamp/EndTimestamp.
+- 'Installed 7.1.0.10 web editor: timezone-free DateTime defaults from Configuration Tool are interpreted as local
+  time when a schedule is saved. For the UTC boundaries below, set the NOAA HistoryStartUtc and Fake StartTimestamp
+  calendar controls to January 1, 2024 12:00 AM Pacific, and Fake EndTimestamp to January 1, 2024 11:45 PM Pacific.
+  Verify the saved UTC values with checks.sql; the intended collector timestamps remain 08:00Z and 07:45Z, not
+  an eight-hour shift.'
+- 'Schedule kinds are Runs once (0), Interval (1) or Cron (2). All schedules use Pacific, TimeZoneId 33. IntervalSeconds
+  must be at least 300. Cron has six fields: seconds minutes hours day-of-month month day-of-week.'
+- MvrsGateway already includes HmrEventsPublish after IntervalDataPublish. Do not create a separate HMR Events Publish
+  workflow, task, gateway or input-file handoff.
+- Gateway IDs for the three handheld profiles remain unresolved until Step 5. Do not use illustrative source-model
+  IDs or invent a placeholder ID to make a schedule save. Their reusable tasks may still be created with blank defaults.
+- Do not modify the pre-existing DatabridgeII/Aggregation tasks. OdbcFileDataGateway is an exporter and BillImporter
+  belongs to the billing stage; neither gets a Northlake acquisition task here.
+- Run the workflow/task section of checks.sql as a stored-configuration check. Its default requires disabled schedules;
+  set RequireDisabledSchedules to 0 only when checking a deliberately enabled deployment after Step 4. A successful configuration check does not prove ingestion.
+taskDefinitionDefaults:
+  Task group: Northlake Gateways
+  Task group ID: 3
+  Workflow version: Latest
+  Minimum interval seconds: 300
+  Can schedule: true
+  Single schedule only: false
+  Parameters visible: true
+  Execution machine: BVirtualPC
+  Machine ID: 2
+  Run as profile: null
+  Run as meaning: Blank inherits the Workers service account. The workflow execution profile Gateway is already
+    part of the built-in definitions; it is not a user credential to enter.
+gatewayEnablement:
+  Screen: Profile Manager > Local Configuration > BVIRTUALPC > Gateway Runtime > GatewayRuntime
+  Setting: Object Enablement
+  Key: GatewayRuntime:ObjectEnablement
+  Type: JSON
+  Value: '{"AcquiSuite": true, "AerisWeather": false, "Bacnet": true, "Cmep": true, "Eaton": true, "Fig": true,
+    "FixedNetworks": true, "Mdef": true, "Mediator": true, "Modbus": true, "Mv9": true, "Mvrs": true, "Neptune":
+    true, "Noaa": true, "Odbc": true, "SiemansReport": true, "Spinwave": true, "Xml": true, "Fake": true, "DataBridge":
+    false, "GraphQl": false, "Opc": false, "WeatherUnderground": false}'
+  Notes:
+  - Enable the listed component kinds before acceptance. Keep AerisWeather false; the NOAA task uses the separate
+    NOAA collector.
+  - Component enablement does not turn on schedules. Leave every Northlake task schedule disabled until its acceptance
+    prerequisites are complete.
+sourceService:
+  Base URL: http://localhost:18081
+  Contract: /releases/<release-id>/files/contracts/source-model.json (resolve release-id from /catalog.json)
+  Current source coverage: 215 direct file-backed inputs across seven gateway profiles; BACnet, Modbus, ODBC and
+    handheld sources are separate prerequisites.
+  Delivery: No files are delivered automatically. Do not copy files or start a delivery command until Step 4 (after Steps
+    5 and 6 are entered). Delivery uses each schedule Source ID and Parameters.RootDirectory/Input (or its explicit InputDirectory
+    override); preserve source delivery subfolders, especially Spinwave SCIENCE.
+  Required node changes:
+  - Gateway: Northlake VED MDEF Interval Import
+    Node: MV90-MDEF-VED-SCIENCE
+    Node ID: 5
+    Field: TimeStampType
+    Value: UTC
+    Verified current value: Local (2026-11-03)
+  - Gateway: Northlake VED MDEF Interval Import
+    Node: MV90-MDEF-VED-RECREATION
+    Node ID: 6
+    Field: TimeStampType
+    Value: UTC
+    Verified current value: Local (2026-11-03)
+  - Gateway: Northlake VED MDEF Interval Import
+    Node: MV90-MDEF-VED-PLANT
+    Node ID: 7
+    Field: TimeStampType
+    Value: UTC
+    Verified current value: Local (2026-11-03)
+  - Gateway: Northlake VED MDEF Interval Import
+    Node: MV90-MDEF-VED-RIDGELINE
+    Node ID: 8
+    Field: TimeStampType
+    Value: UTC
+    Verified current value: Local (2026-11-03)
+  - Gateway: Northlake Helios MV90 Generation Import
+    Node: MV90-MV9-HELIOS
+    Node ID: 9
+    Field: TimeStampType
+    Value: UTC
+    Verified current value: Local (2026-11-03)
+customWorkflows:
+- Name: Fake Gateway
+  Execution profile: Gateway
+  Components:
+  - FakeGateway
+  - IntervalDataPublish
+  Parameters:
+    GatewayId:
+      Type: Integer
+      Required: true
+    RootDirectory:
+      Type: DirectoryPath
+      Default: ''
+    StateFilePath:
+      Type: FilePath
+      Default: ''
+    StartTimestamp:
+      Type: DateTime
+      Default: ''
+    EndTimestamp:
+      Type: DateTime
+      Default: ''
+    GenerationMode:
+      Type: String
+      Default: sine
+    AllowSyntheticData:
+      Type: Boolean
+      Default: true
+    AllowNoData:
+      Type: Boolean
+      Default: true
+    BatchKind:
+      Type: String
+      Default: Auto
+    BatchSize:
+      Type: Integer
+      Default: 20000
+    BackfillCutoffDays:
+      Type: Integer
+      Default: 1
+  Nodes:
+  - Id: FakeGateway
+    Component: FakeGateway
+    Values:
+      GatewayId: ${parameters.GatewayId}
+      RootDirectory: ${parameters.RootDirectory}
+      StateFilePath: ${parameters.StateFilePath}
+      StartTimestamp: ${parameters.StartTimestamp}
+      EndTimestamp: ${parameters.EndTimestamp}
+      GenerationMode: ${parameters.GenerationMode}
+      AllowSyntheticData: ${parameters.AllowSyntheticData}
+      AllowNoData: ${parameters.AllowNoData}
+  - Id: IntervalDataPublish
+    Component: IntervalDataPublish
+    Values:
+      BatchKind: ${parameters.BatchKind}
+      BatchSize: ${parameters.BatchSize}
+      BackfillCutoffDays: ${parameters.BackfillCutoffDays}
+      AllowNoData: ${parameters.AllowNoData}
+      IdempotencyScope: northlake-fake-${parameters.TaskExecutionKey}
+  Links:
+  - From: FakeGateway.Out
+    To: IntervalDataPublish.In
+  - From: FakeGateway.IntervalDataFilePath
+    To: IntervalDataPublish.InputFilePath
+  - From: FakeGateway.ResolvedGatewayId
+    To: IntervalDataPublish.GatewayId
+  - From: FakeGateway.ResolvedGatewayName
+    To: IntervalDataPublish.GatewayName
+  - From: FakeGateway.ResolvedGatewayGuid
+    To: IntervalDataPublish.GatewayGuid
+  - From: FakeGateway.GatewayType
+    To: IntervalDataPublish.GatewayType
+tasks:
+- key: task_acquisuite
+  Task name: Northlake AcquiSuite Gateway
+  Workflow: AcquiSuiteGateway
+  Installed workflow ID: 6
+  Execution target:
+    Machine: BVirtualPC
+    Run as profile: null
+  Default parameters:
+    GatewayId: null
+    RootDirectory: null
+    FilePatterns: '*.log.gz;*.log'
+    ZipFilePattern: '*.zip'
+    AgeThresholdSeconds: 10
+    MaxZipFiles: 0
+    MaxParallelism: 2
+    RowOffset: 0
+    AllowNoData: true
+    BatchKind: Auto
+    BatchSize: 20000
+    BackfillCutoffDays: 1
+- key: task_mv90
+  Task name: Northlake MV90 Gateway
+  Workflow: MV90Gateway
+  Installed workflow ID: 14
+  Execution target:
+    Machine: BVirtualPC
+    Run as profile: null
+  Default parameters:
+    GatewayId: null
+    Format: null
+    FilePatterns: null
+    AgeThresholdSeconds: 10
+    RejectStatusCodes: ''
+    AllowNoData: true
+    BatchKind: Auto
+    BatchSize: 20000
+    BackfillCutoffDays: 1
+    RootDirectory: null
+- key: task_bacnet
+  Task name: Northlake BACnet Gateway
+  Workflow: BacnetGateway
+  Installed workflow ID: 15
+  Execution target:
+    Machine: BVirtualPC
+    Run as profile: null
+  Default parameters:
+    GatewayId: null
+    LocalIpAddress: null
+    UdpPort: 47808
+    LocalDeviceId: 0
+    LocalDeviceName: ''
+    NetworkNumber: 0
+    ReadTimeoutMs: 7000
+    WriteTimeoutMs: 7000
+    MaxReadErrors: 3
+    AllowNoData: true
+    BatchKind: Auto
+    BatchSize: 20000
+    BackfillCutoffDays: 1
+    RootDirectory: null
+- key: task_noaa
+  Task name: Northlake NOAA Gateway
+  Workflow: NOAAGateway
+  Installed workflow ID: 9
+  Execution target:
+    Machine: BVirtualPC
+    Run as profile: null
+  Default parameters:
+    GatewayId: null
+    Operation: null
+    HistoryStartUtc: null
+    HistoryEndUtc: ''
+    ArchiveDelayDays: 3
+    RequestTimeoutSeconds: 120
+    AllowNoData: true
+    BatchSize: 20000
+    BackfillCutoffDays: 1
+    RootDirectory: null
+- key: task_spinwave
+  Task name: Northlake Spinwave Gateway
+  Workflow: SpinwaveGateway
+  Installed workflow ID: 8
+  Execution target:
+    Machine: BVirtualPC
+    Run as profile: null
+  Default parameters:
+    GatewayId: null
+    RootDirectory: null
+    MaxParallelism: 0
+    FilePatterns: '*.csv'
+    ZipFilePattern: '*.zip'
+    AgeThresholdSeconds: 10
+    MaxZipFiles: 0
+    AllowNoData: true
+    BatchKind: Auto
+    BatchSize: 20000
+    BackfillCutoffDays: 1
+- key: task_fig
+  Task name: Northlake FIG Gateway
+  Workflow: FIGGateway
+  Installed workflow ID: 7
+  Execution target:
+    Machine: BVirtualPC
+    Run as profile: null
+  Default parameters:
+    GatewayId: null
+    Format: null
+    FilePatterns: null
+    ZipFilePattern: '*.zip'
+    AgeThresholdSeconds: 10
+    MaxZipFiles: 0
+    TimeStampType: utc
+    IgnoreCodes: ''
+    AllowNoData: true
+    BatchKind: Auto
+    BatchSize: 20000
+    BackfillCutoffDays: 1
+    RootDirectory: null
+    MaxParallelism: 0
+- key: task_modbus
+  Task name: Northlake Modbus Gateway
+  Workflow: ModbusGateway
+  Installed workflow ID: 11
+  Execution target:
+    Machine: BVirtualPC
+    Run as profile: null
+  Default parameters:
+    GatewayId: null
+    ConnectTimeoutSeconds: 5
+    ResponseTimeoutSeconds: 1
+    AllowNoData: true
+    BatchKind: Auto
+    BatchSize: 20000
+    BackfillCutoffDays: 1
+    RootDirectory: null
+- key: task_odbc
+  Task name: Northlake ODBC Gateway
+  Workflow: ODBCGateway
+  Installed workflow ID: 5
+  Execution target:
+    Machine: BVirtualPC
+    Run as profile: null
+  Default parameters:
+    GatewayId: null
+    BackfillDays: 0
+    AllowNoData: true
+    BatchKind: Auto
+    BatchSize: 20000
+    BackfillCutoffDays: 1
+    RootDirectory: null
+- key: task_fake
+  Task name: Northlake Fake Gateway
+  Workflow: Fake Gateway
+  Installed workflow ID: null
+  Execution target:
+    Machine: BVirtualPC
+    Run as profile: null
+  Default parameters:
+    GatewayId: null
+    RootDirectory: null
+    StateFilePath: null
+    StartTimestamp: null
+    EndTimestamp: null
+    GenerationMode: sine
+    AllowSyntheticData: false
+    AllowNoData: true
+    BatchKind: Auto
+    BatchSize: 20000
+    BackfillCutoffDays: 1
+- key: task_neptune
+  Task name: Northlake Neptune Gateway
+  Workflow: NeptuneGateway
+  Installed workflow ID: 13
+  Execution target:
+    Machine: BVirtualPC
+    Run as profile: null
+  Default parameters:
+    GatewayId: null
+    FilePatterns: '*.*'
+    AgeThresholdSeconds: 10
+    UseSqlValues: false
+    CreateSummary: false
+    SummaryOutputPath: ''
+    AllowNoData: true
+    BatchKind: Auto
+    BatchSize: 20000
+    BackfillCutoffDays: 1
+    RootDirectory: null
+- key: task_mvrs
+  Task name: Northlake MVRS Gateway
+  Workflow: MvrsGateway
+  Installed workflow ID: 12
+  Execution target:
+    Machine: BVirtualPC
+    Run as profile: null
+  Default parameters:
+    GatewayId: null
+    FilePatterns: '*.*'
+    AgeThresholdSeconds: 10
+    IgnoreDays: 0
+    AdjustReadOrder: false
+    UseSqlValues: false
+    UseReadingTimeStamp: ''
+    EventsOutputPath: ''
+    AllowNoData: true
+    BatchKind: Auto
+    BatchSize: 20000
+    BackfillCutoffDays: 1
+    RootDirectory: null
+schedules:
+- key: schedule_acquisuite_campus_loggers
+  Task: task_acquisuite
+  Schedule name: Northlake AcquiSuite Campus Loggers
+  Gateway: gw_acquisuite_student_electric
+  Gateway name: Northlake Student Center AcquiSuite
+  Schedule kind: Interval
+  Enabled: false
+  Interval seconds: 900
+  Time zone ID: 33
+  Parameters:
+    GatewayId: 3
+    RootDirectory: C:\ProgramData\EEM Suite\NorthLake\Gateways\AcquiSuite
+  Source ID: gw_acquisuite_student_electric
+  Notes:
+  - Acceptance in this stage runs it by hand with Run now rather than waiting on the clock; see 04-acceptance-runs.yaml.
+- key: schedule_mv90_valley_mdef
+  Task: task_mv90
+  Schedule name: Northlake VED MDEF Interval Import
+  Gateway: gw_mv90_valley_mdef
+  Gateway name: Northlake VED MDEF Interval Import
+  Schedule kind: Interval
+  Enabled: false
+  Interval seconds: 86400
+  Time zone ID: 33
+  Parameters:
+    GatewayId: 4
+    Format: MDEF
+    FilePatterns: '*.mde'
+    RootDirectory: C:\ProgramData\EEM Suite\NorthLake\Gateways\MV90-MDEF
+  Source ID: gw_mv90_valley_mdef
+  Notes:
+  - Also reads the Ridgeline interconnection node MV90-MDEF-VED-RIDGELINE on this gateway; no schedule change.
+- key: schedule_mv90_helios_mv9
+  Task: task_mv90
+  Schedule name: Northlake Helios MV90 Generation Import
+  Gateway: gw_mv90_helios_mv9
+  Gateway name: Northlake Helios MV90 Generation Import
+  Schedule kind: Interval
+  Enabled: false
+  Interval seconds: 86400
+  Time zone ID: 33
+  Parameters:
+    GatewayId: 5
+    Format: MV9
+    FilePatterns: '*.mv9'
+    RootDirectory: C:\ProgramData\EEM Suite\NorthLake\Gateways\MV90-MV9
+  Source ID: gw_mv90_helios_mv9
+- key: schedule_bacnet_thermal_plant
+  Task: task_bacnet
+  Schedule name: Northlake Thermal Plant BACnet
+  Gateway: gw_bacnet_thermal_plant
+  Gateway name: Northlake Thermal Plant BACnet
+  Schedule kind: Interval
+  Enabled: false
+  Interval seconds: 3600
+  Time zone ID: 33
+  Parameters:
+    GatewayId: 6
+    LocalIpAddress: 172.21.29.4
+    RootDirectory: C:\ProgramData\EEM Suite\NorthLake\Gateways\BACnet
+  Source ID: gw_bacnet_thermal_plant
+  Source prerequisite: Start services/bacnet on BVirtualPC and verify its health and collector-client probe before
+    collection. LocalIpAddress 172.21.29.4 is the verified Ethernet 3 interface, not a device address. UDP 47808
+    discovers devices 530101, 530102 and 530103; their unicast endpoints use ports 47820, 47821 and 47822. Keep
+    the three gateway nodes BBMD fields blank. Update this local interface value if the network changes.
+- key: schedule_noaa_ksac
+  Task: task_noaa
+  Schedule name: Northlake NOAA Current Weather
+  Gateway: gw_noaa_ksac_observations
+  Gateway name: Northlake NOAA Weather
+  Schedule kind: Interval
+  Enabled: false
+  Interval seconds: 900
+  Time zone ID: 33
+  Parameters:
+    GatewayId: 7
+    Operation: Current
+    HistoryStartUtc: ''
+    RootDirectory: C:\ProgramData\EEM Suite\NorthLake\Gateways\Noaa
+  Source ID: gw_noaa_ksac_observations
+  Notes:
+  - The three observation nodes collect twelve inputs (temperature, dew point, humidity and wind at each station)
+    every 15 minutes; each station's Forecast node refreshes six separate hourly points (temperature, dew point,
+    relative humidity, wind speed, wind direction and precipitation probability).
+  - Keep this schedule disabled. Enable current collection only after Step 4 and the association checks are accepted.
+- key: schedule_noaa_history
+  Task: task_noaa
+  Schedule name: Northlake NOAA Archive Reconciliation
+  Gateway: gw_noaa_ksac_observations
+  Gateway name: Northlake NOAA Weather
+  Schedule kind: Cron
+  Enabled: false
+  Cron expression: 0 0 3 * * ?
+  Time zone ID: 33
+  Parameters:
+    GatewayId: 7
+    Operation: History
+    HistoryStartUtc: '2024-01-01T08:00:00Z'
+    RootDirectory: C:\ProgramData\EEM Suite\NorthLake\Gateways\Noaa
+  Source ID: gw_noaa_ksac_observations
+  Notes:
+  - Enable after the initial observed-history import is accepted. History never writes forecast points.
+- key: schedule_spinwave_science_lab
+  Task: task_spinwave
+  Schedule name: Northlake Science Center Spinwave
+  Gateway: gw_spinwave_science_lab
+  Gateway name: Northlake Science Center Spinwave
+  Schedule kind: Interval
+  Enabled: false
+  Interval seconds: 900
+  Time zone ID: 33
+  Parameters:
+    GatewayId: 9
+    RootDirectory: C:\ProgramData\EEM Suite\NorthLake\Gateways\Spinwave
+  Source ID: gw_spinwave_science_lab
+  Source prerequisite: Deliver source files below RootDirectory/Input/SCIENCE; keep the SCIENCE subfolder from the
+    source delivery_path.
+- key: schedule_fig_multi_format
+  Task: task_fig
+  Schedule name: Northlake FIG File Imports
+  Gateway: gw_fig_multi_format
+  Gateway name: Northlake FIG File Imports
+  Schedule kind: Interval
+  Enabled: false
+  Interval seconds: 3600
+  Time zone ID: 33
+  Parameters:
+    GatewayId: 10
+    Format: FIG
+    FilePatterns: '*.csv;*.xml'
+    RootDirectory: C:\ProgramData\EEM Suite\NorthLake\Gateways\FIG
+  Source ID: gw_fig_multi_format
+  Notes:
+  - For the seven acceptance formats, override Format on a run of this schedule (FIG, SIEMANSREPORT, MEDIATOR, EATON,
+    XML, FIXEDNETWORKS, CMEP), or on a temporary disabled schedule of task_fig. Keep the reusable task defaults
+    unchanged. Use separate restores or days as 04-acceptance-runs.yaml directs.
+  - The current source-service files carry UTC timestamps. Keep TimeStampType=utc; a node display field does not
+    replace this task setting.
+- key: schedule_modbus_thermal_plant
+  Task: task_modbus
+  Schedule name: Northlake Thermal Plant Modbus
+  Gateway: gw_modbus_thermal_plant
+  Gateway name: Northlake Thermal Plant Modbus
+  Schedule kind: Interval
+  Enabled: false
+  Interval seconds: 300
+  Time zone ID: 33
+  Parameters:
+    GatewayId: 11
+    RootDirectory: C:\ProgramData\EEM Suite\NorthLake\Gateways\Modbus
+  Source ID: gw_modbus_thermal_plant
+- key: schedule_odbc_library_historian
+  Task: task_odbc
+  Schedule name: Northlake ODBC Library Historian
+  Gateway: gw_odbc_library_historian
+  Gateway name: Northlake ODBC Historian
+  Schedule kind: Interval
+  Enabled: false
+  Interval seconds: 900
+  Time zone ID: 33
+  Parameters:
+    GatewayId: 12
+    RootDirectory: C:\ProgramData\EEM Suite\NorthLake\Gateways\ODBC
+  Source ID: gw_odbc_library_historian
+  Source prerequisite: The SyntheticCustomerHistorian connection profile and SyntheticGatewayQueries:LibraryElectricInterval
+    query must exist before collection; these source settings are on ODBC-LIBRARY, not workflow task fields.
+- key: schedule_fake_smoke
+  Task: task_fake
+  Schedule name: Northlake Fake Gateway Smoke
+  Gateway: gw_fake_smoke
+  Gateway name: Northlake Fake Gateway Smoke
+  Schedule kind: Runs once
+  Enabled: false
+  Time zone ID: 33
+  Parameters:
+    GatewayId: 15
+    RootDirectory: C:\ProgramData\EEM Suite\NorthLake\Gateways\Fake
+    StateFilePath: C:\ProgramData\EEM Suite\NorthLake\Gateways\Fake\fake-state.json
+    StartTimestamp: '2024-01-01T08:00:00Z'
+    EndTimestamp: '2024-01-02T07:45:00Z'
+    AllowSyntheticData: true
+  Source ID: gw_fake_smoke
+  Notes:
+  - Build the two-node Fake Gateway workflow above. StartTimestamp and inclusive EndTimestamp cover exactly 96 quarter-hours
+    on 2024-01-01 Pacific (08:00Z through 07:45Z next day). Keep the schedule disabled until Step 4.
+- key: schedule_neptune_river_city_water
+  Task: task_neptune
+  Schedule name: Northlake Neptune Water Upload
+  Gateway: gw_neptune_river_city_water
+  Gateway name: Northlake Neptune Water Upload
+  Schedule kind: Interval
+  Enabled: false
+  Interval seconds: 86400
+  Time zone ID: 33
+  Parameters:
+    GatewayId: 16
+    RootDirectory: C:\ProgramData\EEM Suite\NorthLake\Gateways\Neptune
+  Source ID: gw_neptune_river_city_water
+- key: schedule_mvrs_sierra_gas
+  Task: task_mvrs
+  Schedule name: Northlake MVRS Gas Upload
+  Gateway: gw_mvrs_sierra_gas
+  Gateway name: Northlake MVRS Gas Upload
+  Schedule kind: Interval
+  Enabled: false
+  Interval seconds: 86400
+  Time zone ID: 33
+  Parameters:
+    GatewayId: 17
+    RootDirectory: C:\ProgramData\EEM Suite\NorthLake\Gateways\MVRS
+    UseReadingTimeStamp: false
+  Source ID: gw_mvrs_sierra_gas
+  Notes:
+  - The built-in workflow publishes both interval readings and HMR events in the same run. No separate HMR publisher
+    task is required. Complete Step 5 before running it.
+  - 'UseReadingTimeStamp is false because the web schedule form cannot leave a Boolean blank: its checkbox saves true or
+    false (PRODUCT FINDING 79). False matches the MVRSGateway:UseReadingTimeStamp default the blank task default would
+    otherwise inherit; a later change to that configuration default does not reach this schedule.'
+- key: schedule_fig_fixed_network_submeters
+  Task: task_fig
+  Schedule name: Northlake Fixed Network Submeters
+  Gateway: gw_fig_fixed_network_submeters
+  Gateway name: Northlake Fixed Network Submeters
+  Schedule kind: Interval
+  Enabled: false
+  Interval seconds: 3600
+  Time zone ID: 33
+  Parameters:
+    GatewayId: 13
+    Format: FIXEDNETWORKS
+    FilePatterns: '*.xml'
+    RootDirectory: C:\ProgramData\EEM Suite\NorthLake\Gateways\FIG-FixedNetworks
+  Source ID: gw_fig_fixed_network_submeters
+  Notes:
+  - The current source-service files carry UTC timestamps. Keep TimeStampType=utc; a node display field does not
+    replace this task setting.
+- key: schedule_neptune_cedar_row_submeters
+  Task: task_neptune
+  Schedule name: Cedar Row Submeter Water Route
+  Gateway: gw_neptune_cedar_row_submeters
+  Gateway name: Cedar Row Submeter Water Route
+  Schedule kind: Interval
+  Enabled: false
+  Interval seconds: 86400
+  Time zone ID: 33
+  Parameters:
+    GatewayId: 18
+    RootDirectory: C:\ProgramData\EEM Suite\NorthLake\Gateways\Neptune-CedarRow
+  Source ID: gw_neptune_cedar_row_submeters
+- key: schedule_fig_ridgeline_scada
+  Task: task_fig
+  Schedule name: Ridgeline SCADA File Imports
+  Gateway: gw_fig_ridgeline_scada
+  Gateway name: Ridgeline SCADA File Imports
+  Schedule kind: Interval
+  Enabled: false
+  Interval seconds: 600
+  Time zone ID: 33
+  Parameters:
+    GatewayId: 14
+    Format: FIG
+    FilePatterns: '*.csv'
+    RootDirectory: C:\ProgramData\EEM Suite\NorthLake\Gateways\FIG-Ridgeline
+  Source ID: gw_fig_ridgeline_scada
+  Notes:
+  - Use task_fig with this schedule's GatewayId, RootDirectory, Format=FIG and FilePatterns=*.csv; TimeStampType=utc
+    is inherited. The point OffsetTimeMinutes=480 handles the source clock. July 2024 is the data start, not the
+    schedule start.
+retiredTaskNames:
+- Northlake AcquiSuite Campus Loggers
+- Northlake VED MDEF Interval Import
+- Northlake Helios MV90 Generation Import
+- Northlake Thermal Plant BACnet
+- Northlake NOAA Current Weather
+- Northlake NOAA Archive Reconciliation
+- Northlake Science Center Spinwave
+- Northlake FIG File Imports
+- Northlake Thermal Plant Modbus
+- Northlake ODBC Library Historian
+- Northlake Fake Gateway Smoke
+- Northlake Neptune Water Upload
+- Northlake MVRS Gas Upload
+- Northlake Fixed Network Submeters
+- Cedar Row Submeter Water Route
+- Ridgeline SCADA File Imports
+- Northlake HMR Events Publish
+builtInWorkflows:
+- Name: AcquiSuiteGateway
+  Document ID: acquisuite-gateway
+  Components:
+  - AcquiSuiteGateway
+  - IntervalDataPublish
+  Installed workflow ID: 6
+  Parameters:
+    GatewayId:
+      Type: Integer
+      Default: null
+      Required: true
+    RootDirectory:
+      Type: DirectoryPath
+      Default: ''
+      Required: false
+    ArchiveDirectory:
+      Type: DirectoryPath
+      Default: ''
+      Required: false
+    InputDirectory:
+      Type: DirectoryPath
+      Default: ''
+      Required: false
+    WorkingDirectory:
+      Type: DirectoryPath
+      Default: ''
+      Required: false
+    ErrorDirectory:
+      Type: DirectoryPath
+      Default: ''
+      Required: false
+    FilePatterns:
+      Type: String
+      Default: '*.log.gz;*.log'
+      Required: false
+    ZipFilePattern:
+      Type: FilePattern
+      Default: '*.zip'
+      Required: false
+    AgeThresholdSeconds:
+      Type: Integer
+      Default: '10'
+      Required: false
+    MaxZipFiles:
+      Type: Integer
+      Default: '0'
+      Required: false
+    MaxParallelism:
+      Type: Integer
+      Default: '0'
+      Required: false
+    RowOffset:
+      Type: Integer
+      Default: '0'
+      Required: false
+    AllowNoData:
+      Type: Boolean
+      Default: 'True'
+      Required: false
+    BatchKind:
+      Type: String
+      Default: Auto
+      Required: false
+    BatchSize:
+      Type: Integer
+      Default: '20000'
+      Required: false
+    BackfillCutoffDays:
+      Type: Integer
+      Default: '1'
+      Required: false
+- Name: MV90Gateway
+  Document ID: mv90-gateway
+  Components:
+  - MV90Gateway
+  - IntervalDataPublish
+  Installed workflow ID: 14
+  Parameters:
+    GatewayId:
+      Type: Integer
+      Default: null
+      Required: true
+    Format:
+      Type: String
+      Default: MDEF
+      Required: true
+    InputDirectory:
+      Type: DirectoryPath
+      Default: ''
+      Required: false
+    ErrorDirectory:
+      Type: DirectoryPath
+      Default: ''
+      Required: false
+    FilePatterns:
+      Type: String
+      Default: '*.mde'
+      Required: false
+    AgeThresholdSeconds:
+      Type: Integer
+      Default: '10'
+      Required: false
+    RejectStatusCodes:
+      Type: String
+      Default: ''
+      Required: false
+    AllowNoData:
+      Type: Boolean
+      Default: 'True'
+      Required: false
+    BatchKind:
+      Type: String
+      Default: Auto
+      Required: false
+    BatchSize:
+      Type: Integer
+      Default: '20000'
+      Required: false
+    BackfillCutoffDays:
+      Type: Integer
+      Default: '1'
+      Required: false
+    RootDirectory:
+      Type: DirectoryPath
+      Default: ''
+      Required: false
+    WorkingDirectory:
+      Type: DirectoryPath
+      Default: ''
+      Required: false
+    ArchiveDirectory:
+      Type: DirectoryPath
+      Default: ''
+      Required: false
+- Name: BacnetGateway
+  Document ID: bacnet-gateway
+  Components:
+  - BACnetGateway
+  - IntervalDataPublish
+  Installed workflow ID: 15
+  Parameters:
+    GatewayId:
+      Type: Integer
+      Default: null
+      Required: true
+    LocalIpAddress:
+      Type: String
+      Default: null
+      Required: true
+    UdpPort:
+      Type: Integer
+      Default: '47808'
+      Required: false
+    LocalDeviceId:
+      Type: Integer
+      Default: '0'
+      Required: false
+    LocalDeviceName:
+      Type: String
+      Default: ''
+      Required: false
+    NetworkNumber:
+      Type: Integer
+      Default: '0'
+      Required: false
+    ReadTimeoutMs:
+      Type: Integer
+      Default: '7000'
+      Required: false
+    WriteTimeoutMs:
+      Type: Integer
+      Default: '7000'
+      Required: false
+    MaxReadErrors:
+      Type: Integer
+      Default: '3'
+      Required: false
+    AllowNoData:
+      Type: Boolean
+      Default: 'True'
+      Required: false
+    BatchKind:
+      Type: String
+      Default: Auto
+      Required: false
+    BatchSize:
+      Type: Integer
+      Default: '20000'
+      Required: false
+    BackfillCutoffDays:
+      Type: Integer
+      Default: '1'
+      Required: false
+    RootDirectory:
+      Type: DirectoryPath
+      Default: ''
+      Required: false
+- Name: NOAAGateway
+  Document ID: noaa-gateway
+  Components:
+  - NOAAGateway
+  - IntervalDataPublish
+  Installed workflow ID: 9
+  Parameters:
+    GatewayId:
+      Type: Integer
+      Default: null
+      Required: true
+    Operation:
+      Type: String
+      Default: Current
+      Required: true
+    HistoryStartUtc:
+      Type: DateTime
+      Default: null
+      Required: false
+    HistoryEndUtc:
+      Type: DateTime
+      Default: null
+      Required: false
+    ArchiveDelayDays:
+      Type: Integer
+      Default: '3'
+      Required: false
+    RequestTimeoutSeconds:
+      Type: Integer
+      Default: '120'
+      Required: false
+    AllowNoData:
+      Type: Boolean
+      Default: 'True'
+      Required: false
+    BatchSize:
+      Type: Integer
+      Default: '20000'
+      Required: false
+    BackfillCutoffDays:
+      Type: Integer
+      Default: '1'
+      Required: false
+    RootDirectory:
+      Type: DirectoryPath
+      Default: ''
+      Required: false
+- Name: SpinwaveGateway
+  Document ID: spinwave-gateway
+  Components:
+  - SpinwaveGateway
+  - IntervalDataPublish
+  Installed workflow ID: 8
+  Parameters:
+    GatewayId:
+      Type: Integer
+      Default: null
+      Required: true
+    WorkingDirectory:
+      Type: DirectoryPath
+      Default: ''
+      Required: false
+    RootDirectory:
+      Type: DirectoryPath
+      Default: ''
+      Required: false
+    ArchiveDirectory:
+      Type: DirectoryPath
+      Default: ''
+      Required: false
+    MaxParallelism:
+      Type: Integer
+      Default: '0'
+      Required: false
+    InputDirectory:
+      Type: DirectoryPath
+      Default: ''
+      Required: false
+    ErrorDirectory:
+      Type: DirectoryPath
+      Default: ''
+      Required: false
+    FilePatterns:
+      Type: String
+      Default: '*.csv'
+      Required: false
+    ZipFilePattern:
+      Type: FilePattern
+      Default: '*.zip'
+      Required: false
+    AgeThresholdSeconds:
+      Type: Integer
+      Default: '10'
+      Required: false
+    MaxZipFiles:
+      Type: Integer
+      Default: '0'
+      Required: false
+    AllowNoData:
+      Type: Boolean
+      Default: 'True'
+      Required: false
+    BatchKind:
+      Type: String
+      Default: Auto
+      Required: false
+    BatchSize:
+      Type: Integer
+      Default: '20000'
+      Required: false
+    BackfillCutoffDays:
+      Type: Integer
+      Default: '1'
+      Required: false
+- Name: FIGGateway
+  Document ID: fig-gateway
+  Components:
+  - FIGGateway
+  - IntervalDataPublish
+  Installed workflow ID: 7
+  Parameters:
+    GatewayId:
+      Type: Integer
+      Default: null
+      Required: true
+    Format:
+      Type: String
+      Default: FIG
+      Required: true
+    InputDirectory:
+      Type: DirectoryPath
+      Default: null
+      Required: false
+      Configuration default: FIGGateway:InputDirectory
+    WorkingDirectory:
+      Type: DirectoryPath
+      Default: ''
+      Required: false
+    ErrorDirectory:
+      Type: DirectoryPath
+      Default: null
+      Required: false
+      Configuration default: FIGGateway:ErrorDirectory
+    FilePatterns:
+      Type: String
+      Default: null
+      Required: false
+      Configuration default: FIGGateway:FilePatterns
+    ZipFilePattern:
+      Type: FilePattern
+      Default: '*.zip'
+      Required: false
+    AgeThresholdSeconds:
+      Type: Integer
+      Default: '10'
+      Required: false
+    MaxZipFiles:
+      Type: Integer
+      Default: '0'
+      Required: false
+    TimeStampType:
+      Type: String
+      Default: local
+      Required: false
+    IgnoreCodes:
+      Type: String
+      Default: ''
+      Required: false
+    AllowNoData:
+      Type: Boolean
+      Default: 'True'
+      Required: false
+    BatchKind:
+      Type: String
+      Default: Auto
+      Required: false
+    BatchSize:
+      Type: Integer
+      Default: '20000'
+      Required: false
+    BackfillCutoffDays:
+      Type: Integer
+      Default: '1'
+      Required: false
+    RootDirectory:
+      Type: DirectoryPath
+      Default: ''
+      Required: false
+    ArchiveDirectory:
+      Type: DirectoryPath
+      Default: null
+      Required: false
+      Configuration default: FIGGateway:ArchiveDirectory
+    MaxParallelism:
+      Type: Integer
+      Default: '0'
+      Required: false
+- Name: ModbusGateway
+  Document ID: modbus-gateway
+  Components:
+  - ModbusGateway
+  - IntervalDataPublish
+  Installed workflow ID: 11
+  Parameters:
+    GatewayId:
+      Type: Integer
+      Default: null
+      Required: true
+    ConnectTimeoutSeconds:
+      Type: Integer
+      Default: '5'
+      Required: false
+    ResponseTimeoutSeconds:
+      Type: Integer
+      Default: '1'
+      Required: false
+    AllowNoData:
+      Type: Boolean
+      Default: 'True'
+      Required: false
+    BatchKind:
+      Type: String
+      Default: Auto
+      Required: false
+    BatchSize:
+      Type: Integer
+      Default: '20000'
+      Required: false
+    BackfillCutoffDays:
+      Type: Integer
+      Default: '1'
+      Required: false
+    RootDirectory:
+      Type: DirectoryPath
+      Default: ''
+      Required: false
+- Name: ODBCGateway
+  Document ID: odbc-gateway
+  Components:
+  - ODBCGateway
+  - IntervalDataPublish
+  Installed workflow ID: 5
+  Parameters:
+    GatewayId:
+      Type: Integer
+      Default: null
+      Required: true
+    BackfillDays:
+      Type: Integer
+      Default: '0'
+      Required: false
+    AllowNoData:
+      Type: Boolean
+      Default: 'True'
+      Required: false
+    BatchKind:
+      Type: String
+      Default: Auto
+      Required: false
+    BatchSize:
+      Type: Integer
+      Default: '20000'
+      Required: false
+    BackfillCutoffDays:
+      Type: Integer
+      Default: '1'
+      Required: false
+    RootDirectory:
+      Type: DirectoryPath
+      Default: ''
+      Required: false
+- Name: NeptuneGateway
+  Document ID: neptune-gateway
+  Components:
+  - NeptuneGateway
+  - IntervalDataPublish
+  Installed workflow ID: 13
+  Parameters:
+    GatewayId:
+      Type: Integer
+      Default: null
+      Required: true
+    InputDirectory:
+      Type: DirectoryPath
+      Default: ''
+      Required: false
+    ErrorDirectory:
+      Type: DirectoryPath
+      Default: ''
+      Required: false
+    FilePatterns:
+      Type: String
+      Default: '*.*'
+      Required: false
+    AgeThresholdSeconds:
+      Type: Integer
+      Default: '60'
+      Required: false
+    UseSqlValues:
+      Type: Boolean
+      Default: 'False'
+      Required: false
+    CreateSummary:
+      Type: Boolean
+      Default: 'False'
+      Required: false
+    SummaryOutputPath:
+      Type: FilePath
+      Default: ''
+      Required: false
+    AllowNoData:
+      Type: Boolean
+      Default: 'True'
+      Required: false
+    BatchKind:
+      Type: String
+      Default: Auto
+      Required: false
+    BatchSize:
+      Type: Integer
+      Default: '20000'
+      Required: false
+    BackfillCutoffDays:
+      Type: Integer
+      Default: '1'
+      Required: false
+    RootDirectory:
+      Type: DirectoryPath
+      Default: ''
+      Required: false
+    WorkingDirectory:
+      Type: DirectoryPath
+      Default: ''
+      Required: false
+    ArchiveDirectory:
+      Type: DirectoryPath
+      Default: ''
+      Required: false
+- Name: MvrsGateway
+  Document ID: mvrs-gateway
+  Components:
+  - MVRSGateway
+  - IntervalDataPublish
+  - HmrEventsPublish
+  Installed workflow ID: 12
+  Parameters:
+    GatewayId:
+      Type: Integer
+      Default: null
+      Required: true
+    InputDirectory:
+      Type: DirectoryPath
+      Default: ''
+      Required: false
+    ErrorDirectory:
+      Type: DirectoryPath
+      Default: ''
+      Required: false
+    FilePatterns:
+      Type: String
+      Default: '*.*'
+      Required: false
+    AgeThresholdSeconds:
+      Type: Integer
+      Default: '60'
+      Required: false
+    IgnoreDays:
+      Type: Integer
+      Default: '0'
+      Required: false
+    AdjustReadOrder:
+      Type: Boolean
+      Default: 'False'
+      Required: false
+    UseSqlValues:
+      Type: Boolean
+      Default: 'False'
+      Required: false
+    UseReadingTimeStamp:
+      Type: Boolean
+      Default: null
+      Required: false
+      Configuration default: MVRSGateway:UseReadingTimeStamp
+    EventsOutputPath:
+      Type: FilePath
+      Default: ''
+      Required: false
+    AllowNoData:
+      Type: Boolean
+      Default: 'True'
+      Required: false
+    BatchKind:
+      Type: String
+      Default: Auto
+      Required: false
+    BatchSize:
+      Type: Integer
+      Default: '20000'
+      Required: false
+    BackfillCutoffDays:
+      Type: Integer
+      Default: '1'
+      Required: false
+    RootDirectory:
+      Type: DirectoryPath
+      Default: ''
+      Required: false
+    WorkingDirectory:
+      Type: DirectoryPath
+      Default: ''
+      Required: false
+    ArchiveDirectory:
+      Type: DirectoryPath
+      Default: ''
+      Required: false

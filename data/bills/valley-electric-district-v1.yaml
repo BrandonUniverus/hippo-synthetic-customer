@@ -1,0 +1,155 @@
+manifestVersion: 1
+id: valley_electric_district_bills_v1
+customerScenarioId: demo_university_v1
+purpose: >
+  The four Valley Electric campus sample bills, 01 to 04 of documents/utility-bills/valley-electric-district/,
+  rendered from data by generators/render_bills.py. They replace hand-made images whose meter and charge tables
+  were empty and whose periods ignored the provider's read cycle. Each bill now covers one Stage 1 cycle 1 period,
+  names Stage 2's meters, badges and multipliers, and prices every line at the tariff's own rate; the four stories
+  are kept (a standard month, a summer demand month on two services, a meter exchange, and the FY2025 rate change).
+
+# Each line: description, then quantity x rate = amount (rounded half-up to the cent), or percent + percentOf (the
+# line codes it applies to). `code` is the provider's billCharges code (data/providers/valley-electric-district.yaml).
+# Valley Electric cycle 1 reads on the 5th: a period runs from the 5th to the 4th and posts to the month it ends in
+# (Stage 1 02-utility-providers.yaml). Stage 5 enters a Valley Electric bill on its period end + 3 days, so each
+# statement is dated just after the read and falls due 30 days later (the next Monday when that is a weekend).
+# Summer (June to September) has on-peak, part-peak and off-peak energy; winter (October to May) has part-peak and
+# off-peak only, so a winter bill has no on-peak line.
+bills:
+  # ------------------------------------------------------------------ Admin Hall: a standard winter month
+  - id: ved_admin_hall_2024_04
+    file: documents/utility-bills/valley-electric-district/01-Valley-Electric-Admin-Hall-Standard-Monthly.pdf
+    providerId: valley_electric_district
+    accountId: ved_admin_hall
+    title: Electric Service Statement
+    customer: Northlake University
+    accountNumber: SYN-VED-A-0010001
+    rateSchedules: [VED-TOU-GS]
+    billDate: 2024-04-05          # the April 2024 period, March 5 to April 4
+    dueDate: 2024-05-06
+    period: {start: 2024-03-05, end: 2024-04-04}
+    notice: >
+      A standard monthly bill from a monthly-read meter. Its time-of-use registers were read on April 4 for the
+      March 5 to April 4 cycle (the April 2024 period). Winter has no on-peak period, so the on-peak register does
+      not run and the bill carries part-peak and off-peak energy only, plus billing demand and the facility charge.
+    meters:
+      - {meterNumber: SYN-VED-M-0040001, badge: VED-BADGE-0040001, channel: Part-peak register, previous: 73905, present: 88165, quantity: 14260, unit: kWh}
+      - {meterNumber: SYN-VED-M-0040001, badge: VED-BADGE-0040001, channel: Off-peak register, previous: 66210, present: 79630, quantity: 13420, unit: kWh}
+      - {meterNumber: SYN-VED-M-0040001, badge: VED-BADGE-0040001, channel: Billing demand, quantity: 138, unit: kW}
+    lines:
+      - {code: energy_part_peak, description: "Energy, part-peak (winter)", quantity: 14260, unit: kWh, rate: 0.168, amount: 2395.68}
+      - {code: energy_off_peak, description: "Energy, off-peak (winter)", quantity: 13420, unit: kWh, rate: 0.112, amount: 1503.04}
+      - {code: demand_charge, description: "Demand, maximum 15-minute kW", quantity: 138, unit: kW, rate: 18.40, amount: 2539.20}
+      - {code: facility_charge, description: Facility charge, quantity: 1, unit: month, rate: 64.00, amount: 64.00}
+      - {code: public_purpose_program, description: Public purpose program, percent: 1.5, percentOf: [energy_part_peak, energy_off_peak], amount: 58.48}
+      - {code: utility_users_tax, description: Utility users tax, percent: 5.0, percentOf: [energy_part_peak, energy_off_peak, demand_charge, facility_charge, public_purpose_program], amount: 328.02}
+    total: 6888.42
+
+  # ------------------------------------------------------------------ Science Center: a summer demand month on two services
+  - id: ved_science_center_2024_08
+    file: documents/utility-bills/valley-electric-district/02-Valley-Electric-Science-Center-Summer-Demand.pdf
+    providerId: valley_electric_district
+    accountId: ved_science_center
+    title: Electric Service Statement
+    customer: Northlake University
+    accountNumber: SYN-VED-A-0010002
+    rateSchedules: [VED-TOU-GS]
+    billDate: 2024-08-05          # the August 2024 period, July 5 to August 4
+    dueDate: 2024-09-04
+    period: {start: 2024-07-05, end: 2024-08-04}
+    notice: >
+      A summer cooling cycle on an account with two services. The main service is read by interval meter
+      SYN-VED-M-0040002; the lab wing's second service, SYN-VED-M-0040007, is read monthly and its registers are
+      multiplied by 40 (200:5 current transformers). Energy adds the two meters' kWh in each time-of-use period.
+      Billing demand adds each service's highest 15-minute kW (206 + 62 = 268 kW), and the account pays one
+      facility charge.
+    meters:
+      - {meterNumber: SYN-VED-M-0040002, badge: VED-BADGE-0040002, channel: On-peak kWh (interval), quantity: 11400, unit: kWh}
+      - {meterNumber: SYN-VED-M-0040002, badge: VED-BADGE-0040002, channel: Part-peak kWh (interval), quantity: 11600, unit: kWh}
+      - {meterNumber: SYN-VED-M-0040002, badge: VED-BADGE-0040002, channel: Off-peak kWh (interval), quantity: 11200, unit: kWh}
+      - {meterNumber: SYN-VED-M-0040002, badge: VED-BADGE-0040002, channel: Maximum 15-minute demand, quantity: 206, unit: kW}
+      - {meterNumber: SYN-VED-M-0040007, badge: VED-BADGE-0040007, multiplier: 40, channel: On-peak register, previous: 20455, present: 20575, quantity: 4800, unit: kWh}
+      - {meterNumber: SYN-VED-M-0040007, badge: VED-BADGE-0040007, multiplier: 40, channel: Part-peak register, previous: 25830, present: 25980, quantity: 6000, unit: kWh}
+      - {meterNumber: SYN-VED-M-0040007, badge: VED-BADGE-0040007, multiplier: 40, channel: Off-peak register, previous: 41360, present: 41610, quantity: 10000, unit: kWh}
+      - {meterNumber: SYN-VED-M-0040007, badge: VED-BADGE-0040007, multiplier: 40, channel: Billing demand, quantity: 62, unit: kW}
+    lines:
+      - {code: energy_peak, description: "Energy, on-peak (summer), both services", quantity: 16200, unit: kWh, rate: 0.241, amount: 3904.20}
+      - {code: energy_part_peak, description: "Energy, part-peak, both services", quantity: 17600, unit: kWh, rate: 0.168, amount: 2956.80}
+      - {code: energy_off_peak, description: "Energy, off-peak, both services", quantity: 21200, unit: kWh, rate: 0.112, amount: 2374.40}
+      - {code: demand_charge, description: "Demand, maximum 15-minute kW, both services", quantity: 268, unit: kW, rate: 18.40, amount: 4931.20}
+      - {code: facility_charge, description: Facility charge, quantity: 1, unit: month, rate: 64.00, amount: 64.00}
+      - {code: public_purpose_program, description: Public purpose program, percent: 1.5, percentOf: [energy_peak, energy_part_peak, energy_off_peak], amount: 138.53}
+      - {code: utility_users_tax, description: Utility users tax, percent: 5.0, percentOf: [energy_peak, energy_part_peak, energy_off_peak, demand_charge, facility_charge, public_purpose_program], amount: 718.46}
+    total: 15087.59
+
+  # ------------------------------------------------------------------ Library: one cycle, two meters
+  - id: ved_library_2024_09
+    file: documents/utility-bills/valley-electric-district/03-Valley-Electric-Library-Meter-Replacement.pdf
+    providerId: valley_electric_district
+    accountId: ved_library
+    title: Electric Service Statement
+    customer: Northlake University
+    accountNumber: SYN-VED-A-0010003
+    rateSchedules: [VED-TOU-GS]
+    billDate: 2024-09-05          # the September 2024 period, August 5 to September 4
+    dueDate: 2024-10-07
+    period: {start: 2024-08-05, end: 2024-09-04}
+    notice: >
+      Meter exchange recorded August 15, 2024. Old meter SYN-VED-M-0040003 was read for the last time on August 14
+      and removed; new meter SYN-VED-M-0040103 was installed and registered on August 15. One bill covers the whole
+      cycle with the two read periods back to back, so no usage is counted twice. Energy adds both meters' kWh in
+      each time-of-use period, and billing demand is the higher of the two meters' readings.
+    meters:
+      - {meterNumber: SYN-VED-M-0040003, badge: VED-BADGE-0040003, channel: On-peak register, readPeriod: {start: 2024-08-05, end: 2024-08-14}, previous: 118420, present: 119510, quantity: 1090, unit: kWh}
+      - {meterNumber: SYN-VED-M-0040003, badge: VED-BADGE-0040003, channel: Part-peak register, readPeriod: {start: 2024-08-05, end: 2024-08-14}, previous: 142075, present: 143635, quantity: 1560, unit: kWh}
+      - {meterNumber: SYN-VED-M-0040003, badge: VED-BADGE-0040003, channel: Off-peak register, readPeriod: {start: 2024-08-05, end: 2024-08-14}, previous: 251880, present: 254390, quantity: 2510, unit: kWh}
+      - {meterNumber: SYN-VED-M-0040003, badge: VED-BADGE-0040003, channel: Billing demand, readPeriod: {start: 2024-08-05, end: 2024-08-14}, quantity: 118, unit: kW}
+      - {meterNumber: SYN-VED-M-0040103, badge: VED-BADGE-0040103, channel: On-peak register, readPeriod: {start: 2024-08-15, end: 2024-09-04}, previous: 0, present: 2260, quantity: 2260, unit: kWh}
+      - {meterNumber: SYN-VED-M-0040103, badge: VED-BADGE-0040103, channel: Part-peak register, readPeriod: {start: 2024-08-15, end: 2024-09-04}, previous: 0, present: 3230, quantity: 3230, unit: kWh}
+      - {meterNumber: SYN-VED-M-0040103, badge: VED-BADGE-0040103, channel: Off-peak register, readPeriod: {start: 2024-08-15, end: 2024-09-04}, previous: 0, present: 5310, quantity: 5310, unit: kWh}
+      - {meterNumber: SYN-VED-M-0040103, badge: VED-BADGE-0040103, channel: Billing demand, readPeriod: {start: 2024-08-15, end: 2024-09-04}, quantity: 124, unit: kW}
+    lines:
+      - {code: energy_peak, description: "Energy, on-peak (summer), both meters", quantity: 3350, unit: kWh, rate: 0.241, amount: 807.35}
+      - {code: energy_part_peak, description: "Energy, part-peak, both meters", quantity: 4790, unit: kWh, rate: 0.168, amount: 804.72}
+      - {code: energy_off_peak, description: "Energy, off-peak, both meters", quantity: 7820, unit: kWh, rate: 0.112, amount: 875.84}
+      - {code: demand_charge, description: "Demand, higher meter's maximum 15-minute kW", quantity: 124, unit: kW, rate: 18.40, amount: 2281.60}
+      - {code: facility_charge, description: Facility charge, quantity: 1, unit: month, rate: 64.00, amount: 64.00}
+      - {code: public_purpose_program, description: Public purpose program, percent: 1.5, percentOf: [energy_peak, energy_part_peak, energy_off_peak], amount: 37.32}
+      - {code: utility_users_tax, description: Utility users tax, percent: 5.0, percentOf: [energy_peak, energy_part_peak, energy_off_peak, demand_charge, facility_charge, public_purpose_program], amount: 243.54}
+    total: 5114.37
+
+  # ------------------------------------------------------------------ Student Center: the FY2025 rate change inside a cycle
+  - id: ved_student_center_2025_01
+    file: documents/utility-bills/valley-electric-district/04-Valley-Electric-Student-Center-FY2025-Rate-Change.pdf
+    providerId: valley_electric_district
+    accountId: ved_student_center
+    title: Electric Service Statement
+    customer: Northlake University
+    accountNumber: SYN-VED-A-0010004
+    rateSchedules: [VED-TOU-GS, VED-TOU-GS-FY25]
+    billDate: 2025-01-06          # the January 2025 period, December 5 to January 4
+    dueDate: 2025-02-05
+    period: {start: 2024-12-05, end: 2025-01-04}
+    notice: >
+      A rate change inside the cycle. The FY2025 rates (VED-TOU-GS-FY25) took effect January 1, 2025, so this cycle
+      is billed in two parts: December 5 to 31 (27 days) at the VED-TOU-GS rates and January 1 to 4 (4 days) at the
+      FY2025 rates. Energy is split by the date it was used. The cycle's highest 15-minute demand (156 kW) and the
+      facility charge are prorated by days, 27/31 and 4/31.
+    meters:
+      - {meterNumber: SYN-VED-M-0040004, badge: VED-BADGE-0040004, channel: Part-peak kWh (interval), readPeriod: {start: 2024-12-05, end: 2024-12-31}, quantity: 14600, unit: kWh}
+      - {meterNumber: SYN-VED-M-0040004, badge: VED-BADGE-0040004, channel: Off-peak kWh (interval), readPeriod: {start: 2024-12-05, end: 2024-12-31}, quantity: 17920, unit: kWh}
+      - {meterNumber: SYN-VED-M-0040004, badge: VED-BADGE-0040004, channel: Part-peak kWh (interval), readPeriod: {start: 2025-01-01, end: 2025-01-04}, quantity: 1350, unit: kWh}
+      - {meterNumber: SYN-VED-M-0040004, badge: VED-BADGE-0040004, channel: Off-peak kWh (interval), readPeriod: {start: 2025-01-01, end: 2025-01-04}, quantity: 2770, unit: kWh}
+      - {meterNumber: SYN-VED-M-0040004, badge: VED-BADGE-0040004, channel: Maximum 15-minute demand, quantity: 156, unit: kW}
+    lines:
+      - {code: energy_part_peak, description: "Energy, part-peak, December 5 to 31 (VED-TOU-GS)", quantity: 14600, unit: kWh, rate: 0.168, amount: 2452.80}
+      - {code: energy_off_peak, description: "Energy, off-peak, December 5 to 31 (VED-TOU-GS)", quantity: 17920, unit: kWh, rate: 0.112, amount: 2007.04}
+      - {code: demand_charge, description: "Demand, December 5 to 31 (27 of 31 days of 156 kW)", quantity: 135.87, unit: kW, rate: 18.40, amount: 2500.01}
+      - {code: facility_charge, description: "Facility charge, December 5 to 31 (27 of 31 days)", quantity: 0.871, unit: month, rate: 64.00, amount: 55.74}
+      - {code: energy_part_peak, description: "Energy, part-peak, January 1 to 4 (VED-TOU-GS-FY25)", quantity: 1350, unit: kWh, rate: 0.179, amount: 241.65}
+      - {code: energy_off_peak, description: "Energy, off-peak, January 1 to 4 (VED-TOU-GS-FY25)", quantity: 2770, unit: kWh, rate: 0.118, amount: 326.86}
+      - {code: demand_charge, description: "Demand, January 1 to 4 (4 of 31 days of 156 kW)", quantity: 20.13, unit: kW, rate: 19.75, amount: 397.57}
+      - {code: facility_charge, description: "Facility charge, January 1 to 4 (4 of 31 days)", quantity: 0.129, unit: month, rate: 67.50, amount: 8.71}
+      - {code: public_purpose_program, description: Public purpose program, percent: 1.5, percentOf: [energy_part_peak, energy_off_peak], amount: 75.43}
+      - {code: utility_users_tax, description: Utility users tax, percent: 5.0, percentOf: [energy_part_peak, energy_off_peak, demand_charge, facility_charge, public_purpose_program], amount: 403.29}
+    total: 8469.10

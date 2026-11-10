@@ -1,0 +1,78 @@
+# Stage 12, scenario 2: a register's display changes from kilowatts to megawatts.
+# The Central Plant added a second chiller train in February 2025, and the switchgear meter's demand displays were
+# reprogrammed on March 1, 2025 to show megawatts with three decimals (1.312 instead of 1312.00). The registers keep
+# their points: the history stays in kW, and the handheld configuration converts the new display.
+stage: 12
+step: 2
+title: Track a register that moves from kW to MW
+app: Web
+screen: Handheld Meter Setup (Read types; Configure registers); Task Manager (Northlake MVRS Gas Upload)
+source:
+- implementation/stage-3-gateways-and-data/05-handheld-routes.yaml (hmr_central_plant_switchgear)
+- implementation/stage-2-hierarchy/04-points.yaml (ch_swgr_max_demand_kw, ch_swgr_on_peak_max_demand_kw)
+- Database/EEMSuite/Procs/HMR_Setup_Save.sql (energyhippo; a renamed prompt keeps its previous value)
+requires:
+- Stage 3 Step 5 entered (route SWGR, ten registers, KW and KWP on Northlake Keyed Demand 10D2DC, constant 1).
+- At least one SWGR round read in kW before March 2025.
+notes:
+- 'Two ways to start tracking megawatts: keep the kW points and convert at the register (this scenario), or add
+  MW points and move the registers to them. Moving splits the history across two points and every report, goal
+  and alarm on the kW point stops at the change, so the register converts instead.'
+- 'The conversion is the register''s Meter Constant: the reader keys 1.312, the import stores 1.312 x 1000 = 1312 kW.
+  The read type changes too, because the display now has three decimals.'
+- 'Renaming the prompt (KW to MW) is what the reader sees on the handheld. Handheld Meter Setup keeps the old prompt
+  as the register''s previous prompt, so a route file exported before the change and returned after it (prompt
+  KW, a kW value) still finds its register. Before that fix a rename dropped in-flight reads (the Massport Wood
+  Island case, MW to kw, September 2026); this scenario is the Northlake check of it.'
+- 'The unit system already converts kW and MW (both seeded in the Power class), so a report can show the same
+  point in MW where that reads better. That is a display choice; the stored value stays kW.'
+event:
+  Date: '2025-03-01'
+  Change: Demand displays reprogrammed to MW with three decimals; energy registers unchanged (kWh, kVArh, kVAh).
+readTypes:
+- key: demand_mw_keyed
+  Description: Northlake Keyed Demand MW 10D3DC
+  ERTType:
+  NumDials: 10
+  NumDecimals: 3
+  ReadTypeCode: '14'
+  ReadDirection: L
+  DemandRead: Y
+  TruncationFactor: 0
+registers:
+- Register: KW (Max Demand kW)
+  Before: {Text Prompt: KW, Read Type: Northlake Keyed Demand 10D2DC, Meter Constant: 1}
+  After: {Text Prompt: MW, Read Type: Northlake Keyed Demand MW 10D3DC, Meter Constant: 1000}
+- Register: KWP (On-Peak Max Demand kW)
+  Before: {Text Prompt: KWP, Read Type: Northlake Keyed Demand 10D2DC, Meter Constant: 1}
+  After: {Text Prompt: MWP, Read Type: Northlake Keyed Demand MW 10D3DC, Meter Constant: 1000}
+- Register: KVA (Max Demand kVA)
+  Unchanged: 'Its display stays in kVA. One meter now carries kW-scale and MW-scale displays side by side; the
+    reader keys each as shown.'
+steps:
+- key: in_flight_read
+  Action: 'Before the change, export the route file for SWGR (prompts KW and KWP) and keep it: the February 2025 round
+    is still on the handheld when the display changes.'
+- key: add_read_type
+  Where: Handheld Meter Setup > More > Read types
+  Action: Add Northlake Keyed Demand MW 10D3DC (10 dials, 3 decimals, code 14, read direction L, demand read Y) and save.
+- key: change_registers
+  Where: Handheld Meter Setup > Central Plant Main Switchgear > Actions > Configure registers
+  Action: 'KW: prompt MW, read type Northlake Keyed Demand MW 10D3DC, constant 1000. KWP: prompt MWP, the same read type,
+    constant 1000. Save each register. Leave the points as they are.'
+  Expected: The two registers show prompts MW and MWP; their previous prompts are KW and KWP (HMR_Reading.PreviousTextPrompt).
+- key: return_old_round
+  Where: Task Manager, Northlake MVRS Gas Upload (Run now)
+  Action: Return the February round from the kept route file, read on 2025-02-28 in kW: KW 1294.60, KWP 1281.15.
+  Expected: Both land on their kW points as read (1294.6 and 1281.15), matched through the previous prompts. Nothing is unmatched.
+- key: first_mw_round
+  Action: Export a new route file (prompts MW and MWP) and return the March 31, 2025 read in MW: MW 1.312, MWP 1.298.
+  Expected: Max Demand kW holds 1312 and On-Peak Max Demand kW 1298 at 2025-03-31 07:00 UTC.
+verify:
+- Max Demand kW's history reads 1294.6 (February) then 1312 (March) with no gap and no factor-of-1000 step.
+- The route file after the change carries MW and MWP with three decimals and no KW or KWP prompt.
+- 'A report on Max Demand kW set to show MW reads 1.2946 and 1.312: the unit conversion, not a stored change.'
+negativeCheck:
+  Action: 'Optional, on a restore only: change the prompt and read type but leave the constant at 1.'
+  Expected: 'The March read stores 1.312 kW, a thousand times too low, and nothing flags it: the constant is what keeps
+    the history in one unit. Restore afterward.'

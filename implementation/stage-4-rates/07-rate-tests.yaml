@@ -1,0 +1,582 @@
+# Stage 4, step 7: Test Rates (Database Administrator > RateModeler > Test Rates).
+# A run is a rate, a billing period, the rate classes to bill and the reads. It is saved on the PC, not in the
+# database, so checks.sql cannot query it.
+stage: 4
+step: 7
+title: Rate tests
+app: Database Administrator
+screen: RateModeler > Test Rates
+source:
+- implementation/stage-4-rates/05-rates.yaml (prices), 04-schedules.yaml and 01-holidays.yaml (hours)
+- data/bills/northlake-itemized-bills-v1.yaml (the itemized bills the Ridgeline-era runs reproduce)
+notes:
+- 'Reworked 2026-11-09: every run states its total and its lines, worked out beforehand from the rate as entered.
+  Before, 17 of 29 runs said to record whatever the run produced. The Rate Lab''s runs are in 08-rate-lab.yaml.'
+- 'The first 19 runs use Generate Reads with one flat value per hour, so the quantities are hours x value and can be
+  checked by hand: July 2024 has 744 hours; of them 132 are peak (22 weekdays x 6 hours, July 4 left out), 176
+  part-peak and 436 off-peak. Demand is the generated kW value itself.'
+- 'How the expected hours were counted: an hour belongs to a schedule when its season covers it and its time-of-use
+  cell is lit. On Peak and Super On Peak charges skip holidays; every other charge takes the whole holiday. If the
+  engine counts a reading in the hour it ends in, the lit hours shift by one and a total can differ by an hour or
+  two at the edges of a holiday or of the period. A difference of that size is that question, not a wrong rate.'
+- 'Every line is rounded to the cent when it is posted, and percentage charges apply to the rounded lines.'
+- Energy Multiplier and Demand Multiplier stay at 1.0000.
+- 'Rate Classes: tick All. For a rate with an option, also tick the class the run names; one run proves the default
+  class prices with nothing else ticked.'
+- 'Test Rates cannot run a per-meter price, a ratchet or load factor. The per-meter prices are proved by generated
+  bills (Stage 7); ratchet and load factor are the Rate Lab''s.'
+- 'The last seven runs (2026-10-01, Ridgeline Wind) reproduce the itemized bills, so they paste exact rows. A row is
+  LocalTimestamp, Value, IntervalMinutes and UnitID (6 is KilowattHours, 7 is Kilowatt); its timestamp is the interval
+  start and must fall inside the run''s dates. A run reads one stream per unit, so VED-GEN-IC''s delivered and received
+  quantities take one run each.'
+records:
+- key: test_ved_tou_gs_summer_2024
+  Test Configuration:
+    Rate to Test: VED-TOU-GS
+    Start Date: 2024-07-01
+    End Date: 2024-07-31
+    Rate Classes: All (and each option's default class)
+  Intervals:
+    Source: Generate Reads
+    Generate:
+    - Unit: KilowattHours
+      Interval Minutes: 60
+      Value: 100
+    - Unit: Kilowatt
+      Interval Minutes: 60
+      Value: 450
+  Results:
+    Expected Bill Total: $20,507.05
+    Expected Lines:
+    - 'Facility Charge: $64.00 fixed = $64.00'
+    - 'Energy Peak (Summer): 132 hours, 13,200 x $0.241 = $3,181.20'
+    - 'Energy Part-Peak (Summer): 176 hours, 17,600 x $0.168 = $2,956.80'
+    - 'Energy Off-Peak (Summer): 436 hours, 43,600 x $0.112 = $4,883.20'
+    - 'Demand: 450 x $18.4 = $8,280.00'
+    - 'Public Purpose Program: 1.5% x $11,021.20 = $165.32'
+    - 'Utility Users Tax: 5.0% x $19,530.52 = $976.53'
+  Proves: Three summer periods; July 4 (a Thursday) leaves peak and part-peak and is billed off-peak; the winter charges
+    post no line; 2024 prices.
+- key: test_ved_tou_gs_winter_2025
+  Test Configuration:
+    Rate to Test: VED-TOU-GS
+    Start Date: 2025-01-01
+    End Date: 2025-01-31
+    Rate Classes: All (and each option's default class)
+  Intervals:
+    Source: Generate Reads
+    Generate:
+    - Unit: KilowattHours
+      Interval Minutes: 60
+      Value: 100
+    - Unit: Kilowatt
+      Interval Minutes: 60
+      Value: 450
+  Results:
+    Expected Bill Total: $20,761.51
+    Expected Lines:
+    - 'Facility Charge: $67.50 fixed = $67.50'
+    - 'Energy Part-Peak (Winter): 308 hours, 30,800 x $0.179 = $5,513.20'
+    - 'Energy Off-Peak (Winter): 436 hours, 43,600 x $0.118 = $5,144.80'
+    - 'Demand: 450 x $19.75 = $8,887.50'
+    - 'Public Purpose Program: 1.5% x $10,658.00 = $159.87'
+    - 'Utility Users Tax: 5.0% x $19,772.87 = $988.64'
+  Proves: Two winter periods with New Year's Day off-peak; the FY2025 price date; the summer charges post no line.
+- key: test_ved_tou_gs_summer_2026
+  Test Configuration:
+    Rate to Test: VED-TOU-GS
+    Start Date: 2026-07-01
+    End Date: 2026-07-31
+    Rate Classes: All (and each option's default class)
+  Intervals:
+    Source: Generate Reads
+    Generate:
+    - Unit: KilowattHours
+      Interval Minutes: 60
+      Value: 100
+    - Unit: Kilowatt
+      Interval Minutes: 60
+      Value: 450
+  Results:
+    Expected Bill Total: $22,674.86
+    Expected Lines:
+    - 'Facility Charge: $69.53 fixed = $69.53'
+    - 'Energy Peak (Summer): 138 hours, 13,800 x $0.26574 = $3,667.21'
+    - 'Energy Part-Peak (Summer): 184 hours, 18,400 x $0.18437 = $3,392.41'
+    - 'Energy Off-Peak (Summer): 422 hours, 42,200 x $0.12154 = $5,128.99'
+    - 'Demand: 450 x $20.3425 = $9,154.13'
+    - 'Public Purpose Program: 1.5% x $12,188.61 = $182.83'
+    - 'Utility Users Tax: 5.0% x $21,595.10 = $1,079.76'
+  Proves: The 2026 price date; July 4, 2026 is a Saturday, so the holiday changes nothing.
+- key: test_ved_tou_pri_summer_2024
+  Test Configuration:
+    Rate to Test: VED-TOU-PRI
+    Start Date: 2024-07-01
+    End Date: 2024-07-31
+    Rate Classes: All (and each option's default class)
+  Intervals:
+    Source: Generate Reads
+    Generate:
+    - Unit: KilowattHours
+      Interval Minutes: 60
+      Value: 2000
+    - Unit: Kilowatt
+      Interval Minutes: 60
+      Value: 3200
+  Results:
+    Expected Bill Total: $281,196.30
+    Expected Lines:
+    - 'Facility Charge: $410.00 fixed = $410.00'
+    - 'Energy Peak (Summer): 132 hours, 264,000 x $0.214 = $56,496.00'
+    - 'Energy Part-Peak (Summer): 176 hours, 352,000 x $0.149 = $52,448.00'
+    - 'Energy Off-Peak (Summer): 436 hours, 872,000 x $0.098 = $85,456.00'
+    - 'Demand: 3,200 x $21.9 = $70,080.00'
+    - 'Public Purpose Program: 1.5% x $194,400.00 = $2,916.00'
+    - 'Utility Users Tax: 5.0% x $267,806.00 = $13,390.30'
+  Proves: The primary rate's own prices on the same three periods.
+- key: test_ved_al_1
+  Test Configuration:
+    Rate to Test: VED-AL-1
+    Start Date: 2024-07-01
+    End Date: 2024-07-31
+    Rate Classes: All (and each option's default class)
+  Intervals:
+    Source: none needed (no usage charge)
+  Results:
+    Expected Bill Total: $15.33
+    Expected Lines:
+    - 'Fixture Charge: $14.60 fixed = $14.60'
+    - 'Utility Users Tax: 5.0% x $14.60 = $0.73'
+  Proves: The fixture charge at the rate's own price (one fixture) and its tax.
+  notes:
+  - Test Rates cannot run a per-meter price. The two lighting meters' own prices ($700.80 and $292.00 before tax) are proved
+    by their generated bills.
+- key: test_sgu_gn_1_winter_2025
+  Test Configuration:
+    Rate to Test: SGU-GN-1
+    Start Date: 2025-01-01
+    End Date: 2025-01-31
+    Rate Classes: All (and each option's default class)
+  Intervals:
+    Source: Generate Reads
+    Generate:
+    - Unit: Therm
+      Interval Minutes: 60
+      Value: 2
+  Results:
+    Expected Bill Total: $2,190.30
+    Expected Lines:
+    - 'Customer Charge: $38.00 fixed = $38.00'
+    - 'Commodity (Winter): 744 hours, 1,488 x $1.142 = $1,699.30'
+    - 'Transport: 744 hours, 1,488 x $0.214 = $318.43'
+    - 'Public Purpose Surcharge: 1.5% x $2,017.73 = $30.27'
+    - 'Utility Users Tax: 5.0% x $2,086.00 = $104.30'
+  Proves: Winter commodity only, transport, the 1.5% surcharge on both and the 5% tax on everything; 1,488 therms.
+- key: test_sgu_gn_1_summer_2024
+  Test Configuration:
+    Rate to Test: SGU-GN-1
+    Start Date: 2024-07-01
+    End Date: 2024-07-31
+    Rate Classes: All (and each option's default class)
+  Intervals:
+    Source: Generate Reads
+    Generate:
+    - Unit: Therm
+      Interval Minutes: 60
+      Value: 1
+  Results:
+    Expected Bill Total: $904.18
+    Expected Lines:
+    - 'Customer Charge: $38.00 fixed = $38.00'
+    - 'Commodity (Summer): 744 hours, 744 x $0.876 = $651.74'
+    - 'Transport: 744 hours, 744 x $0.214 = $159.22'
+    - 'Public Purpose Surcharge: 1.5% x $810.96 = $12.16'
+    - 'Utility Users Tax: 5.0% x $861.12 = $43.06'
+  Proves: Summer commodity only; 744 therms.
+- key: test_sgu_gn_1_season_change_2024
+  Test Configuration:
+    Rate to Test: SGU-GN-1
+    Start Date: 2024-10-15
+    End Date: 2024-11-14
+    Rate Classes: All (and each option's default class)
+  Intervals:
+    Source: Generate Reads
+    Generate:
+    - Unit: Therm
+      Interval Minutes: 60
+      Value: 1
+  Results:
+    Expected Bill Total: $999.44
+    Expected Lines:
+    - 'Customer Charge: $38.00 fixed = $38.00'
+    - 'Commodity (Winter): 336 hours, 336 x $1.142 = $383.71'
+    - 'Commodity (Summer): 408 hours, 408 x $0.876 = $357.41'
+    - 'Transport: 744 hours, 744 x $0.214 = $159.22'
+    - 'Public Purpose Surcharge: 1.5% x $900.34 = $13.51'
+    - 'Utility Users Tax: 5.0% x $951.85 = $47.59'
+  Proves: 'A bill across November 1: the engine prices 408 hours at the summer price and 336 at the winter price.'
+  notes:
+  - The provider's bill for a period like this prices every therm at the season of the end date (winter). The difference
+    between that and this total is the recorded gap, not an error in the rate.
+- key: test_sgu_gl_1_winter_2025
+  Test Configuration:
+    Rate to Test: SGU-GL-1
+    Start Date: 2025-01-01
+    End Date: 2025-01-31
+    Rate Classes: All (and each option's default class)
+  Intervals:
+    Source: Generate Reads
+    Generate:
+    - Unit: Therm
+      Interval Minutes: 60
+      Value: 40
+  Results:
+    Expected Bill Total: $36,572.90
+    Expected Lines:
+    - 'Customer Charge: $245.00 fixed = $245.00'
+    - 'Commodity (Winter): 744 hours, 29,760 x $0.982 = $29,224.32'
+    - 'Transport: 744 hours, 29,760 x $0.163 = $4,850.88'
+    - 'Public Purpose Surcharge: 1.5% x $34,075.20 = $511.13'
+    - 'Utility Users Tax: 5.0% x $34,831.33 = $1,741.57'
+  Proves: The large-volume rate's own prices.
+- key: test_rcu_w_tier_default_size
+  Test Configuration:
+    Rate to Test: RCU-W-TIER
+    Start Date: 2024-07-01
+    End Date: 2024-07-31
+    Rate Classes:
+    - All
+    - 2-inch
+  Intervals:
+    Source: Generate Reads
+    Generate:
+    - Unit: Thousands of Gallons
+      Interval Minutes: 60
+      Value: 0.35
+  Results:
+    Expected Bill Total: $1,790.76
+    Expected Lines:
+    - 'Meter Charge (2-inch): $96.00 fixed = $96.00'
+    - 'Water Tiered Commodity: 50 x $4.85 + 150 x $6.4 + 60.40 x $8.15 = $1,694.76'
+  Proves: 'All three tiers (260.4 kgal) and the option''s default class: the 2-inch meter charge prices with no class chosen.'
+  notes:
+  - 'Run it twice: once with only All ticked, to prove the default class prices by itself, and once with 2-inch ticked.
+    Both must give this total.'
+- key: test_rcu_w_tier_4_inch
+  Test Configuration:
+    Rate to Test: RCU-W-TIER
+    Start Date: 2024-07-01
+    End Date: 2024-07-31
+    Rate Classes:
+    - All
+    - 4-inch
+  Intervals:
+    Source: Generate Reads
+    Generate:
+    - Unit: Thousands of Gallons
+      Interval Minutes: 60
+      Value: 0.35
+  Results:
+    Expected Bill Total: $1,954.76
+    Expected Lines:
+    - 'Meter Charge (4-inch): $260.00 fixed = $260.00'
+    - 'Water Tiered Commodity: 50 x $4.85 + 150 x $6.4 + 60.40 x $8.15 = $1,694.76'
+  Proves: 'A meter bound to another class: the 4-inch charge replaces the default.'
+- key: test_rcu_s_vol
+  Test Configuration:
+    Rate to Test: RCU-S-VOL
+    Start Date: 2024-07-01
+    End Date: 2024-07-31
+    Rate Classes: All (and each option's default class)
+  Intervals:
+    Source: Generate Reads
+    Generate:
+    - Unit: Thousands of Gallons
+      Interval Minutes: 60
+      Value: 0.25
+  Results:
+    Expected Bill Total: $1,507.20
+    Expected Lines:
+    - 'Sewer Base: $28.50 fixed = $28.50'
+    - 'Sewer Volume: 744 hours, 186.00 x $7.95 = $1,478.70'
+  Proves: Sewer base and volume on 186 kgal.
+- key: test_rcu_sw_eru
+  Test Configuration:
+    Rate to Test: RCU-SW-ERU
+    Start Date: 2024-07-01
+    End Date: 2024-07-31
+    Rate Classes: All (and each option's default class)
+  Intervals:
+    Source: none needed (no usage charge)
+  Results:
+    Expected Bill Total: $11.20
+    Expected Lines:
+    - 'Stormwater ERU Charge: $11.20 fixed = $11.20'
+  Proves: The stormwater charge at the rate's own price (one ERU).
+  notes:
+  - Per-meter prices (14 to 26 ERUs) are proved by generated bills, as for lighting.
+- key: test_rcu_irr_3_inch
+  Test Configuration:
+    Rate to Test: RCU-IRR
+    Start Date: 2024-07-01
+    End Date: 2024-07-31
+    Rate Classes:
+    - All
+    - 3-inch
+  Intervals:
+    Source: Generate Reads
+    Generate:
+    - Unit: Thousands of Gallons
+      Interval Minutes: 60
+      Value: 0.1
+  Results:
+    Expected Bill Total: $562.32
+    Expected Lines:
+    - 'Meter Charge (3-inch): $168.00 fixed = $168.00'
+    - 'Irrigation Volume: 744 hours, 74.4 x $5.3 = $394.32'
+  Proves: Irrigation volume with the 3-inch meter charge.
+- key: test_rcu_fire_default
+  Test Configuration:
+    Rate to Test: RCU-FIRE
+    Start Date: 2024-07-01
+    End Date: 2024-07-31
+    Rate Classes:
+    - All
+    - 4-inch
+  Intervals:
+    Source: none needed (no usage charge)
+  Results:
+    Expected Bill Total: $38.00
+    Expected Lines:
+    - 'Line Charge (4-inch): $38.00 fixed = $38.00'
+  Proves: The default line size, 4-inch.
+- key: test_rcu_fire_8_inch
+  Test Configuration:
+    Rate to Test: RCU-FIRE
+    Start Date: 2024-07-01
+    End Date: 2024-07-31
+    Rate Classes:
+    - All
+    - 8-inch
+  Intervals:
+    Source: none needed (no usage charge)
+  Results:
+    Expected Bill Total: $95.00
+    Expected Lines:
+    - 'Line Charge (8-inch): $95.00 fixed = $95.00'
+  Proves: The 8-inch line.
+- key: test_ntp_alloc_chw
+  Test Configuration:
+    Rate to Test: NTP-ALLOC-CHW
+    Start Date: 2024-07-01
+    End Date: 2024-07-31
+    Rate Classes: All (and each option's default class)
+  Intervals:
+    Source: Generate Reads
+    Generate:
+    - Unit: Ton-Hour
+      Interval Minutes: 60
+      Value: 150
+    - Unit: Cooling Ton
+      Interval Minutes: 60
+      Value: 320
+  Results:
+    Expected Bill Total: $22,128.80
+    Expected Lines:
+    - 'CHW Consumption: 744 hours, 111,600 x $0.168 = $18,748.80'
+    - 'CHW Demand: 320 x $9.5 = $3,040.00'
+    - 'Fixed O&M Share: $340.00 fixed = $340.00'
+  Proves: Consumption, peak tons and the fixed share at the rate's own price ($340, the Science Center's).
+- key: test_ntp_alloc_steam
+  Test Configuration:
+    Rate to Test: NTP-ALLOC-STEAM
+    Start Date: 2025-01-01
+    End Date: 2025-01-31
+    Rate Classes: All (and each option's default class)
+  Intervals:
+    Source: Generate Reads
+    Generate:
+    - Unit: Steam Thousands of Pounds
+      Interval Minutes: 60
+      Value: 0.5
+  Results:
+    Expected Bill Total: $5,622.40
+    Expected Lines:
+    - 'Steam Consumption: 744 hours, 372.0 x $14.2 = $5,282.40'
+    - 'Fixed O&M Share: $340.00 fixed = $340.00'
+  Proves: Steam consumption and the fixed share.
+- key: test_hos_ppa_2025
+  Test Configuration:
+    Rate to Test: HOS-PPA-2024
+    Start Date: 2025-07-01
+    End Date: 2025-07-31
+    Rate Classes: All (and each option's default class)
+  Intervals:
+    Source: Generate Reads
+    Generate:
+    - Unit: KilowattHours
+      Interval Minutes: 60
+      Value: 60
+  Results:
+    Expected Bill Total: $1,311.52
+    Expected Lines:
+    - 'PPA Energy: 744 hours, 44,640 x $0.12138 = $5,418.40'
+    - 'Net Metering Credit: 744 hours, 44,640 x $-0.092 = $-4,106.88'
+  Proves: The 2025 escalated price, 0.12138.
+  notes:
+  - A run reads one stream per unit, so the Net Metering Credit prices the same 44,640 kWh as PPA Energy. Read the PPA Energy
+    line; the total is right for this run only.
+- key: test_ved_gen_ic_2024_07_service
+  Test Configuration:
+    Rate to Test: VED-GEN-IC
+    Start Date: 2024-07-01
+    End Date: 2024-08-04
+    Rate Classes: Select All
+  Intervals:
+    Source: Paste CSV
+    Rows:
+    - {LocalTimestamp: '2024-07-15 12:00', Value: 4428, IntervalMinutes: 60, UnitID: 6}
+    Shape: the delivered (station service) kWh on the generator's first bill, ved_ridgeline_generator_2024_07 (July 1 to
+      August 4, 2024, the Aug-24 period)
+  Results:
+    Expected Bill Total: not a bill figure, because the Generation Credit line prices this same stream; read only the
+      lines named here
+    Engine Lines:
+    - 'Generator Customer Charge: $285.00 (bill 285.00)'
+    - 'Station Service Energy: 4,428 kWh x $0.131 = $580.07 (bill 580.07)'
+    - 'Utility Users Tax: 5% x ($285.00 + $580.07) = $43.25 (bill 51.31, which also taxes the reactive line)'
+    Outside The Engine:
+    - 'Reactive Power Charge: 38,351 kVArh x $0.0042 = $161.07 (858,948 measured less 820,597 allowed; no determinant)'
+    - 'The tax on that line, $8.06: the difference between the bill''s $51.31 and the engine''s $43.25'
+    Note: the next run, test_ved_gen_ic_2024_07_export, reads the credit and adds up the bill.
+- key: test_ved_gen_ic_2024_07_export
+  Test Configuration:
+    Rate to Test: VED-GEN-IC
+    Start Date: 2024-07-01
+    End Date: 2024-08-04
+    Rate Classes: Select All
+  Intervals:
+    Source: Paste CSV
+    Rows:
+    - {LocalTimestamp: '2024-07-15 12:00', Value: 2496612, IntervalMinutes: 60, UnitID: 6}
+    Shape: the received (export) kWh on the same bill, 2,496,612 (2,496.612 MWh as the bill states it)
+  Results:
+    Expected Bill Total: not a bill figure, because the Station Service Energy and tax lines price this same stream; read
+      only the line named here
+    Engine Lines:
+    - 'Generation Credit: 2,496,612 kWh x -$0.0612 = -$152,792.65 (bill -152,792.65)'
+    Outside The Engine:
+    - 'Transfer under VED-BCT: +$152,792.65 (bct_credit_transferred; it lands on the Central Plant bill, ved_central_plant_2024_09)'
+    Bill Reconstruction: 'ved_ridgeline_generator_2024_07 is 285.00 + 580.07 + 161.07 - 152,792.65 + 152,792.65 + 51.31 =
+      $1,077.45. The engine supplies 285.00, 580.07 and the tax of 43.25 (first run) and -152,792.65 (this run); the
+      reactive line 161.07, the $8.06 of tax on it and the +152,792.65 transfer come from outside it.'
+- key: test_ved_gen_ic_2025_01_service
+  Test Configuration:
+    Rate to Test: VED-GEN-IC
+    Start Date: 2025-01-05
+    End Date: 2025-02-04
+    Rate Classes: Select All
+  Intervals:
+    Source: Paste CSV
+    Rows:
+    - {LocalTimestamp: '2025-01-20 12:00', Value: 46920, IntervalMinutes: 60, UnitID: 6}
+    Shape: the delivered (station service) kWh on the winter bill, ved_ridgeline_generator_2025_01 (January 5 to February
+      4, 2025, the Feb-25 period)
+  Results:
+    Expected Bill Total: not a bill figure, because the Generation Credit line prices this same stream; read only the
+      lines named here
+    Engine Lines:
+    - 'Generator Customer Charge: $285.00 (bill 285.00)'
+    - 'Station Service Energy: 46,920 kWh x $0.131 = $6,146.52 (bill 6,146.52)'
+    - 'Utility Users Tax: 5% x ($285.00 + $6,146.52) = $321.58 (bill 321.58)'
+    Note: the next run, test_ved_gen_ic_2025_01_export, reads the credit and adds up the bill.
+- key: test_ved_gen_ic_2025_01_export
+  Test Configuration:
+    Rate to Test: VED-GEN-IC
+    Start Date: 2025-01-05
+    End Date: 2025-02-04
+    Rate Classes: Select All
+  Intervals:
+    Source: Paste CSV
+    Rows:
+    - {LocalTimestamp: '2025-01-20 12:00', Value: 418836, IntervalMinutes: 60, UnitID: 6}
+    Shape: the received (export) kWh on the winter bill, 418,836 (418.836 MWh as the bill states it)
+  Results:
+    Expected Bill Total: not a bill figure, because the Station Service Energy and tax lines price this same stream; read
+      only the line named here
+    Engine Lines:
+    - 'Generation Credit: 418,836 kWh x -$0.0612 = -$25,632.76 (bill -25,632.76)'
+    Outside The Engine:
+    - 'Transfer under VED-BCT: +$25,632.76 (bct_credit_transferred)'
+    Verify: the engine posts no reactive line at all, which equals the bill's $0.00 (131,664 kVArh measured against
+      137,665 allowed), so this bill differs from the engine only by the transfer.
+    Bill Reconstruction: 'ved_ridgeline_generator_2025_01 is 285.00 + 6,146.52 + 0.00 - 25,632.76 + 25,632.76 + 321.58 =
+      $6,753.10. Every line but the transfer comes from the two runs.'
+- key: test_ved_bct_2024_09
+  Test Configuration:
+    Rate to Test: VED-BCT
+    Start Date: 2024-08-05
+    End Date: 2024-09-04
+    Rate Classes: Select All
+  Intervals:
+    Source: Generate Reads
+    Shape: none needed (no usage-based determinant)
+  Results:
+    Expected Bill Total: $12.50 (Fixed By Period only; the administrative fee on the Central Plant bill ved_central_plant_2024_09)
+    Outside The Engine:
+    - 'BCT credit received: -$152,792.65 on that bill (the generator''s July 1 to August 4 credit; bct_credit_received); no determinant can read another account''s credit'
+- key: test_ved_tou_pri_central_plant_2024_09
+  Test Configuration:
+    Rate to Test: VED-TOU-PRI
+    Start Date: 2024-08-05
+    End Date: 2024-09-04
+    Rate Classes: All
+  Intervals:
+    Source: Paste CSV
+    Rows:
+    - {LocalTimestamp: '2024-08-14 14:00', Value: 412800, IntervalMinutes: 60, UnitID: 6}   # peak, a Wednesday afternoon
+    - {LocalTimestamp: '2024-08-13 09:00', Value: 368400, IntervalMinutes: 60, UnitID: 6}   # part-peak, a Tuesday morning
+    - {LocalTimestamp: '2024-08-17 02:00', Value: 731200, IntervalMinutes: 60, UnitID: 6}   # off-peak, a Saturday night
+    - {LocalTimestamp: '2024-08-14 15:00', Value: 3240, IntervalMinutes: 15, UnitID: 7}     # maximum 15-minute demand
+    Shape: the Central Plant's August 5 to September 4, 2024 quantities, ved_central_plant_2024_09 (1,512,400 kWh in three
+      periods and 3,240 kW); none of the rows falls on Labor Day
+  Results:
+    Expected Bill Total: $303,951.62, the bill's total before VED-BCT, to the cent
+    Expected Lines:
+    - 'Facility Charge: $410.00'
+    - 'Energy Peak (Summer): 412,800 kWh x $0.214 = $88,339.20'
+    - 'Energy Part-Peak (Summer): 368,400 kWh x $0.149 = $54,891.60'
+    - 'Energy Off-Peak (Summer): 731,200 kWh x $0.098 = $71,657.60'
+    - 'Demand: 3,240 kW x $21.90 = $70,956.00'
+    - 'Public Purpose Program: 1.5% x $214,888.40 = $3,223.33'
+    - 'Utility Users Tax: 5% x $289,477.73 = $14,473.89'
+    Outside The Engine:
+    - 'VED-BCT: the $12.50 administrative fee (test_ved_bct_2024_09 runs it) and the credit received, -$152,792.65'
+    Verify: the two winter energy charges post no line, because the whole period is in the VED Summer season.
+    Bill Reconstruction: '303,951.62 - 152,792.65 + 12.50 = $151,171.47, the bill ved_central_plant_2024_09. Until
+      2026-11-09 the library folded part-peak into off-peak and this run came out $39,743.08 over.'
+- key: test_rwl_xfer_2024_07
+  Test Configuration:
+    Rate to Test: RWL-XFER-2024
+    Start Date: 2024-07-01
+    End Date: 2024-07-31
+    Rate Classes: Select All
+  Intervals:
+    Source: Paste CSV
+    Rows:
+    - {LocalTimestamp: '2024-07-15 12:00', Value: 2251384, IntervalMinutes: 60, UnitID: 6}
+    Shape: the stream of the billing meter, Ridgeline Farm Transfer Meter (SYN-RWL-M-0110000), for July 2024, the farm
+      total of 2,251,384 kWh; its one point, Ridgeline Farm Generated kWh 10m, is the ten turbines' kWh added up, and the
+      hand-made statement's ten meter rows (238,412 + 233,905 + 229,768 + 226,341 + 224,087 + 225,530 + 222,196 + 219,874 +
+      217,402 + 213,869) add to the same figure
+  Results:
+    Expected Bill Total: $129,330.27, the hand-made statement's total, to the cent
+    Engine Lines:
+    - 'Transfer Energy: 2,251,384 kWh x $0.058 = $130,580.27 (statement 130,580.27)'
+    - 'Research Credit: -$1,250.00 (statement -1,250.00)'
+    Verify: once Stage 3's data exist, run the same test with Load from Point on Ridgeline Farm Generated kWh 10m for
+      2024-07-01 to 2024-07-31 (4,464 ten-minute rows) and expect the same two lines; what must come to 2,251,384 is that
+      point's sum, which is also Stage 7's acceptance figure.
+    Note: this proves the rate, not Bill Generation. The run names its class itself, so it passes without the Commodity
+      Mapping that the generated statement needs (05-rates.yaml); the hand-made statement is also the
+      acceptance sample for the first generated statement (Stage 7 step 8).

@@ -1,0 +1,95 @@
+# Stage 6, step 4: AP/GL export formats, runnable from Web SPA #/reporting/APApprovalAndUpload. NONE ARE
+# RUNNABLE TODAY in this installed instance - see Findings. This file states the target formats so the content
+# is ready the moment an ExportSetup row (and, for the five Northlake-specific formats, a builder proc) exists.
+#
+# Verified against EEMSuite_Northlake: BOTH ExportSetup (0 rows) and PermissionCatalog TypeKey='EX' (0 rows) are
+# empty. Exports_Get (Database/EEMSuite/Procs/Exports_Get.sql) inner-joins PermissionCatalog to ExportSetup_View
+# on ExportName, so with neither side seeded, the Preview/Create Interface File picker has nothing to show for
+# any format, built-in or Northlake-specific. Checked against the EEMSuite upgraded-demo database for
+# comparison: it has both PermissionCatalog rows (export_ap "Accounts Payable (AP)", export_ap2 "Accounts
+# Payable (AP) Thirvine" - Database/EEMSuite/Scripts/SeedPermissionCatalogLanguage.sql) and both ExportSetup
+# rows, the latter pointing at HIPPODemo-schema procs (HIPPODemo.EEM_AP_BillsForApproval_Get / _UploadFile_Get,
+# etc.). That confirms these "built-in" formats are themselves a per-install customization (a demo customer's
+# own catalog entries and builder procs), not core, always-present product objects - Northlake's install simply
+# never received that customization. Product-gap-backlog.md item 2 already recommends dev work for the five
+# richer formats; this finding means the same two-part gap (catalog entry + ExportSetup row + builder proc)
+# applies, for this instance, to the two the plan called built-in.
+stage: 6
+step: 4
+title: AP/GL export formats
+app: Web SPA (target - no ExportSetup row exists for any format in this instance)
+screen: '#/reporting/APApprovalAndUpload (target: Preview/Create Interface File format picker)'
+source:
+- data/eem/northlake-ap-gl-v1.yaml
+- generators/documents/sources/implementation/dream-customer/phase3-ap-gl-validation-spec.md
+- generators/documents/sources/implementation/dream-customer/product-gap-backlog.md
+- documents/guides/chart-of-accounts-and-gl-guide.pdf
+notes:
+- 'ExportType lookup (verified, 2 rows): APINV "AP Invoice Header", APDIS "AP Distribution Details" - both csv,
+  both already present and usable by whichever ExportSetup row references them once one exists.'
+- The five Northlake-specific formats are unchanged from the AP/GL plan; this file only corrects which two are
+  demo-only versus core product, per the Stage 5 Findings' three-value Bill Service Type correction.
+- 'Added 2026-10-01 (Ridgeline Wind): no format is added, but every builder pair now carries a routing rule for the
+  two Ridgeline accounts (ridgeline_routing below). The transfer statement (SYN-RWL-G-0000001) is GL only, "a
+  journal between the plant and its own wind company" with no payment leaving the plant (chart-of-accounts guide),
+  so no file of vendor invoices may carry it and only the GL journal does. The generator account''s bill
+  (SYN-VED-A-0010014) is an ordinary AP voucher. The bill credit transfer is coded once, on the Central Plant bill
+  where it lands: the generator''s voucher carries no net credit and the Central Plant''s carries it.'
+records:
+- key: export_ap
+  installed: {}
+  Format: export_ap
+  Structure: fixed-width .txt, one record per bill line
+  Status: >-
+    BLOCKED - neither a PermissionCatalog 'EX' row nor an ExportSetup row exists in EEMSuite_Northlake. Needs
+    both a PermissionCatalog row (TypeKey='EX', PermissionKey='export_ap') and a Northlake-specific ExportSetup
+    row (ExportName='export_ap', ApprovalSQL/UploadFileSQL pointing at Northlake builder procs following the
+    demo's HIPPODemo.EEM_AP_BillsForApproval_Get / EEM_AP_UploadFile_Get pattern) before it can run here.
+- key: export_ap2
+  installed: {}
+  Format: export_ap2
+  Structure: .csv, fixed-width-in-CSV at bill grain
+  Status: BLOCKED - same as export_ap; neither the PermissionCatalog row nor the ExportSetup row exists.
+- key: nl_ap_gludf
+  installed: {}
+  Format: nl_ap_gludf
+  Structure: fixed-width header+detail, GL-UD-field coded (Sacramento-County style)
+  Status: NEEDS DEV (product-gap-backlog.md item 2) - depends on 02-gl-fields.yaml, itself blocked on the
+    missing GL user-defined-fields view.
+- key: nl_ap_voucher
+  installed: {}
+  Format: nl_ap_voucher
+  Structure: fixed-width C/H/L/D records, PeopleSoft AP voucher
+  Status: NEEDS DEV (product-gap-backlog.md item 2).
+- key: nl_gl_journal
+  installed: {}
+  Format: nl_gl_journal
+  Structure: fixed-width H/L records, PeopleSoft GL journal, balanced debit/credit pairs
+  Status: NEEDS DEV (product-gap-backlog.md item 2); the only format that carries the GL-only Ridgeline transfer
+    statement (see ridgeline_routing).
+- key: nl_sap_fi
+  installed: {}
+  Format: nl_sap_fi
+  Structure: comma-delimited, SAP FI document
+  Status: NEEDS DEV (product-gap-backlog.md item 2).
+- key: nl_ar_interface
+  installed: {}
+  Format: nl_ar_interface
+  Structure: fixed-width, AR interface (Phase 4 tenant rebilling)
+  Status: NEEDS DEV (product-gap-backlog.md item 2); out of Stage 6's scope (Phase 4/Stage 7).
+- key: ridgeline_routing
+  installed: {}
+  Format: no new format - which Ridgeline bills each existing format may carry
+  Structure: a selection rule in each format's approval builder, not a file layout
+  SYN-RWL-G-0000001 (transfer statement, GL only):
+    Carried by: nl_gl_journal
+    Never carried by: every file of vendor invoices - export_ap, export_ap2, nl_ap_gludf, nl_ap_voucher, and nl_sap_fi
+      when it carries invoices
+  SYN-VED-A-0010014 (Valley Electric generator, AP and GL):
+    Carried by: the AP formats and nl_gl_journal
+    Voucher: its own charges only (first bill total 1077.45); the generation credit and the transferred line net to 0.00
+  Status: TARGET - no builder exists in this instance (see the formats above), so this is the rule to build in,
+    checked by ridgeline_gl_only in checks.sql. The statement is held out of AP files by Bill Entry Type (Bill
+    Generation, BillType_Code 2), not by Bill Service Type, because EEM has no GL-only value, Bill Payment is only the
+    nearest, and the Massport AP approval builder (MPA.MPA_FI_AP_BillsForApproval_Get) admits Type_Code 2 as "both AP
+    and BI".  # assumed - the exclusion column is a design choice for the Northlake builders

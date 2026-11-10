@@ -1,0 +1,633 @@
+# Stage 2, step 2: Sites and Buildings (Database Administrator > Nodes; Site and Location
+# nodes). One record per node. These 4 sites and 13 buildings, plus the two airport nodes noted
+# at the end, already exist on the installed instance (see installed: below); this file records
+# their expected values. The Ridgeline Wind Site and its two buildings (added 2026-10-01) are new:
+# enter them. So is Cedar Row C (added 2026-11-07), the apartment building that opened September 1, 2025.
+stage: 2
+step: 2
+title: Sites and buildings
+app: Database Administrator
+screen: Nodes
+source:
+- data/scenarios/demo-university-v1.yaml (sites, buildings)
+- data/eem/northlake-eem-metaworld-stage1b-v1.yaml (weatherIndexTargets, ownershipRules)
+- generators/documents/sources/implementation/northlake-address-coordinates.md
+notes:
+- 'Each record lists every page the node editor shows for that node, in the editor''s order. A null value or an empty
+  list is deliberate: leave that page empty. The empty states are part of the test, so do not fill them in.'
+- 'Level is the company''s hierarchy level as Stage 1 named it (01-companies.yaml), picked when the node is added. A
+  site (Type Site) sits at the top of its company''s tree; a building (Type Location) sits under its site.'
+- 'Definitions: Description, Time Zone and the level''s code field, Site Code or Building Code. Northlake University
+  codes its campus; Cedar Row and the Thermal Plant leave the code empty.'
+- 'Keywords are the values assigned on that node. Department is assigned once on each site, and Inherited Keywords
+  lists what each building then shows inherited: verify those, do not assign them again. The Department keyword type
+  is seeded.'
+- 'Cedar Row A, Cedar Row B and Cedar Row C also carry Meter Type = Sub-Meter, assigned directly on the building: A and
+  B''s 124 apartment submeters and 4 house submeters, and C''s 50 water submeters, inherit it, and the utility meters in
+  A and B override it with their own Utility Meter (03-meters.yaml). This is the one keyword that exercises inheritance
+  and override below a building.'
+- 'Status is a building''s Status page (Open or Closed, with an as-of date). A site has no Status page. Campus, Cedar Row
+  and Central Plant buildings open 2024-01-01, the start of Northlake''s history in EEM, as their billing accounts do;
+  the Ridgeline buildings open on the acquisition date, 2024-07-01, and Cedar Row C on its lease-up date, 2025-09-01.'
+- 'Cedar Row C (added 2026-11-07) is a post-onboarding building: it is not in the 2024 intake packet or the ENERGY STAR
+  property, and its utility services are outside this recipe. It exists for its 50 owned water submeters, which the
+  installer keyed into the handheld system badly (Stage 3 Step 5, route CRCWTR).'
+- 'Area is the node''s Area page (Floor Area in SqFt, with an as-of date). The 11 buildings with a floor area already
+  hold their history; verify it. Sites, the outdoor nodes (Campus Grounds, Cedar Row Carport and Grounds, the two
+  Ridgeline nodes) and Weather Reference carry none.'
+- 'Floor area: MetaWorld_TBL.Area (the node''s own area, which rp_BuildingList, rp_BenchMark, rp_IndexList and
+  rp_ProjectSummary read) is empty on every building although the Area history is there. A Definitions save writes
+  the node''s in-memory area back over it (PRODUCT FINDING 36, not yet reproduced). Do not re-enter areas to repair
+  it; record what the reports show.'
+- 'Notes is the node''s Notes page (Note History, table code M2), one note per record that has one. Comment is
+  guidance for whoever enters the record and is not typed anywhere.'
+- 'Ownership: a building exists once, in the company that owns its site. The Northlake Thermal Plant company holds
+  Central Plant and, since 2024-07-01, the Ridgeline Wind Site; Northlake University owns every campus building
+  including the ones the Thermal Plant serves.'
+- 'Ridgeline Wind Site (new, 2026-10-01): a second site in the Thermal Plant company with two outdoor nodes, Ridgeline
+  Turbine Field and Ridgeline Substation. Once the site is saved, grant the two Ridgeline Points scopes waiting in
+  Stage 1 (04-groups.yaml laterPermissions).'
+records:
+# ---- Northlake University ----
+- key: northlake_main_campus
+  installed:
+    nodeId: 22
+    recordedOn: 2026-09-18
+  Company: Northlake University
+  Level: {Level: 1, Description: Site, Type: Site}
+  Definitions:
+    Description: Northlake Main Campus
+    Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+    Site Code: NLU-MAIN
+  Node Address:
+    Address: 4100 North Shore Drive
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.5352
+    Longitude: -121.4939
+  Area: null
+  Keywords:
+  - {Type: Department, Attribute: Facilities Operations}
+  Notes: null
+- key: weather_reference
+  installed:
+    nodeId: 33
+    recordedOn: 2026-09-18
+  Company: Northlake University
+  Level: {Level: 1, Description: Site, Type: Site}
+  Definitions:
+    Description: Weather Reference
+    Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+    Site Code: null
+  Node Address: null
+  Area: null
+  Keywords: []
+  Notes: Groups the three weather-station meters (KSAC, KSMF, KSUU); no street address, floor area or department.
+  Comment: The site-level empty state. Its only content is the note and the three weather-station meters (03-meters.yaml).
+- key: admin_hall
+  installed:
+    nodeId: 23
+    recordedOn: 2026-09-18
+  Company: Northlake University
+  Level: {Level: 2, Description: Buildings, Type: Location}
+  Parent: Northlake Main Campus
+  Definitions:
+    Description: Admin Hall
+    Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+    Building Code: ADM
+  Node Address:
+    Address: 100 Synthetic Campus Drive
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.5359
+    Longitude: -121.4945
+  Area:
+    Area Unit: SqFt
+    History:
+    - {Area: 85000, Date: 2026-09-15}
+  Keywords: []
+  Inherited Keywords:
+  - {Type: Department, Attribute: Facilities Operations, From: Northlake Main Campus}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+  Notes: null
+- key: science_center
+  installed:
+    nodeId: 24
+    recordedOn: 2026-09-18
+  Company: Northlake University
+  Level: {Level: 2, Description: Buildings, Type: Location}
+  Parent: Northlake Main Campus
+  Definitions:
+    Description: Science Center
+    Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+    Building Code: SCI
+  Node Address:
+    Address: 120 Synthetic Campus Drive
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.53655
+    Longitude: -121.4928
+  Area:
+    Area Unit: SqFt
+    History:
+    - {Area: 120000, Date: 2026-09-15}
+  Keywords: []
+  Inherited Keywords:
+  - {Type: Department, Attribute: Facilities Operations, From: Northlake Main Campus}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+  Notes: null
+- key: library
+  installed:
+    nodeId: 25
+    recordedOn: 2026-09-18
+  Company: Northlake University
+  Level: {Level: 2, Description: Buildings, Type: Location}
+  Parent: Northlake Main Campus
+  Definitions:
+    Description: Library
+    Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+    Building Code: LIB
+  Node Address:
+    Address: 140 Synthetic Campus Drive
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.5348
+    Longitude: -121.4931
+  Area:
+    Area Unit: SqFt
+    History:
+    - {Area: 70000, Date: 2026-09-15}
+  Keywords: []
+  Inherited Keywords:
+  - {Type: Department, Attribute: Facilities Operations, From: Northlake Main Campus}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+  Notes: null
+- key: student_center
+  installed:
+    nodeId: 26
+    recordedOn: 2026-09-18
+  Company: Northlake University
+  Level: {Level: 2, Description: Buildings, Type: Location}
+  Parent: Northlake Main Campus
+  Definitions:
+    Description: Student Center
+    Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+    Building Code: STU
+  Node Address:
+    Address: 160 Synthetic Campus Drive
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.5342
+    Longitude: -121.4953
+  Area:
+    Area Unit: SqFt
+    History:
+    - {Area: 95000, Date: 2026-09-15}
+  Keywords: []
+  Inherited Keywords:
+  - {Type: Department, Attribute: Facilities Operations, From: Northlake Main Campus}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+  Notes: null
+- key: lakeview_hall
+  installed:
+    nodeId: 27
+    recordedOn: 2026-09-18
+  Company: Northlake University
+  Level: {Level: 2, Description: Buildings, Type: Location}
+  Parent: Northlake Main Campus
+  Definitions:
+    Description: Lakeview Residence Hall
+    Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+    Building Code: LKV
+  Node Address:
+    Address: 180 Synthetic Campus Drive
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.5338
+    Longitude: -121.4922
+  Area:
+    Area Unit: SqFt
+    History:
+    - {Area: 110000, Date: 2026-09-15}
+  Keywords: []
+  Inherited Keywords:
+  - {Type: Department, Attribute: Facilities Operations, From: Northlake Main Campus}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+  Notes: null
+- key: recreation_center
+  installed:
+    nodeId: 28
+    recordedOn: 2026-09-18
+  Company: Northlake University
+  Level: {Level: 2, Description: Buildings, Type: Location}
+  Parent: Northlake Main Campus
+  Definitions:
+    Description: Recreation and Aquatics Center
+    Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+    Building Code: REC
+  Node Address:
+    Address: 200 Synthetic Campus Drive
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.5333
+    Longitude: -121.4944
+  Area:
+    Area Unit: SqFt
+    History:
+    - {Area: 65000, Date: 2026-09-15}
+  Keywords: []
+  Inherited Keywords:
+  - {Type: Department, Attribute: Facilities Operations, From: Northlake Main Campus}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+  Notes: null
+- key: parking_structure
+  installed:
+    nodeId: 29
+    recordedOn: 2026-09-18
+  Company: Northlake University
+  Level: {Level: 2, Description: Buildings, Type: Location}
+  Parent: Northlake Main Campus
+  Definitions:
+    Description: Parking Structure
+    Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+    Building Code: PKG
+  Node Address:
+    Address: 220 Synthetic Campus Drive
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.5346
+    Longitude: -121.496
+  Area:
+    Area Unit: SqFt
+    History:
+    - {Area: 180000, Date: 2026-09-15}
+  Keywords: []
+  Inherited Keywords:
+  - {Type: Department, Attribute: Facilities Operations, From: Northlake Main Campus}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+  Notes: null
+- key: campus_grounds
+  installed:
+    nodeId: 34
+    recordedOn: 2026-09-18
+  Company: Northlake University
+  Level: {Level: 2, Description: Buildings, Type: Location}
+  Parent: Northlake Main Campus
+  Definitions:
+    Description: Campus Grounds
+    Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+    Building Code: GRD
+  Node Address:
+    Address: 4100 North Shore Drive
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.5352
+    Longitude: -121.4939
+  Area: null
+  Keywords: []
+  Inherited Keywords:
+  - {Type: Department, Attribute: Facilities Operations, From: Northlake Main Campus}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+  Notes: Outdoor service area for campus area lighting and the three irrigation meters; no floor area.
+# ---- Cedar Row Apartments ----
+- key: cedar_row_apartments
+  installed:
+    nodeId: 8
+    recordedOn: 2026-09-18
+  Company: Cedar Row Apartments
+  Level: {Level: 1, Description: Property, Type: Site}
+  Definitions:
+    Description: Cedar Row Apartments
+    Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+    Site Code: null
+  Node Address:
+    Address: 1280 Cedar Row Lane
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.5472
+    Longitude: -121.4706
+  Area: null
+  Keywords:
+  - {Type: Department, Attribute: Housing Operations}
+  Notes: null
+- key: cedar_row_a
+  installed:
+    nodeId: 9
+    recordedOn: 2026-09-18
+  Company: Cedar Row Apartments
+  Level: {Level: 2, Description: Buildings, Type: Location}
+  Parent: Cedar Row Apartments
+  Definitions:
+    Description: Cedar Row A
+    Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+    Building Code: null
+  Node Address:
+    Address: 400 Synthetic Grove Avenue
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.54765
+    Longitude: -121.4702
+  Area:
+    Area Unit: SqFt
+    History:
+    - {Area: 58000, Date: 2026-09-15}
+  Keywords:
+  - {Type: Meter Type, Attribute: Sub-Meter}
+  Inherited Keywords:
+  - {Type: Department, Attribute: Housing Operations, From: Cedar Row Apartments}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+  Notes: null
+- key: cedar_row_b
+  installed:
+    nodeId: 10
+    recordedOn: 2026-09-18
+  Company: Cedar Row Apartments
+  Level: {Level: 2, Description: Buildings, Type: Location}
+  Parent: Cedar Row Apartments
+  Definitions:
+    Description: Cedar Row B
+    Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+    Building Code: null
+  Node Address:
+    Address: 420 Synthetic Grove Avenue
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.54685
+    Longitude: -121.46955
+  Area:
+    Area Unit: SqFt
+    History:
+    - {Area: 62000, Date: 2026-09-15}
+  Keywords:
+  - {Type: Meter Type, Attribute: Sub-Meter}
+  Inherited Keywords:
+  - {Type: Department, Attribute: Housing Operations, From: Cedar Row Apartments}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+  Notes: null
+- key: cedar_row_c
+  installed:
+    nodeId:
+  Company: Cedar Row Apartments
+  Level: {Level: 2, Description: Buildings, Type: Location}
+  Parent: Cedar Row Apartments
+  Definitions:
+    Description: Cedar Row C
+    Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+    Building Code: null
+  Node Address:
+    Address: 440 Synthetic Grove Avenue
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.54605
+    Longitude: -121.4689
+  Area:
+    Area Unit: SqFt
+    History:
+    - {Area: 46800, Date: 2025-09-01}
+  Keywords:
+  - {Type: Meter Type, Attribute: Sub-Meter}
+  Inherited Keywords:
+  - {Type: Department, Attribute: Housing Operations, From: Cedar Row Apartments}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+  Notes: Opened September 1, 2025 for lease-up. 48 apartments on four floors; the water submeters hang on two outside meter banks, west (stacks 01-06) and east (stacks 07-12), with the house and laundry meters in the laundry room at the west end.
+- key: cedar_row_common_house
+  installed:
+    nodeId: 11
+    recordedOn: 2026-09-18
+  Company: Cedar Row Apartments
+  Level: {Level: 2, Description: Buildings, Type: Location}
+  Parent: Cedar Row Apartments
+  Definitions:
+    Description: Cedar Row Common House
+    Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+    Building Code: null
+  Node Address:
+    Address: 1304 Cedar Row Lane
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.54715
+    Longitude: -121.47085
+  Area:
+    Area Unit: SqFt
+    History:
+    - {Area: 18400, Date: 2026-09-15}
+  Keywords: []
+  Inherited Keywords:
+  - {Type: Department, Attribute: Housing Operations, From: Cedar Row Apartments}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+  Notes: null
+- key: cedar_row_carport_grounds
+  installed:
+    nodeId: 35
+    recordedOn: 2026-09-18
+  Company: Cedar Row Apartments
+  Level: {Level: 2, Description: Buildings, Type: Location}
+  Parent: Cedar Row Apartments
+  Definitions:
+    Description: Cedar Row Carport and Grounds
+    Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+    Building Code: null
+  Node Address:
+    Address: 1280 Cedar Row Lane
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.5474
+    Longitude: -121.4711
+  Area: null
+  Keywords: []
+  Inherited Keywords:
+  - {Type: Department, Attribute: Housing Operations, From: Cedar Row Apartments}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+  Notes: Parking lighting, grounds irrigation and the carport solar array; outdoor, no floor area.
+# ---- Northlake Thermal Plant ----
+- key: northlake_central_plant
+  installed:
+    nodeId: 31
+    recordedOn: 2026-09-18
+  Company: Northlake Thermal Plant
+  Level: {Level: 1, Description: Plants, Type: Site}
+  Definitions:
+    Description: Northlake Central Plant
+    Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+    Site Code: null
+  Node Address:
+    Address: 4122 Plant Service Road
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.53725
+    Longitude: -121.49685
+  Area: null
+  Keywords:
+  - {Type: Department, Attribute: Thermal Plant Operations}
+  Notes: null
+- key: central_plant
+  installed:
+    nodeId: 32
+    recordedOn: 2026-09-18
+  Company: Northlake Thermal Plant
+  Level: {Level: 2, Description: Facilities, Type: Location}
+  Parent: Northlake Central Plant
+  Definitions:
+    Description: Central Plant
+    Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+    Building Code: null
+  Node Address:
+    Address: 4122 Plant Service Road
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.53725
+    Longitude: -121.49685
+  Area:
+    Area Unit: SqFt
+    History:
+    - {Area: 58400, Date: 2026-09-15}
+  Keywords: []
+  Inherited Keywords:
+  - {Type: Department, Attribute: Thermal Plant Operations, From: Northlake Central Plant}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+  Notes: null
+# ---- Ridgeline Wind (added 2026-10-01; enter these three) ----
+- key: ridgeline_wind_site
+  installed:
+    nodeId:
+  Company: Northlake Thermal Plant
+  Level: {Level: 1, Description: Plants, Type: Site}
+  Definitions:
+    Description: Ridgeline Wind Site
+    Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+    Site Code: null
+  Node Address:
+    Address: 8400 Montezuma Hills Road
+    City: Rio Vista
+    Region: CA
+    Postal Code: '94571'
+    Country: UNITED STATES
+    Latitude: 38.1226
+    Longitude: -121.8134
+  Area: null
+  Keywords:
+  - {Type: Department, Attribute: Thermal Plant Operations}
+  Notes: null
+- key: ridgeline_turbine_field
+  installed:
+    nodeId:
+  Company: Northlake Thermal Plant
+  Level: {Level: 2, Description: Facilities, Type: Location}
+  Parent: Ridgeline Wind Site
+  Definitions:
+    Description: Ridgeline Turbine Field
+    Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+    Building Code: null
+  Node Address:
+    Address: 8400 Montezuma Hills Road
+    City: Rio Vista
+    Region: CA
+    Postal Code: '94571'
+    Country: UNITED STATES
+    Latitude: 38.1226
+    Longitude: -121.8134
+  Area: null
+  Keywords: []
+  Inherited Keywords:
+  - {Type: Department, Attribute: Thermal Plant Operations, From: Ridgeline Wind Site}
+  Status:
+  - {Status: Open, As of Date: 2024-07-01}
+  Notes: Ten 660 kW turbines along the Montezuma Hills ridge, with the met mast; outdoor, no floor area.
+- key: ridgeline_substation
+  installed:
+    nodeId:
+  Company: Northlake Thermal Plant
+  Level: {Level: 2, Description: Facilities, Type: Location}
+  Parent: Ridgeline Wind Site
+  Definitions:
+    Description: Ridgeline Substation
+    Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+    Building Code: null
+  Node Address:
+    Address: 8460 Montezuma Hills Road
+    City: Rio Vista
+    Region: CA
+    Postal Code: '94571'
+    Country: UNITED STATES
+    Latitude: 38.1148
+    Longitude: -121.7921
+  Area: null
+  Keywords: []
+  Inherited Keywords:
+  - {Type: Department, Attribute: Thermal Plant Operations, From: Ridgeline Wind Site}
+  Status:
+  - {Status: Open, As of Date: 2024-07-01}
+  Notes: Collector substation where the turbines meet Valley Electric; outdoor, no floor area.
+# ---- Legacy airport nodes (optional; not checked) ----
+- key: sacramento_executive_airport
+  installed:
+    nodeId: 38
+  Company: Northlake University
+  Level: {Level: 2, Description: Buildings, Type: Location}
+  Parent: Weather Reference
+  Definitions:
+    Description: Sacramento Executive Airport
+  Comment: >-
+    Created as a Location node under Weather Reference before Stage 2 began, when the airport was modeled as a building
+    instead of a meter. Delete it, or keep it as the weather-station meter's parent in 03-meters.yaml; both placements
+    are legal and neither changes a check.
+- key: sacramento_international_airport
+  installed:
+    nodeId: 39
+  Company: Northlake University
+  Level: {Level: 2, Description: Buildings, Type: Location}
+  Parent: Weather Reference
+  Definitions:
+    Description: Sacramento International Airport
+  Comment: >-
+    Created as a Location node under Weather Reference before Stage 2 began, when the airport was modeled as a building
+    instead of a meter. Delete it, or keep it as the weather-station meter's parent in 03-meters.yaml; both placements
+    are legal and neither changes a check.

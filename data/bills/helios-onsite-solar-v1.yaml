@@ -1,0 +1,150 @@
+manifestVersion: 1
+id: helios_onsite_solar_bills_v1
+customerScenarioId: demo_university_v1
+purpose: >
+  The four Helios Onsite Solar sample bills, rendered by generators/render_bills.py into
+  documents/utility-bills/helios-onsite-solar/, where they replace hand-made images that
+  billed 2025 generation at the 2024 rate. Every line is the HOS-PPA-2024 tariff's own: PPA
+  energy at 0.12138 per kWh generated (the 0.119 rate of 2024 grown by the 2.0 percent annual
+  escalator) less the net-metering credit at 0.092 per exported kWh, and quantities, rates and
+  amounts reconcile to each total. RECs and avoided CO2e are informational and never add to a
+  total; the CO2e is Helios's own figure (0.209 kgCO2e per kWh generated), not Northlake's.
+
+# Each line: description, then quantity x rate = amount (rounded half-up to the cent), or a
+# bare amount. `code` is the provider's billCharges code (data/providers/helios-onsite-solar.yaml).
+# The credit is a negative rate on the exported kWh; the REC transfer is a count of RECs with no rate and an amount of 0.00.
+#
+# Helios bills the calendar month (cycle 1, Stage 1 02-utility-providers.yaml). Stage 5 enters a
+# Helios bill on its period end + 7 days, a Cedar Row bill on period end + 5 days
+# (data/eem/northlake-bill-entry-v1.yaml). The Helios PPA escalates 2.0 percent a year from 2025,
+# so 2025 energy is 0.119 x 1.02 = 0.12138 per kWh generated; the credit does not escalate.
+bills:
+  # ------------------------------------------------------------------ Science Center rooftop array
+  - id: hos_science_center_2025_02
+    file: documents/utility-bills/helios-onsite-solar/01-Helios-Science-Center-Solar-PPA.pdf
+    providerId: helios_onsite_solar
+    accountId: hos_science_center
+    title: PPA Statement
+    customer: Northlake University
+    accountNumber: SYN-HOS-P-0000001
+    rateSchedules: [HOS-PPA-2024]
+    billDate: 2025-03-05
+    dueDate: 2025-03-25
+    period: {start: 2025-02-01, end: 2025-02-28}
+    notice: >
+      February generation on the Science Center's 420 kW DC rooftop array: 41,820 kWh made,
+      6,540 kWh exported to the grid and 35,280 kWh used on site. The PPA charge is priced on
+      every kWh generated at the 2025 rate of $0.12138 (the 2024 rate of $0.119 plus the 2.0
+      percent annual escalator), less a credit of $0.092 on each exported kWh. The 42 RECs
+      issued are conveyed to Northlake University at no charge.
+    meters:
+      - {meterNumber: SYN-HOS-M-0080001, channel: Generation (kWh), quantity: 41820, unit: kWh}
+      - {meterNumber: SYN-HOS-M-0080001, channel: Export (kWh), quantity: 6540, unit: kWh}
+    lines:
+      - {code: ppa_energy, description: PPA energy on kWh generated, quantity: 41820, unit: kWh, rate: 0.12138, amount: 5076.11}
+      - {code: net_metering_credit, description: Net-metering credit on kWh exported, quantity: 6540, unit: kWh, rate: -0.092, amount: -601.68}
+      - {code: rec_transfer, description: REC transfer to Northlake University (informational), quantity: 42, unit: RECs, amount: 0.00}
+    total: 4474.43
+    informational:               # not charged
+      - {label: RECs issued (conveyed to Northlake University), value: 42, unit: RECs}
+      - {label: On-site energy consumed (generated less exported), value: 35280, unit: kWh}
+      - {label: "Avoided CO2e, Helios's own estimate at 0.209 kgCO2e per kWh generated", value: 8.74, unit: t CO2e}
+
+  # ------------------------------------------------------------------ Student Center rooftop array
+  - id: hos_student_center_2025_02
+    file: documents/utility-bills/helios-onsite-solar/02-Helios-Student-Center-Midday-Generation.pdf
+    providerId: helios_onsite_solar
+    accountId: hos_student_center
+    title: PPA Statement
+    customer: Northlake University
+    accountNumber: SYN-HOS-P-0000002
+    rateSchedules: [HOS-PPA-2024]
+    billDate: 2025-03-05
+    dueDate: 2025-03-25
+    period: {start: 2025-02-01, end: 2025-02-28}
+    notice: >
+      February generation on the Student Center's 360 kW DC rooftop array: 28,640 kWh made,
+      9,210 kWh exported and 19,430 kWh used on site. Output peaks at midday (about 158 kWh
+      between noon and 1 pm on a representative day), so about a third of what the array makes
+      is exported and credited. HOS-PPA-2024 has no demand charge: only the kWh generated are
+      billed.
+    meters:
+      - {meterNumber: SYN-HOS-M-0080002, channel: Generation (kWh), quantity: 28640, unit: kWh}
+      - {meterNumber: SYN-HOS-M-0080002, channel: Export (kWh), quantity: 9210, unit: kWh}
+    lines:
+      - {code: ppa_energy, description: PPA energy on kWh generated, quantity: 28640, unit: kWh, rate: 0.12138, amount: 3476.32}
+      - {code: net_metering_credit, description: Net-metering credit on kWh exported, quantity: 9210, unit: kWh, rate: -0.092, amount: -847.32}
+      - {code: rec_transfer, description: REC transfer to Northlake University (informational), quantity: 29, unit: RECs, amount: 0.00}
+    total: 2629.00
+    informational:               # not charged
+      - {label: RECs issued (conveyed to Northlake University), value: 29, unit: RECs}
+      - {label: On-site energy consumed (generated less exported), value: 19430, unit: kWh}
+      - {label: "Avoided CO2e, Helios's own estimate at 0.209 kgCO2e per kWh generated", value: 5.99, unit: t CO2e}
+
+  # ------------------------------------------------------------------ Cedar Row solar carport
+  # The carport is its own building (Cedar Row Carport and Grounds, 1280 Cedar Row Lane), not Cedar Row A,
+  # and its account belongs to the Cedar Row Apartments company. The RECs go up to Northlake University.
+  - id: hos_cedar_row_carport_2025_02
+    file: documents/utility-bills/helios-onsite-solar/03-Helios-Cedar-Row-A-Carport-REC-Transfer.pdf
+    providerId: helios_onsite_solar
+    accountId: hos_cedar_row_carport
+    title: PPA Statement
+    customer: Cedar Row Apartments
+    accountNumber: SYN-HOS-P-0000003
+    rateSchedules: [HOS-PPA-2024]
+    billDate: 2025-03-05
+    dueDate: 2025-03-25
+    period: {start: 2025-02-01, end: 2025-02-28}
+    notice: >
+      February generation on the 240 kW DC solar carport at Cedar Row Carport and Grounds:
+      19,470 kWh made, 3,980 kWh exported and 15,490 kWh used on site. All 19 RECs issued this
+      cycle are transferred to Northlake University, which retains them for its market-based
+      Scope 2 reporting; the transfer is informational and carries no charge.
+    meters:
+      - {meterNumber: SYN-HOS-M-0080003, channel: Generation (kWh), quantity: 19470, unit: kWh}
+      - {meterNumber: SYN-HOS-M-0080003, channel: Export (kWh), quantity: 3980, unit: kWh}
+    lines:
+      - {code: ppa_energy, description: PPA energy on kWh generated, quantity: 19470, unit: kWh, rate: 0.12138, amount: 2363.27}
+      - {code: net_metering_credit, description: Net-metering credit on kWh exported, quantity: 3980, unit: kWh, rate: -0.092, amount: -366.16}
+      - {code: rec_transfer, description: REC transfer to Northlake University (informational), quantity: 19, unit: RECs, amount: 0.00}
+    total: 1997.11
+    informational:               # not charged
+      - {label: RECs issued (all transferred to Northlake University), value: 19, unit: RECs}
+      - {label: On-site energy consumed (generated less exported), value: 15490, unit: kWh}
+      - {label: "Avoided CO2e, Helios's own estimate at 0.209 kgCO2e per kWh generated", value: 4.07, unit: t CO2e}
+
+  # ------------------------------------------------------------------ Science Center: the inverter outage month
+  # March 8 09:00 to March 9 16:30 is 31.5 hours with no meter data. Helios backfilled it from the prior
+  # 14-day clear-sky profile and billed 38,210 metered + 2,140 estimated = 40,350 kWh generated.
+  - id: hos_science_center_2025_03
+    file: documents/utility-bills/helios-onsite-solar/04-Helios-Inverter-Outage-Backfill-Adjustment.pdf
+    providerId: helios_onsite_solar
+    accountId: hos_science_center
+    title: PPA Statement
+    customer: Northlake University
+    accountNumber: SYN-HOS-P-0000001
+    rateSchedules: [HOS-PPA-2024]
+    billDate: 2025-04-04
+    dueDate: 2025-04-24
+    period: {start: 2025-03-01, end: 2025-03-31}
+    notice: >
+      March generation on the Science Center array, with an estimated interval. The inverter on
+      meter SYN-HOS-M-0080001 was out from March 8 at 09:00 to March 9 at 16:30 (31.5 hours);
+      Helios backfilled the gap at 2,140 kWh from the prior 14-day clear-sky generation profile
+      and added it to the 38,210 kWh metered, so 40,350 kWh is billed. If the interval is later
+      recovered as an actual read, a corrected statement supersedes this one; the 40 RECs issued
+      are provisional on the backfilled interval.
+    meters:
+      - {meterNumber: SYN-HOS-M-0080001, channel: "Generation (kWh), actual", readPeriod: {start: 2025-03-01, end: 2025-03-31}, readType: actual, quantity: 38210, unit: kWh}
+      - {meterNumber: SYN-HOS-M-0080001, channel: "Generation (kWh), estimated", readPeriod: {start: 2025-03-08, end: 2025-03-09}, readType: estimated, quantity: 2140, unit: kWh}
+      - {meterNumber: SYN-HOS-M-0080001, channel: "Export (kWh), actual", readPeriod: {start: 2025-03-01, end: 2025-03-31}, readType: actual, quantity: 5980, unit: kWh}
+    lines:
+      - {code: ppa_energy, description: PPA energy on metered generation, quantity: 38210, unit: kWh, rate: 0.12138, amount: 4637.93}
+      - {code: ppa_energy, description: PPA energy on backfilled generation, quantity: 2140, unit: kWh, rate: 0.12138, amount: 259.75, estimate: true}
+      - {code: net_metering_credit, description: Net-metering credit on kWh exported, quantity: 5980, unit: kWh, rate: -0.092, amount: -550.16}
+      - {code: rec_transfer, description: REC transfer to Northlake University (informational), quantity: 40, unit: RECs, amount: 0.00}
+    total: 4347.52
+    informational:               # not charged; generation is the adjusted 40,350 kWh, the estimate included
+      - {label: RECs issued (provisional on the backfilled interval), value: 40, unit: RECs}
+      - {label: On-site energy consumed (adjusted generation less exported), value: 34370, unit: kWh}
+      - {label: "Avoided CO2e, Helios's own estimate at 0.209 kgCO2e per kWh of adjusted generation", value: 8.43, unit: t CO2e}

@@ -1,0 +1,66 @@
+# Stage 5, step 4: Bill images and notes. Bill images attach in the Bill Entry editor's own image pane (drag the
+# file onto the editor or use its attach control; verified in billEntryEditorPage.ts - a staged-image flow for a
+# brand-new bill, a direct attach once the bill has been saved). Notes are Table_Code-scoped: a bill's own note is
+# entered in the Bill Entry editor's Notes area; a meter's note has no WPF page (Meter Definition and Node Data
+# carry no Notes tab) and is entered on the web Note History screen instead (viewNoteHistory.ts, api/NoteHistory/
+# AddOrUpdate, Table Code METR); a billing account's note is the Utility Accountant tab's own Notes page
+# (BillAccountViewModel, Table Code BA).
+stage: 5
+step: 4
+title: Bill images and notes
+app: Web SPA and Database Administrator
+screen: Bill Entry Editor (image pane), Note History, Utility Accountant > Billing Account > Notes
+source:
+- generators/documents/sources/implementation/dream-customer/phase1-substrate-extras.md
+- documents/utility-bills/**/*.pdf
+notes:
+- Attach the sample PDF that matches each account's provider and scenario; there is one sample per provider plus
+  one per named fixture, not one per month - every other monthly bill in the series goes in without an image.
+- 'Table codes verified against StatusHistory/NoteHistory usage in the dream-customer notes: BL = bill, METR =
+  meter, BA = billing account.'
+- 'Added 2026-10-01 (Ridgeline Wind): three Valley Electric statements join the samples (the generator account''s
+  first bill and its calm bill for 2025-01-05 to 2025-02-04, and the Central Plant''s first credit, on its Sep-24
+  bill), and Ridgeline Wind''s own sample is the
+  hand-made July 2024 transfer statement. Nobody enters that bill - EEM generates it in Stage 7 - so its PDF
+  attaches to the generated July 2024 statement and is the one image not attached in this stage. The generator
+  account also gets a billing-account note.'
+records:
+- key: bill_images
+  installed: {}
+  Attach:
+  - {Bill: SYN-VED-A-0010001 2024-03-05 to 2024-04-04 bill (Apr-24), Image: documents/utility-bills/valley-electric-district/01-Valley-Electric-Admin-Hall-Standard-Monthly.pdf}
+  - {Bill: SYN-VED-A-0010002 2024-07-05 to 2024-08-04 bill (Aug-24), Image: documents/utility-bills/valley-electric-district/02-Valley-Electric-Science-Center-Summer-Demand.pdf}
+  - {Bill: SYN-VED-A-0010003 2024-08-05 to 2024-09-04 bill (Sep-24, meter_replacement_fixture), Image: documents/utility-bills/valley-electric-district/03-Valley-Electric-Library-Meter-Replacement.pdf}
+  - {Bill: SYN-VED-A-0010004 2024-12-05 to 2025-01-04 bill (Jan-25, rate_change_boundary_fixture), Image: documents/utility-bills/valley-electric-district/04-Valley-Electric-Student-Center-FY2025-Rate-Change.pdf}
+  - {Bill: SYN-VED-A-0010014 2024-07-01 to 2024-08-04 bill (generator_first_bill_fixture), Image: documents/utility-bills/valley-electric-district/05-Valley-Electric-Ridgeline-Generator-First-Bill.pdf}
+  - {Bill: SYN-VED-A-0010014 2025-01-05 to 2025-02-04 bill (generator_winter_calm_fixture), Image: documents/utility-bills/valley-electric-district/06-Valley-Electric-Ridgeline-Generator-Winter-Calm.pdf}
+  - {Bill: SYN-VED-A-0010013 2024-08-05 to 2024-09-04 bill (central_plant_credit_transfer_fixture), Image: documents/utility-bills/valley-electric-district/07-Valley-Electric-Central-Plant-Bill-Credit-Transfer.pdf}
+  - {Bill: SYN-SGU-A-0020001 2025-03-15 to 2025-04-14 bill (Apr-25), Image: documents/utility-bills/sierra-gas-utility/01-Sierra-Gas-Admin-Hall-Standard-Spring.pdf}
+  - {Bill: SYN-SGU-A-0020002 2024-12-15 to 2025-01-14 bill (Jan-25), Image: documents/utility-bills/sierra-gas-utility/02-Sierra-Gas-Science-Center-Winter-Heating.pdf}
+  - {Bill: SYN-SGU-A-0020004 2024-10-15 to 2024-11-14 estimated bill (estimated_then_corrected_fixture), Image: documents/utility-bills/sierra-gas-utility/03-Sierra-Gas-Student-Center-Estimated-Read.pdf}
+  - {Bill: SYN-SGU-A-0020004 2024-10-15 to 2024-11-14 corrected bill (estimated_then_corrected_fixture), Image: documents/utility-bills/sierra-gas-utility/04-Sierra-Gas-Student-Center-Corrected-Actual.pdf}
+  - {Bill: SYN-RCU-A-0030001 2025-02 bill, Image: documents/utility-bills/river-city-utilities/01-River-City-Admin-Hall-Combined-Utility.pdf}
+  - {Bill: SYN-RCU-A-0030002 2025-02 bill, Image: documents/utility-bills/river-city-utilities/02-River-City-Student-Center-Large-Service.pdf}
+  - {Bill: SYN-RCU-A-0030003 2024-08-15 to 2024-09-14 bill (account_number_change_fixture), Image: documents/utility-bills/river-city-utilities/03-River-City-Cedar-Row-A-Account-Renewal.pdf}
+  - {Bill: SYN-RCU-A-0030004 2025-01-15 to 2025-02-14 route-read bill, Image: documents/utility-bills/river-city-utilities/04-River-City-Cedar-Row-B-Route-Read.pdf}
+  - {Bill: SYN-NTP-C-0000001 2025-03 chilled water and steam bill, Image: documents/utility-bills/northlake-thermal-plant/01-Northlake-Thermal-Science-Center-Chilled-And-Steam.pdf}
+  - {Bill: SYN-NTP-C-0000001 2024-07 summer cooling bill, Image: documents/utility-bills/northlake-thermal-plant/02-Northlake-Thermal-Science-Center-Summer-Cooling.pdf}
+  - {Bill: SYN-NTP-C-0000002 2025-01 winter steam-only bill, Image: documents/utility-bills/northlake-thermal-plant/03-Northlake-Thermal-Admin-Hall-Steam-Only-Winter.pdf}
+  - {Bill: SYN-NTP-C-0000004 2024-11 mixed heating bill, Image: documents/utility-bills/northlake-thermal-plant/04-Northlake-Thermal-Student-Center-Mixed-Heating.pdf}
+  - {Bill: SYN-HOS-P-0000001 2025-02 bill, Image: documents/utility-bills/helios-onsite-solar/01-Helios-Science-Center-Solar-PPA.pdf}
+  - {Bill: SYN-HOS-P-0000002 2025-02 bill, Image: documents/utility-bills/helios-onsite-solar/02-Helios-Student-Center-Midday-Generation.pdf}
+  - {Bill: SYN-HOS-P-0000003 2025-02 bill, Image: documents/utility-bills/helios-onsite-solar/03-Helios-Cedar-Row-A-Carport-REC-Transfer.pdf}
+  - {Bill: SYN-HOS-P-0000001 2025-03 backfilled-generation bill, Image: documents/utility-bills/helios-onsite-solar/04-Helios-Inverter-Outage-Backfill-Adjustment.pdf}
+  - {Bill: SYN-RWL-G-0000001 2024-07 statement (generated by EEM in Stage 7; attach it then), Image: documents/utility-bills/ridgeline-wind/01-Ridgeline-Wind-July-2024-Transfer-Statement-Manual.pdf}
+- key: notes
+  installed: {}
+  Notes:
+  - {Target: 'Library electric meter (SYN-VED-M-0040103, the replacement)', Table Code: METR, Text: 'Meter replaced
+      2024-08-14; new synthetic serial issued, same account; reads continuous.'}
+  - {Target: SGU Student Center estimated bill (2024-11), Table Code: BL, Text: 'Estimated read this cycle;
+      corrected actual issued next cycle.'}
+  - {Target: RCU Cedar Row A billing account, Table Code: BA, Text: 'Account number changed at the July 2024
+      renewal; site and building continuity preserved across its water and sewer services.'}
+  - {Target: Valley Electric Science Center meter (SYN-VED-M-0040002), Table Code: METR, Text: 'Lab load drives
+      summer peak; power-factor adjustment expected on heavy months.'}
+  - {Target: VED Ridgeline generator account (SYN-VED-A-0010014), Table Code: BA, Text: 'Transferred to the Thermal Plant at the 2024-07-01 acquisition; the seller''s account was SYN-VED-A-0019014.'}

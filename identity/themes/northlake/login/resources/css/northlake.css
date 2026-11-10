@@ -1,12 +1,13 @@
 /* Northlake University sign-in pages.
    Keycloak login theme, parent keycloak.v2 (PatternFly 5). Tokens come from
-   ../branding/brand.css. Square corners throughout. */
+   ../branding/brand.css, which maps brands/northlake/tokens.css. White header
+   with the navy lockup, Spectral titles, IBM Plex Sans text, square corners. */
 
 /* 1. Hand the brand to PatternFly ------------------------------------------ */
 :root,
 .login-pf {
   --pf-v5-global--FontFamily--text: var(--nl-font);
-  --pf-v5-global--FontFamily--heading: var(--nl-font);
+  --pf-v5-global--FontFamily--heading: var(--nl-font-display);
   --pf-v5-global--FontFamily--monospace: var(--nl-font-mono);
   --pf-v5-global--Color--100: var(--nl-ink);
   --pf-v5-global--Color--200: var(--nl-slate);
@@ -77,17 +78,17 @@ html.login-pf {
   flex-direction: column;
 }
 
-/* 3. Masthead ------------------------------------------------------------------ */
+/* 3. Masthead: white, the navy lockup, a gold rule ------------------------------ */
 .nl-masthead {
   flex: 0 0 auto;
-  color: var(--nl-white);
-  background: var(--nl-navy);
+  color: var(--nl-navy);
+  background: var(--nl-white);
   border-bottom: 3px solid var(--nl-gold);
 }
 
 .nl-masthead__inner {
   display: flex;
-  min-height: 68px;
+  min-height: 76px;
   align-items: center;
   justify-content: space-between;
   gap: 24px;
@@ -102,22 +103,20 @@ html.login-pf {
 }
 
 .nl-lockup:focus-visible {
-  outline-color: var(--nl-gold);
   outline-offset: 4px;
 }
 
 .nl-lockup__image {
   display: block;
   width: auto;
-  height: 40px;
+  height: 46px;
 }
 
 .nl-masthead__service {
   margin: 0;
-  color: var(--nl-on-navy);
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  color: var(--nl-slate);
+  font-size: 14px;
+  font-weight: 500;
   text-align: right;
 }
 
@@ -166,11 +165,21 @@ html.login-pf {
 #kc-page-title.pf-v5-c-title {
   margin: 0;
   color: var(--nl-navy);
-  font-family: var(--nl-font);
-  font-size: 24px;
-  font-weight: 700;
+  font-family: var(--nl-font-display);
+  font-size: 28px;
+  font-weight: 600;
   letter-spacing: -0.01em;
-  line-height: 1.25;
+  line-height: 1.2;
+}
+
+/* A short gold rule above every page title. */
+#kc-page-title.pf-v5-c-title::before {
+  display: block;
+  width: 44px;
+  height: 3px;
+  margin-bottom: 14px;
+  content: "";
+  background: var(--nl-gold);
 }
 
 #kc-page-title p {
@@ -472,7 +481,6 @@ html.login-pf {
   --pf-v5-c-alert--GridTemplateColumns: max-content 1fr;
   --pf-v5-c-alert--BoxShadow: none;
   border: 1px solid var(--nl-line);
-  border-left-width: 4px;
   background: var(--nl-tint);
 }
 
@@ -571,11 +579,13 @@ html.login-pf {
   margin: 0;
 }
 
+/* Page footer: a navy band, as on the Northlake site. */
 .nl-page-footer {
   flex: 0 0 auto;
-  padding: 0 24px 28px;
-  color: var(--nl-slate);
-  font-size: 12px;
+  padding: 0 24px;
+  color: #e9e2cf;
+  background: var(--nl-navy);
+  font-size: 13px;
   line-height: 1.5;
 }
 
@@ -587,8 +597,8 @@ html.login-pf {
   gap: 8px 24px;
   width: min(1180px, 100%);
   margin: 0 auto;
-  padding-top: 16px;
-  border-top: 1px solid var(--nl-line);
+  padding: 20px 0 24px;
+  border-top: 3px solid var(--nl-gold);
 }
 
 .nl-page-footer__legal {
@@ -596,9 +606,18 @@ html.login-pf {
 }
 
 .nl-page-footer__link {
-  color: var(--nl-navy);
-  font-weight: 600;
+  color: #ffffff;
+  font-weight: 500;
   text-underline-offset: 3px;
+}
+
+.nl-page-footer__link:hover {
+  color: #ffffff;
+  text-decoration-color: var(--nl-gold);
+}
+
+.nl-page-footer__link:focus-visible {
+  outline-color: var(--nl-gold);
 }
 
 /* 9. Content pages: errors, info, logout, consent ---------------------------- */
@@ -784,7 +803,7 @@ html.login-pf {
   }
 
   .nl-lockup__image {
-    height: 34px;
+    height: 38px;
   }
 
   .nl-masthead__service {

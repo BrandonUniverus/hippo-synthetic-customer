@@ -1,0 +1,111 @@
+# Stage 8, step 1: Emission Factor Sources and Emission Factors (Web, #/EmissionFactorSources and #/EmissionFactors).
+# VERIFIED against the installed database (sources, members, existing factor rows) before writing this file, because
+# EmissionFactorSource/EmissionFactorSourceMember/EmissionType/EmissionCategory are system-seeded lookups, not blank
+# tables to fill: the phase 5 design note's "10 Steam Plant" source does not exist (only 5 sources are installed:
+# 1 US EIA, 2 Canadian GHG Registry, 3 Non-electric commodities, 4 eGRID, 5 IEA Electricity), and both members this
+# stage needs already exist with real published history. The work here is adding 2024/2025 dated rows, not creating
+# sources or members from scratch.
+stage: 8
+step: 1
+title: Emission factor sources and factors
+app: Web
+screen: EmissionFactorSources, EmissionFactors
+source:
+- data/providers/valley-electric-district.yaml
+- data/providers/sierra-gas-utility.yaml
+- data/providers/river-city-utilities.yaml
+- data/providers/ridgeline-wind.yaml
+notes:
+- 'Verified installed rows: EmissionFactorSource 4 "eGRID" already carries member 67 "CAMX (WECC California)"
+  (EmissionFactorSourceMember, SeqNo 4) with a real, open-ended published history on all three greenhouse gases
+  through 2023-01-01 (EmissionFactorHistory, factor ids 175 CO2 / 201 CH4 / 227 N2O, unit "Pounds per MWh"/lbs/MWh,
+  UnitID 13007: 2023 values 428.464 / 0.025 / 0.003 lbs/MWh). This stage does not create CAMX; it opens the
+  existing member on the Emission Factors screen and adds 2024 and 2025 rows to its History sub-grid so the factor
+  keeps moving and GHGVariance has something to show.'
+- 'Verified installed row: EmissionFactorSource 3 "Non-electric commodities" already carries member 3, itself
+  titled "Non-electric commodities", with an open-ended factor for Natural Gas (EmissionFactor id 12, unit "Metric
+  Ton per MBtu"/Tonne/MBtu, UnitID 13020, value 0.0585 since 1998-01-01). Source 3 is associated with Emission Type
+  CO2 only (EmissionFactorSourceEmissionType has no CH4/N2O row for source 3); this stage keeps it CO2-only and
+  folds Sierra Gas''s already-GWP-inclusive 5.31 kgCO2e/therm into that one CO2 row, rather than adding CH4/N2O
+  types to a source the product ships CO2-only.'
+- 'Unit conversion check: 0.0585 Tonne/MBtu = 5.85 kg/therm, close to Sierra Gas''s 5.31 kgCO2e/therm (VED/SGU
+  synthetic values are marked "(synthetic value)" in their provider files, so a small gap from the generic system
+  default is expected). Enter Sierra Gas''s own value as the 2024 row rather than leaving the 1998 generic default
+  in force through the reporting window.'
+- 'Emission Factor History fields (Effective From, Emission Factor) are entered per existing (member, emission
+  type) row from the Emission Factors screen''s Action > Edit. End the currently-open row the day before the new
+  one starts (the grid does this from the Effective From date; do not hand-edit an end date elsewhere).'
+- 'Water/sewer (River City Utilities, embedded conveyance/treatment energy) has no existing member or measure-type
+  association on any of the 5 installed sources — EmissionFactorSourceMeasureType for source 3 lists only fuel
+  measure types (Natural Gas, Fuel Oil, Propane, Diesel, Kerosene, LPG, Gasoline, Coal), not Potable Water or Sewer
+  Water. Adding Potable Water as a new Commodity on source 3''s Sources-screen editor, and then a new Emission
+  Factor row for it, is possible in principle (the Commodities/Emission Types fields are the multi-selects the
+  screen posts) but was not click-tested end to end for this stage; mark it # assumed and confirm the Unit options
+  the screen actually offers before entering the History values.'
+- 'Chilled water and steam that the Central Plant delivers to campus buildings get no emission factor of their own:
+  the plant is itself a Valley Electric and Sierra Gas customer, so its own electric and gas input meters (assigned
+  in step 2) already carry Scope 1/2 once; a second factor on the delivered ton-hours/klb submeters would double
+  count the same fuel.'
+- 'Helios Onsite Solar generation meters get no emission factor assignment: EmissionMeterMap links a factor to
+  consumption, and the module has no avoided-emissions input. HOS''s own monthly REC/avoided-CO2e statement is a
+  provider disclosure file, not something GHG History renders; recorded under Findings. Its avoided CO2e is Helios''s
+  own estimate, 0.209 kgCO2e/kWh (helios-onsite-solar.yaml; 8.74 t on the Science Center''s 41,820 kWh in February
+  2025); Northlake''s own avoided-emissions figure uses the grid factor below, so the two differ and neither is wrong.'
+- 'Added 2026-10-01 (Ridgeline Wind): no source, member or factor row is added. The Sustainability Office reports the
+  plant''s Ridgeline wind farm (ten turbines, from 2024-07) as avoided emissions at the grid factor, the eGRID CAMX
+  CO2e of the year (valley-electric-district.yaml environmental.co2eFactor: 0.1866 kgCO2e/kWh for 2024, 0.1798 for
+  2025, the rows of egrid_camx_history below), and keeps the RECs (1 per MWh). Like Helios above, that is a figure the
+  GHG module cannot hold: it adds billed energy times a factor and keeps
+  only positive results (wh_GHGTableSync.sql:110,131), the factor save refuses a value of zero or less
+  (EmissionFactorHistoryService.cs:25), and it has no REC, market-based or avoided-emissions input. So the turbines get
+  no factor (step 2 excludes them) and the figure is computed from their generated kWh, record
+  ridgeline_avoided_emissions below. Unlike Helios, nobody issues a REC or avoided-CO2e statement: Ridgeline is the
+  customer''s own company and its provider file has no environmental statement, so Northlake''s computed figure is the
+  record.'
+- 'One grid factor serves Scope 2, Ridgeline''s avoided emissions and the water row: the CAMX rows entered below, which
+  come to 0.1866 (2024) and 0.1798 (2025) kgCO2e/kWh once CH4 and N2O are added at the installed GWPs of 28 and 265,
+  the values Valley Electric''s provider file states. GHG History prices Scope 2 on those dated rows; the avoided
+  emissions and the water factor multiply by the same CO2e of the year.'
+records:
+- key: egrid_camx_history
+  installed:
+    emissionFactorSourceId: 4
+    emissionFactorSourceMemberId: 67
+  Source: eGRID (existing)
+  Member: CAMX (WECC California) (existing)
+  Emission Factor History:
+  - {Emission Type: CO2, factorId: 175, Unit: lbs/MWh, History: [
+      {Effective From: 2024-01-01, Emission Factor: 410.0},   # valley-electric-district.yaml co2eFactor lbPerMWh (synthetic; continues the CAMX trend 423->428->410)
+      {Effective From: 2025-01-01, Emission Factor: 395.0}]}
+  - {Emission Type: CH4, factorId: 201, Unit: lbs/MWh, History: [
+      {Effective From: 2024-01-01, Emission Factor: 0.024},
+      {Effective From: 2025-01-01, Emission Factor: 0.023}]}
+  - {Emission Type: N2O, factorId: 227, Unit: lbs/MWh, History: [
+      {Effective From: 2024-01-01, Emission Factor: 0.0029},
+      {Effective From: 2025-01-01, Emission Factor: 0.0028}]}
+- key: nonelectric_gas_history
+  installed:
+    emissionFactorSourceId: 3
+    emissionFactorSourceMemberId: 3
+  Source: Non-electric commodities (existing)
+  Member: Non-electric commodities (existing)
+  Emission Factor History:
+  - {Emission Type: CO2, factorId: 12, Commodity: Natural Gas, Unit: Tonne/MBtu, History: [
+      {Effective From: 2024-01-01, Emission Factor: 0.0531},  # = 5.31 kg/therm, data/providers/sierra-gas-utility.yaml co2eFactor
+      {Effective From: 2025-01-01, Emission Factor: 0.0537}]} # assumed: revised value
+- key: water_embedded_energy_extension   # assumed, verify screen options before entering
+  installed:
+    emissionFactorSourceId: 3
+    emissionFactorSourceMemberId: 3
+  Source: Non-electric commodities (existing; add Commodity Potable Water on the Sources screen first)
+  Member: Non-electric commodities (existing)
+  Emission Factor History:
+  - {Emission Type: CO2, Commodity: Potable Water, Unit: "kg CO2e/kgal (assumed; confirm the offered unit)", History: [
+      {Effective From: 2024-01-01, Emission Factor: 0.597},   # 3.2 kWh/kgal (RCU environmental) x the 2024 CAMX CO2e 0.1866 kg/kWh
+      {Effective From: 2025-01-01, Emission Factor: 0.575}]}  # 3.2 kWh/kgal x the 2025 CAMX CO2e 0.1798 kg/kWh
+- key: ridgeline_avoided_emissions   # computed outside the GHG screens; nothing is entered
+  installed: {}
+  Report: avoided emissions of the Ridgeline wind farm, kept with the RECs Northlake retains
+  Generation counted: "the ten Ridgeline WTG-01..10 pad meters, Generated kWh 10m (the energy on the generated transfer statement), not the Valley Electric export credit (money, and measured at the substation 1.9% lower)"
+  Formula: "monthly generated kWh x the grid factor of the year (0.1866 kgCO2e/kWh in 2024, 0.1798 in 2025); RECs = generated MWh x 1.0"
+  Expect: "July 2024: 2,251,384 kWh generated (the hand-made statement fixes it), 420,108.3 kg CO2e avoided (420.11 t), 2,251.384 RECs; WTG-07 produces nothing from 2025-02-11 to 2025-04-22 (gearbox fault), so it avoids nothing in those months"

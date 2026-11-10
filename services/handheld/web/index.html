@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow"><title>Meter reading · Northlake University</title>
+  <!-- Relative URLs: this page runs at its own root and at /meter-reading/ in the Northlake site. -->
+  <link rel="icon" href="brands/northlake/mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="branding/brand.css"><link rel="stylesheet" href="branding/site.css">
+  <link rel="stylesheet" href="handheld.css"><script src="model.js" defer></script><script src="app.js" defer></script>
+</head>
+<body>
+  <header class="nl-masthead"><div class="nl-masthead__inner">
+    <div class="nl-masthead__brand"><a class="nl-lockup" href="/"><img class="nl-lockup__image" src="brands/northlake/logo.svg" alt="Northlake University" width="238" height="64"></a><span class="nl-masthead__title">Meter reading</span></div>
+    <span class="nl-masthead__chip">Controlled pilot</span>
+  </div></header>
+  <main class="nl-main">
+    <section class="nl-intro"><p class="eyebrow">Field reading demonstration</p><h1>Prepare a meter-reading round</h1>
+      <p>Import a checked Northlake route, record the visit and prepare a native return file. This pilot uses whole kgal and therm readings for the two master routes.</p>
+    </section>
+    <div id="error" class="notice notice-error" role="alert" hidden></div>
+    <div id="message" class="notice" role="status" aria-live="polite">Loading source release…</div>
+    <div class="hh-layout">
+      <div>
+        <section class="nl-card hh-panel" aria-labelledby="import-title">
+          <p class="card-kicker">1 · Checked files</p><h2 id="import-title">Import a route</h2>
+          <div class="hh-fields">
+            <div><label for="export-file">Northlake route export</label><input id="export-file" type="file" accept=".txt,.dat,.exp"><p class="field-help">The original 126-character export, with spaces preserved.</p></div>
+            <div><label for="binding-file">Verified binding manifest</label><input id="binding-file" type="file" accept=".json"><p class="field-help">Environment IDs, source release and the declared opening readings.</p></div>
+          </div>
+          <div class="hh-actions"><button id="check-files" class="button button-primary" type="button">Check files</button><button id="demo" class="button button-quiet" type="button">Use demonstration files</button></div>
+          <div id="preflight" hidden>
+            <p id="preflight-summary" class="notice"></p>
+            <label for="route">Checked route</label><select id="route"></select>
+            <div class="hh-actions"><button id="create" class="button button-primary" type="button">Start round</button></div>
+          </div>
+        </section>
+        <section id="round" class="nl-card hh-panel" aria-labelledby="round-title" hidden>
+          <div class="hh-heading"><div><p class="card-kicker">2 · Field visit</p><h2 id="round-title"></h2></div><span id="status" class="status-badge"></span></div>
+          <p id="round-context" class="hh-muted"></p><div id="fixture-warning" class="notice notice-warning" hidden>Demonstration IDs only. This file is for a controlled collector test and cannot identify installed Northlake meters.</div>
+          <dl id="binding-details" class="hh-facts"></dl>
+          <p id="opening-reason" class="notice"></p>
+          <form id="visit-form">
+            <fieldset id="visit-fields"><div class="hh-fields">
+              <div><label for="reader">Fictional reader</label><select id="reader" required></select></div>
+              <div><label for="visit-action">Visit result</label><select id="visit-action"><option value="read">Actual reading</option><option value="skip">Skip this visit</option></select></div>
+              <div><label for="observed-at">Observation time with UTC offset</label><input id="observed-at" type="text" required placeholder="2026-10-15T12:00:00-07:00"><p class="field-help">Return files use Pacific time. Repeated-hour timestamps are rejected.</p></div>
+              <div><label id="value-label" for="value">Whole-unit register</label><input id="value" type="text" inputmode="numeric" pattern="[0-9]+"><p class="field-help">Enter the register, not consumption. A skip does not create a reading.</p></div>
+              <div class="hh-wide"><label for="note">Visit note</label><textarea id="note" rows="2"></textarea><p id="note-help" class="field-help"></p></div>
+              <div id="read-code-field" hidden><label for="read-code">Read code</label><select id="read-code"><option value="N">N, normal read</option><option value="O">O</option><option value="C">C</option></select></div>
+              <div id="audit-code-field" hidden><label for="audit-code">Audit code</label><select id="audit-code"><option value="0">0, none</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option><option>9</option></select></div>
+              <div id="skip-code-field" hidden><label for="skip-code">Skip code</label><select id="skip-code"><option>01</option><option>02</option><option>03</option><option>04</option><option>05</option><option>06</option><option>07</option><option>08</option><option>09</option></select></div>
+              <p id="code-help" class="field-help hh-wide" hidden>MVRS codes. Energy Hippo records a read code other than N, a nonzero audit code and every skip code as an HMR log event.</p>
+            </div></fieldset>
+            <div class="hh-actions"><button id="save" class="button button-primary" type="submit">Save visit</button><button id="reload" class="button button-quiet" type="button">Reload saved round</button></div>
+          </form>
+          <section id="review" class="hh-review" hidden><p class="card-kicker">3 · Review and return</p><h3>Saved visit</h3><p id="review-summary"></p>
+            <p class="field-help">Preparation, download and delivery do not confirm a Northlake import. Verify the stored readings and logs in Northlake separately.</p>
+            <div class="hh-actions"><button id="finalize" class="button button-primary" type="button">Finalize return file</button><a id="download" class="button button-primary" hidden>Download return</a><a id="manifest" class="button button-secondary" hidden>View evidence</a></div>
+            <div id="finalized" hidden><p id="artifact-hash" class="hh-hash"></p><div class="hh-actions"><button id="correct" class="button button-secondary" type="button">Create linked correction</button><button id="follow-up" class="button button-secondary" type="button">Follow up skipped visit</button></div>
+              <p id="delivery-help" class="field-help"></p><div class="hh-actions"><button id="deliver" class="button button-secondary" type="button">Deliver to configured target</button><button id="replay" class="button button-quiet" type="button">Explicitly replay delivery</button></div>
+            </div>
+          </section>
+          <details class="hh-details"><summary>Provenance and attempts</summary><pre id="provenance"></pre></details>
+        </section>
+      </div>
+      <aside class="nl-card hh-panel hh-sidebar" aria-labelledby="saved-title"><p class="card-kicker">Resume work</p><h2 id="saved-title">Saved rounds</h2><p class="hh-muted">Drafts and finalized returns survive a restart.</p><div id="round-list"></div><button id="refresh" class="button button-quiet" type="button">Refresh list</button></aside>
+    </div>
+  </main>
+  <footer class="nl-page-footer"><div class="nl-page-footer__inner"><span>Northlake University · Synthetic customer</span><span>Controlled source-side demonstration</span></div></footer>
+</body></html>

@@ -1,0 +1,68 @@
+# Stage 7, step 3: Northlake Thermal Plant's internal cost recovery to the campus buildings it serves
+# (Web > #/reporting/BillAllocationConfiguration, the same screen and record shape as file 04). Two configs,
+# both under Northlake University (company 6), because NTP has exactly one CompanyProvider record and it is
+# with Northlake University (Stage 1 step 2's Associated Companies page); the plant itself (company 5) never
+# appears as a Bill Allocation participant here.
+stage: 7
+step: 3
+title: Thermal Plant chilled water and steam cost recovery
+app: Web
+screen: "#/reporting/BillAllocationConfiguration"
+source:
+- data/providers/northlake-thermal-plant.yaml
+- generators/documents/sources/implementation/dream-customer/phase4-tenant-rebilling-spec.md
+- documents/utility-bills/northlake-thermal-plant/*.pdf
+notes:
+- 'Design decision (mark for Stage 2 reconciliation): Stage 2''s checks.sql already plans 6 NTP billing
+  accounts under Northlake University, one per served building, entry type Bill Allocation (BillType_Code 3)
+  — science_center, recreation_center, admin_hall, library, student_center, lakeview_hall, the exact union of
+  northlake-thermal-plant.yaml''s chilled_water and steam servedBuildings lists. This file adds two MORE NLU
+  accounts as the allocation masters: Central Plant CHW Allocation and Central Plant Steam Allocation, each
+  carrying NTP''s one consolidated monthly internal invoice for that commodity. That makes 8 NTP accounts
+  under NLU in total, not Stage 2''s 6 — flag this to the Stage 2 author so its count and this file agree
+  before both stages'' checks.sql are run together. If Stage 2 instead expects the master cost to arrive
+  pre-allocated by NTP''s own CSV extract (northlake-thermal-plant.yaml fileFormats.allocation, one row per
+  cost center already), then this Bill Allocation Configuration step is unnecessary and the 6 accounts are
+  simply bill-imported directly; this file assumes the more product-feature-exercising path instead, since
+  Stage 7''s job is to demonstrate every allocation method, and says so here rather than guessing silently.'
+- Assumed - the two master accounts are Bill Type Entry (not Allocation) - Devon Brooks' team keys NTP's
+  consolidated invoice into Bill Entry each period, at NTP-ALLOC-CHW's and NTP-ALLOC-STEAM's per-unit rates
+  (0.168 $/ton-hour + 9.50 $/ton demand; 14.20 $/klb) times that period's total metered plant production.
+  Amounts below are one illustrative period.
+- 'Chilled water (method 2, Fully Submetered): only Science Center and Recreation Center carry the hourly
+  BTU ton-hour meter northlake-thermal-plant.yaml describes, so those are the only two candidates. As with
+  every method-2 config in this stage, allocation percentages are computed by the engine from each meter''s
+  interval consumption when Process Meter Allocations runs (file 07) — nothing is typed into Allocation %.'
+- 'Steam (method 1, Fixed Amount & %): no served building has an interval steam channel (the plant meters
+  total steam production, not delivery per building), so there is no consumption ratio to compute from.
+  Percentages are fixed and typed in, apportioned by each building''s approximate conditioned floor area
+  relative to the others. # assumed — the real customer would confirm these from the buildings'' actual
+  design heating loads, not floor area, once that data exists.'
+- Master and detail node names below are Stage 2 keys, not yet real MetaWorldIDs since Stage 2's hierarchy
+  file is still being written in parallel; substitute the real Description/MetaWorldID once Stage 2 lands and
+  confirm the buildings and their BTU/steam meters are named as expected here.
+records:
+- key: ntp_alloc_chw
+  installed: {billAllocationConfigId:}
+  Master Meter: Central Plant CHW Allocation                # new NLU node, company 6, carries NTP's monthly CHW invoice
+  Commodity: Chilled Water
+  Method: Fully Submetered
+  Effective From: {Fiscal Year Start: 2024, Fiscal Period Start: 1, Fiscal Year End: 9999, Fiscal Period End: 12}
+  Combine Overhead: false
+  Add Allocated Meters:
+  - {order: 1, meter: Science Center Chilled Water BTU Meter}     # Stage 2 key; real name TBD
+  - {order: 2, meter: Recreation Center Chilled Water BTU Meter}  # Stage 2 key; real name TBD
+- key: ntp_alloc_steam
+  installed: {billAllocationConfigId:}
+  Master Meter: Central Plant Steam Allocation               # new NLU node, company 6, carries NTP's monthly steam invoice
+  Commodity: Steam
+  Method: Fixed Amount and %
+  Effective From: {Fiscal Year Start: 2024, Fiscal Period Start: 1, Fiscal Year End: 9999, Fiscal Period End: 12}
+  Combine Overhead: true
+  Add Allocated Meters:
+  - {order: 1, meter: Science Center Steam Cost Center, Allocation %: 30}        # assumed
+  - {order: 2, meter: Admin Hall Steam Cost Center, Allocation %: 12}            # assumed
+  - {order: 3, meter: Library Steam Cost Center, Allocation %: 18}               # assumed
+  - {order: 4, meter: Student Center Steam Cost Center, Allocation %: 20}        # assumed
+  - {order: 5, meter: Lakeview Hall Steam Cost Center, Allocation %: 10}         # assumed
+  - {order: 6, meter: Recreation Center Steam Cost Center, Allocation %: 10}     # assumed; sums to 100

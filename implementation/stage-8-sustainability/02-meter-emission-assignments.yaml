@@ -1,0 +1,115 @@
+# Stage 8, step 2: Meter Emission Factor Assignment (Web, #/MeterEmissionFactorAssignment).
+# One grid row per meter: Meter, Utility Provider, Commodity, Emission Factor Source, Emission Factor Member,
+# Emission Source Category. Meters are named by their Stage 2/3 scenario id (data/scenarios/demo-university-v1.yaml)
+# because Stages 2-7 are being written in parallel and have not recorded installed MeterIDs yet; look each one up
+# on the hierarchy by its display name (e.g. "Admin Hall Gas") when Stages 2-7 land.
+stage: 8
+step: 2
+title: Meter emission factor assignment
+app: Web
+screen: MeterEmissionFactorAssignment
+source:
+- data/scenarios/demo-university-v1.yaml
+- implementation/stage-8-sustainability/01-emission-factors.yaml
+- implementation/stage-2-hierarchy/03-meters.yaml (the Ridgeline meter descriptions)
+notes:
+- 'Screen shape (viewMeterEmissionFactorAssignment.ts, MeterEmissionFactorAssignment.cshtml): a Meter criteria rail
+  (the Meter status switch Assigned / Excluded / Unassigned, the hierarchy, the utility providers and Show meters),
+  an Assignment defaults card (Emission factor source, source member and emission source category, which Assign and
+  Assign all copy onto the rows), and a grid of Meter, Utility Provider, Commodity, Emission Factor Source, Member
+  and Category with Assign, Unassign and Exclude on each row. Nothing is written until Save. Assign is offered only
+  on a row whose commodity the chosen member has a factor for.'
+- 'The Effective Date on each record below is the in-service date for the reader only: the screen has no date and every
+  assignment is saved from 1970-01-01 (EmissionMeterMap_Save.sql:17-26; the in-product help says the same).'
+- 'Electric meters take source eGRID, member CAMX (WECC California) (existing, id 67), category Indirect (Scope 2
+  in customer language, step 1''s note explains the category catalog has no literal Scope 1/2/3).'
+- 'Gas meters take source Non-electric commodities, member "Non-electric commodities" (existing, id 3), commodity
+  Natural Gas, category Stationary (Scope 1).'
+- 'Water meters take source Non-electric commodities, same member, commodity Potable Water (step 1''s assumed
+  extension), category Indirect (the product has no Scope 3; this is the closest existing category, see Findings).'
+- Sewer channels are derived from the water channel on the same meter (Stage 2/3) and are not separately metered,
+  so they are not separately assigned here.
+- 'Deliberately left unassigned: the Central Plant''s own chilled-water and steam SUBMETERS (ntp_* ids, delivered
+  ton-hours/klb to each building) get no assignment -- assigning them alongside the plant''s electric and gas INPUT
+  meters (ved_central_plant_main, sgu_central_plant_boiler_gas, both assigned below) would count the same fuel
+  twice, since the plant''s Scope 1/2 already lands on those two input meters. Helios Onsite Solar generation
+  meters (ved-paired, net-metered) get no assignment either; GHG History treats whatever energy a mapped meter is
+  billed as consumption, and the module has no avoided-emissions input (see step 1''s note and Findings).
+  rcu_campus_irrigation_* (north
+  quad, south fields, athletics) is out of the campus building GHG boundary for this stage; add later if a
+  stakeholder asks for Scope 3 irrigation. Unassigned is not the same as kept out of GHG History (the Ridgeline note
+  below says why). That applies equally to the three Helios arrays (their PPA bills carry the generated kWh) and to
+  the owned Electricity submeters (131 in Stage 2; they add emissions once bills exist for them, as Stage 7''s tenant
+  bills would give the Cedar Row apartments), which this file still leaves unassigned. Open: Exclude them in the same
+  pass.'
+- 'Added 2026-10-01 (Ridgeline Wind): the ten turbine pad meters are Excluded and the Ridgeline Interconnection Meter
+  is assigned (records at the end). Generation has to stay out of GHG History. It multiplies the energy billed to a
+  mapped meter by the factor and nothing marks a meter as generation (wh_GHGTableSync.sql:55-61,110; PRODUCT FINDING
+  44), and Bill Generation writes a kWh quantity for every meter on the transfer statement
+  (BillGenBill_Generate.sql:294-317), so a mapped turbine adds its output to Scope 2: about 420 t CO2e for July
+  2024 on the 2024 CAMX rows (assumed in step 1), against 0.7 t of station service. Leaving the turbines Unassigned
+  does not prevent it.
+  Enabling a source on GHG Company Configuration (step 3) turns on automatic assignment, and the warehouse job
+  (Job_PopulateWarehouse.sql:21-22, which task 23 Populate Warehouse runs, hourly from Stage 9) then gives every
+  unassigned, unexcluded Electricity
+  meter in California a CAMX mapping at the company''s default category (CreateDefaultEmissionMeterMap.sql:14-70;
+  in-product help, SeedHelpGuides.sql:1026). Exclude is the one state it skips, and it is the state the product
+  offers for a meter whose consumption must not be converted (SeedHelpGuides.sql:1118). So: Exclude the ten before
+  step 3 saves the Thermal Plant''s configuration, and keep Assign all away from the Thermal Plant node (from
+  Unassigned it would map the turbines, from Excluded it clears the exclusions: SeedHelpGuides.sql:1109).'
+- 'The interconnection meter takes the same eGRID CAMX / Indirect assignment as every electric meter and counts
+  station service only. GHG History adds every energy-class quantity billed to a meter and drops a period whose total is
+  not positive (wh_GHGTableSync.sql:55-61,131); kVArh is another unit class, so a reactive line is ignored. The
+  Valley Electric generator bill therefore must not carry the export (received) kWh as an energy quantity on this
+  meter: the generation credit stays a money line (Stage 5; check ridgeline_interconnection_energy_quantity). Entered
+  as energy, the first generator bill (2024-07-01 to 2024-08-04, Aug-24) would put 2,501,040 kWh (export plus station
+  service) through the CAMX rows instead of 4,428 kWh. The same goes for the VED-BCT credit on the Central Plant''s
+  Sep-24 bill (2024-08-05 to 2024-09-04): money, no kWh (check
+  ridgeline_bct_credit_is_money). The avoided emissions of the turbines are not in this file or in any GHG screen
+  (01-emission-factors.yaml, record ridgeline_avoided_emissions).'
+records:
+- {key: ved_admin_hall_main, installed: {emissionMeterMapId: }, Assignment: {Meter: "ved_admin_hall_main (Admin Hall)", Emission Factor Source: eGRID, Emission Factor Member: "CAMX (WECC California)", Emission Source Category: Indirect, Effective Date: 2024-01-01}}
+- {key: ved_science_center_interval, installed: {emissionMeterMapId: }, Assignment: {Meter: "ved_science_center_interval (Science Center, main)", Emission Factor Source: eGRID, Emission Factor Member: "CAMX (WECC California)", Emission Source Category: Indirect, Effective Date: 2024-01-01}}
+- {key: ved_science_center_lab_wing, installed: {emissionMeterMapId: }, Assignment: {Meter: "ved_science_center_lab_wing (Science Center, lab wing)", Emission Factor Source: eGRID, Emission Factor Member: "CAMX (WECC California)", Emission Source Category: Indirect, Effective Date: 2024-01-01}}
+- {key: ved_library_main_before_replacement, installed: {emissionMeterMapId: }, Assignment: {Meter: "ved_library_main_before_replacement (Library, pre meter-swap)", Emission Factor Source: eGRID, Emission Factor Member: "CAMX (WECC California)", Emission Source Category: Indirect, Effective Date: 2024-01-01}}
+- {key: ved_library_main_after_replacement, installed: {emissionMeterMapId: }, Assignment: {Meter: "ved_library_main_after_replacement (Library, post meter-swap)", Emission Factor Source: eGRID, Emission Factor Member: "CAMX (WECC California)", Emission Source Category: Indirect, Effective Date: 2024-01-01}}
+- {key: ved_student_center_interval, installed: {emissionMeterMapId: }, Assignment: {Meter: "ved_student_center_interval (Student Center)", Emission Factor Source: eGRID, Emission Factor Member: "CAMX (WECC California)", Emission Source Category: Indirect, Effective Date: 2024-01-01}}
+- {key: ved_lakeview_hall_main, installed: {emissionMeterMapId: }, Assignment: {Meter: "ved_lakeview_hall_main (Lakeview Hall)", Emission Factor Source: eGRID, Emission Factor Member: "CAMX (WECC California)", Emission Source Category: Indirect, Effective Date: 2024-01-01}}
+- {key: ved_recreation_center_main, installed: {emissionMeterMapId: }, Assignment: {Meter: "ved_recreation_center_main (Recreation Center)", Emission Factor Source: eGRID, Emission Factor Member: "CAMX (WECC California)", Emission Source Category: Indirect, Effective Date: 2024-01-01}}
+- {key: ved_parking_structure_main, installed: {emissionMeterMapId: }, Assignment: {Meter: "ved_parking_structure_main (Parking Structure)", Emission Factor Source: eGRID, Emission Factor Member: "CAMX (WECC California)", Emission Source Category: Indirect, Effective Date: 2024-01-01}}
+- {key: ved_campus_area_lighting, installed: {emissionMeterMapId: }, Assignment: {Meter: "ved_campus_area_lighting (Campus grounds, area lighting)", Emission Factor Source: eGRID, Emission Factor Member: "CAMX (WECC California)", Emission Source Category: Indirect, Effective Date: 2024-01-01}}
+- {key: ved_cedar_row_a_master, installed: {emissionMeterMapId: }, Assignment: {Meter: "ved_cedar_row_a_master (Cedar Row A)", Emission Factor Source: eGRID, Emission Factor Member: "CAMX (WECC California)", Emission Source Category: Indirect, Effective Date: 2024-01-01}}
+- {key: ved_cedar_row_b_master, installed: {emissionMeterMapId: }, Assignment: {Meter: "ved_cedar_row_b_master (Cedar Row B)", Emission Factor Source: eGRID, Emission Factor Member: "CAMX (WECC California)", Emission Source Category: Indirect, Effective Date: 2024-01-01}}
+- {key: ved_cedar_row_common_house_main, installed: {emissionMeterMapId: }, Assignment: {Meter: "ved_cedar_row_common_house_main (Cedar Row Common House)", Emission Factor Source: eGRID, Emission Factor Member: "CAMX (WECC California)", Emission Source Category: Indirect, Effective Date: 2024-01-01}}
+- {key: ved_cedar_row_parking_lighting, installed: {emissionMeterMapId: }, Assignment: {Meter: "ved_cedar_row_parking_lighting (Cedar Row grounds, area lighting)", Emission Factor Source: eGRID, Emission Factor Member: "CAMX (WECC California)", Emission Source Category: Indirect, Effective Date: 2024-01-01}}
+- {key: ved_central_plant_main, installed: {emissionMeterMapId: }, Assignment: {Meter: "ved_central_plant_main (Central Plant, electric input; drives its Scope 2)", Emission Factor Source: eGRID, Emission Factor Member: "CAMX (WECC California)", Emission Source Category: Indirect, Effective Date: 2024-01-01}}
+- {key: sgu_admin_hall_gas, installed: {emissionMeterMapId: }, Assignment: {Meter: "sgu_admin_hall_gas (Admin Hall)", Emission Factor Source: "Non-electric commodities", Emission Factor Member: "Non-electric commodities", Emission Source Category: Stationary, Effective Date: 2024-01-01}}
+- {key: sgu_science_center_gas, installed: {emissionMeterMapId: }, Assignment: {Meter: "sgu_science_center_gas (Science Center)", Emission Factor Source: "Non-electric commodities", Emission Factor Member: "Non-electric commodities", Emission Source Category: Stationary, Effective Date: 2024-01-01}}
+- {key: sgu_library_gas, installed: {emissionMeterMapId: }, Assignment: {Meter: "sgu_library_gas (Library)", Emission Factor Source: "Non-electric commodities", Emission Factor Member: "Non-electric commodities", Emission Source Category: Stationary, Effective Date: 2024-01-01}}
+- {key: sgu_student_center_gas, installed: {emissionMeterMapId: }, Assignment: {Meter: "sgu_student_center_gas (Student Center)", Emission Factor Source: "Non-electric commodities", Emission Factor Member: "Non-electric commodities", Emission Source Category: Stationary, Effective Date: 2024-01-01}}
+- {key: sgu_lakeview_hall_gas, installed: {emissionMeterMapId: }, Assignment: {Meter: "sgu_lakeview_hall_gas (Lakeview Hall)", Emission Factor Source: "Non-electric commodities", Emission Factor Member: "Non-electric commodities", Emission Source Category: Stationary, Effective Date: 2024-01-01}}
+- {key: sgu_recreation_center_pool_gas, installed: {emissionMeterMapId: }, Assignment: {Meter: "sgu_recreation_center_pool_gas (Recreation Center, pool heat)", Emission Factor Source: "Non-electric commodities", Emission Factor Member: "Non-electric commodities", Emission Source Category: Stationary, Effective Date: 2024-01-01}}
+- {key: sgu_cedar_row_a_house_gas, installed: {emissionMeterMapId: }, Assignment: {Meter: "sgu_cedar_row_a_house_gas (Cedar Row A)", Emission Factor Source: "Non-electric commodities", Emission Factor Member: "Non-electric commodities", Emission Source Category: Stationary, Effective Date: 2024-01-01}}
+- {key: sgu_cedar_row_b_house_gas, installed: {emissionMeterMapId: }, Assignment: {Meter: "sgu_cedar_row_b_house_gas (Cedar Row B)", Emission Factor Source: "Non-electric commodities", Emission Factor Member: "Non-electric commodities", Emission Source Category: Stationary, Effective Date: 2024-01-01}}
+- {key: sgu_cedar_row_common_house_gas, installed: {emissionMeterMapId: }, Assignment: {Meter: "sgu_cedar_row_common_house_gas (Cedar Row Common House)", Emission Factor Source: "Non-electric commodities", Emission Factor Member: "Non-electric commodities", Emission Source Category: Stationary, Effective Date: 2024-01-01}}
+- {key: sgu_central_plant_boiler_gas, installed: {emissionMeterMapId: }, Assignment: {Meter: "sgu_central_plant_boiler_gas (Central Plant, boiler gas input; drives its Scope 1)", Emission Factor Source: "Non-electric commodities", Emission Factor Member: "Non-electric commodities", Emission Source Category: Stationary, Effective Date: 2024-01-01}}
+- {key: rcu_admin_hall_water, installed: {emissionMeterMapId: }, Assignment: {Meter: "rcu_admin_hall_water (Admin Hall)", Emission Factor Source: "Non-electric commodities", Emission Factor Member: "Non-electric commodities", Emission Source Category: Indirect, Effective Date: 2024-01-01}}
+- {key: rcu_science_center_water, installed: {emissionMeterMapId: }, Assignment: {Meter: "rcu_science_center_water (Science Center)", Emission Factor Source: "Non-electric commodities", Emission Factor Member: "Non-electric commodities", Emission Source Category: Indirect, Effective Date: 2024-01-01}}
+- {key: rcu_library_water, installed: {emissionMeterMapId: }, Assignment: {Meter: "rcu_library_water (Library)", Emission Factor Source: "Non-electric commodities", Emission Factor Member: "Non-electric commodities", Emission Source Category: Indirect, Effective Date: 2024-01-01}}
+- {key: rcu_student_center_water, installed: {emissionMeterMapId: }, Assignment: {Meter: "rcu_student_center_water (Student Center)", Emission Factor Source: "Non-electric commodities", Emission Factor Member: "Non-electric commodities", Emission Source Category: Indirect, Effective Date: 2024-01-01}}
+- {key: rcu_lakeview_hall_water, installed: {emissionMeterMapId: }, Assignment: {Meter: "rcu_lakeview_hall_water (Lakeview Hall)", Emission Factor Source: "Non-electric commodities", Emission Factor Member: "Non-electric commodities", Emission Source Category: Indirect, Effective Date: 2024-01-01}}
+- {key: rcu_recreation_center_water, installed: {emissionMeterMapId: }, Assignment: {Meter: "rcu_recreation_center_water (Recreation Center)", Emission Factor Source: "Non-electric commodities", Emission Factor Member: "Non-electric commodities", Emission Source Category: Indirect, Effective Date: 2024-01-01}}
+- {key: rcu_cedar_row_a_water, installed: {emissionMeterMapId: }, Assignment: {Meter: "rcu_cedar_row_a_water (Cedar Row A)", Emission Factor Source: "Non-electric commodities", Emission Factor Member: "Non-electric commodities", Emission Source Category: Indirect, Effective Date: 2024-01-01}}
+- {key: rcu_cedar_row_b_water, installed: {emissionMeterMapId: }, Assignment: {Meter: "rcu_cedar_row_b_water (Cedar Row B)", Emission Factor Source: "Non-electric commodities", Emission Factor Member: "Non-electric commodities", Emission Source Category: Indirect, Effective Date: 2024-01-01}}
+# ---- Ridgeline Wind: one assignment, then ten exclusions (Northlake Thermal Plant company, Ridgeline Wind Site) ----
+- {key: ved_ridgeline_interconnection, installed: {emissionMeterMapId: }, Assignment: {Meter: "ved_ridgeline_interconnection (Ridgeline Interconnection Meter, station service only)", Emission Factor Source: eGRID, Emission Factor Member: "CAMX (WECC California)", Emission Source Category: Indirect, Effective Date: 2024-07-01}, expect: "GHG History, Indirect: no row before Aug-24; about 1,822 lb CO2e for Aug-24 (the first bill, 2024-07-01 to 2024-08-04: 4,428 kWh on the 2024 rows) and about 18,598 lb CO2e for Feb-25 (the bill 2025-01-05 to 2025-02-04: 46,920 kWh on the 2025 rows)"}   # assumed: derived from step 1's assumed 2024 and 2025 CAMX rows
+- {key: rwl_wtg_01, installed: {excludedMeterId: }, Assignment: {Meter: "rwl_wtg_01 (Ridgeline WTG-01, turbine pad meter, generation)", Action: Exclude}}
+- {key: rwl_wtg_02, installed: {excludedMeterId: }, Assignment: {Meter: "rwl_wtg_02 (Ridgeline WTG-02, turbine pad meter, generation)", Action: Exclude}}
+- {key: rwl_wtg_03, installed: {excludedMeterId: }, Assignment: {Meter: "rwl_wtg_03 (Ridgeline WTG-03, turbine pad meter, generation)", Action: Exclude}}
+- {key: rwl_wtg_04, installed: {excludedMeterId: }, Assignment: {Meter: "rwl_wtg_04 (Ridgeline WTG-04, turbine pad meter, generation)", Action: Exclude}}
+- {key: rwl_wtg_05, installed: {excludedMeterId: }, Assignment: {Meter: "rwl_wtg_05 (Ridgeline WTG-05, turbine pad meter, generation)", Action: Exclude}}
+- {key: rwl_wtg_06, installed: {excludedMeterId: }, Assignment: {Meter: "rwl_wtg_06 (Ridgeline WTG-06, turbine pad meter, generation)", Action: Exclude}}
+- {key: rwl_wtg_07, installed: {excludedMeterId: }, Assignment: {Meter: "rwl_wtg_07 (Ridgeline WTG-07, turbine pad meter, generation)", Action: Exclude}}
+- {key: rwl_wtg_08, installed: {excludedMeterId: }, Assignment: {Meter: "rwl_wtg_08 (Ridgeline WTG-08, turbine pad meter, generation)", Action: Exclude}}
+- {key: rwl_wtg_09, installed: {excludedMeterId: }, Assignment: {Meter: "rwl_wtg_09 (Ridgeline WTG-09, turbine pad meter, generation)", Action: Exclude}}
+- {key: rwl_wtg_10, installed: {excludedMeterId: }, Assignment: {Meter: "rwl_wtg_10 (Ridgeline WTG-10, turbine pad meter, generation)", Action: Exclude}}

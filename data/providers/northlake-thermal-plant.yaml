@@ -128,7 +128,7 @@ environmental:
     chillers), allocated to delivered thermal energy.
   metrics:
     - { name: plant_electric_input, unit: kWh/ton_hour, value: 0.62 }
-    - { name: plant_gas_input, unit: therms/klb, value: 1.18 }
+    - { name: plant_gas_input, unit: therms/klb, value: 11.8 }   # a klb of steam is about 1 MMBtu (10 therms) delivered; boilers near 85% efficient
 
 scenarioHooks:
   - { scenario: chilled_water_hourly, role: primary, targets: [science_center, recreation_center] }

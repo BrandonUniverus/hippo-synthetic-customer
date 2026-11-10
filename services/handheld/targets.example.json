@@ -1,0 +1,16 @@
+{
+  "crbmw-pilot": {
+    "enabled": false,
+    "environment_id": "REPLACE-WITH-VERIFIED-ENVIRONMENT",
+    "gateway_profile": "gw_neptune_river_city_water",
+    "fixture_only": false,
+    "destination": "/delivery-root/Input"
+  },
+  "scgas-pilot": {
+    "enabled": false,
+    "environment_id": "REPLACE-WITH-VERIFIED-ENVIRONMENT",
+    "gateway_profile": "gw_mvrs_sierra_gas",
+    "fixture_only": false,
+    "destination": "/delivery-root/Input"
+  }
+}

@@ -2,7 +2,7 @@ manifestVersion: 1
 id: northlake_bill_entry_v1
 customerScenarioId: demo_university_v1
 stage: 2
-roadmapPhase: 1            # implementation/dream-customer/bill-charge-line-spec.pdf + phase1-substrate-extras.md
+roadmapPhase: 1            # now Stage 5: implementation/stage-5-bills/stage-5-bills.pdf
 displayName: Northlake Bill & Cost-Core Entry Plan
 purpose: >
   How the Phase 1 cost-core data gets INTO EEM through the UI / data paths: monthly
@@ -26,49 +26,62 @@ entryUI:
   images: { screen: "bill image upload", source: "documents/utility-bills/<provider>/*.pdf (existing synthetic bills)" }
 
 sourceReferences:
-  chargeLineRules: implementation/dream-customer/bill-charge-line-spec.pdf
-  substrateExtras: implementation/dream-customer/phase1-substrate-extras.pdf
+  stageChapter: implementation/stage-5-bills/stage-5-bills.pdf
   providerValues: data/providers/
   calendar: data/eem/northlake-company-calendar-v1.yaml
 
 bills:
   span: 2024-01..2025-12
   grain: one bill per account per month (RCU = 3 service lines on one statement)
-  chargeLines: "decompose per implementation/dream-customer/bill-charge-line-spec.pdf (energy/demand/fixed/tier/tax...); lines reconcile to total"
+  chargeLines: "decompose per implementation/stage-5-bills/03-bills.yaml (energy/demand/fixed/tier/tax...); lines reconcile to total"
   preferredEntry:
+    # VED and RCU are imported in every company, the Central Plant's included: the register names Nora Chen as
+    # the bill import specialist for Northlake University and Cedar Row (facilities-and-meter-register.pdf p4).
     - { providers: [valley_electric_district, river_city_utilities], method: import (DATA-PATH), user: nora.chen }
     - { providers: [sierra_gas_utility, helios_onsite_solar], method: manual (Bill Entry), user: iris.morales }
     - { providers: [northlake_thermal_plant], method: manual allocation, user: keiko.tan }
-    - { scope: cedar_row_apartments, method: manual, user: marcus.reed }   # company scope: beats the provider default above
+    - { scope: cedar_row_apartments, providers: [sierra_gas_utility, helios_onsite_solar], method: manual, user: marcus.reed }   # Cedar Row staff enter its own gas and PPA bills
+    # Nobody sends Ridgeline a bill: EEM generates the transfer statement on the Ridgeline Farm Transfer
+    # Meter (the ten turbines' aggregate) with RWL-XFER-2024. The Run Bill Gen task writes it, under the
+    # task's login, as soon as a month's data is complete; keiko.tan reviews it and devon.brooks (a company
+    # administrator) owns the generation setup. The hand-made July 2024 statement is what the first
+    # generated one must match.
+    - { providers: [ridgeline_wind], method: generate (Bill Generation), user: "Run Bill Gen task; keiko.tan reviews" }
 
 statusHistory:
   rule: "every bill gets a Status_Code 1 (Bill Entry) row; ~1/3 advanced to 2 (QC Approval) by an AccessLevel-3 user"
-  entryLagDays: { valley_electric_district: 3, river_city_utilities: 4, sierra_gas_utility: 5, northlake_thermal_plant: 6, helios_onsite_solar: 7, cedar_row: 5 }
+  # ridgeline_wind 0: a generated statement is written when its month's data completes; Offset cannot delay it (finding 70)
+  entryLagDays: { valley_electric_district: 3, river_city_utilities: 4, sierra_gas_utility: 5, northlake_thermal_plant: 6, helios_onsite_solar: 7, ridgeline_wind: 0, cedar_row: 5 }
 
 digitalPoints:
   - { id: ch_modbus_ntp_chiller_enable_status, stateSet: "chiller_run {0 off,1 on}", interval: 5 }
   - { id: ch_student_center_occupancy_status, stateSet: "occupancy {0 unoccupied,1 occupied}", interval: 15 }
   - { id: ch_science_center_lab_exhaust_status, stateSet: "exhaust_mode {0 normal,1 high}", interval: 15 }
+  - { id: "ch_rwl_wtg01_state_10m .. ch_rwl_wtg10_state_10m", stateSet: "turbine_state {0 stopped,1 running,2 fault,3 curtailed}", interval: 10 }   # the only four-state digital points
 
 notesAndImages:
   notes:
     - { target: library electric meter, tableCode: METR, text: "Meter replaced 2024-08-14; new serial, same account; reads continuous." }
     - { target: SGU Student Center estimated bill, tableCode: BL, text: "Estimated read; corrected actual next cycle." }
     - { target: RCU Cedar Row A account, tableCode: BA, text: "Account number changed at the July 2024 renewal; continuity preserved for the water and sewer services." }
+    - { target: VED Ridgeline generator account, tableCode: BA, text: "Transferred to the Thermal Plant at the 2024-07-01 acquisition; the seller's account was SYN-VED-A-0019014." }
   images:
     - { target: each provider sample bill, tableCode: BL, kind: bill_image, fileRef: "documents/utility-bills/<provider>/*.pdf" }
 
 fixtures:
   - { id: late_bill, account: SGU Library, behavior: "stop series 1 period early -> appears in rp_LateBills (>5 day overdue)" }
-  - { id: estimated_bill_correction, account: SGU Student Center, behavior: "estimated bill then corrected actual supersedes" }
-  - { id: meter_replacement, account: VED Library, behavior: "meter swap 2024-08-14/15; no double-count" }
+  - { id: estimated_bill_correction, account: SGU Student Center, behavior: "estimated Nov-24 bill (2024-10-15..11-14) then the corrected actual, dated after the December read, supersedes it" }
+  - { id: meter_replacement, account: VED Library, behavior: "meter swap 2024-08-14/15 inside the Sep-24 cycle (2024-08-05..09-04): one bill, items on both meters with their own periods; no double-count" }
   - { id: duplicate_file_import, account: RCU Northlake Main Campus combined file, behavior: "same file delivered twice (2024-09); no service double-counted" }
   - { id: account_number_change, account: RCU Cedar Row A, behavior: "new account # at the July 2024 renewal" }
-  - { id: provider_rate_change, scope: VED, behavior: "bills >=2025-01 use FY2025 rates" }
-  - { id: fiscal_period_not_found, behavior: "import a bill dated 2026-01 -> rejected (no calendar period)" }
+  - { id: provider_rate_change, scope: VED, behavior: "FY2025 rates apply to service from 2025-01-01: the Jan-25 bill (2024-12-05..2025-01-04) is priced in two parts, energy by date and demand and facility prorated by days" }
+  - { id: fiscal_period_not_found, behavior: "import a bill keyed with its year transposed (fiscal 2052 for 2025) -> rejected (no calendar period; the calendars run to 2026 or 2027 and keep extending)" }
+  - { id: generated_transfer_statement, account: RWL Ridgeline transfer, behavior: "EEM generates the July 2024 statement from the ten turbine meters; it matches the hand-made sample to the cent" }
+  - { id: account_opened_mid_window, account: "RWL Ridgeline transfer and VED Ridgeline generator", behavior: "series start 2024-07; no bill expected before the acquisition" }
+  - { id: bill_credit_transfer, account: "VED Ridgeline generator -> VED Central Plant", behavior: "each generator bill's credit leaves that bill and lands on the Central Plant bill one cycle later (the first generator bill, 2024-07-01..08-04, -> the Central Plant's September 2024 bill, 2024-08-05..09-04); counted once in provider totals" }
 
 expectedAssertions:
-  ref: implementation/dream-customer/phase-0-1-assertions.pdf
+  ref: implementation/stage-5-bills/checks.sql
   keyChecks:
     - charge lines sum to bill total (+-$0.01); usage lines reconcile to bill usage
     - ">=24 monthly bills per active account minus fixtures; >=2 distinct entry users"

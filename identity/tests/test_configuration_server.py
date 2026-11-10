@@ -180,7 +180,7 @@ class ConfigurationServerTests(unittest.TestCase):
 
         self.assertEqual(200, status)
         self.assertIn("Shape fictional identities", document)
-        self.assertEqual({"total": 19, "enabled": 18, "local": 0}, payload["counts"])
+        self.assertEqual({"total": 23, "enabled": 22, "local": 0}, payload["counts"])
         serialized = json.dumps(payload)
         self.assertNotIn(self.environment["SYNTHETIC_USER_PASSWORD"], serialized)
         self.assertNotIn("generatedPassword", serialized)
@@ -193,7 +193,7 @@ class ConfigurationServerTests(unittest.TestCase):
         self.assertEqual(200, status)
         self.assertIn("Shape protocol claims", document)
         self.assertIn("does not grant EnergyHippo authorization", document)
-        self.assertEqual({"total": 27, "base": 27, "local": 0}, payload["counts"])
+        self.assertEqual({"total": 29, "base": 29, "local": 0}, payload["counts"])
         self.assertNotIn("password", json.dumps(payload).lower())
 
     def test_oidc_form_and_secret_free_copy_values_are_available_without_authentication(self) -> None:
@@ -606,7 +606,7 @@ class ConfigurationServerTests(unittest.TestCase):
         self.assertEqual("phase3_identity_reviewers", renamed["group"]["groupId"])
         self.assertEqual(200, delete_status)
         self.assertTrue(deleted["group"]["deleted"])
-        self.assertEqual({"total": 27, "base": 27, "local": 0}, listed["counts"])
+        self.assertEqual({"total": 29, "base": 29, "local": 0}, listed["counts"])
         self.assertEqual(4, len(self.keycloak.replacements))
 
     def test_invalid_group_changes_fail_before_overlay_or_realm_mutation(self) -> None:
@@ -673,7 +673,7 @@ class ConfigurationServerTests(unittest.TestCase):
         self.assertEqual(200, reset_status)
         self.assertNotEqual(created["generatedPassword"], reset["generatedPassword"])
         self.assertEqual(200, list_status)
-        self.assertEqual(20, listed["counts"]["total"])
+        self.assertEqual(24, listed["counts"]["total"])
         self.assertEqual(1, listed["counts"]["local"])
         self.assertNotIn("generatedPassword", json.dumps(listed))
         self.assertEqual(4, len(self.keycloak.replacements))

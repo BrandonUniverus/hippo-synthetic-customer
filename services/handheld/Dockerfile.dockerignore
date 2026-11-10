@@ -1,0 +1,14 @@
+**
+!services
+!services/handheld
+!services/handheld/**
+services/handheld/**/__pycache__
+services/handheld/.runtime
+services/handheld/node_modules
+!identity
+!identity/branding
+!identity/branding/**
+!brands
+!brands/northlake
+!brands/northlake/**
+brands/northlake/fonts/*.ttf

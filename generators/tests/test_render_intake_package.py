@@ -108,7 +108,7 @@ class IntakePackageTests(unittest.TestCase):
             self.assertContains(f'href="#section-{section["key"]}"><span class="toc-n">{number:02d}</span>')
             self.assertContains(f'id="section-{section["key"]}"')
         self.assertContains('<a href="#section-register">Facilities and Meter Register</a>')
-        self.assertEqual(self.html.count('class="sheet-band"'), 5)
+        self.assertEqual(self.html.count('class="sheet-band"'), 6)   # one per provider, Ridgeline's transfer price sheet included
 
     def test_checked_in_binder_matches_regeneration(self):
         checked_in = (ROOT / TARGET).read_text(encoding="utf-8").replace("\r\n", "\n")

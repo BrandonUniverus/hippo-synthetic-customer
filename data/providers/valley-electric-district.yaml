@@ -2,6 +2,8 @@
 # Single commodity (electric) but the most data-rich everyday provider:
 # every account produces a monthly tariff bill, and the five interval-metered
 # buildings (four on campus plus the Central Plant) also produce 15-minute kWh and kW channels.
+# Since 2024-07 it also bills the Ridgeline Wind generator interconnection in both
+# directions, and moves that account's export credit to the Central Plant's bill (VED-BCT).
 id: valley_electric_district
 displayName: Valley Electric District
 shortName: VED
@@ -16,7 +18,9 @@ description: >
   Central Plant and Cedar Row Apartments, where it bills one master meter per
   building and never an individual apartment. Demand is billed on the highest 15-minute
   average kW in the period, and power factor is tracked so reactive-power
-  adjustments can appear on lab-heavy buildings.
+  adjustments can appear on lab-heavy buildings. Its generator interconnection
+  service meters the Ridgeline Wind substation both ways at 34.5 kV: station
+  service in, export out, and reactive energy for the power-factor charge.
 
 website: https://www.valleyelectric.example
 icon: fa-bolt          # the Font Awesome mark the provider picker shows
@@ -50,6 +54,16 @@ supplies:
     dataTypes: [monthly_bill, interval_15min, billing_demand]
     intervalMinutes: 15
     notes: Demand billed on max 15-minute kW; power factor below 0.95 triggers an adjustment.
+  - commodity: electric
+    role: generator_interconnection
+    usageUnit: kWh
+    reactiveUnit: kVArh
+    statementUnit: MWh       # the generator bill states export in MWh
+    dataTypes: [monthly_bill, interval_15min]
+    intervalMinutes: 15
+    direction: bidirectional
+    servedBuildings: [ridgeline_substation]
+    notes: Delivered is station service while the turbines are idle; received is the farm's export. The export credit transfers to the Central Plant account under VED-BCT.
 
 accountModel:
   numberFormat: "SYN-VED-A-#######"
@@ -61,8 +75,8 @@ meterModel:
   providerNumberFormat: "VED-BADGE-#######"   # the provider's own badge number; the digits repeat our meter number
   numberFormat: "SYN-VED-M-#######"
   example: "SYN-VED-M-0040207"
-  meterTypes: [interval_demand, monthly_kwh, unmetered_area_lighting]
-  intervalBuildings: [science_center, student_center, lakeview_hall, recreation_center, central_plant]
+  meterTypes: [interval_demand, monthly_kwh, unmetered_area_lighting, bidirectional_interval]
+  intervalBuildings: [science_center, student_center, lakeview_hall, recreation_center, central_plant, ridgeline_substation]
   monthlyOnlyBuildings: [admin_hall, library, parking_structure, cedar_row_a, cedar_row_b, cedar_row_common_house]
   unmeteredServices: [campus_grounds, cedar_row_carport_grounds]
 
@@ -130,6 +144,26 @@ rateSchedules:
     appliesTo: [campus_grounds, cedar_row_carport_grounds]
     components:
       fixtureCharge: { unit: $/fixture/month, rate: 14.60, basis: fixture_count }
+  - id: VED-GEN-IC
+    name: Generator Interconnection Service
+    type: generator_interconnection
+    effective: "2024-07-01..2025-12-31"
+    appliesTo: [ridgeline_substation]
+    components:
+      customerCharge: { unit: $/month, rate: 285.00 }
+      stationServiceEnergy: { unit: $/kWh, rate: 0.131, basis: delivered_kwh }
+      reactivePower: { unit: $/kVArh, rate: 0.0042, basis: kvarh_beyond_power_factor_0_95 }
+      generationCredit: { unit: $/kWh, rate: -0.0612, basis: received_kwh }
+  - id: VED-BCT
+    name: Renewable Generation Bill Credit Transfer
+    type: bill_credit_transfer_rider
+    effective: "2024-07-01..2025-12-31"
+    appliesTo: [ridgeline_substation, central_plant]
+    generatingAccount: SYN-VED-A-0010014
+    benefitingAccount: SYN-VED-A-0010013
+    components:
+      creditTransfer: { unit: $, rate: 1.0, basis: the_generating_accounts_generation_credit_moved_whole_to_the_benefiting_account }
+      administrativeFee: { unit: $/month, rate: 12.50, basis: per_benefiting_account }
 
 billCharges:
   - { code: energy_peak, type: usage_tou, unit: $/kWh }
@@ -140,6 +174,13 @@ billCharges:
   - { code: power_factor_adjustment, type: adjustment, unit: $ }
   - { code: public_purpose_program, type: rider, unit: $ }
   - { code: utility_users_tax, type: tax, unit: $ }
+  - { code: generator_customer_charge, type: fixed, unit: $/month }
+  - { code: station_service_energy, type: usage, unit: $/kWh }
+  - { code: reactive_power_charge, type: usage, unit: $/kVArh }
+  - { code: generation_credit, type: generation_credit, unit: $/kWh }
+  - { code: bct_credit_transferred, type: transfer_out, unit: $ }
+  - { code: bct_credit_received, type: credit, unit: $ }
+  - { code: bct_administrative_fee, type: fixed, unit: $/month }
 
 fileFormats:
   billing:
@@ -157,8 +198,15 @@ fileFormats:
 
 environmental:
   scope: 2
-  emissionFactorSource: eGRID CAMX region (synthetic value)
-  co2eFactor: { unit: kgCO2e/kWh, value: 0.231 }
+  # The grid factor for Scope 2 and for the avoided emissions of Ridgeline's generation. CO2e adds CH4 and N2O at the
+  # GWPs EEM ships (28 and 265). Synthetic 2024 and 2025 values continuing the eGRID CAMX trend; EEM's eGRID source
+  # carries CAMX through 2023 and Stage 8 adds these rows.
+  emissionFactorSource: eGRID CAMX subregion (synthetic 2024 and 2025 values)
+  co2eFactor:
+    unit: kgCO2e/kWh
+    history:
+      - { effectiveFrom: 2024-01-01, value: 0.1866, lbPerMWh: { co2: 410.0, ch4: 0.024, n2o: 0.0029 } }
+      - { effectiveFrom: 2025-01-01, value: 0.1798, lbPerMWh: { co2: 395.0, ch4: 0.023, n2o: 0.0028 } }
 
 scenarioHooks:
   - { scenario: baseline_monthly_bills, role: primary }
@@ -166,8 +214,13 @@ scenarioHooks:
   - { scenario: meter_replacement, role: primary, targets: [library] }
   - { scenario: missing_interval_backfill, role: primary, targets: [student_center] }
   - { scenario: provider_rate_change, role: primary, note: "FY2025 TOU rate step" }
+  - { scenario: generator_bill_credit_transfer, role: primary, targets: [ridgeline_substation, central_plant], note: "Export credit leaves the generator account and lands on the Central Plant bill" }
+  - { scenario: account_transferred_at_acquisition, role: primary, targets: [ridgeline_substation], note: "The seller's generator account closed 2024-06-30; the plant's opened 2024-07-01 under a new number" }
 
 dataQuirks:
   - Summer cooling load raises Science Center peak demand and shifts energy into peak hours.
   - Power factor below 0.95 on lab loads adds a reactive-power adjustment line.
   - One meter swap keeps the same account but issues a new synthetic meter number.
+  - The generator account keeps none of its export credit, so it always pays a small bill (customer charge, station service, reactive power, tax); in a still winter month station service makes that bill larger.
+  - The same export credit appears on two bills, as a transfer out on the generator account and as a credit received on the Central Plant account. Count it once.
+  - The generator bill states export in MWh; the interval data is kWh.

@@ -1,0 +1,803 @@
+# Stage 4, step 6: Meter-to-rate assignments (Database Administrator > Nodes, select a meter node,
+# Definitions dock, "Tenant Rebill" tab).
+#
+# Order inside the tab: pick the Bill Scenario at the top (every Northlake company has only "Actual"), then add one
+# row per rate with its Start date. The Rate Lab's meters are assigned in 08-rate-lab.yaml.
+stage: 4
+step: 6
+title: Rate assignments
+app: Database Administrator
+screen: Nodes > Tenant Rebill
+source:
+- data/scenarios/demo-university-v1.yaml (each account's rate schedules; meter sizes, fixture and ERU counts, floor areas)
+- data/providers/valley-electric-district.yaml and data/providers/ridgeline-wind.yaml (which rates apply to the Ridgeline meters)
+notes:
+- 'Reworked 2026-11-09: every real meter carries the tariff its provider bills it on. Before, 16 meters carried a
+  feature rate (the nine gas meters, for one, were not on Sierra Gas''s own rate); those rates moved to the Rate Lab.
+  The Central Plant main meter now carries VED-TOU-PRI. Stormwater is on the six meters the provider bills it on, and
+  the Central Plant''s makeup water meter gains its sewer row.'
+- 'End Date blank = open-ended. The screen accepts an End Date but the product does not store it; a row runs until
+  the next row''s Start Date.'
+- Bill checked = this assignment takes part in bill reconciliation for the scenario; every row is checked except
+  the Ridgeline Farm Transfer Meter's, whose statement EEM generates itself (Stage 7 step 8).
+- 'Rate Options on a row: the class this meter takes for the rate''s option (its meter or line size). A meter of the
+  default size needs nothing entered. Binding a meter to a class is done where the product offers it (the rate''s
+  option editor, or the web''s Rate Class Assignment); record which screen it was on the first entry.'
+- 'Meter Prices on a row: the meter''s own price for a User Defined charge (fixtures x $14.60, ERUs x $11.20, the
+  plant''s fixed share by floor area), with the 2026 step. If no screen can enter a per-meter price, record the product
+  finding and enter the charge as one flat amount on the rate.'
+- 'OPEN, for the rate tests to settle: a meter carries one rate at a time (the engine prices the row with the latest
+  Start Date on or before the period end; finding 65), so the water meters'' three rows (water, sewer, stormwater)
+  and the two VED-BCT rows do not price beside each other as entered. The rows are listed as the provider bills
+  them; how the product should carry three rates on one meter is still to be worked out.'
+- The Library's meter-replacement pair is a Stage 2/3 concern; the rate assignment does not change across the swap,
+  so only the after-replacement meter is listed.
+- 'Ridgeline (2026-10-01): the interconnection meter (VED-GEN-IC and VED-BCT), a VED-BCT row on the Central Plant
+  meter and the Ridgeline Farm Transfer Meter (RWL-XFER-2024), all from 2024-07-01. The ten turbine pad meters have no
+  row: the billing meter carries the rate for them.'
+records:
+- key: ved_admin_hall_main
+  meter: ved_admin_hall_main
+  company: northlake_university
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: VED-TOU-GS
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+- key: ved_science_center_interval
+  meter: ved_science_center_interval
+  company: northlake_university
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: VED-TOU-GS
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+- key: ved_science_center_lab_wing
+  meter: ved_science_center_lab_wing
+  company: northlake_university
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: VED-TOU-GS
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+- key: ved_library_main
+  meter: ved_library_main_after_replacement
+  company: northlake_university
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: VED-TOU-GS
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+- key: ved_student_center_interval
+  meter: ved_student_center_interval
+  company: northlake_university
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: VED-TOU-GS
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+- key: ved_lakeview_hall_main
+  meter: ved_lakeview_hall_main
+  company: northlake_university
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: VED-TOU-GS
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+- key: ved_recreation_center_main
+  meter: ved_recreation_center_main
+  company: northlake_university
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: VED-TOU-GS
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+- key: ved_parking_structure_main
+  meter: ved_parking_structure_main
+  company: northlake_university
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: VED-TOU-GS
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+- key: ved_campus_area_lighting
+  meter: ved_campus_area_lighting
+  company: northlake_university
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: VED-AL-1
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+    Meter Prices:
+    - Charge: Fixture Charge
+      Basis: 48 fixtures
+      Effective Dates:
+      - Effective Date: '2024-01-01'
+        Value: 700.8
+      - Effective Date: '2026-01-01'
+        Value: 721.82
+- key: ved_cedar_row_a_master
+  meter: ved_cedar_row_a_master
+  company: cedar_row_apartments
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: VED-TOU-GS
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+- key: ved_cedar_row_b_master
+  meter: ved_cedar_row_b_master
+  company: cedar_row_apartments
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: VED-TOU-GS
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+- key: ved_cedar_row_common_house_main
+  meter: ved_cedar_row_common_house_main
+  company: cedar_row_apartments
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: VED-TOU-GS
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+- key: ved_cedar_row_parking_lighting
+  meter: ved_cedar_row_parking_lighting
+  company: cedar_row_apartments
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: VED-AL-1
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+    Meter Prices:
+    - Charge: Fixture Charge
+      Basis: 20 fixtures
+      Effective Dates:
+      - Effective Date: '2024-01-01'
+        Value: 292.0
+      - Effective Date: '2026-01-01'
+        Value: 300.76
+- key: ved_central_plant_main
+  meter: ved_central_plant_main
+  company: northlake_thermal_plant
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: VED-TOU-PRI
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+  - Rate: VED-BCT
+    Start Date: 2024-07-01
+    End Date: ''
+    Bill: true
+- key: ved_ridgeline_interconnection
+  meter: ved_ridgeline_interconnection
+  company: northlake_thermal_plant
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: VED-BCT
+    Start Date: 2024-07-01
+    End Date: ''
+    Bill: true
+  - Rate: VED-GEN-IC
+    Start Date: 2024-07-01
+    End Date: ''
+    Bill: true
+  notes:
+  - 'Generator account SYN-VED-A-0010014 (Bill Importer): its bills are imported, so these rows only drive reconciliation.
+    Both start with the acquisition, 2024-07-01, and the rates end 2025-12-31 (left open, like every row here).'
+  - The provider file lists VED-GEN-IC and VED-BCT together, but the grid keeps one rate at a time. Rows with one Start
+    Date are a duplicate and reports keep the later-created one (rp_CostSummary), so VED-BCT is listed, and entered, first
+    to leave VED-GEN-IC the later row; which of the two the engine itself prices is not defined. VED-BCT's only charge,
+    the $12.50 fee, belongs to the Central Plant's bills, not this account's. See Findings, "A meter carries one rate at
+    a time."
+- key: sgu_admin_hall_gas
+  meter: sgu_admin_hall_gas
+  company: northlake_university
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: SGU-GN-1
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+- key: sgu_science_center_gas
+  meter: sgu_science_center_gas
+  company: northlake_university
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: SGU-GN-1
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+- key: sgu_library_gas
+  meter: sgu_library_gas
+  company: northlake_university
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: SGU-GN-1
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+- key: sgu_student_center_gas
+  meter: sgu_student_center_gas
+  company: northlake_university
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: SGU-GN-1
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+- key: sgu_lakeview_hall_gas
+  meter: sgu_lakeview_hall_gas
+  company: northlake_university
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: SGU-GN-1
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+- key: sgu_recreation_center_pool_gas
+  meter: sgu_recreation_center_pool_gas
+  company: northlake_university
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: SGU-GN-1
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+- key: sgu_cedar_row_a_house_gas
+  meter: sgu_cedar_row_a_house_gas
+  company: cedar_row_apartments
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: SGU-GN-1
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+- key: sgu_cedar_row_b_house_gas
+  meter: sgu_cedar_row_b_house_gas
+  company: cedar_row_apartments
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: SGU-GN-1
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+- key: sgu_cedar_row_common_house_gas
+  meter: sgu_cedar_row_common_house_gas
+  company: cedar_row_apartments
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: SGU-GN-1
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+- key: sgu_central_plant_boiler_gas
+  meter: sgu_central_plant_boiler_gas
+  company: northlake_thermal_plant
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: SGU-GL-1
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+- key: rcu_admin_hall_water
+  meter: rcu_admin_hall_water
+  company: northlake_university
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: RCU-W-TIER
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+    Rate Options:
+      Meter: 2-inch (the default, nothing to enter)
+  - Rate: RCU-S-VOL
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+  - Rate: RCU-SW-ERU
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+    Meter Prices:
+    - Charge: Stormwater ERU Charge
+      Basis: 18 ERUs
+      Effective Dates:
+      - Effective Date: '2024-01-01'
+        Value: 201.6
+      - Effective Date: '2026-01-01'
+        Value: 207.65
+- key: rcu_science_center_water
+  meter: rcu_science_center_water
+  company: northlake_university
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: RCU-W-TIER
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+    Rate Options:
+      Meter: 3-inch
+  - Rate: RCU-S-VOL
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+  - Rate: RCU-SW-ERU
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+    Meter Prices:
+    - Charge: Stormwater ERU Charge
+      Basis: 26 ERUs
+      Effective Dates:
+      - Effective Date: '2024-01-01'
+        Value: 291.2
+      - Effective Date: '2026-01-01'
+        Value: 299.94
+- key: rcu_library_water
+  meter: rcu_library_water
+  company: northlake_university
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: RCU-W-TIER
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+    Rate Options:
+      Meter: 2-inch (the default, nothing to enter)
+  - Rate: RCU-S-VOL
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+  - Rate: RCU-SW-ERU
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+    Meter Prices:
+    - Charge: Stormwater ERU Charge
+      Basis: 14 ERUs
+      Effective Dates:
+      - Effective Date: '2024-01-01'
+        Value: 156.8
+      - Effective Date: '2026-01-01'
+        Value: 161.5
+- key: rcu_student_center_water
+  meter: rcu_student_center_water
+  company: northlake_university
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: RCU-W-TIER
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+    Rate Options:
+      Meter: 4-inch
+  - Rate: RCU-S-VOL
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+  - Rate: RCU-SW-ERU
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+    Meter Prices:
+    - Charge: Stormwater ERU Charge
+      Basis: 22 ERUs
+      Effective Dates:
+      - Effective Date: '2024-01-01'
+        Value: 246.4
+      - Effective Date: '2026-01-01'
+        Value: 253.79
+- key: rcu_lakeview_hall_water
+  meter: rcu_lakeview_hall_water
+  company: northlake_university
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: RCU-W-TIER
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+    Rate Options:
+      Meter: 3-inch
+  - Rate: RCU-S-VOL
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+  - Rate: RCU-SW-ERU
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+    Meter Prices:
+    - Charge: Stormwater ERU Charge
+      Basis: 20 ERUs
+      Effective Dates:
+      - Effective Date: '2024-01-01'
+        Value: 224.0
+      - Effective Date: '2026-01-01'
+        Value: 230.72
+- key: rcu_recreation_center_water
+  meter: rcu_recreation_center_water
+  company: northlake_university
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: RCU-W-TIER
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+    Rate Options:
+      Meter: 3-inch
+  - Rate: RCU-S-VOL
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+  - Rate: RCU-SW-ERU
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+    Meter Prices:
+    - Charge: Stormwater ERU Charge
+      Basis: 16 ERUs
+      Effective Dates:
+      - Effective Date: '2024-01-01'
+        Value: 179.2
+      - Effective Date: '2026-01-01'
+        Value: 184.58
+- key: rcu_irrigation_north_quad
+  meter: rcu_irrigation_north_quad
+  company: northlake_university
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: RCU-IRR
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+    Rate Options:
+      Meter: 2-inch (the default, nothing to enter)
+- key: rcu_irrigation_south_fields
+  meter: rcu_irrigation_south_fields
+  company: northlake_university
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: RCU-IRR
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+    Rate Options:
+      Meter: 3-inch
+- key: rcu_irrigation_athletics
+  meter: rcu_irrigation_athletics
+  company: northlake_university
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: RCU-IRR
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+    Rate Options:
+      Meter: 3-inch
+- key: rcu_admin_hall_fire_service
+  meter: rcu_admin_hall_fire_service
+  company: northlake_university
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: RCU-FIRE
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+    Rate Options:
+      Line: 6-inch
+- key: rcu_science_center_fire_service
+  meter: rcu_science_center_fire_service
+  company: northlake_university
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: RCU-FIRE
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+    Rate Options:
+      Line: 8-inch
+- key: rcu_lakeview_hall_fire_service
+  meter: rcu_lakeview_hall_fire_service
+  company: northlake_university
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: RCU-FIRE
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+    Rate Options:
+      Line: 6-inch
+- key: rcu_cedar_row_a_water
+  meter: rcu_cedar_row_a_water
+  company: cedar_row_apartments
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: RCU-W-TIER
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+    Rate Options:
+      Meter: 3-inch
+  - Rate: RCU-S-VOL
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+- key: rcu_cedar_row_b_water
+  meter: rcu_cedar_row_b_water
+  company: cedar_row_apartments
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: RCU-W-TIER
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+    Rate Options:
+      Meter: 3-inch
+  - Rate: RCU-S-VOL
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+- key: rcu_cedar_row_common_house_water
+  meter: rcu_cedar_row_common_house_water
+  company: cedar_row_apartments
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: RCU-W-TIER
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+    Rate Options:
+      Meter: 2-inch (the default, nothing to enter)
+  - Rate: RCU-S-VOL
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+- key: rcu_cedar_row_irrigation
+  meter: rcu_cedar_row_irrigation
+  company: cedar_row_apartments
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: RCU-IRR
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+    Rate Options:
+      Meter: 2-inch (the default, nothing to enter)
+- key: rcu_cedar_row_a_fire_service
+  meter: rcu_cedar_row_a_fire_service
+  company: cedar_row_apartments
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: RCU-FIRE
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+    Rate Options:
+      Line: 4-inch (the default, nothing to enter)
+- key: rcu_cedar_row_b_fire_service
+  meter: rcu_cedar_row_b_fire_service
+  company: cedar_row_apartments
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: RCU-FIRE
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+    Rate Options:
+      Line: 4-inch (the default, nothing to enter)
+- key: rcu_central_plant_makeup_water
+  meter: rcu_central_plant_makeup_water
+  company: northlake_thermal_plant
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: RCU-W-TIER
+    Start Date: &id001 2024-01-01
+    End Date: ''
+    Bill: true
+    Rate Options:
+      Meter: 4-inch
+  - Rate: RCU-S-VOL
+    Start Date: *id001
+    End Date: ''
+    Bill: true
+  notes:
+  - Cooling-tower makeup water only; no sewer or stormwater charge assumed (evaporative use, not returned to sewer, and
+    the plant is not one of README's stormwater-billed account types).
+- key: ntp_science_center_chilled_water
+  meter: ntp_science_center_chilled_water
+  company: northlake_university
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: NTP-ALLOC-CHW
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+    Meter Prices:
+    - Charge: Fixed O&M Share
+      Basis: 120,000 square feet
+      Effective Dates:
+      - Effective Date: '2024-01-01'
+        Value: 340.0
+      - Effective Date: '2026-01-01'
+        Value: 350.2
+- key: ntp_science_center_steam
+  meter: ntp_science_center_steam
+  company: northlake_university
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: NTP-ALLOC-STEAM
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+    Meter Prices:
+    - Charge: Fixed O&M Share
+      Basis: carried on this building's chilled water rate
+      Effective Dates:
+      - Effective Date: '2024-01-01'
+        Value: 0.0
+- key: ntp_admin_hall_steam
+  meter: ntp_admin_hall_steam
+  company: northlake_university
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: NTP-ALLOC-STEAM
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+    Meter Prices:
+    - Charge: Fixed O&M Share
+      Basis: 85,000 square feet
+      Effective Dates:
+      - Effective Date: '2024-01-01'
+        Value: 240.0
+      - Effective Date: '2026-01-01'
+        Value: 247.2
+- key: ntp_library_steam
+  meter: ntp_library_steam
+  company: northlake_university
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: NTP-ALLOC-STEAM
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+    Meter Prices:
+    - Charge: Fixed O&M Share
+      Basis: 70,000 square feet
+      Effective Dates:
+      - Effective Date: '2024-01-01'
+        Value: 200.0
+      - Effective Date: '2026-01-01'
+        Value: 206.0
+- key: ntp_student_center_steam
+  meter: ntp_student_center_steam
+  company: northlake_university
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: NTP-ALLOC-STEAM
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+    Meter Prices:
+    - Charge: Fixed O&M Share
+      Basis: 95,000 square feet
+      Effective Dates:
+      - Effective Date: '2024-01-01'
+        Value: 270.0
+      - Effective Date: '2026-01-01'
+        Value: 278.1
+- key: ntp_lakeview_hall_steam
+  meter: ntp_lakeview_hall_steam
+  company: northlake_university
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: NTP-ALLOC-STEAM
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+    Meter Prices:
+    - Charge: Fixed O&M Share
+      Basis: 110,000 square feet
+      Effective Dates:
+      - Effective Date: '2024-01-01'
+        Value: 310.0
+      - Effective Date: '2026-01-01'
+        Value: 319.3
+- key: ntp_recreation_center_chilled_water
+  meter: ntp_recreation_center_chilled_water
+  company: northlake_university
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: NTP-ALLOC-CHW
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+    Meter Prices:
+    - Charge: Fixed O&M Share
+      Basis: 65,000 square feet
+      Effective Dates:
+      - Effective Date: '2024-01-01'
+        Value: 180.0
+      - Effective Date: '2026-01-01'
+        Value: 185.4
+- key: ntp_recreation_center_steam
+  meter: ntp_recreation_center_steam
+  company: northlake_university
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: NTP-ALLOC-STEAM
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+    Meter Prices:
+    - Charge: Fixed O&M Share
+      Basis: carried on this building's chilled water rate
+      Effective Dates:
+      - Effective Date: '2024-01-01'
+        Value: 0.0
+- key: hos_science_center_array
+  meter: hos_science_center_array
+  company: northlake_university
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: HOS-PPA-2024
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+- key: hos_student_center_array
+  meter: hos_student_center_array
+  company: northlake_university
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: HOS-PPA-2024
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+- key: hos_cedar_row_carport
+  meter: hos_cedar_row_carport
+  company: cedar_row_apartments
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: HOS-PPA-2024
+    Start Date: 2024-01-01
+    End Date: ''
+    Bill: true
+- key: rwl_farm_transfer
+  meter: rwl_farm_transfer
+  company: northlake_thermal_plant
+  Bill Scenario: Actual
+  Rate Config:
+  - Rate: RWL-XFER-2024
+    Start Date: 2024-07-01
+    End Date: ''
+    Bill: false
+  notes:
+  - 'Ridgeline Farm Transfer Meter (SYN-RWL-M-0110000) is a logical billing meter on SYN-RWL-G-0000001: no channels, and
+    its one point is the aggregate Ridgeline Farm Generated kWh 10m, the ten turbines'' Generated kWh (Stage 2). The rate
+    goes here and the ten turbine pad meters (SYN-RWL-M-0110001..0110010, meter keys rwl_wtg_01 to rwl_wtg_10) get no row,
+    because EEM prices the points under one meter and writes one bill per meter and month (UtilityRate_Exec, UtilityGenBill_Create;
+    finding 66). Rated on the ten pad meters, the statement would be ten bills a month, the research credit would post ten
+    times and the ten cent-rounded transfer lines would add to $130,580.28; rated here it is one Transfer Energy line on
+    the farm total and one Research Credit, $129,330.27 for July 2024.'
+  - 'Start Date is the acquisition, 2024-07-01: a month is generated only if it starts on or after the rate''s Start Date
+    (UtilityGenBillDates_Set.sql:286). The rate''s own dates end it on 2025-12-31 (End Date left open, like every row here).
+    Bill is unchecked because EEM generates this account''s statement itself (the Bill Generation sub-tab, Stage 7 step
+    8), so there is no separate bill to reconcile it against, and a checked box would copy the rate onto a Bill Reconciliation
+    scenario that Northlake Thermal Plant does not have.'
+  - 'RWL-XFER-2024 needs no Rate Option: its determinants sit under the automatic All class, which the engine takes for
+    every meter (UtilityRate_Exec.sql:303-307), and its Commodity Mapping is what turns its two amounts into bill lines
+    (both in 05-rates.yaml).'

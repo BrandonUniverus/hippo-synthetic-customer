@@ -1,0 +1,149 @@
+# Stage 5, step 2: Bill Importer sources (WPF Bill Importer app, then Web SPA #/BillImporter).
+# Valley Electric District and River City Utilities are the two providers northlake-bill-entry-v1.yaml routes
+# through import (user nora.chen); Sierra Gas, Helios Solar and the Thermal Plant are manual Bill Entry and are
+# not here (see 03-bills.yaml), nor is Ridgeline Wind (EEM generates its statements, Stage 7). The WPF app only
+# converts a provider's own file into the flat BIF the Web SPA reads - it has no "add a provider" screen; a
+# provider is a Schemas/<code>.xml file plus a code in appsettings.json's BillImporter:Utilities list, both
+# installed alongside the app. The bad-data and fiscal-period fixtures are hand-authored flat BIF files (the
+# format the WPF app itself produces) loaded straight into the Web SPA, which is the same DATA-PATH a converted
+# file uses from the Files tab on.
+stage: 5
+step: 2
+title: Bill Importer sources
+app: Bill Importer (WPF) and Web SPA
+screen: BillImporterMainWindow, then '#/BillImporter (Files, Mappings, Workspace, History)'
+source:
+- data/providers/valley-electric-district.yaml
+- data/providers/river-city-utilities.yaml
+- data/providers/sierra-gas-utility.yaml
+- data/eem/northlake-bill-entry-v1.yaml
+- data/bills/northlake-itemized-bills-v1.yaml
+notes:
+- 'Verified in src/Apps/EEMSuite.Apps.BillImporter: appsettings.json BillImporter:Utilities lists the utility
+  codes the app loads at startup; for each one it reads Schemas/<code>.xml from the app''s own folder
+  (BillImporterMainWindowViewModel.cs, _TryLoadProvider). There is no in-app "new provider" command - the XML
+  and the appsettings.json entry are a one-time customization step the integrator makes to the installed app,
+  not a screen Brandon fills in. Schemas/CRC.xml is the shipped example this stage''s two new schemas follow.'
+- 'The schema''s own header comment documents its grammar: [F]literal, [C]column name, dateformat/customdate/
+  daysoffset for dates, one <BillItem> block per charge line with Meter/Description/Estimate/Quantity/Amount.'
+- 'The flat BIF column order (verified against the shipped TestSamples/bill-importer-validation-issues.bif) is
+  Provider,Scenario,CustomerName,InvoiceNumber,FiscalYear,FiscalPeriod,InvoiceDate,PeriodStart,PeriodEnd,DueDate,
+  Account,Location,Currency,Amount,PrevBalance,EarMark,Notes, then Meter/Descriptor/Estimate/Quantity/Amount
+  repeated once per bill item.'
+- 'The fiscal-period rejection messages are exact product text (Database/EEMSuite/Procs/
+  BillImportPro_FileData_Validate.sql:481-502): "Fiscal Year NOT found!" and "Fiscal Period NOT found!" are two
+  checks on the same test, a CompanyCalendar row for the row''s fiscal year and period, so a row with none gets
+  both. The installed calendars run to 2026 or 2027 and EEM keeps extending them, so the sample row is a bill keyed
+  with its year transposed (2052 for 2025), which no calendar reaches.'
+- Account Mapping and Commodity Mapping are both on the Mappings tab (billImporterAccountMappingEditor.ts,
+  billImporterCommodityMappingEditor.ts); map every source account/commodity token once and it applies to every
+  file from that provider from then on.
+- 'Verified against EEMSuite_Northlake: the Mappings tab writes one BillImportPro_Utility row per provider
+  (ProviderName_BIF/CompanyName_BIF text resolved to UtilityProviderID/CompanyID) and one BillImportPro_AccMeter
+  row per source account number resolved to a BillingAccountID. Both tables are empty until this step runs.'
+- 'Added 2026-10-01 (Ridgeline Wind): Valley Electric''s generator account at the Ridgeline substation
+  (SYN-VED-A-0010014) and the credit lines on the Central Plant''s bills arrive in the same Valley Electric file,
+  so this step gains no source, only seven charge codes on the existing VED mapping. The plant company now holds
+  two imported Valley Electric accounts (the Central Plant and the generator), and the import covers 31 accounts
+  in all: 14 Valley Electric and 17 River City. Ridgeline Wind itself has no source: nobody sends it a bill, EEM
+  generates its statement from the ten turbine meters (Stage 7).'
+records:
+- key: ved_import_source
+  installed: {}
+  Utility Configuration (Bill Importer app):
+    Utility Code: VED
+    Schema File: Schemas/VED.xml
+    File Type: CSV, one row per account per billing period
+    Sample Input: 'work/input/VED/VED_sample.csv (columns per data/providers/valley-electric-district.yaml
+      fileFormats.billing: synthetic_account_number, billing_start, billing_end, total_kwh, billing_demand_kw,
+      total_cost, bill_status)'
+    BIF Output Folder: work/output
+    Backup Folder: work/backup
+  Files (Web SPA):
+    Upload: the .bif file BillImporter wrote to work/output
+  Account Mapping:
+  - {Source Account: SYN-VED-A-#######, Maps To: 'the matching Northlake University, Cedar Row Apartments or
+      Northlake Thermal Plant billing account by synthetic number (Stage 2); the plant holds two, SYN-VED-A-0010013
+      (Central Plant) and SYN-VED-A-0010014 (Ridgeline Substation)'}
+  Commodity Mapping:
+  - {Source Charge: energy_peak / energy_part_peak / energy_off_peak, Maps To: 'Electric, TOU'}
+  - {Source Charge: demand_charge, Maps To: 'Electric, Demand'}
+  - {Source Charge: facility_charge, Maps To: 'Electric, Fixed'}
+  - {Source Charge: power_factor_adjustment, Maps To: 'Electric, Adjustment'}
+  - {Source Charge: public_purpose_program, Maps To: 'Electric, Rider'}
+  - {Source Charge: utility_users_tax, Maps To: 'Electric, Tax'}
+  - {Source Charge: generator_customer_charge, Maps To: 'Electric, Fixed'}
+  - {Source Charge: station_service_energy, Maps To: 'Electric, Non-TOU energy'}
+  - {Source Charge: reactive_power_charge, Maps To: 'Electric, Reactive energy'}
+  - {Source Charge: generation_credit, Maps To: 'Electric, Credit'}
+  - {Source Charge: bct_credit_transferred, Maps To: 'Electric, Credit'}
+  - {Source Charge: bct_credit_received, Maps To: 'Electric, Credit'}
+  - {Source Charge: bct_administrative_fee, Maps To: 'Electric, Fixed'}
+  # The last seven are Ridgeline's. In the picker (Electricity measure type, EEMSuite_Northlake) station_service_energy
+  # is Non-TOU kWh, reactive_power_charge is Elec rkVAh (its quantity is the kVArh billed above the allowance, not the
+  # kVArh measured), and the fixed charge, the fee and the three credit lines are Elec Misc Chgs/Credits. The three
+  # credit lines are dollars only: the export energy stays in the received interval channel, because a kWh commodity
+  # here would add the export to use (product finding 44).
+  Generator Account (SYN-VED-A-0010014):
+  - VED.xml gets one BillItem block for each new code. The three credit blocks send Quantity [F]0, dollars only, as
+    CRC.xml's tax and fee lines do; set SaveAllValues to false on all seven (the shipped CRC.xml comment documents
+    it) so a zero line, the reactive charge of a calm bill such as the one for 2025-01-05 to 2025-02-04, is dropped
+    the way a winter peak line is.
+  - 'MWh versus kWh: the statement prints the export register in MWh (2,496.612) beside kWh (2,496,612), and the
+    15-minute interval channels are kWh. A bill item has no unit of its own (the flat BIF item is Meter, Descriptor,
+    Estimate, Quantity and Amount, and BillItem stores a quantity only), so a quantity takes the unit of the
+    commodity it maps to. The export is dollars only here, so nothing depends on it, but the MWh figure against a
+    kWh commodity, or kWh against a MWh one, would be stored 1,000 times off and nothing would flag it.'
+  - The first bill's flat BIF row carries PeriodStart 2024-07-01, PeriodEnd 2024-08-04 (35 days), FiscalYear 2024 and
+    FiscalPeriod 8. Valley Electric periods post to the month they end in (Stage 1), so the opening bill is the Aug-24
+    period, not July, and the last generator bill is Dec-25 (2025-11-05 to 2025-12-04).
+  - SYN-VED-A-0019014 is the seller's number from before 2024-07-01; Northlake has no bills on it, so it is not mapped.
+  Workspace:
+  - Review the queue, resolve any mapping-fix flags, then import.
+  - The generator account's first bill (2024-07-01 to 2024-08-04) is the credit pair to check by eye -
+    bct_credit_transferred +152,792.65 beside generation_credit -152,792.65 on its bill, and bct_credit_received
+    -152,792.65 on the Central Plant's Sep-24 bill (2024-08-05 to 2024-09-04).
+- key: rcu_import_source
+  installed: {}
+  Utility Configuration (Bill Importer app):
+    Utility Code: RCU
+    Schema File: Schemas/RCU.xml
+    File Type: CSV, one row per account per service per billing period (service_code WATER/SEWER/STORM on one
+      statement)
+    Sample Input: 'work/input/RCU/RCU_sample.csv (columns per data/providers/river-city-utilities.yaml
+      fileFormats.billing: synthetic_account_number, service_code, billing_start, billing_end, usage_quantity,
+      usage_unit, total_cost)'
+    BIF Output Folder: work/output
+    Backup Folder: work/backup
+  Files (Web SPA):
+    Upload: the .bif file BillImporter wrote to work/output
+  Account Mapping:
+  - {Source Account: SYN-RCU-A-#######, Maps To: the matching billing account by synthetic number (Stage 2)}
+  Commodity Mapping:
+  - {Source Charge: water_meter_charge / water_tier1 / water_tier2 / water_tier3, Maps To: Water}
+  - {Source Charge: sewer_base / sewer_volume, Maps To: Sewer}
+  - {Source Charge: stormwater_eru, Maps To: Stormwater}
+  Workspace:
+  - Review the queue; the account_number_change fixture (03-bills.yaml) needs Cedar Row A remapped to its new
+    account number after the July 2024 renewal; the duplicate_file_import fixture needs the same combined file
+    uploaded twice to prove the Workspace does not double the service lines.
+- key: bad_data_sample
+  installed: {}
+  Files (Web SPA):
+    Upload: bad-data-sample.bif (hand-authored flat BIF, one row)
+  File Contents: |
+    Provider,Scenario,CustomerName,InvoiceNumber,FiscalYear,FiscalPeriod,InvoiceDate,PeriodStart,PeriodEnd,DueDate,Account,Location,Currency,Amount,PrevBalance,EarMark,Notes,Meter1,Descriptor1,Estimate1,Quantity1,Amount1,Unit1
+    SGU,Actual,Sierra Gas Utility,SGU-BAD-UNIT-0001,2024,3,2024-03-18,2024-02-15,2024-03-14,2024-04-08,SYN-SGU-A-0020004,Student Center,USD,412.00,0,Y,Bad-data validation sample,SYN-SGU-M-0050004,Gas Commodity,N,15100,412.00,BTU/hr
+  # why: Sierra Gas Student Center is the account data/providers/sierra-gas-utility.yaml scenarioHooks names for
+  # negative_bad_units; BTU/hr is not a unit the commodity's measure type accepts, so the Workspace flags the row
+  # instead of importing it.
+- key: fiscal_period_rejection_sample
+  installed: {}
+  Files (Web SPA):
+    Upload: fiscal-period-rejection-sample.bif (hand-authored flat BIF, one row)
+  File Contents: |
+    Provider,Scenario,CustomerName,InvoiceNumber,FiscalYear,FiscalPeriod,InvoiceDate,PeriodStart,PeriodEnd,DueDate,Account,Location,Currency,Amount,PrevBalance,EarMark,Notes,Meter1,Descriptor1,Estimate1,Quantity1,Amount1
+    VED,Actual,Valley Electric District,VED-FISCAL-2052-0001,2052,1,2052-01-06,2051-12-05,2052-01-04,2052-02-05,SYN-VED-A-0010001,Admin Hall,USD,3150.00,0,Y,Fiscal-period rejection sample,SYN-VED-M-0040001,Energy,N,13100,3150.00
+  # why: Admin Hall's Jan-25 bill (Valley Electric's 2024-12-05 to 2025-01-04 cycle) keyed with its year transposed,
+  # 2052 for 2025. No Northlake calendar has 2052 rows (they run to 2026 or 2027), so the Workspace shows "Fiscal Year
+  # NOT found!" and "Fiscal Period NOT found!" for this row and nothing imports.

@@ -1,0 +1,90 @@
+# Stage 9, step 5: My Favorite Reports library (Web, Save-as-Favorite drawer on any report, and
+# #/MyFavoriteReports/Index for dashboards). `kind` distinguishes a saved report, a dashboard, the two
+# business-proposed "custom reports" (which are saved reports too, see the note below) and a goal (something the
+# product cannot do yet; nothing is entered for it).
+stage: 9
+step: 5
+title: Saved reports and dashboards
+app: Web
+screen: Save-as-Favorite drawer, MyFavoriteReports/Index
+source:
+- generators/documents/sources/implementation/dream-customer/phase6-operations-engagement-spec.md
+notes:
+- 'Verified table shape: GUIMFRSavedReports (Title, GuiReportID, ReportRecentID, URI, Dashboardable) is a named,
+  parameterized SNAPSHOT of an existing report, not a new report definition; GUIMFRDashboards (Title, PublicFlag,
+  Columns) + GUIMFRDashboardReports (Sequence, DashboardColumn, RefreshRateInMinutes) arrange saved reports into
+  tiles.'
+- 'What "custom report" means in this product: there is no screen to register a brand-new, SQL-backed report type.
+  The 2 items below the business calls "custom reports" are entered as named, parameter-locked Favorites of an
+  existing report -- the closest the product has to a customer-specific view -- created from that report''s own
+  Save-as-Favorite drawer, not from a report-authoring screen.'
+- 'Save-as-Favorite fields: Title, which module it files under, and whether it is Dashboardable; the report''s
+  current filter/parameter state (building, date range, commodity) is what gets snapshotted.'
+- 'Confirmed finding, carried in the chapter''s Findings section: no screen registers a new report type.
+  ReportMenuItemDTOController.Save (api/ReportMenuItem/Save) can re-file an EXISTING ReportOptionId into a
+  different module/submodule, but nothing in the web frontend (checked routing.ts and views/) or Configuration
+  Tool calls it, and it does not create new report logic.'
+- 'Added 2026-10-01 (Ridgeline Wind): 14 saved reports, 1 dashboard and 1 goal. Report keys checked in PermissionCatalog
+  (rp_ScatterPlot and rp_MultiPointTrend are Use Analysis, G:17; rp_GatewayStatus is System Manager, G:15); "Based On" is
+  the report route, as above. Mateo Alvarez (Ridgeline Wind Site Manager) owns three of the saved reports and the Ridgeline
+  Operations dashboard, which he shares with his group ntp_wind_ops; the monthly one belongs to whoever authors its
+  delivery (step 6). Elena Vasquez (Wind Energy Research Lab Director) owns the ten power curves and shares them with
+  eem_ridgeline_research. Ownership follows the product: a shared dashboard can hold only its owner''s own saved reports,
+  and a user who does not administer the target company can share only to a group of their own company that they belong
+  to (GUIMFRDashboard_Save, GuiMFRPermissions_Save), so the plant''s dashboard cannot reach the university researchers
+  and their power curves cannot reach the plant''s staff.'
+- 'What the Ridgeline researchers (eem_ridgeline_research, Elena and Kai) can open: every Use Analysis report on the
+  Ridgeline Wind Site, Points List and Point Data Map, and the shared power curves (a shared favorite is listed only for a
+  user whose modules hold its report). They cannot open Gateway Status, Alarm Data Map or Task Log (the group holds no
+  System Manager reports beyond the two), any bill report, or the plant''s dashboard. Dashboards need the function
+  allow_dashboards (Allow User Dashboards, level 1) for the owner and every viewer: without it the dashboard list is empty
+  (DapperReportingDataAccess.GetAllDashboardInfoByUserId). Stage 1 grants it through three groups: ntp_wind_ops (Mateo and
+  the wind team, the Ridgeline Operations dashboard), eem_reports (Samantha and the Executive Overview''s viewers) and
+  eem_gateway_reports (Jordan''s Facility Operations). The researchers'' group does not hold it, so Elena''s shared power
+  curves reach Kai as favorites, not on a dashboard.'
+- 'Reading the two reports for Ridgeline (from rp_MultiPointTrend, rp_ScatterPlot and wh_GetIntervalData, not yet run on
+  Ridgeline data): Multi-Point Trend reads both farm points as demand and converts the energy point by its interval, so
+  Generated kWh and Possible kW are both kW on one axis and "Use a separate axis for each point" stays off. Scatter Plot
+  reads each point as usage, and a unit class outside its usage list (Power, Speed) is the reading times interval/60, so
+  on 10-minute data Active Power kW and Nacelle Wind Speed may both plot at one sixth of the reading, with no unit on the
+  axes; the shape and the fit are unchanged. The first point selected is the X axis: if power lands on X, reselect with
+  wind speed first. Run the first power curve against the point''s own values before relying on its scale.'
+records:
+- {key: saved_monthly_building_energy, kind: saved_report, installed: {guiMfrSavedReportsId: }, Save-as-Favorite: {Title: Monthly Building Energy, Module: Use Analysis, "Based On": MonthlyEUI, Params: "Northlake Main Campus buildings, rolling 12 months", Dashboardable: true}}
+- {key: saved_weekly_cost_rollup, kind: saved_report, installed: {guiMfrSavedReportsId: }, Save-as-Favorite: {Title: Weekly Cost Rollup, Module: Bill Processing, "Based On": "cost/spend report (rp_ variant already in the coverage matrix's Bill Management bucket)", Params: "all three companies, current fiscal week", Dashboardable: true}}
+- {key: saved_executive_sustainability_summary, kind: saved_report, installed: {guiMfrSavedReportsId: }, Save-as-Favorite: {Title: Executive Sustainability Summary, Module: Green House Gases, "Based On": GHGHistory, Params: "all three companies, 2024-2025", Dashboardable: true}}
+- {key: saved_daily_operations, kind: saved_report, installed: {guiMfrSavedReportsId: }, Save-as-Favorite: {Title: Daily Operations, Module: System Administration, "Based On": "TaskLog + GatewayStatus", Params: "yesterday, all gateways", Dashboardable: true}}
+- {key: dashboard_facility_operations, kind: dashboard, installed: {guiMfrDashboardId: }, MyFavoriteReports_Index: {Title: Facility Operations, Tiles: "Gateway Status, Alarm Data Map, Task Log", Public: false, Owner: jordan.hale}}
+- {key: dashboard_executive_overview, kind: dashboard, installed: {guiMfrDashboardId: }, MyFavoriteReports_Index: {Title: Executive Overview, Tiles: "GHG History, Benchmark Ranking (Use per area), Weekly Cost Rollup", Public: true, Owner: samantha.ireland}}
+- {key: custom_campus_vs_cedar_row_eui, kind: proposed_custom_report, installed: {guiMfrSavedReportsId: }, Save-as-Favorite: {Title: "Northlake Campus vs. Cedar Row EUI Comparison", "Based On": BenchmarkRanking, Params: "peer set locked to the 12-building set from Stage 8 step 6"}}
+- {key: custom_quarterly_es_portfolio_status, kind: proposed_custom_report, installed: {guiMfrSavedReportsId: }, Save-as-Favorite: {Title: "Quarterly ENERGY STAR Portfolio Status", "Based On": ESRatingHistory, Params: "all 13 properties, quarterly grouping"}}
+# ---- Ridgeline Wind ----
+- key: goal_ridgeline_expected_vs_actual_scorecard
+  kind: goal
+  goal: 47
+  installed: {}
+  Wanted: {Title: Ridgeline Expected vs Actual Scorecard, Module: Use Analysis, Visual: "Radar chart with its actual-against-target scorecard table", Params: "the ten Ridgeline turbines for one period, for example 2025-02-11 to 2025-04-22"}
+  Needs: "A report that returns one row per turbine: the turbine name first (WTG-01 to WTG-10), then two number columns with GraphData on, Generated (the actual, from Generated kWh 10m) and Possible (the reference, from Possible kW 10m x 10/60, the energy the controller says the wind allowed), the second flagged seriesrole = 'reference' in the formatting result so the Radar draws it dashed and unfilled. It is developer work: a stored procedure with a ReportOptions row, a Radar row in ReportCharts, a grid and a Use Analysis permission entry, because no screen registers a report (product finding 23)."
+  Scale: both series as a percent of one shared base   # assumed: each turbine's rated energy for the period, 660 kW x the hours in it. The Radar scale is fixed at 0-100% (RadarChartSettingsV1, normalized) and warns on any value outside it, so raw kWh cannot be returned
+  Reads as: "The scorecard table beside the radar paints an axis orange when Generated falls below 80% of Possible (radarAlertRatio, default 0.8, in the chart's SettingsJson): WTG-07 from 2025-02-11 to 2025-04-22, and no axis at the fleet's 96.7% of July 2024, when the two outlines almost coincide."
+  Today: "No shipped report feeds a Radar (ReportCharts holds none); the one consumer is the developer gallery, src/Documentation/Developers/Testing/ChartDashboardGallery.seed.sql. The farm trend below draws the same two quantities summed over the farm, as two lines."
+# The plant's saved reports (Mateo's three, and the monthly one for the delivery). The date ranges are assumed: calendar 2025
+# for the farm trend and February to December 2025 for WTG-07, so the outage and the recovery both show; the monthly one is
+# relative because it is delivered every month.
+- {key: saved_ridgeline_farm_generated_vs_possible, kind: saved_report, installed: {guiMfrSavedReportsId: }, Owner: mateo.alvarez, Save-as-Favorite: {Title: Ridgeline Farm Generated vs Possible, Module: Use Analysis, "Based On": MultiPointTrend, Params: "Ridgeline Farm Generated kWh 10m and Ridgeline Farm Possible Power kW 10m, 2025-01-01 to 2025-12-31, Daily; the gap between the lines widens from 2025-02-11 to 2025-04-22 while WTG-07 is down", Dashboardable: true}}
+- {key: saved_ridgeline_wtg07_generated_vs_possible, kind: saved_report, installed: {guiMfrSavedReportsId: }, Owner: mateo.alvarez, Save-as-Favorite: {Title: Ridgeline WTG-07 Generated vs Possible, Module: Use Analysis, "Based On": MultiPointTrend, Params: "Ridgeline WTG-07 Generated kWh 10m and Possible kW 10m, 2025-02-01 to 2025-12-31, Daily; the M&V view of the WTG-07 Gearbox Replacement project (step 1): zero against full possible power until 2025-04-22, then the two lines together", Dashboardable: true}}
+- {key: saved_ridgeline_gateway_status, kind: saved_report, installed: {guiMfrSavedReportsId: }, Owner: mateo.alvarez, Save-as-Favorite: {Title: Ridgeline Gateway Status, Module: System Manager, "Based On": GatewayStatus, Params: "90% threshold (the report's default), results by node", Dashboardable: true}}
+- {key: saved_ridgeline_monthly_performance, kind: saved_report, installed: {guiMfrSavedReportsId: }, Owner: "the delivery's author, a system administrator (step 6)", Save-as-Favorite: {Title: Ridgeline Monthly Performance, Module: Use Analysis, "Based On": MultiPointTrend, Params: "Ridgeline Farm Generated kWh 10m and Ridgeline Farm Possible Power kW 10m, Last Month, Daily; a relative range, so it shows nothing for the scenario (its data ends 2025-12-31) until it is run on a month inside it", Dashboardable: true}}
+- {key: dashboard_ridgeline_operations, kind: dashboard, installed: {guiMfrDashboardId: }, MyFavoriteReports_Index: {Title: Ridgeline Operations, Tiles: "Ridgeline Farm Generated vs Possible, Ridgeline WTG-07 Generated vs Possible, Ridgeline Gateway Status", Public: false, Owner: mateo.alvarez, "Shared With": "group ntp_wind_ops (Northlake Thermal Plant)"}}
+# Power curves, Elena's: one calendar year (2025, assumed) so every wind-speed bin fills; WTG-07's carries its fault as a stack
+# along zero power from 2025-02-11 to 2025-04-22. The curve fit is goal 43: Scatter Plot fits only a straight line, y = mx + b.
+- {key: saved_ridgeline_wtg01_power_curve, kind: saved_report, installed: {guiMfrSavedReportsId: }, Owner: elena.vasquez, "Shared With": "group eem_ridgeline_research (Northlake University copy)", Save-as-Favorite: {Title: Ridgeline WTG-01 Power Curve, Module: Use Analysis, "Based On": ScatterPlot, Params: "X Nacelle Wind Speed 10m, Y Active Power kW 10m, both on Ridgeline WTG-01, 2025-01-01 to 2025-12-31", Dashboardable: true}}
+- {key: saved_ridgeline_wtg02_power_curve, kind: saved_report, installed: {guiMfrSavedReportsId: }, Owner: elena.vasquez, "Shared With": "group eem_ridgeline_research (Northlake University copy)", Save-as-Favorite: {Title: Ridgeline WTG-02 Power Curve, Module: Use Analysis, "Based On": ScatterPlot, Params: "X Nacelle Wind Speed 10m, Y Active Power kW 10m, both on Ridgeline WTG-02, 2025-01-01 to 2025-12-31", Dashboardable: true}}
+- {key: saved_ridgeline_wtg03_power_curve, kind: saved_report, installed: {guiMfrSavedReportsId: }, Owner: elena.vasquez, "Shared With": "group eem_ridgeline_research (Northlake University copy)", Save-as-Favorite: {Title: Ridgeline WTG-03 Power Curve, Module: Use Analysis, "Based On": ScatterPlot, Params: "X Nacelle Wind Speed 10m, Y Active Power kW 10m, both on Ridgeline WTG-03, 2025-01-01 to 2025-12-31", Dashboardable: true}}
+- {key: saved_ridgeline_wtg04_power_curve, kind: saved_report, installed: {guiMfrSavedReportsId: }, Owner: elena.vasquez, "Shared With": "group eem_ridgeline_research (Northlake University copy)", Save-as-Favorite: {Title: Ridgeline WTG-04 Power Curve, Module: Use Analysis, "Based On": ScatterPlot, Params: "X Nacelle Wind Speed 10m, Y Active Power kW 10m, both on Ridgeline WTG-04, 2025-01-01 to 2025-12-31", Dashboardable: true}}
+- {key: saved_ridgeline_wtg05_power_curve, kind: saved_report, installed: {guiMfrSavedReportsId: }, Owner: elena.vasquez, "Shared With": "group eem_ridgeline_research (Northlake University copy)", Save-as-Favorite: {Title: Ridgeline WTG-05 Power Curve, Module: Use Analysis, "Based On": ScatterPlot, Params: "X Nacelle Wind Speed 10m, Y Active Power kW 10m, both on Ridgeline WTG-05, 2025-01-01 to 2025-12-31", Dashboardable: true}}
+- {key: saved_ridgeline_wtg06_power_curve, kind: saved_report, installed: {guiMfrSavedReportsId: }, Owner: elena.vasquez, "Shared With": "group eem_ridgeline_research (Northlake University copy)", Save-as-Favorite: {Title: Ridgeline WTG-06 Power Curve, Module: Use Analysis, "Based On": ScatterPlot, Params: "X Nacelle Wind Speed 10m, Y Active Power kW 10m, both on Ridgeline WTG-06, 2025-01-01 to 2025-12-31", Dashboardable: true}}
+- {key: saved_ridgeline_wtg07_power_curve, kind: saved_report, installed: {guiMfrSavedReportsId: }, Owner: elena.vasquez, "Shared With": "group eem_ridgeline_research (Northlake University copy)", Save-as-Favorite: {Title: Ridgeline WTG-07 Power Curve, Module: Use Analysis, "Based On": ScatterPlot, Params: "X Nacelle Wind Speed 10m, Y Active Power kW 10m, both on Ridgeline WTG-07, 2025-01-01 to 2025-12-31", Dashboardable: true}}
+- {key: saved_ridgeline_wtg08_power_curve, kind: saved_report, installed: {guiMfrSavedReportsId: }, Owner: elena.vasquez, "Shared With": "group eem_ridgeline_research (Northlake University copy)", Save-as-Favorite: {Title: Ridgeline WTG-08 Power Curve, Module: Use Analysis, "Based On": ScatterPlot, Params: "X Nacelle Wind Speed 10m, Y Active Power kW 10m, both on Ridgeline WTG-08, 2025-01-01 to 2025-12-31", Dashboardable: true}}
+- {key: saved_ridgeline_wtg09_power_curve, kind: saved_report, installed: {guiMfrSavedReportsId: }, Owner: elena.vasquez, "Shared With": "group eem_ridgeline_research (Northlake University copy)", Save-as-Favorite: {Title: Ridgeline WTG-09 Power Curve, Module: Use Analysis, "Based On": ScatterPlot, Params: "X Nacelle Wind Speed 10m, Y Active Power kW 10m, both on Ridgeline WTG-09, 2025-01-01 to 2025-12-31", Dashboardable: true}}
+- {key: saved_ridgeline_wtg10_power_curve, kind: saved_report, installed: {guiMfrSavedReportsId: }, Owner: elena.vasquez, "Shared With": "group eem_ridgeline_research (Northlake University copy)", Save-as-Favorite: {Title: Ridgeline WTG-10 Power Curve, Module: Use Analysis, "Based On": ScatterPlot, Params: "X Nacelle Wind Speed 10m, Y Active Power kW 10m, both on Ridgeline WTG-10, 2025-01-01 to 2025-12-31", Dashboardable: true}}

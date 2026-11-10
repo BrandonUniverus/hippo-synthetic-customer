@@ -1,0 +1,936 @@
+# Stage 4, step 8: the Rate Lab (Database Administrator > RateModeler). NOT READY TO ENTER.
+# Starting material only: the nine feature rates and four scripts that sat under the real providers until
+# 2026-11-09, moved here unchanged. They become the Northlake Rate Lab provider's rates, a seventh provider that
+# carries the full engine: every significance, a day-of-week season, ratchet and load factor with history, real-time
+# pricing with its price point, minimum and maximum charges, every kind of option, per-meter prices, excluded points,
+# scripts, and export and import. Known to be wrong as written: the three new scripts use variables the engine does
+# not supply (a script works on the bill-item table), the schedules they name were replaced, the real-time price
+# point does not exist, and four of the five option classes carry no charge.
+stage: 4
+step: 8
+title: Rate Lab
+app: Database Administrator
+screen: RateModeler > Rate Edit
+status: starting material, to be reworked
+records:
+- key: script_base_excess_pre
+  installed:
+    determinantScriptId: null
+  kind: Determinant script
+  Scripts:
+    Description: Base/Excess Demand Split (Pre)
+    Type: Pre
+    SQL: '-- Synthetic stand-in: the engine has no native "base vs excess" demand tier.
+
+      -- Reads the meter''s billed demand and caps this determinant''s usage at the contract
+
+      -- base demand (16.2 kW basis); the paired Post script bills the remainder as Excess Demand.
+
+      -- @DeterminantID, @MetaWorldID, @BillDemand are the script context variables the engine supplies.
+
+      SELECT @BillDemand = CASE WHEN @BillDemand > 16.2 THEN 16.2 ELSE @BillDemand END
+
+      '
+- key: script_base_excess_post
+  installed:
+    determinantScriptId: null
+  kind: Determinant script
+  Scripts:
+    Description: Base/Excess Demand Split (Post)
+    Type: Post
+    SQL: '-- Pairs with Base/Excess Demand Split (Pre): re-reads the meter''s actual billed demand and
+
+      -- bills only the amount above the 16.2 kW contract base on the Excess Demand determinant.
+
+      SELECT @BillDemand = CASE WHEN @BillDemand > 16.2 THEN @BillDemand - 16.2 ELSE 0 END
+
+      '
+- key: script_pf_adjust
+  installed:
+    determinantScriptId: null
+  kind: Determinant script
+  Scripts:
+    Description: Power Factor Adjustment (Post)
+    Type: Post
+    SQL: '-- Synthetic stand-in: the engine has no power-factor math. Northlake has no measured power
+
+      -- factor point yet, so this adds a small flat reactive-power adjustment on the lab-heavy
+
+      -- Science Center account instead of computing kVAR from a real PF reading.
+
+      SELECT @ChargeAmount = @ChargeAmount + 45.00
+
+      '
+- key: script_round_2dp
+  installed:
+    determinantScriptId: 1
+    note: already exists (verified in dbo.UtilityDeterminantScript); no new script to create
+  kind: Determinant script
+  Scripts:
+    Description: Round Bill Item Down 2 Decimals
+    Type: Post
+  notes:
+  - Pre-existing on this installed database, presumably from an earlier setup step; reuse it as-is on NL-RTP-Index's
+    two RTP determinants rather than creating a second rounding script. Its SQL rounds down (floor), not to nearest,
+    which is fine for the RTP proof and not worth changing here.
+- key: nl_gs_tou_seasonal
+  installed:
+    providerId: 1
+    rateId: null
+  provider: valley_electric_district
+  Rate:
+    Rate Name: NL-GS-TOU-Seasonal
+    Currency: US Dollar
+    Measure Type: Electricity
+    Rate Categories:
+      Transmission: false
+      Distribution: true
+      Commodity: true
+  Rate Classes:
+  - Rate Class Name: All
+  Determinants:
+  - Charge Name: Facility Charge
+    Charge Type: 400 Fixed By Period
+    Units: Kilowatt Hours
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 64.0
+    - Effective Date: 2025-01-01
+      Value: 67.5
+  - Charge Name: Energy On-Peak
+    Charge Type: 200 Charge Period
+    Units: KilowattHours
+    Aggregation Rule: Summing
+    Schedule: Summer On-Peak
+    Significance: On Peak
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 0.241
+    - Effective Date: 2025-01-01
+      Value: 0.258
+  - Charge Name: Energy Part-Peak
+    Charge Type: 200 Charge Period
+    Units: KilowattHours
+    Aggregation Rule: Summing
+    Schedule: Summer Off-Peak
+    Significance: Off Peak
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 0.168
+    - Effective Date: 2025-01-01
+      Value: 0.179
+  - Charge Name: Energy Off-Peak (Winter)
+    Charge Type: 200 Charge Period
+    Units: KilowattHours
+    Aggregation Rule: Summing
+    Schedule: Winter Off-Peak
+    Significance: Off Peak
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 0.112
+    - Effective Date: 2025-01-01
+      Value: 0.118
+  - Charge Name: Energy On-Peak (Winter)
+    Charge Type: 200 Charge Period
+    Units: KilowattHours
+    Aggregation Rule: Summing
+    Schedule: Winter On-Peak
+    Significance: On Peak
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 0.112
+    - Effective Date: 2025-01-01
+      Value: 0.118
+    notes:
+    - 'Added beyond the source entry plan, which never assigns a determinant to SCHED-WIN-ONPEAK: without one, the
+      tariff''s winter weekday 17:00-21:00 window has no energy price at all. Value is # assumed (no separate winter
+      on-peak figure exists in the provider file); see Findings.'
+  - Charge Name: Summer Demand
+    Charge Type: 200 Charge Period
+    IsDemand: true
+    Units: Kilowatt
+    Aggregation Rule: Maximum
+    Schedule: Summer (Demand)
+    Significance: All Hour
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 18.4
+    - Effective Date: 2025-01-01
+      Value: 19.75
+  - Charge Name: Winter Demand
+    Charge Type: 200 Charge Period
+    IsDemand: true
+    Units: Kilowatt
+    Aggregation Rule: Maximum
+    Schedule: Winter (Demand)
+    Significance: All Hour
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 14.1
+  - Charge Name: Public Purpose Rider
+    Charge Type: 700 Bill Adj
+    Units: Percent
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Apply Charges:
+    - Energy On-Peak
+    - Energy Part-Peak
+    - Energy Off-Peak (Winter)
+    - Energy On-Peak (Winter)
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 2.85
+  - Charge Name: Renewable Energy Rider
+    Charge Type: 200 Charge Period
+    Units: KilowattHours
+    Aggregation Rule: Summing
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 0.00461
+  - Charge Name: Utility Users Tax
+    Charge Type: 800 Taxes
+    Units: Percent
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Apply Charges: Apply to All
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 5.0
+  notes:
+  - Flagship rate; enriches VED-TOU-GS to full determinant granularity for Admin Hall and Library (06-rate-assignments),
+    which carry monthly-only registers that still read as TOU energy.
+  - Rate Class is the automatic All, which is already the always-applied type the source asks for (ClassType 0,
+    UtilityRate_Save.sql:89-90); the source's Track B item 6 assumed it was Unique (finding 8).
+- key: nl_res_tiered
+  installed:
+    providerId: 1
+    rateId: null
+  provider: valley_electric_district
+  Rate:
+    Rate Name: NL-RES-Tiered
+    Currency: US Dollar
+    Measure Type: Electricity
+    Rate Categories:
+      Transmission: false
+      Distribution: true
+      Commodity: true
+  Rate Classes:
+  - Rate Class Name: All
+  Determinants:
+  - Charge Name: Customer Charge
+    Charge Type: 400 Fixed By Period
+    Units: Kilowatt Hours
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 12.5
+  - Charge Name: Energy (Tiered)
+    Charge Type: 200 Charge Period
+    Units: KilowattHours
+    Aggregation Rule: Summing
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Blocks:
+      - Block Number: 1
+        Block Size: 500
+        Block Value: 0.128
+      - Block Number: 2
+        Block Size: 1000
+        Block Value: 0.156
+      - Block Number: 3
+        Block Size: (blank
+        remainder): null
+        Block Value: 0.189
+  - Charge Name: Minimum Bill
+    Charge Type: 500 Min Value
+    Units: Dollar
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Apply Charges:
+    - Customer Charge
+    - Energy (Tiered)
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 18.0
+  - Charge Name: State Tax
+    Charge Type: 800 Taxes
+    Units: Percent
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Apply Charges:
+    - Customer Charge
+    - Energy (Tiered)
+    - Minimum Bill
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 2.5
+  - Charge Name: Municipal Tax
+    Charge Type: 800 Taxes
+    Units: Percent
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Apply Charges:
+    - Customer Charge
+    - Energy (Tiered)
+    - Minimum Bill
+    - State Tax
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 1.75
+  notes:
+  - Municipal Tax applies on top of State Tax on purpose (tax-on-tax ordering); its Apply Charges list includes
+    State Tax where every other rate's tax list stops at the priced charges.
+  - Cedar Row's residential electric; the district never bills an individual apartment (README), so this rate exists
+    only on the two building master meters.
+- key: nl_lg_ratchet
+  installed:
+    providerId: 1
+    rateId: null
+  provider: valley_electric_district
+  Rate:
+    Rate Name: NL-LG-Ratchet
+    Currency: US Dollar
+    Measure Type: Electricity
+    Rate Categories:
+      Transmission: false
+      Distribution: true
+      Commodity: true
+  Rate Classes:
+  - Rate Class Name: All
+  Determinants:
+  - Charge Name: Facility Charge
+    Charge Type: 400 Fixed By Period
+    Units: Kilowatt Hours
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 320.0
+  - Charge Name: Energy (Load-Factor Sized)
+    Charge Type: 200 Charge Period
+    Units: KilowattHours
+    Aggregation Rule: Summing
+    Use Factor-Based Block Sizes: true
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Blocks:
+      - Block Number: 1
+        Block Size Factor: (load factor)
+        Block Value: 0.131
+  - Charge Name: Demand (Ratchet)
+    Charge Type: 200 Charge Period
+    IsDemand: true
+    Units: Kilowatt
+    Aggregation Rule: Maximum
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Post Script: Power Factor Adjustment (Post)
+    Ratchets:
+    - Current %: 100
+      Previous %: 80
+      Aggregation Rule: Maximum
+      Interval Rule: Averaging
+      Months: 11
+      Bill Cycle: true
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 21.4
+  - Charge Name: Utility Users Tax
+    Charge Type: 800 Taxes
+    Units: Percent
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Apply Charges: Apply to All
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 5.0
+  notes:
+  - Science Center; the Post Script is the synthetic power-factor stand-in the provider notes call for on this building's
+    lab-heavy load.
+  - Needs at least 12 months of interval data with a strong summer peak for the winter ratchet floor (80% of prior
+    summer peak) to bind; flag this to whoever builds Stage 3's interval generator.
+- key: nl_contract_2part
+  installed:
+    providerId: 1
+    rateId: null
+  provider: valley_electric_district
+  Rate:
+    Rate Name: NL-CONTRACT-2Part
+    Currency: US Dollar
+    Measure Type: Electricity
+    Rate Categories:
+      Transmission: true
+      Distribution: true
+      Commodity: true
+  Rate Classes:
+  - Rate Class Name: All
+  Determinants:
+  - Charge Name: Base Contract Demand
+    Charge Type: 200 Charge Period
+    IsDemand: true
+    Units: Kilowatt
+    Aggregation Rule: Maximum
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Pre Script: Base/Excess Demand Split (Pre)
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 16.2
+  - Charge Name: Excess Demand
+    Charge Type: 200 Charge Period
+    IsDemand: true
+    Units: Kilowatt
+    Aggregation Rule: Maximum
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Post Script: Base/Excess Demand Split (Post)
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 24.3
+  - Charge Name: Base Energy
+    Charge Type: 200 Charge Period
+    Units: KilowattHours
+    Aggregation Rule: Summing
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 0.118
+  - Charge Name: Facility Charge
+    Charge Type: 400 Fixed By Period
+    Units: Kilowatt Hours
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 500.0
+  - Charge Name: Utility Users Tax
+    Charge Type: 800 Taxes
+    Units: Percent
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Apply Charges: Apply to All
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 5.0
+  notes:
+  - Central Plant's electric service; supersedes VED-TOU-PRI for this meter so the base/excess pre-post script pair
+    actually fires.
+- key: nl_rtp_index
+  installed:
+    providerId: 1
+    rateId: null
+  provider: valley_electric_district
+  Rate:
+    Rate Name: NL-RTP-Index
+    Currency: US Dollar
+    Measure Type: Electricity
+    Rate Categories:
+      Transmission: false
+      Distribution: true
+      Commodity: true
+  Rate Classes:
+  - Rate Class Name: All
+  Determinants:
+  - Charge Name: RTP Energy
+    Charge Type: 100 RTP
+    Units: KilowattHours
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Post Script: Round Bill Item Down 2 Decimals
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      RTP Pt ID: pt_ved_rtp_price_hourly
+      Use Price Ranges: false
+  - Charge Name: RTP Energy Capped
+    Charge Type: 100 RTP
+    Units: KilowattHours
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Post Script: Round Bill Item Down 2 Decimals
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      RTP Pt ID: pt_ved_rtp_price_hourly
+      Use Price Ranges: true
+      High Price Range: 0.95
+      Low Price Range: 0.02
+  - Charge Name: Delivery Charge
+    Charge Type: 400 Fixed By Period
+    Units: Kilowatt Hours
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 145.0
+  notes:
+  - Only source of Charge Type 100 in the library. RTP Pt ID needs the synthetic hourly price point pt_ved_rtp_price_hourly
+    created in Stage 2/3's Node/Point editor with hourly $/kWh values loaded by DATA-PATH; Stage 4 does not create
+    that point.
+  - A what-if / shadow rate. Student Center's Actual bill stays on VED-TOU-GS; this rate is assigned under the "Scenario
+    (what-if)" bill scenario in 06-rate-assignments so rp_RateComparison can shadow-bill it.
+- key: nl_step_demand
+  installed:
+    providerId: 1
+    rateId: null
+  provider: valley_electric_district
+  Rate:
+    Rate Name: NL-STEP-Demand
+    Currency: US Dollar
+    Measure Type: Electricity
+    Rate Categories:
+      Transmission: false
+      Distribution: true
+      Commodity: true
+  Rate Classes:
+  - Rate Class Name: All
+  Determinants:
+  - Charge Name: Stepped Demand
+    Charge Type: 210 Charge Period Fixed Value
+    IsDemand: true
+    Units: Kilowatt
+    Aggregation Rule: Maximum
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Blocks:
+      - Block Number: 1
+        Block Size: 100
+        Block Value: 1500.0
+      - Block Number: 2
+        Block Size: 150
+        Block Value: 3200.0
+      - Block Number: 3
+        Block Size: (blank
+        remainder): null
+        Block Value: 6800.0
+  - Charge Name: Energy
+    Charge Type: 200 Charge Period
+    Units: KilowattHours
+    Aggregation Rule: Summing
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 0.142
+  - Charge Name: Maximum Bill
+    Charge Type: 600 Max Value
+    Units: Dollar
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Apply Charges:
+    - Stepped Demand
+    - Energy
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 25000.0
+  notes:
+  - Only source of Charge Types 210 and 600 in the library.
+  - Meant for the Town Center anchor's master meter (tc_market_main), a Phase 4 company not yet installed (only
+    Northlake University, Cedar Row Apartments and Northlake Thermal Plant exist today). No entry in 06-rate-assignments
+    for this reason; proved instead in 07-rate-tests.yaml with generated (synthetic) interval reads that need no
+    real meter.
+- key: nl_gas_fueladj
+  installed:
+    providerId: 2
+    rateId: null
+  provider: sierra_gas_utility
+  Rate:
+    Rate Name: NL-GAS-FuelAdj
+    Currency: US Dollar
+    Measure Type: Natural Gas
+    Rate Categories:
+      Transmission: false
+      Distribution: true
+      Commodity: true
+  Rate Classes:
+  - Rate Class Name: All
+  Determinants:
+  - Charge Name: Customer Charge
+    Charge Type: 300 Fixed By Day
+    Units: Therm
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 1.267
+    notes:
+    - Only source of Charge Type 300 in the library. $38.00/month prorated over a 30-day month (38.00 / 30 = 1.267/day);
+      the product bills this per day rather than per period.
+  - Charge Name: Commodity (Winter)
+    Charge Type: 200 Charge Period
+    Units: Therm
+    Aggregation Rule: Summing
+    Schedule: Gas Winter
+    Significance: All Hour
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 1.142
+  - Charge Name: Commodity (Summer)
+    Charge Type: 200 Charge Period
+    Units: Therm
+    Aggregation Rule: Summing
+    Schedule: Gas Summer
+    Significance: All Hour
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 0.876
+  - Charge Name: Transport
+    Charge Type: 200 Charge Period
+    Units: Therm
+    Aggregation Rule: Summing
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 0.214
+    notes:
+    - Provider file gives this as a ccf-based rate (1.027 ccf/therm conversion); no unit-conversion field exists
+      on a determinant, so the $/therm figure above already has the conversion folded in. Informational only.
+  - Charge Name: Fuel Cost Adjustment
+    Charge Type: 200 Charge Period
+    Units: Therm
+    Aggregation Rule: Summing
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 0.015
+    - Effective Date: 2024-02-01
+      Value: 0.012
+    - Effective Date: 2024-03-01
+      Value: 0.008
+    - Effective Date: 2024-04-01
+      Value: -0.006
+    - Effective Date: 2024-05-01
+      Value: -0.009
+    - Effective Date: 2024-06-01
+      Value: -0.011
+    - Effective Date: 2024-07-01
+      Value: -0.01
+    - Effective Date: 2024-08-01
+      Value: -0.008
+    - Effective Date: 2024-09-01
+      Value: -0.005
+    - Effective Date: 2024-10-01
+      Value: 0.004
+    - Effective Date: 2024-11-01
+      Value: 0.01
+    - Effective Date: 2024-12-01
+      Value: 0.016
+    - Effective Date: 2025-01-01
+      Value: 0.017
+    - Effective Date: 2025-02-01
+      Value: 0.013
+    - Effective Date: 2025-03-01
+      Value: 0.009
+    - Effective Date: 2025-04-01
+      Value: -0.007
+    - Effective Date: 2025-05-01
+      Value: -0.01
+    - Effective Date: 2025-06-01
+      Value: -0.012
+    - Effective Date: 2025-07-01
+      Value: -0.011
+    - Effective Date: 2025-08-01
+      Value: -0.009
+    - Effective Date: 2025-09-01
+      Value: -0.006
+    - Effective Date: 2025-10-01
+      Value: 0.005
+    - Effective Date: 2025-11-01
+      Value: 0.011
+    - Effective Date: 2025-12-01
+      Value: 0.017
+    notes:
+    - '# assumed: 24 illustrative monthly PCA values (2024-01 through 2025-12), a small surcharge in heating months
+      and a small credit in shoulder/summer months. No real per-month adjustment filing exists anywhere in the source
+      documents; each is its own Effective Date (a new BlockValue per month), per the source entry plan.'
+  - Charge Name: Public Purpose Surcharge
+    Charge Type: 700 Bill Adj
+    Units: Percent
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Apply Charges:
+    - Commodity (Winter)
+    - Commodity (Summer)
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 1.9
+  - Charge Name: Utility Users Tax
+    Charge Type: 800 Taxes
+    Units: Percent
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Apply Charges: Apply to All
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 5.0
+  notes:
+  - Enriches SGU-GN-1; assigned in 06-rate-assignments to every non-plant Sierra Gas meter for Actual billing (the
+    boiler gas meter stays on the base SGU-GL-1 large-volume tariff).
+- key: nl_options_phase
+  installed:
+    providerId: 1
+    rateId: null
+  provider: valley_electric_district
+  Rate:
+    Rate Name: NL-OPTIONS-Phase
+    Currency: US Dollar
+    Measure Type: Electricity
+    Rate Categories:
+      Transmission: false
+      Distribution: true
+      Commodity: true
+  Rate Classes:
+  - Rate Class Name: All
+  - Rate Class Name: Primary Voltage
+  - Rate Class Name: Secondary Voltage
+  - Rate Class Name: Three-Phase
+  - Rate Class Name: Tax-Exempt
+  - Rate Class Name: Farm Discount
+  Rate Options:
+  - Option Name: Voltage
+    Min Classes: 1
+    Max Classes: 1
+    Assign Option Rate:
+    - Primary Voltage
+    - Secondary Voltage
+    Default: Secondary Voltage
+  - Option Name: Phase
+    Min Classes: 0
+    Max Classes: 1
+    Assign Option Rate:
+    - Three-Phase
+  - Option Name: Tax
+    Min Classes: 0
+    Max Classes: 1
+    Assign Option Rate:
+    - Tax-Exempt
+  - Option Name: Discount
+    Min Classes: 0
+    Max Classes: 1
+    Assign Option Rate:
+    - Farm Discount
+  Determinants:
+  - Charge Name: Energy
+    Charge Type: 200 Charge Period
+    Units: KilowattHours
+    Aggregation Rule: Summing
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Rate Class: All
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 0.151
+  - Charge Name: Voltage Discount
+    Charge Type: 700 Bill Adj
+    Units: Percent
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Rate Class: Primary Voltage
+    Apply Charges:
+    - Energy
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: -3.0
+  - Charge Name: Utility Users Tax
+    Charge Type: 800 Taxes
+    Units: Percent
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Rate Class: All
+    Apply Charges: Apply to All
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 5.0
+    notes:
+    - Source says this excludes the Tax-Exempt class; unconfirmed whether the Apply Charges checklist supports excluding
+      one class from "Apply to All". If it does not, add a second Tax determinant scoped only to the non-exempt
+      classes instead.
+  notes:
+  - Every class this screen lets you add is Unique (UtilityRateClass_Save.sql inserts ClassType 1), beside the automatic
+    All class, which is always applied (ClassType 0); Rate Options is the grouping mechanic for the added classes (Min/Max
+    classes, a default). The screen shows neither type (finding 8).
+  - 'This is the vehicle for the Track B item 5 finding: the Rate screen can define and default these options, but
+    nothing in the desktop app binds a specific meter to one of them for billing -- see Findings.'
+- key: nl_multi_currency
+  installed:
+    providerId: 1
+    rateId: null
+  provider: valley_electric_district
+  Rate:
+    Rate Name: NL-MULTI-Currency
+    Currency: Canadian Dollar
+    Measure Type: Electricity
+    Rate Categories:
+      Transmission: false
+      Distribution: true
+      Commodity: true
+  Rate Classes:
+  - Rate Class Name: All
+  Determinants:
+  - Charge Name: Energy (C$)
+    Charge Type: 200 Charge Period
+    Units: KilowattHours
+    Aggregation Rule: Summing
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 0.148
+  - Charge Name: GST
+    Charge Type: 800 Taxes
+    Units: Percent
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Apply Charges:
+    - Energy (C$)
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 5.0
+  notes:
+  - Completeness-only. Exercises the Currency picker against a non-USD unit. No real cross-border meter exists in
+    this system; proved in 07-rate-tests.yaml with generated interval reads, no entry in 06-rate-assignments.
+# The nine runs that tested these rates, as they were. To be reworked with the rates.
+oldRateTests:
+- key: test_nl_gs_tou_seasonal
+  Test Configuration:
+    Rate to Test: NL-GS-TOU-Seasonal
+    Start Date: 2024-01-01
+    End Date: 2024-12-31
+    Rate Classes: Select All
+  Intervals:
+    Source: Generate Reads
+    Shape: full-year electric load with a summer cooling peak
+  Results:
+    Expected Bill Total: record from run; no independent total (full-year, multi-schedule usage)
+    Verify: every one of the four seasonal energy determinants (On-Peak, Part-Peak, Off-Peak Winter, On-Peak Winter)
+      posts at least one charge line, proving all four Summer/Winter On/Off-Peak schedules fire, plus the Public
+      Purpose Rider (700) and Utility Users Tax (800).
+- key: test_nl_res_tiered
+  Test Configuration:
+    Rate to Test: NL-RES-Tiered
+    Start Date: 2024-01-01
+    End Date: 2024-01-31
+    Rate Classes: Select All
+  Intervals:
+    Source: Generate Reads
+    Shape: low-usage month
+    under 500 kWh: null
+    to reach the Minimum Bill floor: null
+  Results:
+    Expected Bill Total: $18.00 (Minimum Bill floor) once generated usage keeps Customer Charge + Energy under $18.00;
+      verify Minimum Bill (500) actually raises the subtotal and that State Tax then Municipal Tax compound in order
+      (800, 800)
+- key: test_nl_lg_ratchet
+  Test Configuration:
+    Rate to Test: NL-LG-Ratchet
+    Start Date: 2024-01-01
+    End Date: 2024-12-31
+    Rate Classes: Select All
+  Intervals:
+    Source: Generate Reads
+    Shape: full year
+    strong summer afternoon demand peak: null
+    low winter demand: null
+  Results:
+    Expected Bill Total: record from run; no independent total
+    Verify: winter billed demand lands at 80% of the prior summer peak per the Ratchet row (Current 100% / Previous
+      80% / 11 months), and the Power Factor Adjustment post-script posts its flat adjustment line.
+- key: test_nl_contract_2part
+  Test Configuration:
+    Rate to Test: NL-CONTRACT-2Part
+    Start Date: 2024-07-01
+    End Date: 2024-07-31
+    Rate Classes: Select All
+  Intervals:
+    Source: Generate Reads
+    Shape: demand above the 16.2 kW contract base
+  Results:
+    Expected Bill Total: record from run; no independent total
+    Verify: Base Contract Demand caps at 16.2 kW (Pre Script) and Excess Demand bills only the remainder (Post Script)
+      -- the pair should sum to the meter's actual billed demand.
+- key: test_nl_rtp_index
+  Test Configuration:
+    Rate to Test: NL-RTP-Index
+    Start Date: 2024-07-01
+    End Date: 2024-07-07
+    Rate Classes: Select All
+  Intervals:
+    Source: Generate Reads
+    Shape: hourly kWh for one week (RTP Pt ID needs its price point loaded separately)
+  Results:
+    Expected Bill Total: 'record from run: RTP Energy = sum(interval kWh x hourly price); RTP Energy Capped must
+      respect the 0.95 high range and 0.02 low range'
+    Note: cannot run for real until pt_ved_rtp_price_hourly exists with hourly values; until then this row documents
+      intent and the run stays in draft.
+- key: test_nl_step_demand
+  Test Configuration:
+    Rate to Test: NL-STEP-Demand
+    Start Date: 2024-07-01
+    End Date: 2024-07-31
+    Rate Classes: Select All
+  Intervals:
+    Source: Generate Reads
+    Shape: demand spanning all three step blocks (over 250 kW)
+  Results:
+    Expected Bill Total: capped at $25,000.00 (Maximum Bill) once Stepped Demand + Energy would otherwise exceed
+      it; verify only one Block Number is picked as the effective step, not all three summed
+    Note: only real-world proof of Charge Types 210 and 600 in this library; no meter exists yet (see 06-rate-assignments),
+      so this run is the whole verification.
+- key: test_nl_gas_fueladj
+  Test Configuration:
+    Rate to Test: NL-GAS-FuelAdj
+    Start Date: 2024-01-01
+    End Date: 2024-12-31
+    Rate Classes: Select All
+  Intervals:
+    Source: Generate Reads
+    Shape: full-year gas load
+    winter heating peak: null
+  Results:
+    Expected Bill Total: record from run; no independent total
+    Verify: Customer Charge (Charge Type 300, Fixed By Day) prorates by day count per period, not a flat monthly
+      amount -- the only place this determinant type fires -- and the Fuel Cost Adjustment picks a different Effective
+      Date value each month.
+- key: test_nl_options_phase
+  Test Configuration:
+    Rate to Test: NL-OPTIONS-Phase
+    Start Date: 2024-07-01
+    End Date: 2024-07-31
+    Rate Classes:
+    - Primary Voltage
+    - Tax-Exempt
+  Intervals:
+    Source: Generate Reads
+    Shape: flat electric load
+  Results:
+    Expected Bill Total: record from run
+    Verify: Voltage Discount (-3.0%) applies only to the Primary Voltage class row, and confirm by eye whether Utility
+      Users Tax still posts against the Tax-Exempt class row (the open question noted in 05-rates.yaml). This run
+      is also where to confirm there is no way, anywhere in this screen or the Tenant Rebill screen, to bind one
+      specific meter to the Primary Voltage / Tax-Exempt choice rather than testing every class at once -- see Findings,
+      Track B item 5.
+- key: test_nl_multi_currency
+  Test Configuration:
+    Rate to Test: NL-MULTI-Currency
+    Start Date: 2024-07-01
+    End Date: 2024-07-31
+    Rate Classes: Select All
+  Intervals:
+    Source: Generate Reads
+    Shape: flat electric load
+  Results:
+    Expected Bill Total: record from run, in Canadian Dollar; confirm the Results screen labels the currency correctly
+      and does not silently convert to USD
+# ---- Ridgeline Wind-era bills ----

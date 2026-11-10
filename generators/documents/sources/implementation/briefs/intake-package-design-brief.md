@@ -16,7 +16,7 @@ software vendor.
 
 **Important:** the content is **synthetic/fictional**. Use the values exactly as
 written — do not invent real companies, people, addresses, or numbers. Keep a
-small "Synthetic — Packet 0.3" marker on each document.
+small "Synthetic — Packet 0.4" marker on each document.
 
 ## Source files
 
@@ -51,7 +51,7 @@ source-system and tenant/lease tabs; do not generate separate inventory workbook
 | 1 | Cover / transmittal letter | 00-cover-letter.md | PDF (on letterhead) |
 | 2 | Discovery Questionnaire | 01-discovery-questionnaire.md | PDF |
 | 3 | Facilities & Utility Overview | northlake-facilities-and-utility-overview.md | PDF (cover page + TOC) |
-| 4 | Rate Tariff Sheets (5) | rate-tariff-sheets/*.md | one PDF each, utility-rate-sheet style |
+| 4 | Rate Tariff Sheets (6) | rate-tariff-sheets/*.md | one PDF each, utility-rate-sheet style |
 | 5 | Chart of Accounts & GL Coding Guide | chart-of-accounts-and-gl-guide.md | PDF |
 | 6 | User Access Request & Role Matrix | user-access-request.md | PDF |
 | 7 | Tenant & Lease Roster | tenant-and-lease-roster.md | Tenants & Leases tab in Data Collection (+ optional PDF summary) |
@@ -67,11 +67,11 @@ source-system and tenant/lease tabs; do not generate separate inventory workbook
   wordmark with a small lake/leaf mark is fine (placeholder logo OK).
 - **Letterhead / header:** university wordmark + "Facilities · Housing ·
   Sustainability · Finance," with a header on each page: *Northlake University —
-  <Document Title> — Packet 0.3*.
+  <Document Title> — Packet 0.4*.
 - **Footer:** page X of Y + "Synthetic, fictional data — prepared for
   implementation setup."
 - **Cover pages** on the overview and the combined binder (title, "Onboarding Data
-  Package," coverage period Jan 1 2024 – Dec 31 2025, Packet 0.3).
+  Package," coverage period Jan 1 2024 – Dec 31 2025, Packet 0.4).
 - **Tariff sheets:** style like real utility rate sheets — provider name as the
   issuer, effective-date banners, clean rate tables — presented as enclosures
   Finance compiled.

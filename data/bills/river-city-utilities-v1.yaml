@@ -1,0 +1,134 @@
+manifestVersion: 1
+id: northlake_river_city_bills_v1
+customerScenarioId: demo_university_v1
+purpose: >
+  The four River City Utilities sample bills, rendered by generators/render_bills.py into
+  documents/utility-bills/river-city-utilities/. They replace the earlier hand-made images, whose meter and
+  charge tables were empty and whose periods ignored the provider's read cycle. Every line here is a fact:
+  quantities, rates and amounts reconcile to the total, the rates are the tariff's own
+  (data/providers/river-city-utilities.yaml) and each period is one Stage 1 period of the meter's cycle.
+
+# Each line: description, then quantity x rate = amount (rounded half-up to the cent). `code` is the provider's
+# billCharges code. River City's cycle 1 (the campus) is the calendar month; cycle 2 (Cedar Row) is read a fortnight
+# later, so its periods run from the 15th to the 14th and post to the month they end in (Stage 1
+# 02-utility-providers.yaml). Stage 5 enters a campus bill on its period end + 4 days and a Cedar Row bill on its
+# period end + 5 (data/eem/northlake-bill-entry-v1.yaml entryLagDays); every statement is dated the day before that.
+# Water is the meter charge for the meter's size, then the three usage tiers (0 to 50, 50 to 200, over 200 kgal),
+# and a tier with no usage is left off. Sewer is the base charge plus the metered water volume. Stormwater is the
+# account's ERU count x $11.20 and is campus only: Cedar Row is billed water and sewer. Meter sizes and ERU counts
+# are the scenario's (data/scenarios/demo-university-v1.yaml accounts). Stage 2 gives these four meters no multiplier.
+# The tariff sheet's apartment winter-average cap on sewer volume and its Student Center kitchen sewer deduct are not
+# applied: Stage 4's RCU-S-VOL bills sewer on the full metered water, and no file gives a cap or a deduct reading.
+bills:
+  # ------------------------------------------------------------------ Admin Hall: the combined statement
+  - id: rcu_admin_hall_2025_02
+    file: documents/utility-bills/river-city-utilities/01-River-City-Admin-Hall-Combined-Utility.pdf
+    providerId: river_city_utilities
+    accountId: rcu_admin_hall
+    title: Combined Utility Statement
+    customer: Northlake University
+    accountNumber: SYN-RCU-A-0030001
+    rateSchedules: [RCU-W-TIER, RCU-S-VOL, RCU-SW-ERU]
+    billDate: 2025-03-03        # cycle 1, the February 2025 period (the calendar month); Stage 5 enters it 2025-03-04
+    dueDate: 2025-03-24
+    period: {start: 2025-02-01, end: 2025-02-28}
+    notice: >
+      One statement carries all three River City services for Admin Hall: potable water from the 2 in meter,
+      sanitary sewer billed on the same metered water, and stormwater on 18 ERU of impervious area. The reads
+      are actual reads, and at 240 kgal the water runs through all three usage tiers.
+    meters:
+      - {meterNumber: SYN-RCU-M-0060001, badge: RCU-DEV-0060001, channel: Delivered (water), previous: 1284, present: 1524, readType: actual, quantity: 240, unit: kgal}
+    lines:
+      - {code: water_meter_charge, description: Water meter charge (2 in meter), quantity: 1, unit: month, rate: 96.00, amount: 96.00}
+      - {code: water_tier1, description: Water tier 1 (0 to 50 kgal), quantity: 50, unit: kgal, rate: 4.85, amount: 242.50}
+      - {code: water_tier2, description: Water tier 2 (50 to 200 kgal), quantity: 150, unit: kgal, rate: 6.40, amount: 960.00}
+      - {code: water_tier3, description: Water tier 3 (over 200 kgal), quantity: 40, unit: kgal, rate: 8.15, amount: 326.00}
+      - {code: sewer_base, description: Sewer base charge, quantity: 1, unit: month, rate: 28.50, amount: 28.50}
+      - {code: sewer_volume, description: Sewer volume (billed on the metered water), quantity: 240, unit: kgal, rate: 7.95, amount: 1908.00}
+      - {code: stormwater_eru, description: Stormwater (18 ERU of impervious area), quantity: 18, unit: ERU, rate: 11.20, amount: 201.60}
+    total: 3762.60
+
+  # ------------------------------------------------------------------ Student Center: the large service
+  - id: rcu_student_center_2025_02
+    file: documents/utility-bills/river-city-utilities/02-River-City-Student-Center-Large-Service.pdf
+    providerId: river_city_utilities
+    accountId: rcu_student_center
+    title: Combined Utility Statement
+    customer: Northlake University
+    accountNumber: SYN-RCU-A-0030002
+    rateSchedules: [RCU-W-TIER, RCU-S-VOL, RCU-SW-ERU]
+    billDate: 2025-03-03        # cycle 1, the February 2025 period; Stage 5 enters it 2025-03-04
+    dueDate: 2025-03-24
+    period: {start: 2025-02-01, end: 2025-02-28}
+    notice: >
+      A large service: the 4 in meter carries River City's highest monthly meter charge, and 520 kgal of water
+      reaches tier 3, so 320 kgal is billed at the over-200 kgal rate of $8.15. Sewer is billed on the same 520
+      kgal and stormwater on 22 ERU. The reads are actual reads.
+    meters:
+      - {meterNumber: SYN-RCU-M-0060002, badge: RCU-DEV-0060002, channel: Delivered (water), previous: 4102, present: 4622, readType: actual, quantity: 520, unit: kgal}
+    lines:
+      - {code: water_meter_charge, description: Water meter charge (4 in meter), quantity: 1, unit: month, rate: 260.00, amount: 260.00}
+      - {code: water_tier1, description: Water tier 1 (0 to 50 kgal), quantity: 50, unit: kgal, rate: 4.85, amount: 242.50}
+      - {code: water_tier2, description: Water tier 2 (50 to 200 kgal), quantity: 150, unit: kgal, rate: 6.40, amount: 960.00}
+      - {code: water_tier3, description: Water tier 3 (over 200 kgal), quantity: 320, unit: kgal, rate: 8.15, amount: 2608.00}
+      - {code: sewer_base, description: Sewer base charge, quantity: 1, unit: month, rate: 28.50, amount: 28.50}
+      - {code: sewer_volume, description: Sewer volume (billed on the metered water), quantity: 520, unit: kgal, rate: 7.95, amount: 4134.00}
+      - {code: stormwater_eru, description: Stormwater (22 ERU of impervious area), quantity: 22, unit: ERU, rate: 11.20, amount: 246.40}
+    total: 8479.40
+
+  # ------------------------------------------------------------------ Cedar Row A: the renumbered account
+  # Cedar Row A holds 60 apartments. Stage 5 (duplicate_import_fixture) attaches this image to the September 2024 bill.
+  - id: rcu_cedar_row_a_2024_09
+    file: documents/utility-bills/river-city-utilities/03-River-City-Cedar-Row-A-Account-Renewal.pdf
+    providerId: river_city_utilities
+    accountId: rcu_cedar_row_a
+    title: Combined Utility Statement
+    customer: Cedar Row Apartments
+    accountNumber: SYN-RCU-A-0030003
+    rateSchedules: [RCU-W-TIER, RCU-S-VOL]
+    billDate: 2024-09-18        # cycle 2, the September 2024 period, August 15 to September 14; Stage 5 enters it 2024-09-19
+    dueDate: 2024-10-09
+    period: {start: 2024-08-15, end: 2024-09-14}
+    notice: >
+      Your account number changed at the July 2024 lease renewal: SYN-RCU-A-0030003 replaces SYN-RCU-A-0030103.
+      The service address, the 3 in master meter and the rate schedules are unchanged. Water use follows
+      occupancy. Cedar Row is billed for water and sewer, with no stormwater charge.
+    meters:
+      - {meterNumber: SYN-RCU-M-0060003, badge: RCU-DEV-0060003, channel: Delivered (water), previous: 2090, present: 2220, readType: actual, quantity: 130, unit: kgal}
+    lines:
+      - {code: water_meter_charge, description: Water meter charge (3 in meter), quantity: 1, unit: month, rate: 168.00, amount: 168.00}
+      - {code: water_tier1, description: Water tier 1 (0 to 50 kgal), quantity: 50, unit: kgal, rate: 4.85, amount: 242.50}
+      - {code: water_tier2, description: Water tier 2 (50 to 200 kgal), quantity: 80, unit: kgal, rate: 6.40, amount: 512.00}
+      - {code: sewer_base, description: Sewer base charge, quantity: 1, unit: month, rate: 28.50, amount: 28.50}
+      - {code: sewer_volume, description: Sewer volume (billed on the metered water), quantity: 130, unit: kgal, rate: 7.95, amount: 1033.50}
+    total: 1984.50
+    informational:              # not charged; what drives the month's water use
+      - {label: Apartments occupied this cycle, value: 58, unit: of 60}
+
+  # ------------------------------------------------------------------ Cedar Row B: the handheld route read
+  # Cedar Row B holds 64 apartments. The register reads are above 1,200, the last reading Stage 3's Neptune route
+  # starts from (data/scenarios/demo-university-v1.yaml gw_neptune_river_city_water), so the register only counts up.
+  - id: rcu_cedar_row_b_2025_02
+    file: documents/utility-bills/river-city-utilities/04-River-City-Cedar-Row-B-Route-Read.pdf
+    providerId: river_city_utilities
+    accountId: rcu_cedar_row_b
+    title: Combined Utility Statement
+    customer: Cedar Row Apartments
+    accountNumber: SYN-RCU-A-0030004
+    rateSchedules: [RCU-W-TIER, RCU-S-VOL]
+    billDate: 2025-02-18        # cycle 2, the February 2025 period, January 15 to February 14; Stage 5 enters it 2025-02-19
+    dueDate: 2025-03-11
+    period: {start: 2025-01-15, end: 2025-02-14}
+    notice: >
+      Read on River City's Neptune handheld route (CRB-WATER-01, sequence 1): an actual route read for the cycle 2
+      period of January 15 to February 14. Sewer is billed on the metered water, and Cedar Row has no stormwater
+      charge.
+    meters:
+      - {meterNumber: SYN-RCU-M-0060004, badge: RCU-DEV-0060004, channel: Delivered (route read), previous: 2918, present: 3058, readType: actual, quantity: 140, unit: kgal}
+    lines:
+      - {code: water_meter_charge, description: Water meter charge (3 in meter), quantity: 1, unit: month, rate: 168.00, amount: 168.00}
+      - {code: water_tier1, description: Water tier 1 (0 to 50 kgal), quantity: 50, unit: kgal, rate: 4.85, amount: 242.50}
+      - {code: water_tier2, description: Water tier 2 (50 to 200 kgal), quantity: 90, unit: kgal, rate: 6.40, amount: 576.00}
+      - {code: sewer_base, description: Sewer base charge, quantity: 1, unit: month, rate: 28.50, amount: 28.50}
+      - {code: sewer_volume, description: Sewer volume (billed on the metered water), quantity: 140, unit: kgal, rate: 7.95, amount: 1113.00}
+    total: 2128.00

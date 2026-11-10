@@ -1,0 +1,342 @@
+# Stage 2, step 6: Aggregates. Two screens: an aggregate point is CREATED from the Nodes tree's
+# "Create Aggregate Point" context menu (ordinary point editor fields, gateway is the
+# Aggregation Gateway), then its MEMBERS are added on the top-level Aggregates workspace (nav
+# item after Nodes): pick the aggregate, use the Add Points drawer, set Required and Multiplier
+# per member, then Recalculate.
+stage: 2
+step: 6
+title: Aggregates
+app: Database Administrator
+screen: Nodes (Create Aggregate Point) and the Aggregates workspace
+source:
+- data/eem/northlake-eem-metaworld-stage1b-v1.yaml (aggregateTargets)
+notes:
+- 'Create Aggregate Point: right-click the parent site or building in the tree, choose Create Aggregate Point, and
+  fill it exactly like an ordinary point (Name, Measure Type, Unit, Interval); the gateway is set to Aggregation
+  automatically.'
+- 'Members: on the Aggregates workspace, select the aggregate, open Add Points, and pick from the eligible list
+  (same company, time zone, measure type, interval and unit as the aggregate). Each member names its meter as the
+  tree shows it, that meter''s number, and the point under it. Set Required and Multiplier per row;
+  Science Center Net Electric kWh has one member at Multiplier -1 and Required unchecked (delivered minus generated,
+  and generation may be offline).'
+- 'Cedar Row A and B totals use a member template: every apartment''s electric submeter in that building, plus the
+  building''s own house submeter (Required).'
+- 'PRODUCT FINDING 14: an aggregate is registered (its PointAggregates_TBL row) once it has members; the web
+  API''s SaveAggregate, the only path to PointAggregation_Save, refuses an aggregate without them, so no row is
+  expected before the members. Database Administrator''s Save writes the members (PointAggregatePoints) and stops,
+  so the aggregate is still unregistered after they are saved: the Aggregates workspace''s picker shows ID 0,
+  Recalculate fails with error 51081, the aggregation job skips it, and the tree does not mark the node as an
+  aggregate, so its Aggregate page stays hidden. Enter the members all the same: they key on the aggregate''s
+  point, and PointAggregation_Save registers an existing aggregate point, so the fix (one call after the member
+  save when the row is missing) also registers the aggregates entered before it. Recalculate waits for it.'
+- 'Measure Type and Unit are written the way the editor shows them (Electricity, "KilowattHours - (kWh)"). The PV
+  members are Electricity points (EEM has no solar measure type), which is also what lets the Science Center Net
+  Electric aggregate take its generation member: members must match the aggregate''s measure type.'
+- '11 aggregates: 4 members each for the two campus electric totals, 2 for the campus solar total, 2 for the campus
+  chilled-water total, 2 for Science Center Net Electric, 61 for Cedar Row A (60 apartments + house), 65 for Cedar
+  Row B (64 apartments + house), 10 each for the three Ridgeline farm totals (generated kWh, active kW, possible kW)
+  and 2 for Ridgeline Net Export.'
+- 'Ridgeline (added 2026-10-01): the farm totals are the first 10-minute aggregates. Active and possible power sit on
+  the Ridgeline Wind Site; Ridgeline Farm Generated kWh 10m sits under the Ridgeline Farm Transfer Meter (03-meters),
+  because it is the quantity the generated transfer statement prices and EEM''s Bill Generation reads only the points
+  under one meter. Right-click that meter, not the site, to create it. Every member is Required: a
+  turbine down for repair keeps reporting zero energy and full possible power, so a missing member is a data problem,
+  not an outage. Generated kWh against possible kW is the
+  expected-against-actual goal; the possible side is kW, not kWh, and no aggregate can turn one into the other, which
+  is what a calculated point would do (PRODUCT FINDING 41). Ridgeline Net Export sits on Ridgeline Substation: export
+  minus station service at 15 minutes, a second weighted sum with a -1 member.'
+records:
+- key: agg_nlu_campus_electric_kwh_15m
+  installed:
+    pointId:
+    aggregateId:
+  Create Aggregate Point:
+    Name: Campus Interval Electric kWh Total
+    Parent: Northlake Main Campus
+    Measure Type: Electricity
+    Unit: KilowattHours - (kWh)
+    Interval: 15
+  Members:
+  - {Meter: Science Center Electric Main, Meter Number: SYN-VED-M-0040002, Point: Delivered kWh 15m, Required: true, Multiplier: 1}
+  - {Meter: Student Center Electric Main, Meter Number: SYN-VED-M-0040004, Point: Delivered kWh 15m, Required: true, Multiplier: 1}
+  - {Meter: Lakeview Hall Electric Main, Meter Number: SYN-VED-M-0040008, Point: Delivered kWh 15m, Required: true, Multiplier: 1}
+  - {Meter: Recreation Center Electric Main, Meter Number: SYN-VED-M-0040009, Point: Delivered kWh 15m, Required: true, Multiplier: 1}
+- key: agg_nlu_campus_electric_kw_15m
+  installed:
+    pointId:
+    aggregateId:
+  Create Aggregate Point:
+    Name: Campus Coincident Electric kW
+    Parent: Northlake Main Campus
+    Measure Type: Electricity
+    Unit: Kilowatt - (kW)
+    Interval: 15
+  Members:
+  - {Meter: Science Center Electric Main, Meter Number: SYN-VED-M-0040002, Point: Demand kW 15m, Required: true, Multiplier: 1}
+  - {Meter: Student Center Electric Main, Meter Number: SYN-VED-M-0040004, Point: Demand kW 15m, Required: true, Multiplier: 1}
+  - {Meter: Lakeview Hall Electric Main, Meter Number: SYN-VED-M-0040008, Point: Demand kW 15m, Required: true, Multiplier: 1}
+  - {Meter: Recreation Center Electric Main, Meter Number: SYN-VED-M-0040009, Point: Demand kW 15m, Required: true, Multiplier: 1}
+- key: agg_nlu_campus_solar_generation_kwh_15m
+  installed:
+    pointId:
+    aggregateId:
+  Create Aggregate Point:
+    Name: Campus PV Generated kWh
+    Parent: Northlake Main Campus
+    Measure Type: Electricity
+    Unit: KilowattHours - (kWh)
+    Interval: 15
+  Members:
+  - {Meter: Science Center PV Array, Meter Number: SYN-HOS-M-0080001, Point: Generated kWh 15m, Required: true, Multiplier: 1}
+  - {Meter: Student Center PV Array, Meter Number: SYN-HOS-M-0080002, Point: Generated kWh 15m, Required: true, Multiplier: 1}
+- key: agg_nlu_campus_chw_ton_hours_hourly
+  installed:
+    pointId:
+    aggregateId:
+  Create Aggregate Point:
+    Name: Campus Chilled Water Delivered Ton-Hours
+    Parent: Northlake Main Campus
+    Measure Type: Chilled Water
+    Unit: Ton-Hour - (TonHr)
+    Interval: 60
+  Members:
+  - {Meter: Science Center Chilled Water, Meter Number: SYN-NTP-M-0070001, Point: Delivered Ton-Hours 60m, Required: true, Multiplier: 1}
+  - {Meter: Recreation Center Chilled Water, Meter Number: SYN-NTP-M-0070006, Point: Delivered Ton-Hours 60m, Required: true, Multiplier: 1}
+- key: agg_nlu_science_net_electric_kwh_15m
+  installed:
+    pointId:
+    aggregateId:
+  Create Aggregate Point:
+    Name: Science Center Net Electric kWh
+    Parent: Science Center
+    Measure Type: Electricity
+    Unit: KilowattHours - (kWh)
+    Interval: 15
+  Members:
+  - {Meter: Science Center Electric Main, Meter Number: SYN-VED-M-0040002, Point: Delivered kWh 15m, Required: true, Multiplier: 1}
+  - {Meter: Science Center PV Array, Meter Number: SYN-HOS-M-0080001, Point: Generated kWh 15m, Required: false, Multiplier: -1}
+- key: agg_cra_a_submeter_electric_kwh_60m
+  installed:
+    pointId:
+    aggregateId:
+  Create Aggregate Point:
+    Name: Cedar Row A Submetered kWh Total
+    Parent: Cedar Row A
+    Measure Type: Electricity
+    Unit: KilowattHours - (kWh)
+    Interval: 60
+  Members:
+  - {Meter: Cedar Row A Electric House, Meter Number: SYN-SUB-E-AH, Point: Submeter kWh 60m, Required: true, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 101 Electric, Meter Number: SYN-SUB-E-A101, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 102 Electric, Meter Number: SYN-SUB-E-A102, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 103 Electric, Meter Number: SYN-SUB-E-A103, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 104 Electric, Meter Number: SYN-SUB-E-A104, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 105 Electric, Meter Number: SYN-SUB-E-A105, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 106 Electric, Meter Number: SYN-SUB-E-A106, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 107 Electric, Meter Number: SYN-SUB-E-A107, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 108 Electric, Meter Number: SYN-SUB-E-A108, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 109 Electric, Meter Number: SYN-SUB-E-A109, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 110 Electric, Meter Number: SYN-SUB-E-A110, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 111 Electric, Meter Number: SYN-SUB-E-A111, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 112 Electric, Meter Number: SYN-SUB-E-A112, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 113 Electric, Meter Number: SYN-SUB-E-A113, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 114 Electric, Meter Number: SYN-SUB-E-A114, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 115 Electric, Meter Number: SYN-SUB-E-A115, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 116 Electric, Meter Number: SYN-SUB-E-A116, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 117 Electric, Meter Number: SYN-SUB-E-A117, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 118 Electric, Meter Number: SYN-SUB-E-A118, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 119 Electric, Meter Number: SYN-SUB-E-A119, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 120 Electric, Meter Number: SYN-SUB-E-A120, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 201 Electric, Meter Number: SYN-SUB-E-A201, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 202 Electric, Meter Number: SYN-SUB-E-A202, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 203 Electric, Meter Number: SYN-SUB-E-A203, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 204 Electric, Meter Number: SYN-SUB-E-A204, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 205 Electric, Meter Number: SYN-SUB-E-A205, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 206 Electric, Meter Number: SYN-SUB-E-A206, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 207 Electric, Meter Number: SYN-SUB-E-A207, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 208 Electric, Meter Number: SYN-SUB-E-A208, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 209 Electric, Meter Number: SYN-SUB-E-A209, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 210 Electric, Meter Number: SYN-SUB-E-A210, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 211 Electric, Meter Number: SYN-SUB-E-A211, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 212 Electric, Meter Number: SYN-SUB-E-A212, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 213 Electric, Meter Number: SYN-SUB-E-A213, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 214 Electric, Meter Number: SYN-SUB-E-A214, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 215 Electric, Meter Number: SYN-SUB-E-A215, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 216 Electric, Meter Number: SYN-SUB-E-A216, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 217 Electric, Meter Number: SYN-SUB-E-A217, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 218 Electric, Meter Number: SYN-SUB-E-A218, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 219 Electric, Meter Number: SYN-SUB-E-A219, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 220 Electric, Meter Number: SYN-SUB-E-A220, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 301 Electric, Meter Number: SYN-SUB-E-A301, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 302 Electric, Meter Number: SYN-SUB-E-A302, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 303 Electric, Meter Number: SYN-SUB-E-A303, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 304 Electric, Meter Number: SYN-SUB-E-A304, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 305 Electric, Meter Number: SYN-SUB-E-A305, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 306 Electric, Meter Number: SYN-SUB-E-A306, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 307 Electric, Meter Number: SYN-SUB-E-A307, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 308 Electric, Meter Number: SYN-SUB-E-A308, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 309 Electric, Meter Number: SYN-SUB-E-A309, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 310 Electric, Meter Number: SYN-SUB-E-A310, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 311 Electric, Meter Number: SYN-SUB-E-A311, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 312 Electric, Meter Number: SYN-SUB-E-A312, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 313 Electric, Meter Number: SYN-SUB-E-A313, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 314 Electric, Meter Number: SYN-SUB-E-A314, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 315 Electric, Meter Number: SYN-SUB-E-A315, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 316 Electric, Meter Number: SYN-SUB-E-A316, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 317 Electric, Meter Number: SYN-SUB-E-A317, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 318 Electric, Meter Number: SYN-SUB-E-A318, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 319 Electric, Meter Number: SYN-SUB-E-A319, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row A Unit 320 Electric, Meter Number: SYN-SUB-E-A320, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+- key: agg_cra_b_submeter_electric_kwh_60m
+  installed:
+    pointId:
+    aggregateId:
+  Create Aggregate Point:
+    Name: Cedar Row B Submetered kWh Total
+    Parent: Cedar Row B
+    Measure Type: Electricity
+    Unit: KilowattHours - (kWh)
+    Interval: 60
+  Members:
+  - {Meter: Cedar Row B Electric House, Meter Number: SYN-SUB-E-BH, Point: Submeter kWh 60m, Required: true, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 101 Electric, Meter Number: SYN-SUB-E-B101, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 102 Electric, Meter Number: SYN-SUB-E-B102, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 103 Electric, Meter Number: SYN-SUB-E-B103, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 104 Electric, Meter Number: SYN-SUB-E-B104, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 105 Electric, Meter Number: SYN-SUB-E-B105, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 106 Electric, Meter Number: SYN-SUB-E-B106, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 107 Electric, Meter Number: SYN-SUB-E-B107, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 108 Electric, Meter Number: SYN-SUB-E-B108, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 109 Electric, Meter Number: SYN-SUB-E-B109, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 110 Electric, Meter Number: SYN-SUB-E-B110, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 111 Electric, Meter Number: SYN-SUB-E-B111, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 112 Electric, Meter Number: SYN-SUB-E-B112, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 113 Electric, Meter Number: SYN-SUB-E-B113, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 114 Electric, Meter Number: SYN-SUB-E-B114, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 115 Electric, Meter Number: SYN-SUB-E-B115, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 116 Electric, Meter Number: SYN-SUB-E-B116, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 201 Electric, Meter Number: SYN-SUB-E-B201, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 202 Electric, Meter Number: SYN-SUB-E-B202, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 203 Electric, Meter Number: SYN-SUB-E-B203, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 204 Electric, Meter Number: SYN-SUB-E-B204, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 205 Electric, Meter Number: SYN-SUB-E-B205, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 206 Electric, Meter Number: SYN-SUB-E-B206, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 207 Electric, Meter Number: SYN-SUB-E-B207, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 208 Electric, Meter Number: SYN-SUB-E-B208, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 209 Electric, Meter Number: SYN-SUB-E-B209, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 210 Electric, Meter Number: SYN-SUB-E-B210, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 211 Electric, Meter Number: SYN-SUB-E-B211, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 212 Electric, Meter Number: SYN-SUB-E-B212, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 213 Electric, Meter Number: SYN-SUB-E-B213, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 214 Electric, Meter Number: SYN-SUB-E-B214, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 215 Electric, Meter Number: SYN-SUB-E-B215, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 216 Electric, Meter Number: SYN-SUB-E-B216, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 301 Electric, Meter Number: SYN-SUB-E-B301, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 302 Electric, Meter Number: SYN-SUB-E-B302, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 303 Electric, Meter Number: SYN-SUB-E-B303, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 304 Electric, Meter Number: SYN-SUB-E-B304, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 305 Electric, Meter Number: SYN-SUB-E-B305, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 306 Electric, Meter Number: SYN-SUB-E-B306, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 307 Electric, Meter Number: SYN-SUB-E-B307, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 308 Electric, Meter Number: SYN-SUB-E-B308, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 309 Electric, Meter Number: SYN-SUB-E-B309, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 310 Electric, Meter Number: SYN-SUB-E-B310, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 311 Electric, Meter Number: SYN-SUB-E-B311, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 312 Electric, Meter Number: SYN-SUB-E-B312, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 313 Electric, Meter Number: SYN-SUB-E-B313, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 314 Electric, Meter Number: SYN-SUB-E-B314, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 315 Electric, Meter Number: SYN-SUB-E-B315, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 316 Electric, Meter Number: SYN-SUB-E-B316, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 401 Electric, Meter Number: SYN-SUB-E-B401, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 402 Electric, Meter Number: SYN-SUB-E-B402, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 403 Electric, Meter Number: SYN-SUB-E-B403, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 404 Electric, Meter Number: SYN-SUB-E-B404, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 405 Electric, Meter Number: SYN-SUB-E-B405, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 406 Electric, Meter Number: SYN-SUB-E-B406, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 407 Electric, Meter Number: SYN-SUB-E-B407, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 408 Electric, Meter Number: SYN-SUB-E-B408, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 409 Electric, Meter Number: SYN-SUB-E-B409, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 410 Electric, Meter Number: SYN-SUB-E-B410, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 411 Electric, Meter Number: SYN-SUB-E-B411, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 412 Electric, Meter Number: SYN-SUB-E-B412, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 413 Electric, Meter Number: SYN-SUB-E-B413, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 414 Electric, Meter Number: SYN-SUB-E-B414, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 415 Electric, Meter Number: SYN-SUB-E-B415, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+  - {Meter: Cedar Row B Unit 416 Electric, Meter Number: SYN-SUB-E-B416, Point: Submeter kWh 60m, Required: false, Multiplier: 1}
+# ---- Ridgeline Wind (added 2026-10-01) ----
+- key: agg_ntp_ridgeline_generated_kwh_10m
+  installed:
+    pointId:
+    aggregateId:
+  Create Aggregate Point:
+    Name: Ridgeline Farm Generated kWh 10m
+    Parent: Ridgeline Farm Transfer Meter     # a meter, not the site: Bill Generation prices this point (Stage 7 step 8)
+    Measure Type: Electricity
+    Unit: KilowattHours - (kWh)
+    Interval: 10
+  Members:
+  - {Meter: Ridgeline WTG-01, Meter Number: SYN-RWL-M-0110001, Point: Generated kWh 10m, Required: true, Multiplier: 1}
+  - {Meter: Ridgeline WTG-02, Meter Number: SYN-RWL-M-0110002, Point: Generated kWh 10m, Required: true, Multiplier: 1}
+  - {Meter: Ridgeline WTG-03, Meter Number: SYN-RWL-M-0110003, Point: Generated kWh 10m, Required: true, Multiplier: 1}
+  - {Meter: Ridgeline WTG-04, Meter Number: SYN-RWL-M-0110004, Point: Generated kWh 10m, Required: true, Multiplier: 1}
+  - {Meter: Ridgeline WTG-05, Meter Number: SYN-RWL-M-0110005, Point: Generated kWh 10m, Required: true, Multiplier: 1}
+  - {Meter: Ridgeline WTG-06, Meter Number: SYN-RWL-M-0110006, Point: Generated kWh 10m, Required: true, Multiplier: 1}
+  - {Meter: Ridgeline WTG-07, Meter Number: SYN-RWL-M-0110007, Point: Generated kWh 10m, Required: true, Multiplier: 1}
+  - {Meter: Ridgeline WTG-08, Meter Number: SYN-RWL-M-0110008, Point: Generated kWh 10m, Required: true, Multiplier: 1}
+  - {Meter: Ridgeline WTG-09, Meter Number: SYN-RWL-M-0110009, Point: Generated kWh 10m, Required: true, Multiplier: 1}
+  - {Meter: Ridgeline WTG-10, Meter Number: SYN-RWL-M-0110010, Point: Generated kWh 10m, Required: true, Multiplier: 1}
+- key: agg_ntp_ridgeline_active_kw_10m
+  installed:
+    pointId:
+    aggregateId:
+  Create Aggregate Point:
+    Name: Ridgeline Farm Active Power kW 10m
+    Parent: Ridgeline Wind Site
+    Measure Type: Electricity
+    Unit: Kilowatt - (kW)
+    Interval: 10
+  Members:
+  - {Meter: Ridgeline WTG-01, Meter Number: SYN-RWL-M-0110001, Point: Active Power kW 10m, Required: true, Multiplier: 1}
+  - {Meter: Ridgeline WTG-02, Meter Number: SYN-RWL-M-0110002, Point: Active Power kW 10m, Required: true, Multiplier: 1}
+  - {Meter: Ridgeline WTG-03, Meter Number: SYN-RWL-M-0110003, Point: Active Power kW 10m, Required: true, Multiplier: 1}
+  - {Meter: Ridgeline WTG-04, Meter Number: SYN-RWL-M-0110004, Point: Active Power kW 10m, Required: true, Multiplier: 1}
+  - {Meter: Ridgeline WTG-05, Meter Number: SYN-RWL-M-0110005, Point: Active Power kW 10m, Required: true, Multiplier: 1}
+  - {Meter: Ridgeline WTG-06, Meter Number: SYN-RWL-M-0110006, Point: Active Power kW 10m, Required: true, Multiplier: 1}
+  - {Meter: Ridgeline WTG-07, Meter Number: SYN-RWL-M-0110007, Point: Active Power kW 10m, Required: true, Multiplier: 1}
+  - {Meter: Ridgeline WTG-08, Meter Number: SYN-RWL-M-0110008, Point: Active Power kW 10m, Required: true, Multiplier: 1}
+  - {Meter: Ridgeline WTG-09, Meter Number: SYN-RWL-M-0110009, Point: Active Power kW 10m, Required: true, Multiplier: 1}
+  - {Meter: Ridgeline WTG-10, Meter Number: SYN-RWL-M-0110010, Point: Active Power kW 10m, Required: true, Multiplier: 1}
+- key: agg_ntp_ridgeline_possible_kw_10m
+  installed:
+    pointId:
+    aggregateId:
+  Create Aggregate Point:
+    Name: Ridgeline Farm Possible Power kW 10m
+    Parent: Ridgeline Wind Site
+    Measure Type: Electricity
+    Unit: Kilowatt - (kW)
+    Interval: 10
+  Members:
+  - {Meter: Ridgeline WTG-01, Meter Number: SYN-RWL-M-0110001, Point: Possible kW 10m, Required: true, Multiplier: 1}
+  - {Meter: Ridgeline WTG-02, Meter Number: SYN-RWL-M-0110002, Point: Possible kW 10m, Required: true, Multiplier: 1}
+  - {Meter: Ridgeline WTG-03, Meter Number: SYN-RWL-M-0110003, Point: Possible kW 10m, Required: true, Multiplier: 1}
+  - {Meter: Ridgeline WTG-04, Meter Number: SYN-RWL-M-0110004, Point: Possible kW 10m, Required: true, Multiplier: 1}
+  - {Meter: Ridgeline WTG-05, Meter Number: SYN-RWL-M-0110005, Point: Possible kW 10m, Required: true, Multiplier: 1}
+  - {Meter: Ridgeline WTG-06, Meter Number: SYN-RWL-M-0110006, Point: Possible kW 10m, Required: true, Multiplier: 1}
+  - {Meter: Ridgeline WTG-07, Meter Number: SYN-RWL-M-0110007, Point: Possible kW 10m, Required: true, Multiplier: 1}
+  - {Meter: Ridgeline WTG-08, Meter Number: SYN-RWL-M-0110008, Point: Possible kW 10m, Required: true, Multiplier: 1}
+  - {Meter: Ridgeline WTG-09, Meter Number: SYN-RWL-M-0110009, Point: Possible kW 10m, Required: true, Multiplier: 1}
+  - {Meter: Ridgeline WTG-10, Meter Number: SYN-RWL-M-0110010, Point: Possible kW 10m, Required: true, Multiplier: 1}
+- key: agg_ntp_ridgeline_net_export_kwh_15m
+  installed:
+    pointId:
+    aggregateId:
+  Create Aggregate Point:
+    Name: Ridgeline Net Export kWh 15m
+    Parent: Ridgeline Substation
+    Measure Type: Electricity
+    Unit: KilowattHours - (kWh)
+    Interval: 15
+  Members:
+  - {Meter: Ridgeline Interconnection Meter, Meter Number: SYN-VED-M-0040015, Point: Exported kWh 15m, Required: true, Multiplier: 1}
+  - {Meter: Ridgeline Interconnection Meter, Meter Number: SYN-VED-M-0040015, Point: Station Service kWh 15m, Required: true, Multiplier: -1}

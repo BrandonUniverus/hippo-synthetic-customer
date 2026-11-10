@@ -1,0 +1,83 @@
+# Stage 8, step 5: Weather regression (Web, Custom views WeatherNormalization_SetPeriod -> _Run -> _MeterDetails).
+# UI-THEN-RUN: configure the period and inputs, then run it; the fit statistics are computed, not typed. Values
+# below are expected ranges, not entries.
+stage: 8
+step: 5
+title: Weather regression
+app: Web
+screen: "Custom: WeatherNormalization_SetPeriod, WeatherNormalization_Run, WeatherNormalization_MeterDetails"
+source:
+- generators/documents/sources/implementation/dream-customer/phase5-sustainability-analytics-spec.md
+- data/scenarios/demo-university-v1.yaml (weather, HDD/CDD channels)
+- generators/documents/sources/implementation/product-findings.md (finding 42)
+notes:
+- Classification is UI-THEN-RUN. Pick the point and the period on _SetPeriod, run it on _Run (it calls the
+  FF_wn* regression procs, task Weather Normalization Sync, Task 48, verified in Task_Tbl), then read the fitted
+  coefficients and R^2/CV-RMSE on _MeterDetails. Nothing here is hand-entered; this step is done when four
+  regressions exist with plausible statistics.
+- HDD and CDD points already exist behind the KSAC primary weather station (data/scenarios/demo-university-v1.yaml
+  weather.primaryStation) from Stage 2/3's weather setup and the Process HDD/CDD Calculations task (Task 25,
+  verified); this stage does not create them, only points the regression at them.
+- Meters/points are named by their Stage 2/3 scenario id, matching step 2's note, since Stages 2-7 are running in
+  parallel and installed PointIDs are not recorded yet.
+- 'Model form: Use = intercept + HDD x f_h + CDD x f_c (heating and cooling terms only where the target expects
+  them).'
+- Once all four regressions have run, they fill the phase 0/1 baseline shells (bl_nlu_*) with computed values and
+  enable the weather-normalized column on ScatterPlot/UsageVariance for these four points.
+- 'Added 2026-10-01 (Ridgeline Wind): no regression is run for a Ridgeline meter and the count stays four. A degree-day
+  fit suits neither Ridgeline load. The ten turbine meters are generation, and Use = intercept + HDD x f_h + CDD x f_c
+  would explain wind output with temperature. The interconnection meter''s station service is tiny (4,428 kWh on the
+  Aug-24 bill, 46,920 kWh on the Feb-25 bill) and follows how long the turbines stand idle, which is calm weather, not
+  heating or cooling; a fit could pick up the winter calm and show a respectable R^2 for the wrong reason. The engine
+  also fits twelve fiscal periods of bills (FF_wncore.sql:43-75) and the generator account''s first bill posts to
+  Aug-24, so the earliest baseline ends with the July 2025 period (the plant''s fiscal year is the calendar year).
+  KSUU supplies HDD(C) and CDD(C), so
+  a run is possible; it should not be made. The Weather Normalization sync only touches meters that already have a
+  regression (FF_WeatherNormalization.sql:45-48, wnAllBills = 0), so nothing normalizes Ridgeline unless
+  FF_PopulateRegressions is run for the whole company, which takes every energy meter in it, generation included
+  (FF_PopulateRegressions.sql:75-95; check ridgeline_not_benchmarked_or_regressed). The regression the wind farm does
+  want, output against wind speed, is goal 42 and is recorded below as a goal, not a built feature.'
+records:
+- key: science_center_electric_regression
+  installed:
+    ffWnRegressionBestResultsId:
+  WeatherNormalization_SetPeriod:
+    Point: ch_ved_science_center_kwh_15m (Science Center electric kWh, rolled to monthly for the regression)
+    Weather Inputs: [HDD, CDD]
+  WeatherNormalization_MeterDetails:
+    Expect: "cooling-driven; R^2 >= 0.8 (lab HVAC load tracks CDD strongly)"
+- key: student_center_demand_regression
+  installed:
+    ffWnRegressionBestResultsId:
+  WeatherNormalization_SetPeriod:
+    Point: ch_ved_student_center_kw_15m (Student Center peak demand kW)
+    Weather Inputs: [CDD]
+  WeatherNormalization_MeterDetails:
+    Expect: "R^2 ~ 0.6; event/occupancy noise (dining hours, event days) keeps the fit looser than a pure HVAC load"
+- key: admin_hall_gas_regression
+  installed:
+    ffWnRegressionBestResultsId:
+  WeatherNormalization_SetPeriod:
+    Point: ch_sgu_admin_hall_therms_monthly (Admin Hall gas therms)
+    Weather Inputs: [HDD]
+  WeatherNormalization_MeterDetails:
+    Expect: "heating-driven; R^2 >= 0.85"
+- key: ntp_chilled_water_regression
+  installed:
+    ffWnRegressionBestResultsId:
+  WeatherNormalization_SetPeriod:
+    Point: ch_ntp_science_center_chw_ton_hours_hourly (NTP chilled-water delivered to Science Center, rolled to monthly)
+    Weather Inputs: [CDD]
+  WeatherNormalization_MeterDetails:
+    Expect: "strong cooling fit; ton-hours track CDD closely, R^2 >= 0.85"
+- key: ridgeline_farm_wind_regression   # goal 42 (PRODUCT FINDING 42), not built: no screen or run offers it
+  installed: {}
+  WeatherNormalization_SetPeriod:
+    Point: "Ridgeline WTG-01..10 monthly output, summed; the driver would be Ridgeline Met Mast Hub-Height Wind Speed 10m (m/s) or KSUU Wind Speed (knots)"
+    Weather Inputs: "wind speed is not offered; the engine takes HDD and CDD from one temperature point"
+  WeatherNormalization_MeterDetails:
+    Expect: "when built: output rises with wind speed along a curve, roughly the cube of speed between cut-in and rated and flat above it, so a straight line fits it poorly (goal 43 is the power-curve fit); leave out WTG-07, or February to April 2025, where zero energy is a gearbox fault and not weak wind"
+  Engine today:
+  - "it regresses one meter's bills, as daily averages over twelve fiscal periods, on a temperature point's HDD and CDD (FF_wncore.sql:43-75), and no temperature point means no regression (FF_wncore.sql:117-124)"
+  - "a third variable exists in FF_wnCore (@IndVarPtID, summed over each bill period and labelled Occupancy in its output: FF_wncore.sql:36,87,585,599), but FF_PopulateRegressions always passes 0 (line 121; its header calls the third variable TBD, line 37) and FF_wnCalculateRegression normalizes with the HDD and CDD factors only (line 167)"
+  - "a wind driver needs an averaged value (a sum of speeds means nothing), temperature made optional, a way to choose the driver, and the driver's factor used when normalizing"

@@ -1,0 +1,1030 @@
+# Stage 1, step 4: System/shared groups first, then company-local duties and Science Center.
+# Nine shared Points masters provide three access levels for each target company.
+stage: 1
+step: 4
+title: Groups and permissions
+app: Database Administrator
+screen: Users & Groups > Groups
+source:
+- data/security/northlake-eem-security-v1.yaml
+- documents/intake-package/user-access-request.pdf
+verifiedAgainst:
+  Server: .
+  Database: EEMSuite_Northlake
+  Shared Points and fixed permission keys checked on: '2026-09-23'
+  Report placement exclusions checked on: '2026-09-21'
+  Definitions: [dbo.PermissionCatalog, dbo.PermissionCatalogType]
+  Sharing implementation:
+  - Database/EEMSuite/Procs/UserGroups_Shared_Sync.sql
+  - Database/EEMSuite/Procs/UserGroups_Save.sql
+  - Database/EEMSuite/Procs/UserGroups_Delete.sql
+  - Database/EEMSuite/Procs/Permissions_Save.sql
+  Sharing deployment: The deployed Northlake procedures allow shared Points and preserve MetaCompanyID, MetaKey and level
+    in each company copy. Administrator roles remain protected. Source/schema inspection is not a manual application test.
+  Live reconciliation: 04-groups-reconciliation.md
+companyIds:
+  Common (System, CompanyID -1): -1
+  Northlake University: 6
+  Cedar Row Apartments: 3
+  Northlake Thermal Plant: 5
+setupOrder:
+- Complete Common/System first. All 21 Common records are Shared=true masters, including the three existing system/support
+  groups, nine Points groups and eem_ridgeline_research (added 2026-10-01). Keep eem_system_db_admins,
+  eem_implementation_admins and eem_support_readonly shared.
+- Create/save the ten missing Common masters listed in 04-groups-reconciliation.md, enable Shared and enter their exact
+  permissions. The new eem_nlu_points_*, eem_cra_points_* and eem_ntp_points_* IDs allow their copies to be created while
+  the old local Points groups still exist. EEMSuite creates the copies; do not enter duplicate copy records manually.
+- For each Points master, select the named target company root and level. Sharing preserves that target in every copy;
+  it does not retarget the Points to the company that receives the copy. Verify MetaCompanyID as well as the level.
+- Correct the existing Common masters and then each company's local groups using the reconciliation checklist. Eight
+  local definitions remain, including Northlake's existing Science Center scope, the new ntp_wind_ops and Cedar Row's
+  eem_reports, made local. The two Ridgeline Points grants name the Ridgeline Wind Site node, so they are made once
+  Stage 2 step 2 has saved it (key 0.5.40).
+- Move Samantha and Jordan from Northlake nlu_points_admin to the Northlake copy of eem_nlu_points_admin before removing
+  that old local group. Retire only the ten existing local groups identified in the checklist after checking memberships
+  and references. The obsolete cross-company-only groups were never installed and need no deletion.
+- Finish and verify the groups before entering the remaining users. 05-users.yaml is the authoritative membership and
+  IsAdmin list. Samantha, Jordan and Priya already exist in the checked database; reconcile those records instead of recreating them.
+- laterPermissions and laterLocalGroups at the end hold only grants that cannot be made yet. The company-specific
+  bill-import task groups of Stage 5 do not exist, and the two gateway task viewers need a read-only Task Manager grant,
+  a requested capability still to confirm on the installed build (finding 1). A group that needs every task group or
+  every library rate takes the
+  category grant now, which also covers ones created later.
+notes:
+- '2026-11-01 upgrade reconciliation: System Manager groups also require the System Health and GHG Reporting module grants added by AddSystemHealthModule.sql. These module entries preserve access to moved pages; report grants still control the pages each group can open. Audit Explorer (audit_explorer) replaces the retired rp_Audit report.'
+- Edit shared names and grants on the Common master. Its company copies have independent membership and read-only grants.
+  A newly created company receives copies with the same Points scopes and no members. Membership is always assigned in
+  the user's home company, including when the group's Points target another company.
+- 'Example: Nora joins Northlake eem_bill_import, eem_nlu_points_read and eem_cra_points_read. The Cedar Row Points copy
+  still targets MetaCompanyID 3 even though Nora and the copy belong to Northlake (CompanyID 6).'
+- Each target company has Read (1), Modify (2) and Insert/Delete (3) Points masters. eem_nlu_points_modify is currently
+  unassigned but completes the requested three-level set. Dana keeps the local Science Center-only group, with no company-root grant.
+- System-root Points in eem_system_db_admins and eem_implementation_admins are level 3; eem_support_readonly has level 1.
+  MetaCompanyID=null means all companies. These grants now remain shared; customer users receive only the groups listed in 05-users.yaml.
+- Permissions combine across a user's groups. Shared report/function permissions and Points scopes are not separate
+  per-company bundles; check the combined effective scope and level.
+- Make Local detaches a company copy and retains its grants/memberships. Deleting a company copy opts it out of future
+  synchronization until Restore shared group is used. Deleting a shared Common master also deletes its attached shared
+  company copies. The retirement list below contains local groups only; keep all 21 planned masters and their copies.
+- Cedar Row's copy of eem_reports is the one copy detached on purpose (record cra_eem_reports_local). Make Local it, save,
+  then rename it CRA EEM Billing and Usage Reports and add its local grants. Detach no other copy.
+- Name is the English display label; Key is the exact catalog PermissionKey. Enter only the listed grants. Permission
+  Profile is a planning label in the old security source, not an EEMSuite object.
+- Fixed permissions generally support levels 1 Read/Execute, 2 Modify and 3 Insert/Delete; omitted/0 means no grant.
+  Functions are entered at level 3. Bulk Data Entry works only at 3 although the catalog lists it as level 1 only, and
+  until 2026-10-02 every upgrade raised a function grant saved at 1 or 2 to 3 (finding 77). Catalog thresholds do not
+  prove a screen's behavior at every level.
+- Access Management replaces the retired UsersTab/GroupsTab keys with A / AccessManagementTab. Its editor requires both
+  an administrator role and this permission; level 1 reads, level 3 manages, and level 2 is treated as read. Avery's system
+  setup group includes level 3. Quinn stays a non-administrator and cannot inspect that editor through the audit group alone.
+- User Modules and Report Groups save as level 1. A report category marked All is one grant on the category itself (Key *),
+  made by setting the level on the category, not on each report. It covers reports added later, such as the Scene reports,
+  and reports also need their module grants. A category that lists reports is granted report by report.
+- Task Manager Items and Library Rates use the same category grant. Key * covers every task group or library rate,
+  including ones created later. A named TS key is one task group's saved Description, never an individual task.
+- Library Rates levels hold in the desktop (Read views, Modify edits, Insert/Delete adds and deletes), capped by the Rate
+  Modeler tab level. Task Manager never compares the level, so any TS grant gives full control of those tasks. Even
+  system administrators see no task without a TS grant. The Rate Analysis and Tenant Rebilling reports show only rates
+  the user holds, so groups with those reports and no rate setup hold all library rates at Read.
+- F / anonymize_user_data needs no entry. The 2026-09-25 user data upgrade granted it at level 3 to every group then
+  holding the Anonymize Data report, so eem_system_db_admins, eem_implementation_admins and eem_company_setup (through
+  System Administration Functions All) and their copies have it.
+- Administrator Roles (AR) cannot be placed in ordinary/shared groups. Set the User Editor's Administrator checkbox to
+  each record's explicit IsAdmin boolean in 05-users.yaml; EEMSuite manages the protected administrator membership.
+- Science Center is the existing node 24, path 0.6.22.24, MetaCompanyID 6. Bill approval is F / Bill Validation (only its
+  presence is checked); bill entry has bill_entry_web and bill_images without Bill Validation.
+- 'This recipe has 29 definitions: 21 shared masters plus eight local groups, one of them Cedar Row''s eem_reports made
+  local. The 62 copies that stay shared bring the planned custom-group total to 91. Protected/default groups and
+  not-yet-retired old groups are additional rows.'
+- 'Ridgeline (2026-10-01): eem_ridgeline_research is the first shared master whose Points name a node inside another
+  company, and ntp_wind_ops the first node-scoped group at Modify. Both get their Points once Stage 2 saves the node.'
+permissionTypes:
+  Admin Modules: A
+  Functions: F
+  Task Manager Items: TS
+  My Import Methods: MI
+  Library Rates: $
+  Points: D
+  User Modules: G:21
+  Report Groups: Type is specified beside each report category
+catalogExclusions:
+  Empty report categories used by the old file:
+    Alarm Manager Reports: G:2
+    Baseline Performance Reports: G:3
+    Bill Administration: G:4
+    Bill-Meter Reconciliation: G:7
+    Utility Accountant Sub Reports: G:18
+    Rate Analysis Configuration: G:23
+  Module keys with no report placements:
+  - alarms
+  - baseline_perf
+  - billmeter_rec
+  - utility_accountant
+  Explanation: These type/module definitions remain in Northlake, but they do not provide selectable report content. Do
+    not grant them just because the catalog has a heading. Recheck if a future feature supplies real content.
+  Existing task permission keys, not automatic grants:
+  - Bill Importer Tasks
+  - EEM Gateways
+  - Report Tasks
+  - Standard Alerts
+  - System Tasks
+  TaskType without a TS definition: MFR Reports exists in TaskType but has no active TS catalog row; it is not a grantable
+    key in this snapshot.
+replacedGroups:
+  nlu_points_read:
+    Company: Northlake University
+    Permission groups:
+    - eem_nlu_points_read
+  nlu_points_admin:
+    Company: Northlake University
+    Permission groups:
+    - eem_nlu_points_admin
+  cra_points_read:
+    Company: Cedar Row Apartments
+    Permission groups:
+    - eem_cra_points_read
+  cra_points_modify:
+    Company: Cedar Row Apartments
+    Permission groups:
+    - eem_cra_points_modify
+  cra_points_admin:
+    Company: Cedar Row Apartments
+    Permission groups:
+    - eem_cra_points_admin
+  ntp_points_read:
+    Company: Northlake Thermal Plant
+    Permission groups:
+    - eem_ntp_points_read
+  ntp_points_modify:
+    Company: Northlake Thermal Plant
+    Permission groups:
+    - eem_ntp_points_modify
+  ntp_points_admin:
+    Company: Northlake Thermal Plant
+    Permission groups:
+    - eem_ntp_points_admin
+  nlu_rates_admins:
+    Company: Northlake University
+    Permission groups:
+    - eem_rate_allocations
+  ntp_rates_allocations:
+    Company: Northlake Thermal Plant
+    Permission groups:
+    - eem_rate_allocations
+records:
+- key: eem_system_db_admins
+  installed:
+    groupId: eem_system_db_admins
+    recordedOn: '2026-09-23'
+  Company: Common (System, CompanyID -1)
+  Group ID: eem_system_db_admins
+  Name: EEM System DB Admins
+  Purpose: System configuration and diagnostics; the actual system administrator role is assigned on the user in step 5.
+  Permissions:
+    Admin Modules:
+    - {Name: Access Management, Key: AccessManagementTab, Level: 3}
+    - {Name: Commodities, Key: CommodityTab, Level: 3}
+    - {Name: Units, Key: UnitsTab, Level: 3}
+    - {Name: System Settings, Key: SystemSettingsTab, Level: 3}
+    Functions:
+    - {Name: Anonymize User Data, Key: anonymize_user_data, Level: 3}
+    - {Name: Bulk Data Entry, Key: Bulk Data Entry, Level: 3}
+    - {Name: Impersonate User, Key: ImpersonateUser, Level: 3}
+    - {Name: System Administration, Key: System Administration, Level: 3}
+    Points: {Level: 3, Key: '*', MetaCompanyID: null, Node Scope: Every company (grant at the System root)}
+    User Modules:
+    - {Name: System Manager, Key: system_reports, Level: 1}
+    - {Name: System Health, Key: system_health, Level: 1}
+    - {Name: GHG Reporting, Key: green_house_gases, Level: 1}
+    Report Groups:
+      System Manager Reports: {Type: 'G:15', Reports: All, Level: 1}
+      System Administration Functions: {Type: 'G:14', Reports: All, Level: 1}
+  Shared: true
+- key: eem_implementation_admins
+  installed:
+    groupId: eem_implementation_admins
+    recordedOn: '2026-09-23'
+  Company: Common (System, CompanyID -1)
+  Group ID: eem_implementation_admins
+  Name: EEM Implementation Admins
+  Purpose: Create hierarchy, rates and provider setup across companies; task-group access is assigned after task groups
+    exist.
+  Permissions:
+    Admin Modules:
+    - {Name: Nodes, Key: HierarchyTab, Level: 3}
+    - {Name: Rate Modeler, Key: RateModelerTab, Level: 3}
+    - {Name: Utility Providers, Key: UtilityProviderTab, Level: 3}
+    Functions:
+    - {Name: Anonymize User Data, Key: anonymize_user_data, Level: 3}
+    - {Name: Impersonate User, Key: ImpersonateUser, Level: 3}
+    - {Name: System Administration, Key: System Administration, Level: 3}
+    Task Manager Items:
+    - {Name: All task groups, Key: '*', Level: 3}
+    Library Rates:
+    - {Name: All library rates, Key: '*', Level: 3}
+    Points: {Level: 3, Key: '*', MetaCompanyID: null, Node Scope: Every company (grant at the System root)}
+    User Modules:
+    - {Name: Bill Management, Key: bill_entry_process, Level: 1}
+    - {Name: Bill Processing, Key: bp_bill_process, Level: 1}
+    - {Name: Bill Tracking, Key: bt_bill_tracking, Level: 1}
+    - {Name: ENERGY STAR, Key: energy_star_rating, Level: 1}
+    - {Name: GHG Reporting, Key: green_house_gases, Level: 1}
+    - {Name: My Reports, Key: my_reports, Level: 1}
+    - {Name: Project Tracking, Key: project_tracking, Level: 1}
+    - {Name: Rate Analysis, Key: rate_analysis, Level: 1}
+    - {Name: System Manager, Key: system_reports, Level: 1}
+    - {Name: System Health, Key: system_health, Level: 1}
+    - {Name: Tenant Rebilling, Key: tr_tenant_rebilling, Level: 1}
+    - {Name: Use Analysis, Key: use_analysis, Level: 1}
+    Report Groups:
+      Bill Management Reports: {Type: 'G:26', Reports: All, Level: 1}
+      Bill Processing Reports: {Type: 'G:5', Reports: All, Level: 1}
+      Bill Tracking Reports: {Type: 'G:6', Reports: All, Level: 1}
+      Energy Star Rating: {Type: 'G:11', Reports: All, Level: 1}
+      Green House Gas Reporting: {Type: 'G:19', Reports: All, Level: 1}
+      Custom My Reports: {Type: 'G:1', Reports: All, Level: 1}
+      Project Tracking: {Type: 'G:12', Reports: All, Level: 1}
+      Rate Analysis Reports: {Type: 'G:13', Reports: All, Level: 1}
+      System Manager Reports: {Type: 'G:15', Reports: All, Level: 1}
+      System Administration Functions: {Type: 'G:14', Reports: All, Level: 1}
+      Tenant Rebilling Reports: {Type: 'G:16', Reports: All, Level: 1}
+      Use Analysis Reports: {Type: 'G:17', Reports: All, Level: 1}
+  Shared: true
+- key: eem_support_readonly
+  installed:
+    groupId: eem_support_readonly
+    recordedOn: '2026-09-23'
+  Company: Common (System, CompanyID -1)
+  Group ID: eem_support_readonly
+  Name: EEM Support Read Only
+  Purpose: Inspect hierarchy, rates, providers and diagnostic reports without setup changes.
+  Permissions:
+    Admin Modules:
+    - {Name: Nodes, Key: HierarchyTab, Level: 1}
+    - {Name: Rate Modeler, Key: RateModelerTab, Level: 1}
+    - {Name: Utility Providers, Key: UtilityProviderTab, Level: 1}
+    Library Rates:
+    - {Name: All library rates, Key: '*', Level: 1}
+    Points: {Level: 1, Key: '*', MetaCompanyID: null, Node Scope: Every company (grant at the System root)}
+    User Modules:
+    - {Name: System Manager, Key: system_reports, Level: 1}
+    - {Name: System Health, Key: system_health, Level: 1}
+    - {Name: GHG Reporting, Key: green_house_gases, Level: 1}
+    Report Groups:
+      System Manager Reports:
+        Type: G:15
+        Level: 1
+        Reports:
+        - {Name: Log Analysis, Key: log_analysis}
+        - {Name: Gateway Status, Key: rp_GatewayStatus}
+        - {Name: TaskLog Report, Key: rp_TaskLog}
+  Shared: true
+- key: eem_company_setup
+  installed:
+    groupId: eem_company_setup
+    recordedOn: '2026-09-23'
+  Company: Common (System, CompanyID -1)
+  Group ID: eem_company_setup
+  Name: EEM Company Setup
+  Shared: true
+  Purpose: Company setup, security screens and bill approval. Assign the protected administrator role separately on the
+    user.
+  Permissions:
+    Admin Modules:
+    - {Name: Access Management, Key: AccessManagementTab, Level: 3}
+    - {Name: Nodes, Key: HierarchyTab, Level: 3}
+    - {Name: System Settings, Key: SystemSettingsTab, Level: 3}
+    Functions:
+    - {Name: Anonymize User Data, Key: anonymize_user_data, Level: 3}
+    - {Name: Bill Administration, Key: Bill Administration, Level: 3}
+    - {Name: Bill Validation, Key: Bill Validation, Level: 3}
+    - {Name: System Administration, Key: System Administration, Level: 3}
+    Library Rates:
+    - {Name: All library rates, Key: '*', Level: 1}
+    User Modules:
+    - {Name: Bill Management, Key: bill_entry_process, Level: 1}
+    - {Name: Bill Processing, Key: bp_bill_process, Level: 1}
+    - {Name: Bill Tracking, Key: bt_bill_tracking, Level: 1}
+    - {Name: ENERGY STAR, Key: energy_star_rating, Level: 1}
+    - {Name: GHG Reporting, Key: green_house_gases, Level: 1}
+    - {Name: My Reports, Key: my_reports, Level: 1}
+    - {Name: Project Tracking, Key: project_tracking, Level: 1}
+    - {Name: Rate Analysis, Key: rate_analysis, Level: 1}
+    - {Name: System Manager, Key: system_reports, Level: 1}
+    - {Name: System Health, Key: system_health, Level: 1}
+    - {Name: Tenant Rebilling, Key: tr_tenant_rebilling, Level: 1}
+    - {Name: Use Analysis, Key: use_analysis, Level: 1}
+    Report Groups:
+      Bill Management Reports: {Type: 'G:26', Reports: All, Level: 1}
+      Bill Processing Reports: {Type: 'G:5', Reports: All, Level: 1}
+      Bill Tracking Reports: {Type: 'G:6', Reports: All, Level: 1}
+      Energy Star Rating: {Type: 'G:11', Reports: All, Level: 1}
+      Green House Gas Reporting: {Type: 'G:19', Reports: All, Level: 1}
+      Custom My Reports: {Type: 'G:1', Reports: All, Level: 1}
+      Project Tracking: {Type: 'G:12', Reports: All, Level: 1}
+      Rate Analysis Reports: {Type: 'G:13', Reports: All, Level: 1}
+      System Manager Reports: {Type: 'G:15', Reports: All, Level: 1}
+      System Administration Functions: {Type: 'G:14', Reports: All, Level: 1}
+      Tenant Rebilling Reports: {Type: 'G:16', Reports: All, Level: 1}
+      Use Analysis Reports: {Type: 'G:17', Reports: All, Level: 1}
+- key: eem_bill_entry
+  installed:
+    groupId: eem_bill_entry
+    recordedOn: '2026-09-23'
+  Company: Common (System, CompanyID -1)
+  Group ID: eem_bill_entry
+  Name: EEM Bill Entry
+  Shared: true
+  Purpose: Bill entry, bill images and the bill list; no validation or approval function.
+  Permissions:
+    Functions:
+    - {Name: Bill Entry Web, Key: bill_entry_web, Level: 3}
+    - {Name: Bill Images, Key: bill_images, Level: 3}
+    User Modules:
+    - {Name: Bill Management, Key: bill_entry_process, Level: 1}
+    Report Groups:
+      Bill Management Reports:
+        Type: G:26
+        Level: 1
+        Reports:
+        - {Name: Bill Entry, Key: bill_entry}
+        - {Name: Bill Entry List, Key: rp_BillEntryList}
+- key: eem_bill_import
+  installed:
+    groupId: eem_bill_import
+    recordedOn: '2026-09-23'
+  Company: Common (System, CompanyID -1)
+  Group ID: eem_bill_import
+  Name: EEM Bill Import
+  Shared: true
+  Purpose: Bill Importer and the bill list. Company-specific task permissions are added to local task-access groups later.
+  Permissions:
+    User Modules:
+    - {Name: Bill Management, Key: bill_entry_process, Level: 1}
+    Report Groups:
+      Bill Management Reports:
+        Type: G:26
+        Level: 1
+        Reports:
+        - {Name: Bill Importer, Key: bill_importer}
+        - {Name: Bill Entry List, Key: rp_BillEntryList}
+# Changed 2026-10-02: Allow User Dashboards added, not yet on the installed group. Samantha owns the public Executive
+# Overview dashboard (Stage 9) and this group's report readers view it; without the function the dashboard list is empty.
+- key: eem_reports
+  installed:
+    groupId: eem_reports
+    recordedOn: '2026-09-23'
+  Company: Common (System, CompanyID -1)
+  Group ID: eem_reports
+  Name: EEM Billing and Usage Reports
+  Shared: true
+  Purpose: Billing and usage reports, and the dashboards built from them. Data scope comes from a separate Points group,
+    including the local Science Center-only case.
+  Permissions:
+    Functions:
+    - {Name: Allow User Dashboards, Key: allow_dashboards, Level: 3}
+    User Modules:
+    - {Name: Bill Processing, Key: bp_bill_process, Level: 1}
+    - {Name: Bill Tracking, Key: bt_bill_tracking, Level: 1}
+    - {Name: Use Analysis, Key: use_analysis, Level: 1}
+    Report Groups:
+      Bill Processing Reports: {Type: 'G:5', Reports: All, Level: 1}
+      Bill Tracking Reports: {Type: 'G:6', Reports: All, Level: 1}
+      Use Analysis Reports: {Type: 'G:17', Reports: All, Level: 1}
+# Added 2026-10-01 for Ridgeline Wind. The first shared master whose Points name a node inside another company
+# rather than a company root: university researchers (members in the Northlake University copy) read the plant's
+# Ridgeline Wind Site and nothing else. Its Points grant names that node, saved in Stage 2 step 2 (key 0.5.40).
+- key: eem_ridgeline_research
+  installed:
+    groupId: null
+  Company: Common (System, CompanyID -1)
+  Group ID: eem_ridgeline_research
+  Name: EEM Ridgeline Wind Research
+  Shared: true
+  Purpose: Read-only research access to the Ridgeline Wind Site for university researchers. Usage analysis (including the
+    scatter plot) and point lists only; no bill reports, no setup. Data scope is the Ridgeline Wind Site node in Northlake
+    Thermal Plant.
+  Permissions:
+    Points: {Level: 1, Key: '0.5.40', MetaCompanyID: 5, Node Scope: Northlake Thermal Plant > Ridgeline Wind Site}
+    User Modules:
+    - {Name: System Manager, Key: system_reports, Level: 1}
+    - {Name: System Health, Key: system_health, Level: 1}
+    - {Name: GHG Reporting, Key: green_house_gases, Level: 1}
+    - {Name: Use Analysis, Key: use_analysis, Level: 1}
+    Report Groups:
+      System Manager Reports:
+        Type: G:15
+        Level: 1
+        Reports:
+        - {Name: Point Data Map, Key: rp_PointDataMap}
+        - {Name: Points List, Key: rp_PointsList}
+      Use Analysis Reports: {Type: 'G:17', Reports: All, Level: 1}
+- key: eem_sustainability_reports
+  installed:
+    groupId: eem_sustainability_reports
+    recordedOn: '2026-09-23'
+  Company: Common (System, CompanyID -1)
+  Group ID: eem_sustainability_reports
+  Name: EEM Sustainability Reports
+  Shared: true
+  Purpose: ENERGY STAR rating results, GHG and usage reports; no ENERGY STAR setup or rating request entry.
+  Permissions:
+    User Modules:
+    - {Name: ENERGY STAR, Key: energy_star_rating, Level: 1}
+    - {Name: GHG Reporting, Key: green_house_gases, Level: 1}
+    - {Name: Use Analysis, Key: use_analysis, Level: 1}
+    Report Groups:
+      Energy Star Rating:
+        Type: G:11
+        Level: 1
+        Reports:
+        - {Name: Rating Comparison, Key: rp_ESRatingComparison}
+        - {Name: Rating History, Key: rp_ESRatingHistory}
+        - {Name: Rating Request Log, Key: rp_ESRatingRequestLog}
+      Green House Gas Reporting: {Type: 'G:19', Reports: All, Level: 1}
+      Use Analysis Reports: {Type: 'G:17', Reports: All, Level: 1}
+- key: eem_audit_readonly
+  installed:
+    groupId: eem_audit_readonly
+    recordedOn: '2026-09-23'
+  Company: Common (System, CompanyID -1)
+  Group ID: eem_audit_readonly
+  Name: EEM Audit Read Only
+  Shared: true
+  Purpose: Read setup and audit reports. Access Management also requires an administrator role; Quinn remains IsAdmin=false
+    and cannot use that editor merely from its level-1 grant.
+  Permissions:
+    Admin Modules:
+    - {Name: Access Management, Key: AccessManagementTab, Level: 1}
+    - {Name: Nodes, Key: HierarchyTab, Level: 1}
+    - {Name: System Settings, Key: SystemSettingsTab, Level: 1}
+    - {Name: Rate Modeler, Key: RateModelerTab, Level: 1}
+    - {Name: Utility Providers, Key: UtilityProviderTab, Level: 1}
+    Library Rates:
+    - {Name: All library rates, Key: '*', Level: 1}
+    User Modules:
+    - {Name: System Manager, Key: system_reports, Level: 1}
+    - {Name: System Health, Key: system_health, Level: 1}
+    - {Name: GHG Reporting, Key: green_house_gases, Level: 1}
+    Report Groups:
+      System Manager Reports:
+        Type: G:15
+        Level: 1
+        Reports:
+        - {Name: Activity Tracker, Key: rp_ActivityTracker}
+        - {Name: Audit Explorer, Key: audit_explorer}
+# Changed 2026-10-02: Allow User Dashboards added, not yet on the installed group. Jordan builds the private Facility
+# Operations dashboard (Stage 9) from this group's reports; without the function the dashboard list is empty.
+- key: eem_gateway_reports
+  installed:
+    groupId: eem_gateway_reports
+    recordedOn: '2026-09-23'
+  Company: Common (System, CompanyID -1)
+  Group ID: eem_gateway_reports
+  Name: EEM Gateway and Task Reports
+  Shared: true
+  Purpose: Gateway Status and TaskLog reports, and a dashboard of them. This shared group does not grant task execution or
+    a company-specific task group.
+  Permissions:
+    Functions:
+    - {Name: Allow User Dashboards, Key: allow_dashboards, Level: 3}
+    User Modules:
+    - {Name: System Manager, Key: system_reports, Level: 1}
+    - {Name: System Health, Key: system_health, Level: 1}
+    - {Name: GHG Reporting, Key: green_house_gases, Level: 1}
+    Report Groups:
+      System Manager Reports:
+        Type: G:15
+        Level: 1
+        Reports:
+        - {Name: Gateway Status, Key: rp_GatewayStatus}
+        - {Name: TaskLog Report, Key: rp_TaskLog}
+- key: eem_rate_allocations
+  installed:
+    groupId: null
+  Company: Common (System, CompanyID -1)
+  Group ID: eem_rate_allocations
+  Name: EEM Rates and Allocations
+  Shared: true
+  Purpose: Shared rate, schedule and allocation permissions for Priya in Northlake and Keiko in the Thermal Plant. Assign
+    each user's home-company copy and the listed Points groups. All library rates at level 3, including those Stage 4 adds.
+  Permissions:
+    Admin Modules:
+    - {Name: Rate Modeler, Key: RateModelerTab, Level: 3}
+    - {Name: Schedule, Key: ScheduleTab, Level: 3}
+    - {Name: Schedules, Key: SchedulesTab, Level: 3}
+    - {Name: Utility Accountant, Key: UtilityAccountantTab, Level: 3}
+    Library Rates:
+    - {Name: All library rates, Key: '*', Level: 3}
+    User Modules:
+    - {Name: Rate Analysis, Key: rate_analysis, Level: 1}
+    - {Name: Tenant Rebilling, Key: tr_tenant_rebilling, Level: 1}
+    Report Groups:
+      Rate Analysis Reports: {Type: 'G:13', Reports: All, Level: 1}
+      Tenant Rebilling Reports: {Type: 'G:16', Reports: All, Level: 1}
+- key: eem_nlu_points_read
+  installed:
+    groupId: null
+  Company: Common (System, CompanyID -1)
+  Group ID: eem_nlu_points_read
+  Name: NLU Points Read
+  Shared: true
+  Purpose: Northlake University Points at level 1. Assign the copy in the user's home company; every copy retains this target scope.
+  Permissions:
+    Points: {Level: 1, Key: '*', MetaCompanyID: 6, Node Scope: 'The whole company: Northlake University'}
+- key: eem_nlu_points_modify
+  installed:
+    groupId: null
+  Company: Common (System, CompanyID -1)
+  Group ID: eem_nlu_points_modify
+  Name: NLU Points Modify
+  Shared: true
+  Purpose: Northlake University Points at level 2. Assign the copy in the user's home company; every copy retains this target scope.
+  Permissions:
+    Points: {Level: 2, Key: '*', MetaCompanyID: 6, Node Scope: 'The whole company: Northlake University'}
+- key: eem_nlu_points_admin
+  installed:
+    groupId: null
+  Company: Common (System, CompanyID -1)
+  Group ID: eem_nlu_points_admin
+  Name: NLU Points Insert/Delete
+  Shared: true
+  Purpose: Northlake University Points at level 3. Assign the copy in the user's home company; every copy retains this target scope.
+  Permissions:
+    Points: {Level: 3, Key: '*', MetaCompanyID: 6, Node Scope: 'The whole company: Northlake University'}
+- key: eem_cra_points_read
+  installed:
+    groupId: null
+  Company: Common (System, CompanyID -1)
+  Group ID: eem_cra_points_read
+  Name: CRA Points Read
+  Shared: true
+  Purpose: Cedar Row Apartments Points at level 1. Assign the copy in the user's home company; every copy retains this target scope.
+  Permissions:
+    Points: {Level: 1, Key: '*', MetaCompanyID: 3, Node Scope: 'The whole company: Cedar Row Apartments'}
+- key: eem_cra_points_modify
+  installed:
+    groupId: null
+  Company: Common (System, CompanyID -1)
+  Group ID: eem_cra_points_modify
+  Name: CRA Points Modify
+  Shared: true
+  Purpose: Cedar Row Apartments Points at level 2. Assign the copy in the user's home company; every copy retains this target scope.
+  Permissions:
+    Points: {Level: 2, Key: '*', MetaCompanyID: 3, Node Scope: 'The whole company: Cedar Row Apartments'}
+- key: eem_cra_points_admin
+  installed:
+    groupId: null
+  Company: Common (System, CompanyID -1)
+  Group ID: eem_cra_points_admin
+  Name: CRA Points Insert/Delete
+  Shared: true
+  Purpose: Cedar Row Apartments Points at level 3. Assign the copy in the user's home company; every copy retains this target scope.
+  Permissions:
+    Points: {Level: 3, Key: '*', MetaCompanyID: 3, Node Scope: 'The whole company: Cedar Row Apartments'}
+- key: eem_ntp_points_read
+  installed:
+    groupId: null
+  Company: Common (System, CompanyID -1)
+  Group ID: eem_ntp_points_read
+  Name: NTP Points Read
+  Shared: true
+  Purpose: Northlake Thermal Plant Points at level 1. Assign the copy in the user's home company; every copy retains this target scope.
+  Permissions:
+    Points: {Level: 1, Key: '*', MetaCompanyID: 5, Node Scope: 'The whole company: Northlake Thermal Plant'}
+- key: eem_ntp_points_modify
+  installed:
+    groupId: null
+  Company: Common (System, CompanyID -1)
+  Group ID: eem_ntp_points_modify
+  Name: NTP Points Modify
+  Shared: true
+  Purpose: Northlake Thermal Plant Points at level 2. Assign the copy in the user's home company; every copy retains this target scope.
+  Permissions:
+    Points: {Level: 2, Key: '*', MetaCompanyID: 5, Node Scope: 'The whole company: Northlake Thermal Plant'}
+- key: eem_ntp_points_admin
+  installed:
+    groupId: null
+  Company: Common (System, CompanyID -1)
+  Group ID: eem_ntp_points_admin
+  Name: NTP Points Insert/Delete
+  Shared: true
+  Purpose: Northlake Thermal Plant Points at level 3. Assign the copy in the user's home company; every copy retains this target scope.
+  Permissions:
+    Points: {Level: 3, Key: '*', MetaCompanyID: 5, Node Scope: 'The whole company: Northlake Thermal Plant'}
+- key: nlu_database_admins
+  installed:
+    groupId: nlu_database_admins
+    recordedOn: '2026-09-23'
+  Company: Northlake University
+  Group ID: nlu_database_admins
+  Name: NLU Database Admins
+  Purpose: Northlake data setup and diagnostics; membership does not confer the system administrator role.
+  Permissions:
+    Admin Modules:
+    - {Name: Commodities, Key: CommodityTab, Level: 3}
+    - {Name: Nodes, Key: HierarchyTab, Level: 3}
+    - {Name: System Settings, Key: SystemSettingsTab, Level: 3}
+    - {Name: Units, Key: UnitsTab, Level: 3}
+    Functions:
+    - {Name: Bulk Data Entry, Key: Bulk Data Entry, Level: 3}
+    - {Name: Impersonate User, Key: ImpersonateUser, Level: 3}
+    - {Name: System Administration, Key: System Administration, Level: 3}
+    Library Rates:
+    - {Name: All library rates, Key: '*', Level: 1}
+    User Modules:
+    - {Name: Bill Management, Key: bill_entry_process, Level: 1}
+    - {Name: Bill Processing, Key: bp_bill_process, Level: 1}
+    - {Name: Bill Tracking, Key: bt_bill_tracking, Level: 1}
+    - {Name: ENERGY STAR, Key: energy_star_rating, Level: 1}
+    - {Name: GHG Reporting, Key: green_house_gases, Level: 1}
+    - {Name: My Reports, Key: my_reports, Level: 1}
+    - {Name: Project Tracking, Key: project_tracking, Level: 1}
+    - {Name: Rate Analysis, Key: rate_analysis, Level: 1}
+    - {Name: System Manager, Key: system_reports, Level: 1}
+    - {Name: System Health, Key: system_health, Level: 1}
+    - {Name: Tenant Rebilling, Key: tr_tenant_rebilling, Level: 1}
+    - {Name: Use Analysis, Key: use_analysis, Level: 1}
+    Report Groups:
+      Bill Management Reports: {Type: 'G:26', Reports: All, Level: 1}
+      Bill Processing Reports: {Type: 'G:5', Reports: All, Level: 1}
+      Bill Tracking Reports: {Type: 'G:6', Reports: All, Level: 1}
+      Energy Star Rating: {Type: 'G:11', Reports: All, Level: 1}
+      Green House Gas Reporting: {Type: 'G:19', Reports: All, Level: 1}
+      Custom My Reports: {Type: 'G:1', Reports: All, Level: 1}
+      Project Tracking: {Type: 'G:12', Reports: All, Level: 1}
+      Rate Analysis Reports: {Type: 'G:13', Reports: All, Level: 1}
+      System Manager Reports: {Type: 'G:15', Reports: All, Level: 1}
+      Tenant Rebilling Reports: {Type: 'G:16', Reports: All, Level: 1}
+      Use Analysis Reports: {Type: 'G:17', Reports: All, Level: 1}
+  Administrator note: Emerson has IsAdmin=false in 05-users.yaml and receives these explicit data permissions. Avery
+    receives the required setup grants and all-company Points through the Common groups; no Northlake membership is needed.
+  Shared: false
+- key: nlu_facilities_setup
+  installed:
+    groupId: nlu_facilities_setup
+    recordedOn: '2026-09-23'
+  Company: Northlake University
+  Group ID: nlu_facilities_setup
+  Name: NLU Facilities Setup
+  Purpose: Create Northlake hierarchy and aggregates; inspect commodity and unit definitions.
+  Permissions:
+    Admin Modules:
+    - {Name: Aggregates, Key: AggregatesTab, Level: 3}
+    - {Name: Commodities, Key: CommodityTab, Level: 1}
+    - {Name: Nodes, Key: HierarchyTab, Level: 3}
+    - {Name: Units, Key: UnitsTab, Level: 1}
+    User Modules:
+    - {Name: System Manager, Key: system_reports, Level: 1}
+    - {Name: System Health, Key: system_health, Level: 1}
+    - {Name: GHG Reporting, Key: green_house_gases, Level: 1}
+    - {Name: Use Analysis, Key: use_analysis, Level: 1}
+    Report Groups:
+      System Manager Reports:
+        Type: G:15
+        Level: 1
+        Reports:
+        - {Name: Hierarchy Details Editor, Key: rp_HierarchyDetailsEditor}
+        - {Name: Point Data Map, Key: rp_PointDataMap}
+        - {Name: Points List, Key: rp_PointsList}
+      Use Analysis Reports: {Type: 'G:17', Reports: All, Level: 1}
+  Shared: false
+- key: nlu_utility_setup
+  installed:
+    groupId: nlu_utility_setup
+    recordedOn: '2026-09-23'
+  Company: Northlake University
+  Group ID: nlu_utility_setup
+  Name: NLU Utility Setup
+  Purpose: Create Northlake commodities, units, utility providers, accounts and meters.
+  Permissions:
+    Admin Modules:
+    - {Name: Commodities, Key: CommodityTab, Level: 3}
+    - {Name: Units, Key: UnitsTab, Level: 3}
+    - {Name: Utility Accountant, Key: UtilityAccountantTab, Level: 3}
+    - {Name: Utility Providers, Key: UtilityProviderTab, Level: 3}
+    User Modules:
+    - {Name: System Manager, Key: system_reports, Level: 1}
+    - {Name: System Health, Key: system_health, Level: 1}
+    - {Name: GHG Reporting, Key: green_house_gases, Level: 1}
+    Report Groups:
+      System Manager Reports:
+        Type: G:15
+        Level: 1
+        Reports:
+        - {Name: Hierarchy Details Editor, Key: rp_HierarchyDetailsEditor}
+        - {Name: Point Data Map, Key: rp_PointDataMap}
+        - {Name: Points List, Key: rp_PointsList}
+  Shared: false
+- key: nlu_science_center_scope
+  installed:
+    groupId: nlu_science_center_scope
+    recordedOn: '2026-09-23'
+  Company: Northlake University
+  Group ID: nlu_science_center_scope
+  Name: NLU Science Center Points Read
+  Shared: false
+  Purpose: Read the existing Science Center building and its descendants. Pair with the Northlake copy of eem_reports.
+  Permissions:
+    Points: {Level: 1, Key: '0.6.22.24', MetaCompanyID: 6, Node Scope: Northlake University > Northlake Main Campus > Science Center}
+- key: cra_housing_ops
+  installed:
+    groupId: cra_housing_ops
+    recordedOn: '2026-09-23'
+  Company: Cedar Row Apartments
+  Group ID: cra_housing_ops
+  Name: Cedar Row Housing Operations
+  Purpose: Modify existing Cedar Row hierarchy and aggregates at level 2; creation and deletion stay with administrators.
+  Permissions:
+    Admin Modules:
+    - {Name: Aggregates, Key: AggregatesTab, Level: 2}
+    - {Name: Nodes, Key: HierarchyTab, Level: 2}
+    User Modules:
+    - {Name: Bill Processing, Key: bp_bill_process, Level: 1}
+    - {Name: Bill Tracking, Key: bt_bill_tracking, Level: 1}
+    - {Name: System Manager, Key: system_reports, Level: 1}
+    - {Name: System Health, Key: system_health, Level: 1}
+    - {Name: GHG Reporting, Key: green_house_gases, Level: 1}
+    - {Name: Use Analysis, Key: use_analysis, Level: 1}
+    Report Groups:
+      Bill Processing Reports: {Type: 'G:5', Reports: All, Level: 1}
+      Bill Tracking Reports: {Type: 'G:6', Reports: All, Level: 1}
+      System Manager Reports:
+        Type: G:15
+        Level: 1
+        Reports:
+        - {Name: Point Data Map, Key: rp_PointDataMap}
+        - {Name: Points List, Key: rp_PointsList}
+        - {Name: Note History, Key: rp_NoteHistory}
+      Use Analysis Reports: {Type: 'G:17', Reports: All, Level: 1}
+  Shared: false
+# Make Local fixture (added 2026-10-02). Open Cedar Row's copy of eem_reports, use Make Local and save, then add the
+# Tenant Rebilling module, Tenant Rebilling Reports (All) and all library rates at Read. Cedar Row's housing staff check
+# the Stage 7 residential tenant bills; those reports show only the rates a user holds. The other two copies stay
+# shared and keep following the Common master, and later master changes must not reach this one.
+- key: cra_eem_reports_local
+  installed:
+    groupId: eem_reports
+    recordedOn: '2026-10-02'
+  Company: Cedar Row Apartments
+  Group ID: eem_reports
+  Name: CRA EEM Billing and Usage Reports
+  Shared: false
+  Purpose: Cedar Row's copy of eem_reports, made local so its housing staff also review tenant rebilling. Keeps the
+    master's grants and its members (Maya, Valerie).
+  Permissions:
+    Functions:
+    - {Name: Allow User Dashboards, Key: allow_dashboards, Level: 3}
+    Library Rates:
+    - {Name: All library rates, Key: '*', Level: 1}
+    User Modules:
+    - {Name: Bill Processing, Key: bp_bill_process, Level: 1}
+    - {Name: Bill Tracking, Key: bt_bill_tracking, Level: 1}
+    - {Name: Tenant Rebilling, Key: tr_tenant_rebilling, Level: 1}
+    - {Name: Use Analysis, Key: use_analysis, Level: 1}
+    Report Groups:
+      Bill Processing Reports: {Type: 'G:5', Reports: All, Level: 1}
+      Bill Tracking Reports: {Type: 'G:6', Reports: All, Level: 1}
+      Tenant Rebilling Reports: {Type: 'G:16', Reports: All, Level: 1}
+      Use Analysis Reports: {Type: 'G:17', Reports: All, Level: 1}
+- key: ntp_plant_ops
+  installed:
+    groupId: ntp_plant_ops
+    recordedOn: '2026-09-23'
+  Company: Northlake Thermal Plant
+  Group ID: ntp_plant_ops
+  Name: Thermal Plant Operators
+  Purpose: Modify existing Thermal Plant meter metadata at level 2 and view operational reports.
+  Permissions:
+    Admin Modules:
+    - {Name: Nodes, Key: HierarchyTab, Level: 2}
+    User Modules:
+    - {Name: System Manager, Key: system_reports, Level: 1}
+    - {Name: System Health, Key: system_health, Level: 1}
+    - {Name: GHG Reporting, Key: green_house_gases, Level: 1}
+    - {Name: Use Analysis, Key: use_analysis, Level: 1}
+    Report Groups:
+      System Manager Reports:
+        Type: G:15
+        Level: 1
+        Reports:
+        - {Name: Point Data Map, Key: rp_PointDataMap}
+        - {Name: Points List, Key: rp_PointsList}
+        - {Name: Gateway Status, Key: rp_GatewayStatus}
+        - {Name: TaskLog Report, Key: rp_TaskLog}
+      Use Analysis Reports: {Type: 'G:17', Reports: All, Level: 1}
+  Shared: false
+# Added 2026-10-01 for Ridgeline Wind: the plant's operators, scoped to one site at Modify. The Science Center group is
+# the read-only, one-building case; this is the read-write, one-site case. Its Points grant names the Ridgeline Wind
+# Site node (key 0.5.40). Do not add eem_ntp_points_modify or any company-root Points: they would mask the scope.
+- key: ntp_wind_ops
+  installed:
+    groupId: null
+  Company: Northlake Thermal Plant
+  Group ID: ntp_wind_ops
+  Name: Ridgeline Wind Operations
+  Purpose: Modify the Ridgeline Wind Site's meters and points at level 2 and view its operational reports; the Central
+    Plant stays out of reach. Holds Allow User Dashboards for the Ridgeline Operations dashboard (Stage 9), which Mateo
+    owns and shares with this group.
+  Permissions:
+    Admin Modules:
+    - {Name: Nodes, Key: HierarchyTab, Level: 2}
+    Functions:
+    - {Name: Allow User Dashboards, Key: allow_dashboards, Level: 3}
+    Points: {Level: 2, Key: '0.5.40', MetaCompanyID: 5, Node Scope: Northlake Thermal Plant > Ridgeline Wind Site}
+    User Modules:
+    - {Name: System Manager, Key: system_reports, Level: 1}
+    - {Name: System Health, Key: system_health, Level: 1}
+    - {Name: GHG Reporting, Key: green_house_gases, Level: 1}
+    - {Name: Use Analysis, Key: use_analysis, Level: 1}
+    Report Groups:
+      System Manager Reports:
+        Type: G:15
+        Level: 1
+        Reports:
+        - {Name: Point Data Map, Key: rp_PointDataMap}
+        - {Name: Points List, Key: rp_PointsList}
+        - {Name: Gateway Status, Key: rp_GatewayStatus}
+      Use Analysis Reports: {Type: 'G:17', Reports: All, Level: 1}
+  Shared: false
+laterPermissions: []
+laterLocalGroups:
+- Group ID: eem_gateway_tasks_readonly
+  Company: Common (System, CompanyID -1)
+  Shared: false
+  Create when: Task Manager can grant read-only access (product finding 1).
+  Deferred Permissions:
+  - Section: Task Manager Items
+    Type: TS
+    Key: EEM Gateways
+    Level: 1
+    When: Once Task Manager compares a grant's level. Today any TS grant, even Read, lets the holder edit and enable the
+      group's tasks, so a read-only viewer cannot be expressed.
+    Action: Grant the existing EEM Gateways task group at level 1, the group that holds the Northlake gateway tasks.
+    Verification: Sign in as the member and confirm the gateway tasks show but cannot be edited, enabled or run.
+  Members after creation:
+  - morgan.patel
+- Group ID: nlu_gateway_tasks_readonly
+  Company: Northlake University
+  Shared: false
+  Create when: Task Manager can grant read-only access (product finding 1).
+  Deferred Permissions:
+  - Section: Task Manager Items
+    Type: TS
+    Key: EEM Gateways
+    Level: 1
+    When: Once Task Manager compares a grant's level. Today any TS grant, even Read, lets the holder edit and enable the
+      group's tasks, so a read-only viewer cannot be expressed.
+    Action: Grant the existing EEM Gateways task group at level 1, the group that holds the Northlake gateway tasks.
+    Verification: Sign in as the member and confirm the gateway tasks show but cannot be edited, enabled or run.
+  Members after creation:
+  - jordan.hale
+- Group ID: nlu_bill_import_tasks
+  Company: Northlake University
+  Shared: false
+  Create when: Stage 5, after creating/selecting the task group that actually contains this company's bill-import tasks.
+  Deferred Permissions:
+  - Section: Task Manager Items
+    Type: TS
+    Key: null
+    Level: 3
+    When: Stage 5, after creating/selecting the task group that actually contains this company's bill-import tasks.
+    Action: Record the exact group Description and confirm its active TS key before granting it. Use Bill Importer Tasks
+      only if that existing group is intentionally the correct scope. Do not add MI / Interval Data Import for bill import.
+  Members after creation:
+  - nora.chen
+  - priya.nandakumar
+- Group ID: nlu_cra_bill_import_tasks
+  Company: Northlake University
+  Shared: false
+  Create when: Stage 5, after creating/selecting the task group that actually contains Cedar Row's bill-import tasks.
+  Deferred Permissions:
+  - Section: Task Manager Items
+    Type: TS
+    Key: null
+    Level: 3
+    When: Stage 5, after creating/selecting the task group that actually contains Cedar Row's bill-import tasks.
+    Action: Assign Nora in her Northlake home company. Record the exact Cedar Row task-group Description and confirm its active TS key
+      before granting it. Use Bill Importer Tasks only if that existing group is intentionally the correct scope. Do not add MI / Interval Data Import for bill import.
+  Members after creation:
+  - nora.chen
+verificationAfterSetup:
+  Status: Pending application execution. Catalog/key checks are not proof that every action enforces its level.
+  Method: Save each group, leave/reopen it, and verify its exact keys, levels and node scope. Use the named non-administrator
+    users below after step 5; inspect their combined effective grants first so another membership cannot mask the tested
+    level. For temporary task/rate level checks use isolated test membership and restore the intended grants afterward.
+    Record actual results, including any unsupported level boundary.
+  Cases:
+  - Case: Shared masters and company copies
+    Expect: Twenty-one Shared masters under Common and one Shared copy of each in every company, except Cedar Row's
+      eem_reports, which is made local. Master grant additions, level changes and removals reach each attached copy. A
+      company copy rejects direct edits; memberships remain independently editable.
+  - Case: Shared permission exclusions
+    Expect: No AR rows in any shared master/copy. Shared D rows retain the exact target MetaCompanyID, node path and level.
+      Local Science Center remains unchanged when a shared master is edited.
+  - Case: Cross-company Points through home-company membership
+    Users:
+    - {User: nora.chen, Home company: Northlake University, Additional group: eem_cra_points_read, Target company: Cedar Row Apartments, Level: 1}
+    - {User: leo.martinez, Home company: Northlake University, Additional group: eem_ntp_points_read, Target company: Northlake Thermal Plant, Level: 1}
+    - {User: priya.nandakumar, Home company: Northlake University, Additional group: eem_ntp_points_modify, Target company: Northlake Thermal Plant, Level: 2}
+    - {User: keiko.tan, Home company: Northlake Thermal Plant, Additional group: eem_nlu_points_read, Target company: Northlake University, Level: 1}
+    - {User: quinn.roberts, Home company: Northlake University, Additional group: eem_cra_points_read, Target company: Cedar Row Apartments, Level: 1}
+    - {User: quinn.roberts, Home company: Northlake University, Additional group: eem_ntp_points_read, Target company: Northlake Thermal Plant, Level: 1}
+    Expect: Every membership belongs to the user's home company. Save/reload each target MetaCompanyID and level, then verify
+      the named user's combined Points scope. Nora has Northlake and Cedar Row only; Leo and Priya have Northlake and Thermal
+      Plant only; Keiko has Thermal Plant and Northlake only; Quinn reads all three. Other company copies gain no members.
+  - Case: Shared rates and allocations
+    Group: eem_rate_allocations
+    Users: [priya.nandakumar, keiko.tan]
+    Expect: Priya uses the Northlake copy and Keiko the Thermal Plant copy. Both receive the shared rate/schedule/allocation
+      capabilities and their separate listed Points levels. The master's Library Rates category grant (Key *, level 3)
+      covers the rates Stage 4 creates, so no rate is granted one by one.
+  - Case: Common implementation access
+    User: avery.singh
+    Expect: IsAdmin is true. Common eem_system_db_admins and eem_implementation_admins supply the listed setup functions,
+      reports and all-company Points at level 3, including Northlake. No customer-company membership is required.
+  - Case: Future company and detach behavior
+    Expect: A new company gets the twenty-one copies with their exact Points scopes and without members. Make Local on Cedar
+      Row's eem_reports keeps its grants and members (Maya, Valerie) and lets it take its own Tenant Rebilling grants. Then
+      change the Common master (add and remove a disposable report) and confirm Cedar Row's copy does not follow while the
+      Northlake and Thermal Plant copies do.
+  - Case: Level 1 fixed permissions
+    Group: eem_support_readonly
+    User: taylor.bennett
+    Keys:
+    - A / HierarchyTab
+    - A / RateModelerTab
+    - A / UtilityProviderTab
+    Expect: Each grant reloads as 1; view succeeds, update/create/delete fail.
+  - Case: Level 2 fixed permissions
+    Group: cra_housing_ops
+    User: valerie.kim
+    Keys:
+    - A / HierarchyTab
+    - A / AggregatesTab
+    Expect: Each grant reloads as 2. Exercise view/update/create/delete separately. Installed Admin Module update/insert
+      metadata is 3/3, so do not count level 2 as working modify access until the actual screen proves it; record a denied
+      required update as a gap.
+  - Case: Level 3 fixed permissions
+    Group: nlu_facilities_setup
+    User: emerson.fox
+    Keys:
+    - A / HierarchyTab
+    - A / AggregatesTab
+    Expect: Each grant reloads as 3; create, update and delete a disposable hierarchy/aggregate item in the existing hierarchy.
+  - Case: Points levels 1 / 2 / 3
+    Groups:
+    - eem_nlu_points_read
+    - eem_ntp_points_modify
+    - eem_nlu_points_admin
+    Users:
+    - quinn.roberts
+    - riley.santos
+    - emerson.fox
+    Expect: Their company-node grants reload as 1 / 2 / 3 respectively. At a supported node editor verify read-only, modify-existing
+      and create/delete boundaries. Check outside-scope denial only where no other membership grants that scope.
+  - Case: Bill entry versus approval
+    Groups:
+    - eem_bill_entry
+    - eem_company_setup
+    Expect: After Stage 5 data exists, entry can enter bills/images but cannot validate; the company-admin setup can validate.
+      The determining function is F / Bill Validation, not G:4 or F / Bill Administration.
+    Company: Northlake University (CompanyID 6); test the company copies, not the Common masters.
+  - Case: Report and module grants
+    Groups:
+    - eem_bill_entry
+    - eem_bill_import
+    - eem_audit_readonly
+    Expect: G:21 and report grants save as 1. Entry has Bill Entry and Bill Entry List; import has Bill Importer and Bill
+      Entry List; audit has Activity Tracker and Audit Report. No empty category/module grants, and no G:14 All on viewer
+      groups.
+    Company: Northlake University (CompanyID 6); test the company copies, not the Common masters.
+  - Case: Task-group lifecycle and levels
+    When: Stage 3 or Stage 5, after a task group is saved.
+    Expect: The new exact TS key appears only after group creation. Using an isolated test group, save/reload levels 1,
+      2 and 3 and check view, edit, add/delete, enable and Run Now independently. Do not assume that storing a lower level
+      proves execution is denied; grant a real viewer only after that boundary passes.
+  - Case: Library-rate levels
+    When: Stage 4, after a library rate exists.
+    Expect: On an isolated test group, save/reload levels 1 / 2 / 3 for that exact rate and verify view / modify / create-delete
+      behavior before restoring the intended level 3 rate-admin grants.
+  - Case: Science Center scope
+    Group: nlu_science_center_scope
+    Expect: Dana belongs to Northlake eem_reports and local nlu_science_center_scope only. Her Points grant
+      is the existing Science Center path 0.6.22.24, MetaCompanyID 6, at level 1 with no company-root or Common Points grant.
+  - Case: Ridgeline site scope at Modify
+    When: Stage 2, after the Ridgeline Wind Site Points grant.
+    Group: ntp_wind_ops
+    Expect: Renee belongs to Northlake Thermal Plant ntp_wind_ops only; Mateo adds eem_reports. Their only Points grant is
+      the Ridgeline Wind Site node at level 2 in MetaCompanyID 5. They edit Ridgeline meters and points, cannot create or
+      delete nodes, and never see the Central Plant.
+  - Case: Cross-company site scope through a shared master
+    When: Stage 2, after the Ridgeline Wind Site Points grant.
+    Group: eem_ridgeline_research
+    Expect: Elena and Kai belong to the Northlake University copy only. The Common master's Points grant (Ridgeline Wind
+      Site node, MetaCompanyID 5, level 1) reloads unchanged in all three company copies. They read Ridgeline points and
+      Use Analysis reports; no Northlake University node, no other plant node and no bill report is reachable.
+  - Case: Membership and administrator ordering
+    Expect: Groups save without users in step 4. After step 5, memberships match both the Company and Group ID in 05-users.yaml.
+      All memberships are in the user's home company. IsAdmin is true for Avery, Samantha, Jordan, Maya and Devon, false
+      for the other 18 users. Sharing has not copied members to another company; Casey remains inactive.

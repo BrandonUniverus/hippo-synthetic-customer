@@ -5,7 +5,7 @@ department: Facilities Operations
 # Northlake University Facilities And Utility Overview
 
 Prepared by: Northlake University Facilities, Housing, Sustainability, and Finance  
-Packet version: 0.3
+Packet version: 0.4
 
 Coverage period requested: January 1, 2024 through December 31, 2025
 
@@ -25,15 +25,19 @@ operating unit with its own staff, accounts, and reports. Facilities Operations
 manages campus utilities, building automation systems, and meter maintenance.
 Housing Operations manages Cedar Row Apartments. Thermal Plant Operations runs
 the central plant and supplies chilled water and steam to the campus buildings.
-Finance owns external utility account payment and internal cost allocation.
-Sustainability uses the same data for reporting, performance tracking, and
-renewable energy accounting.
+Since July 2024 the plant also owns Ridgeline Wind, a ten-turbine wind site run
+by its own small team, which the Mechanical Engineering department's Wind
+Energy Research Lab uses for research. Finance owns external utility account
+payment and internal cost allocation. Sustainability uses the same data for
+reporting, performance tracking, and renewable energy accounting.
 
 Primary groups:
 
 - Facilities Operations
 - Housing Operations
 - Thermal Plant Operations
+- Ridgeline Wind Operations
+- Wind Energy Research Lab
 - Science Operations
 - Dining And Events
 - Library Administration
@@ -54,9 +58,16 @@ owns the submeters in every apartment; the utility never bills a resident.
 Northlake Central Plant is the site of the central thermal plant that produces
 chilled water and steam for the campus.
 
-The two Sacramento airport weather stations we rely on are not properties; they
-are listed alongside the sites so that every building can name its primary
-station.
+Ridgeline Wind Site, in the Montezuma Hills near Rio Vista, about fifty miles
+southwest of campus, belongs to the thermal plant. The plant bought it on July
+1, 2024 with university capital funding. It has ten 660 kW turbines (6.6 MW), a
+50 m met mast and a collector substation where Valley Electric meters the
+connection.
+
+The three airport weather stations we rely on are not properties; they are
+listed alongside the sites so that every building can name its primary station.
+KSAC and KSMF are the Sacramento airports; KSUU (Travis Air Force Base) is the
+nearest station to Ridgeline.
 
 ## Buildings And Properties
 
@@ -79,6 +90,11 @@ parking lighting, and landscape irrigation.
 
 The Central Plant (58,400 sq ft) is the only building at the plant site.
 
+Ridgeline Turbine Field is not a building: it is the ridge that holds the ten
+turbines and the met mast. Ridgeline Substation is the fenced substation and
+control house at the point of interconnection; it holds the SCADA server and
+the research lab's field office, and has no benchmarked floor area.
+
 Every building appears once, under the site and operating unit that owns it, and
 lists every meter that serves it whatever the provider or commodity. Each is
 identified by its common name, service address, primary use, approximate size,
@@ -90,7 +106,11 @@ Valley Electric District supplies external electric service. It bills monthly
 energy, time-of-use charges, and billing demand. Science Center, Student Center,
 Lakeview Residence Hall, the Recreation and Aquatics Center, and the Central
 Plant also have interval demand data. Campus Grounds and the Cedar Row carport
-take unmetered area-lighting service at a flat monthly charge.
+take unmetered area-lighting service at a flat monthly charge. At the Ridgeline
+substation Valley Electric meters both directions at 34.5 kV under its
+generator interconnection schedule: it charges station service, credits the
+farm's export, and moves that credit to the Central Plant's account under its
+bill credit transfer rider.
 
 Sierra Gas Utility supplies natural gas service. It bills monthly therms and is
 used for heating, domestic hot water, pool heating, food-service loads, and the
@@ -115,11 +135,20 @@ agreement at Science Center, Student Center, and the Cedar Row carport. It
 provides generation, exported energy, monthly invoices, renewable energy
 certificates, and avoided-emissions information.
 
+Ridgeline Wind is the plant's own wind company. The plant buys everything the
+turbines make at an internal transfer price, less a monthly credit for the
+research lab's use of the site. Nobody sends that bill: we want the system to
+generate the monthly statement from the ten turbine meters. Each turbine's
+SCADA also reports power, the controller's possible power at the measured
+wind, nacelle wind, rotor speed and run state every ten minutes, and the met
+mast reports the free-stream wind in metric units.
+
 ## Accounts, Agreements, And Cost Centers
 
 External utility accounts are maintained by Finance. Internal plant allocations
 use cost centers rather than utility accounts. Solar service uses PPA agreement
-ids. Submeters that Northlake owns, including every Cedar Row apartment meter,
+ids. Ridgeline's output is bought under one transfer agreement whose statement
+is generated, never received. Submeters that Northlake owns, including every Cedar Row apartment meter,
 have no account of their own; their usage is recovered from the master meter's
 bill. Account and agreement identifiers in this packet are synthetic and should
 not be confused with real account numbers.
@@ -159,6 +188,12 @@ Examples:
 - Outdoor air temperature
 - Indoor air temperature
 - Relative humidity
+- Turbine generated kWh, active power and possible power, every ten minutes
+- Turbine nacelle wind (m/s), rotor speed (RPM) and run state
+- Met mast wind speed (m/s), wind direction (degrees), air temperature,
+  pressure (kPa), air density (kg/m3) and humidity
+- Interconnection export, station service and reactive energy (kVArh)
+- Airport wind speed in knots
 
 ## Data Sources
 
@@ -182,6 +217,8 @@ Known source categories:
 - Neptune handheld water route uploads, including the apartment submeter route
 - MVRS handheld gas route uploads
 - Handheld meter reading event files
+- Ridgeline turbine SCADA and met mast files (ten-minute, Pacific Standard Time
+  all year)
 
 ## Known Events
 
@@ -195,10 +232,16 @@ intentionally:
 - Cedar Row A municipal account number change at renewal
 - Valley Electric District rate schedule change beginning January 2025
 - One negative-test utility file with unsupported units, excluded from normal loads
+- Ridgeline acquisition on July 1, 2024: its accounts and meters start that day,
+  and Valley Electric's generator account moved to the plant under a new number
+- The first bill credit transfer, on the Central Plant's September 2024 bill
+  (August 5 to September 4), for the generator account's first bill (July 1 to
+  August 4)
+- Ridgeline WTG-07 gearbox outage, February 11 to April 22, 2025
 
 ## Current Decisions And Open Items
 
-Packet 0.3 adopts one inventory standard: a building appears once, under the
+Since packet 0.3 we use one inventory standard: a building appears once, under the
 operating unit that owns its site, and holds every meter that serves it; the
 thermal plant is its own operating unit and a provider to the campus; Cedar Row
 is master-metered with an owned submeter in every apartment; meters that only
@@ -206,14 +249,21 @@ have bills carry no measured points; and buildings keep the names we use every
 day. The Facilities and Meter Register and Source System Inventory record the
 building areas, source owners, and delivery cadence. Cedar Row has water and
 sewer without stormwater. Student Center receives steam without chilled water.
-KSAC supplies the shared observation reference for every building, with KSMF
-retained for secondary weather and forecasts. Northlake retains the solar RECs.
+KSAC supplies the shared observation reference for the campus and plant
+buildings, Cedar Row benchmarks on KSMF, which is also the forecast source, and
+the Ridgeline site uses KSUU. Northlake retains the solar RECs.
+
+Packet 0.4 adds the Ridgeline Wind Site as a second site of the thermal plant.
+The plant buys its output at a transfer price, the system generates that
+statement, Valley Electric's export credit lands on the Central Plant's bill,
+and university researchers read the site without seeing anything else of the
+plant or any bill. We retain Ridgeline's RECs as well.
 
 The remaining work is to confirm installed configuration through the UI,
 supply and test the other data feeds (including the fixed-network submeter file
 and the apartment water route), decide how the manual deduct-meter readings are
-entered, reconcile illustrated bills with tariffs, and specify the new account
-number for Cedar Row A's renewal event. Rate calculations, permissions, bill
+entered, and supply the Ridgeline SCADA sample files. Every sample bill is now
+itemized on its provider's own read cycle and priced at the tariff. Rate calculations, permissions, bill
 validations and reporting have their own later acceptance steps. The workbook's
 Open Items tab records these boundaries.
 

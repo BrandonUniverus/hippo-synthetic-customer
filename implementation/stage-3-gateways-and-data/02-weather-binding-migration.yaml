@@ -1,0 +1,83 @@
+# Optional SQL migration input. This is a snapshot of the previous installation, not manual setup instructions.
+# The values below are accepted only by @AllowLegacyWeatherMigration=1 in the generated binding script.
+# For the values to enter in the app, use 02-gateways.yaml: Gateway binding and Point Parameters.
+purpose: Recognize nine previous weather point bindings for optional bulk migration
+records:
+- channel: ch_weather_ksac_temp_f_hourly
+  Existing binding:
+    GatewayNames:
+    - Northlake NOAA Current Observations
+    - Northlake NOAA Weather
+    Node: NOAA-KSAC
+    Params:
+    - '1'
+    - tempi
+- channel: ch_weather_ksac_rh_hourly
+  Existing binding:
+    GatewayNames:
+    - Northlake NOAA Current Observations
+    - Northlake NOAA Weather
+    Node: NOAA-KSAC
+    Params:
+    - '1'
+    - hum
+- channel: ch_weather_ksac_wind_mph_hourly
+  Existing binding:
+    GatewayNames:
+    - Northlake NOAA Current Observations
+    - Northlake NOAA Weather
+    Node: NOAA-KSAC
+    Params:
+    - '1'
+    - wspdi
+- channel: ch_weather_ksuu_temp_c_hourly
+  Existing binding:
+    GatewayNames:
+    - Northlake NOAA Current Observations
+    - Northlake NOAA Weather
+    Node: NOAA-KSUU
+    Params:
+    - '1'
+    - tempm
+- channel: ch_weather_ksuu_wind_knots_hourly
+  Existing binding:
+    GatewayNames:
+    - Northlake NOAA Current Observations
+    - Northlake NOAA Weather
+    Node: NOAA-KSUU
+    Params:
+    - '1'
+    - wspdm
+- channel: ch_weather_ksuu_dewpoint_c_hourly
+  Existing binding:
+    GatewayNames:
+    - Northlake NOAA Current Observations
+    - Northlake NOAA Weather
+    Node: NOAA-KSUU
+    Params:
+    - '1'
+    - dewptm
+- channel: ch_weather_ksmf_temp_c_hourly
+  Existing binding:
+    GatewayNames:
+    - Northlake Aeris Weather
+    Node: AERIS-KSMF-OBS
+    Params:
+    - '1'
+    - tempC
+- channel: ch_weather_ksmf_wind_kph_hourly
+  Existing binding:
+    GatewayNames:
+    - Northlake Aeris Weather
+    Node: AERIS-KSMF-OBS
+    Params:
+    - '1'
+    - windSpeedKPH
+- channel: ch_weather_ksmf_forecast_temp_f_hourly
+  Existing binding:
+    GatewayNames:
+    - Northlake Aeris Weather
+    Node: AERIS-KSMF-FORECAST
+    Params:
+    - '1'
+    - tempF

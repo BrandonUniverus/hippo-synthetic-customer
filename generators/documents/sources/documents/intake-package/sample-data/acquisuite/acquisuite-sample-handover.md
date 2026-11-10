@@ -49,4 +49,4 @@ are alternative deliveries, not three independent meters or days.
 The file has been generated and checked against its expected values. Installed
 gateway execution, data storage, reports and replay behavior still require the
 implementation team's acceptance run. The accompanying
-[UI checklist](../../../../implementation/northlake-onboarding-ui-checklist.pdf) describes that run.
+[Stage 3 chapter of the implementation guide](../../../../implementation/stage-3-gateways-and-data/stage-3-gateways-and-data.pdf) describes that run.

@@ -1,0 +1,60 @@
+# Stage 2, step 5: Weather Stations (Database Administrator > Nodes > company node >
+# Definitions tab > Weather Stations page; WeatherStationViewModel). One record per company: the
+# grid lists that company's Location (building) nodes; set every row's Station combo, tick each
+# row and click Associate with Selected once per company.
+stage: 2
+step: 5
+title: Weather stations
+app: Database Administrator
+screen: Nodes > company node > Definitions tab > Weather Stations page
+source:
+- data/eem/northlake-eem-metaworld-stage1b-v1.yaml (weatherIndexTargets.stationAssignments)
+notes:
+- The Station combo lists every level-4 (Meter) node anywhere in the instance whose Meter row carries the Weather
+  measure type; it is not scoped to the company being edited, so a Cedar Row Apartments or Northlake Thermal Plant
+  building can (and here does) point at a Northlake University weather station.
+- One station per node; the assignment cascades to that node's descendants (its meters and points).
+- 'Assign KSAC Sacramento Executive Airport to the 9 Northlake University and Northlake Thermal Plant buildings and
+  KSMF Sacramento International Airport to the 5 Cedar Row buildings (Cedar Row C since it opened): Cedar Row''s property manager benchmarks its
+  portfolio on KSMF (weatherIndexTargets.stationAssignments.exceptions). Cedar Row''s weather therefore arrives in
+  degrees Centigrade and its degree days in HDD(C)/CDD(C), while the campus uses degrees Fahrenheit.'
+- The Station combo is sorted by distance from the node, so KSAC is listed first for every Cedar Row building; pick
+  KSMF deliberately.
+- Buttons stage changes only; Associate with Selected writes the ticked rows (WeatherStationMap_Sync) and the shell's
+  Save/Cancel bar is what actually persists them. Delete Associations (WeatherStationMap_Del) removes a mapping
+  the same way.
+- The two airport nodes (38, 39) noted in 02-sites-and-buildings.yaml get no station assignment; they are not a
+  company's serviced buildings.
+- 'PRODUCT FINDING 18: the Station combo lists every meter with the Weather measure type, not only real weather
+  stations. Science Center Lab Environment (an indoor temperature/humidity sensor group, 03-meters.yaml) is now a
+  Sensor meter, so it no longer appears; any future Weather-type meter will.'
+- 'Ridgeline (added 2026-10-01): Ridgeline Turbine Field and Ridgeline Substation take KSUU Travis Air Force Base, the
+  nearest airport, fifty miles from KSAC; their degree days are HDD(C)/CDD(C). The Ridgeline Met Mast is a Weather-type
+  meter and does appear in the Station combo (finding 18), sorted first for both Ridgeline nodes because it stands on
+  the site: do not pick it. It is not a station; it has no degree-day temperature point.'
+records:
+- key: northlake_university
+  Company: Northlake University
+  Associate with Selected:
+  - {Location: Admin Hall, Station: KSAC Sacramento Executive Airport}
+  - {Location: Science Center, Station: KSAC Sacramento Executive Airport}
+  - {Location: Library, Station: KSAC Sacramento Executive Airport}
+  - {Location: Student Center, Station: KSAC Sacramento Executive Airport}
+  - {Location: Lakeview Residence Hall, Station: KSAC Sacramento Executive Airport}
+  - {Location: Recreation and Aquatics Center, Station: KSAC Sacramento Executive Airport}
+  - {Location: Parking Structure, Station: KSAC Sacramento Executive Airport}
+  - {Location: Campus Grounds, Station: KSAC Sacramento Executive Airport}
+- key: cedar_row_apartments
+  Company: Cedar Row Apartments
+  Associate with Selected:
+  - {Location: Cedar Row A, Station: KSMF Sacramento International Airport}
+  - {Location: Cedar Row B, Station: KSMF Sacramento International Airport}
+  - {Location: Cedar Row C, Station: KSMF Sacramento International Airport}
+  - {Location: Cedar Row Common House, Station: KSMF Sacramento International Airport}
+  - {Location: Cedar Row Carport and Grounds, Station: KSMF Sacramento International Airport}
+- key: northlake_thermal_plant
+  Company: Northlake Thermal Plant
+  Associate with Selected:
+  - {Location: Central Plant, Station: KSAC Sacramento Executive Airport}
+  - {Location: Ridgeline Turbine Field, Station: KSUU Travis Air Force Base}
+  - {Location: Ridgeline Substation, Station: KSUU Travis Air Force Base}

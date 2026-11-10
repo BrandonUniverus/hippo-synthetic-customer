@@ -1,0 +1,67 @@
+/* ==========================================================================
+   Northlake Thermal Plant (Central Plant Operations): design tokens
+
+   Character: not an outside utility. The university's own central plant, so it
+   wears the Northlake unit lockup and Northlake type, with an operational
+   palette: plant slate, chilled-water blue and steam red. Its statements look
+   like they came out of the university's facilities office.
+   It imports northlake/tokens.css and overrides only what differs.
+   ========================================================================== */
+@import url("../northlake/tokens.css");
+
+:root {
+  /* Colour: brand ------------------------------------------------------- */
+  --primary: #2F3E46;          /* Plant Slate: unit header, table heads (bills keep their charcoal) */
+  --primary-strong: #1F2A30;
+  --on-primary: #FFFFFF;
+  --accent: #C8A24A;           /* Northlake Gold, inherited: the mark and rules */
+  --accent-ink: #7A5D12;
+  --on-accent: #14263F;
+  --support: #2B7BB9;          /* commodity colours, used together: */
+  --commodity-chilled: #2B7BB9;  /* chilled water (ton-hours, tons) */
+  --commodity-steam: #C2462F;    /* steam (klb) */
+  --commodity-power: #6C7A82;    /* plant electric and gas inputs */
+
+  /* Colour: neutrals (Northlake's) ------------------------------------- */
+  --ink: #1C2430;
+  --muted: #59606B;
+  --canvas: #F7F4EC;
+  --surface: #FFFFFF;
+  --tint: #EAEDEE;             /* cooler than Northlake's tint: a plant, not a quad */
+  --line: #D5DADC;
+  --line-strong: #94A0A6;
+  --link: #14263F;
+  --heading-ink: #1F2A30;      /* headings are deep slate */
+
+  /* Page chrome --------------------------------------------------------- */
+  --topbar-bg: #14263F;        /* the university bar stays */
+  --topbar-ink: #E9E2CF;
+  --header-bg: #2F3E46;
+  --header-ink: #FFFFFF;
+  --header-rule: #C8A24A;
+  --footer-bg: #14263F;
+  --footer-ink: #E9E2CF;
+
+  /* Type: Northlake's, with the mono doing the work --------------------- */
+  --font-display: "Spectral", Georgia, serif;
+  --font-text: "IBM Plex Sans", "Segoe UI", Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", Consolas, monospace;   /* meters, readings, cost centres */
+  --weight-display: 600;
+  --weight-strong: 600;
+  --tracking-display: -0.01em;
+  --case-heading: none;
+  --case-label: none;
+  --case-button: none;
+
+  /* Shape --------------------------------------------------------------- */
+  --radius: 0;               /* square, as Northlake */
+  --rule: 1px;
+  --rule-accent: 3px;
+
+  /* Logo use ------------------------------------------------------------ */
+  /* No logo of its own. Unit lockup: Northlake mark, "Northlake University"
+     in Spectral, a hairline, "Central Plant Operations" in IBM Plex Sans.
+     Reversed (white and gold) on Plant Slate or navy. A two-segment bar in
+     chilled-water blue and steam red may sit under the unit name on
+     statements; it is a commodity key, not part of the logo. */
+}

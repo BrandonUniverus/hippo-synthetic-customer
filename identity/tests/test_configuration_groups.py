@@ -38,7 +38,7 @@ class SyntheticGroupStoreTests(unittest.TestCase):
     def test_lists_checked_in_groups_and_protocol_claim_previews(self) -> None:
         state = self.store.public_state()
 
-        self.assertEqual({"total": 27, "base": 27, "local": 0}, state["counts"])
+        self.assertEqual({"total": 29, "base": 29, "local": 0}, state["counts"])
         self.assertTrue(all(group["source"] == "base" for group in state["groups"]))
         first_group = state["groups"][0]
         self.assertEqual(
@@ -71,7 +71,7 @@ class SyntheticGroupStoreTests(unittest.TestCase):
         self.assertEqual(sorted(member_ids), renamed["memberIds"])
         self.assertNotIn("phase3_reviewers", after_rename_claims["oidc"]["groups"])
         self.assertIn("phase3_identity_reviewers", after_rename_claims["oidc"]["groups"])
-        self.assertEqual(27, self.store.public_state()["counts"]["total"])
+        self.assertEqual(29, self.store.public_state()["counts"]["total"])
 
     def test_checked_in_group_membership_override_can_be_restored(self) -> None:
         state = self.store.public_state()

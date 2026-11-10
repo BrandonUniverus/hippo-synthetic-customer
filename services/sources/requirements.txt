@@ -1,0 +1,5 @@
+-r ../../generators/requirements.txt
+tzdata==2026.6
+pillow==12.2.0
+charset-normalizer==3.4.7
+et-xmlfile==2.0.0

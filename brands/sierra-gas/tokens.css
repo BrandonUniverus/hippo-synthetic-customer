@@ -1,0 +1,87 @@
+/* ==========================================================================
+   Sierra Gas Utility: design tokens
+
+   Character: an investor-owned regional gas company. Corporate, established
+   and safety-first: a granite header, an ember flame, Libre Franklin (an
+   American corporate gothic), and a standing "Smell gas?" safety line.
+   The ember is darker and redder than EEM's orange on purpose.
+   ========================================================================== */
+:root {
+  /* Colour: brand ------------------------------------------------------- */
+  --primary: #B5441B;          /* Ember: buttons, the flame, statement highlights */
+  --primary-strong: #8F3413;
+  --on-primary: #FFFFFF;
+  --accent: #2B2F33;           /* Granite: header, footer, table heads */
+  --accent-ink: #2B2F33;
+  --on-accent: #FFFFFF;
+  --support: #F08A3E;          /* inner flame only */
+
+  /* Colour: neutrals ---------------------------------------------------- */
+  --ink: #1E2124;
+  --muted: #5A5F64;
+  --canvas: #F8F4EF;           /* warm stone */
+  --surface: #FFFFFF;
+  --tint: #F2E8DE;
+  --line: #E0D5CA;
+  --line-strong: #A8998A;
+  --link: #9A3A17;
+  --heading-ink: #2B2F33;      /* headings are granite */
+
+  /* Colour: status ------------------------------------------------------ */
+  --positive: #2F6B45;
+  --negative: #A12A22;
+  --caution: #8A5A00;
+  --positive-tint: #EBF4EE;
+  --negative-tint: #FAEBEA;
+  --caution-tint: #FBF1DE;
+
+  /* Page chrome --------------------------------------------------------- */
+  --topbar-bg: #B5441B;        /* the standing safety line */
+  --topbar-ink: #FFFFFF;
+  --header-bg: #2B2F33;
+  --header-ink: #FFFFFF;
+  --header-rule: #B5441B;
+  --footer-bg: #2B2F33;
+  --footer-ink: #D9D4CE;
+
+  /* Type ---------------------------------------------------------------- */
+  --font-display: "Libre Franklin", "Franklin Gothic Medium", Arial, sans-serif;
+  --font-text: "Libre Franklin", Arial, sans-serif;
+  --font-mono: "Libre Franklin", Arial, sans-serif;   /* tabular figures */
+  --weight-display: 800;
+  --weight-strong: 600;
+  --tracking-display: -0.015em;
+  --case-heading: none;
+  --case-label: uppercase;
+  --case-button: none;
+  --size-h1: 42px;
+  --size-h2: 28px;
+  --size-h3: 20px;
+  --size-body: 16px;
+  --size-small: 14px;
+  --size-label: 12px;
+  --leading-body: 1.55;
+
+  /* Space: 8-point, standard ----------------------------------------- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+  --content-width: 1160px;
+
+  /* Shape --------------------------------------------------------------- */
+  --radius: 3px;             /* buttons, fields and cards */
+  --rule: 1px;
+  --rule-accent: 4px;
+
+  /* Logo use ------------------------------------------------------------ */
+  --logo-height: 40px;
+  --logo-min-height: 24px;
+  /* Clear space: the flame's width. Reversed wordmark (white) with the
+     two-tone flame on granite; full-colour on white. The flame alone is the
+     favicon. Never place the flame on Ember. */
+}

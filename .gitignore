@@ -31,3 +31,7 @@ __pycache__/
 
 # Excel lock files
 ~$*.xlsx
+
+# The historian's Access database when it runs with its default output folder, and Access lock files
+services/sources/historian-output/
+*.laccdb

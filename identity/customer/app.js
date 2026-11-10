@@ -87,13 +87,13 @@ function realmCard(slot, realm, providerOrigin, activeCookieMode) {
         <div><dt>Probe</dt><dd>${escapeHtml(realm.probeClientId)} · consent</dd></div>
       </dl>
       <div class="scenario-block">
-        <p class="mini-label">ESTABLISH SESSION</p>
+        <p class="mini-label">Establish session</p>
         <a class="button primary" href="${laxLogin}">Login · Lax cookie</a>
         <a class="button secondary" href="${noneLogin}">Login · SameSite=None</a>
         <a class="button secondary wide" href="${bootstrap}">Local admin bootstrap · no password exposure</a>
       </div>
       <div class="scenario-block">
-        <p class="mini-label">REUSE AND POLICY</p>
+        <p class="mini-label">Reuse and policy</p>
         <a class="button secondary" href="${silentTop}">Top-level prompt=none</a>
         <a class="button secondary" href="${consent}">Grant probe consent</a>
         <a class="button secondary" href="${maxAge}">Require max_age=0</a>

@@ -16,6 +16,13 @@
 		header Cache-Control "no-cache"
 		file_server
 	}
+
+	# The brand systems in brands/: tokens, fonts, logos and the preview gallery.
+	handle_path /brands/* {
+		root * /srv/brands
+		header Cache-Control "no-cache"
+		file_server
+	}
 }
 
 https://{$IDENTITY_HOST:localhost}:8443 {
@@ -34,10 +41,57 @@ https://{$IDENTITY_HOST:localhost}:8443 {
 		Referrer-Policy "no-referrer"
 	}
 
-	@portal path /
+	# The Northlake site. It is a Caddy template: its links into Energy Hippo read
+	# EEMSUITE_APPLICATION_HOME_URL, NORTHLAKE_EEM_PROVIDER_KEY,
+	# NORTHLAKE_PUBLIC_DASHBOARD_ID and NORTHLAKE_SOURCES_URL from the environment.
+	@portal path / /index.html
 	handle @portal {
 		root * /srv/northlake-portal
+		header Cache-Control "no-cache"
+		templates
 		file_server
+	}
+
+	# Northlake's own documents (guides, tariff sheets, onboarding package), read-only.
+	handle_path /documents/* {
+		root * /srv/northlake-documents
+		file_server
+	}
+
+	# The source bundle's utility pages, as part of the site. The producer
+	# rendered them with an older copy of the Northlake look, so the site serves
+	# today's stylesheets, lockup and fonts in their place. The bundle's own
+	# directory page is the site's Utilities section.
+	redir /utilities /utilities/ 308
+	handle_path /utilities/* {
+		redir / "/#utilities" 302
+		rewrite /branding/northlake-logo-reversed.svg /brands/northlake/logo.svg
+		rewrite /branding/northlake-mark.svg /brands/northlake/mark.svg
+		handle_path /branding/* {
+			root * /srv/northlake-branding
+			header Cache-Control "no-cache"
+			file_server
+		}
+		handle_path /brands/* {
+			root * /srv/brands
+			header Cache-Control "no-cache"
+			file_server
+		}
+		handle /assets/sources.css {
+			root * /srv/northlake-sources-web
+			rewrite * /sources.css
+			header Cache-Control "no-cache"
+			file_server
+		}
+		handle {
+			reverse_proxy {$NORTHLAKE_SOURCES_UPSTREAM:host.docker.internal:18081}
+		}
+	}
+
+	# The handheld meter-reading tool, as part of the site.
+	redir /meter-reading /meter-reading/ 308
+	handle_path /meter-reading/* {
+		reverse_proxy {$NORTHLAKE_HANDHELD_UPSTREAM:host.docker.internal:18082}
 	}
 
 	@energyhippo path /open-energyhippo

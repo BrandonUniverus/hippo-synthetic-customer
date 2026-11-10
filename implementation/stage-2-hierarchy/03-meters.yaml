@@ -1,0 +1,3599 @@
+# Stage 2, step 3: Meters (Database Administrator > Nodes > Meter nodes; MeterDefinitionViewModel).
+# One record per meter, key = the source model's meter id. Meter Definition is the group of
+# fields under the node's own Definitions page, in the editor's order: Billing Account is the
+# account number to pick, then the Utility Provider and Bill Cycle it brings. All three are blank
+# for owned meters and the weather stations, which carry no provider or account.
+stage: 2
+step: 3
+title: Meters
+app: Database Administrator
+screen: Nodes > Meter nodes
+source:
+- data/scenarios/demo-university-v1.yaml (accounts[].meters, ownedMeters)
+- data/eem/northlake-eem-metaworld-stage1b-v1.yaml (meterSetup, weatherIndexTargets)
+notes:
+- '390 meters: 67 utility meters (on a billing account), 320 owned (no billing account, incl. 248 Cedar Row A and B
+  apartment submeters, 124 apartments x electric + water), 3 weather-station meters. Ridgeline Wind (added 2026-10-01)
+  brings 14: ten turbine pad meters and the Ridgeline Farm Transfer Meter on the Ridgeline transfer agreement, the
+  Valley Electric interconnection meter, the met mast and the KSUU station. The handheld routes (added 2026-11-07) bring
+  54 owned meters: Cedar Row C''s 50 water submeters (48 apartments, the house and the laundry, open 2025-09-01), three
+  emergency generators and the Central Plant Main Switchgear.'
+- 'A record''s Notes is that meter''s node note (Note History, table code M2) and Status its node Status page rows;
+  the Stage 2 import enters both, and the Keywords, from the meters workbook.'
+- 'Ridgeline Farm Transfer Meter is a logical billing meter: no channels, no keywords, no provider meter number, and its
+  only point is the aggregate Ridgeline Farm Generated kWh 10m (06-aggregates.yaml). EEM''s Bill Generation prices the
+  points under one meter and writes one bill per meter and month, so the monthly transfer statement
+  is generated on this meter (Stage 7 step 8); billing the ten pad meters would write ten statements.'
+- 'Ridgeline: the turbines are Electricity meters on SYN-RWL-G-0000001 (Utility Provider Ridgeline Wind, Bill Cycle
+  1), with the turbine''s position tag RWL-WTG-01..10 as Provider Meter Number. The interconnection meter has
+  multiplier 12000 (300:1 potential transformers, 200:5 current transformers at 34.5 kV). The met mast is an owned
+  Weather meter: like the Science Center sensor group it is not a weather station, but unlike it it does carry the
+  Weather measure type, so it will appear in the Weather Stations picker beside KSAC, KSMF and KSUU (PRODUCT FINDING 18)
+  and must not be picked. Each Ridgeline meter opens on the acquisition date, 2024-07-01 (Status page).'
+- 'Keywords for Ridgeline: create the keyword type Generation Source with attributes Wind and Solar on the Keywords
+  page (catalog view) and add the attribute 34.5 kV to Service Voltage (the seed has 33.6 kV, not 34.5); both types
+  take new values. Generation Source = Wind on the ten turbines and Solar on the three Helios arrays marks generation
+  for report filters until the product can tell generation from use (PRODUCT FINDING 44).'
+- 'The Meter editor (MeterDefinitionViewModel) has two identifiers: Meter Number, and Provider Meter Number, which is
+  bound straight to MeterInfo.SerialNumber. A provider badge number and a manufacturer serial share that one field;
+  a third identifier would be a new requirement (PRODUCT FINDING 16).'
+- Utility Provider and Bill Cycle are set by choosing the Billing Account first; the account brings its provider
+  with it, and Bill Cycle then lists that provider's cycles for the meter's company.
+- Meter Number is the customer's own tag (the synthetic meter number below); Provider Meter Number is the provider-formatted
+  number extracted from it, blank for owned and weather-station meters.
+- 'Two Meter Numbers are longer than 30 characters: SCIENCE-CENTER-ENVIRONMENTAL-SENSORS (36) and
+  LIBRARY-HISTORIAN-ELECTRIC-INTERVAL (35). Meter.SM_Code holds 60; builds before the October 2026 fix cut the number
+  at 30 without an error, so check both numbers in full after entry.'
+- 'Measure Type is the editor''s list (MeasureType names): Electricity, Potable Water, Natural Gas, Steam, Chilled
+  Water, Weather and Sensor appear below. The packet''s electric, water and solar generation commodities map to
+  Electricity and Potable Water; EEM has no solar measure type, so the three Helios PPA arrays are Electricity meters
+  on Helios accounts. A new meter starts as Activity Level: change it before the first save.'
+- Meter Multiplier is blank (defaults to 1) except Science Center Electric Lab Wing (40, current-transformer ratio),
+  Central Plant Steam Production (10, header pulse value) and Central Plant Boiler Gas (3.0367, the pressure factor of
+  its 30 psig delivery, (30 + 14.73) / 14.73).
+- The 2 weather-station meters (KSAC, KSMF) carry measure type Weather and sit directly under the Weather Reference
+  site (02-sites-and-buildings.yaml), not under a building. Science Center Lab Environment is indoor temperature and
+  humidity, so it is a Sensor meter and stays out of the Weather Stations picker.
+- 'Keywords (the node''s Keywords page, values already seeded): every utility meter gets Meter Type = Utility Meter and
+  every owned submeter Sub-Meter. The Cedar Row A and B apartment and house submeters inherit Sub-Meter from their
+  building (02-sites-and-buildings.yaml), and the utility meters in those buildings override it with their own Utility
+  Meter. Electric utility services carry their Service Voltage, the plant boiler gas its Service Pressure, and plant,
+  lighting, laundry and charging loads a System Component. Production meters and logical sources carry no Meter Type.'
+- 'Status (the node''s Status page) is the meter''s SM history, the one bill validation reads (tests 41 and 42), and
+  its list is SM''s: Open, Closed - Ex, Closed - Lo, To Be Determined, Temp, Removed, Obsolete, Landlord, Closed -
+  Mass Sale. Every meter opens on its in-service date: 2024-01-01, when its billing account turns Active; the
+  Ridgeline meters on the acquisition, 2024-07-01; the Library replacement on 2024-08-15, the day after the old meter
+  closes as Closed - Ex. Meter_Save writes an Open row dated the day a meter is first saved, and saving the earlier
+  Open row folds it in, as saving any status removes a later row of the same status. Without the backdated row,
+  tests 41 and 42 would flag the meter''s 2024-2025 bills. Enter a sample on the Status page; the Stage 2 import
+  sets every meter''s rows.'
+records:
+- key: ved_admin_hall_main
+  installed:
+    meterId:
+  Building: Admin Hall
+  Meter Definition: {Description: Admin Hall Electric Main, Measure Type: Electricity, Meter Number: SYN-VED-M-0040001,
+    Provider Meter Number: VED-BADGE-0040001, Meter Multiplier: '', Billing Account: SYN-VED-A-0010001,
+    Utility Provider: Valley Electric District, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  - {Type: Service Voltage, Attribute: 480 Volts}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: ved_science_center_interval
+  installed:
+    meterId:
+  Building: Science Center
+  Meter Definition: {Description: Science Center Electric Main, Measure Type: Electricity,
+    Meter Number: SYN-VED-M-0040002, Provider Meter Number: VED-BADGE-0040002, Meter Multiplier: '',
+    Billing Account: SYN-VED-A-0010002, Utility Provider: Valley Electric District, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  - {Type: Service Voltage, Attribute: 480 Volts}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: ved_science_center_lab_wing
+  installed:
+    meterId:
+  Building: Science Center
+  Meter Definition: {Description: Science Center Electric Lab Wing, Measure Type: Electricity,
+    Meter Number: SYN-VED-M-0040007, Provider Meter Number: VED-BADGE-0040007, Meter Multiplier: 40,
+    Billing Account: SYN-VED-A-0010002, Utility Provider: Valley Electric District, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  - {Type: Service Voltage, Attribute: 480 Volts}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: ved_library_main_before_replacement
+  installed:
+    meterId:
+  Building: Library
+  Meter Definition: {Description: Library Electric Old Meter, Measure Type: Electricity,
+    Meter Number: SYN-VED-M-0040003, Provider Meter Number: VED-BADGE-0040003, Meter Multiplier: '',
+    Billing Account: SYN-VED-A-0010003, Utility Provider: Valley Electric District, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  - {Type: Service Voltage, Attribute: 480 Volts}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+  - {Status: Closed - Ex, As of Date: 2024-08-14}
+- key: ved_library_main_after_replacement
+  installed:
+    meterId:
+  Building: Library
+  Meter Definition: {Description: Library Electric New Meter, Measure Type: Electricity,
+    Meter Number: SYN-VED-M-0040103, Provider Meter Number: VED-BADGE-0040103, Meter Multiplier: '',
+    Billing Account: SYN-VED-A-0010003, Utility Provider: Valley Electric District, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  - {Type: Service Voltage, Attribute: 480 Volts}
+  Status:
+  - {Status: Open, As of Date: 2024-08-15}
+- key: ved_student_center_interval
+  installed:
+    meterId:
+  Building: Student Center
+  Meter Definition: {Description: Student Center Electric Main, Measure Type: Electricity,
+    Meter Number: SYN-VED-M-0040004, Provider Meter Number: VED-BADGE-0040004, Meter Multiplier: '',
+    Billing Account: SYN-VED-A-0010004, Utility Provider: Valley Electric District, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  - {Type: Service Voltage, Attribute: 480 Volts}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: ved_lakeview_hall_main
+  installed:
+    meterId:
+  Building: Lakeview Residence Hall
+  Meter Definition: {Description: Lakeview Hall Electric Main, Measure Type: Electricity,
+    Meter Number: SYN-VED-M-0040008, Provider Meter Number: VED-BADGE-0040008, Meter Multiplier: '',
+    Billing Account: SYN-VED-A-0010007, Utility Provider: Valley Electric District, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  - {Type: Service Voltage, Attribute: 480 Volts}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: ved_recreation_center_main
+  installed:
+    meterId:
+  Building: Recreation and Aquatics Center
+  Meter Definition: {Description: Recreation Center Electric Main, Measure Type: Electricity,
+    Meter Number: SYN-VED-M-0040009, Provider Meter Number: VED-BADGE-0040009, Meter Multiplier: '',
+    Billing Account: SYN-VED-A-0010008, Utility Provider: Valley Electric District, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  - {Type: Service Voltage, Attribute: 480 Volts}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: ved_parking_structure_main
+  installed:
+    meterId:
+  Building: Parking Structure
+  Meter Definition: {Description: Parking Structure Electric Main, Measure Type: Electricity,
+    Meter Number: SYN-VED-M-0040010, Provider Meter Number: VED-BADGE-0040010, Meter Multiplier: '',
+    Billing Account: SYN-VED-A-0010009, Utility Provider: Valley Electric District, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  - {Type: Service Voltage, Attribute: 480 Volts}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: ved_campus_area_lighting
+  installed:
+    meterId:
+  Building: Campus Grounds
+  Meter Definition: {Description: Campus Grounds Area Lighting, Measure Type: Electricity,
+    Meter Number: SYN-VED-M-0040011, Provider Meter Number: VED-BADGE-0040011, Meter Multiplier: '',
+    Billing Account: SYN-VED-A-0010010, Utility Provider: Valley Electric District, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  - {Type: Service Voltage, Attribute: 240 Volts}
+  - {Type: System Component, Attribute: Lighting}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: ved_cedar_row_a_master
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Electric Master, Measure Type: Electricity,
+    Meter Number: SYN-VED-M-0040005, Provider Meter Number: VED-BADGE-0040005, Meter Multiplier: '',
+    Billing Account: SYN-VED-A-0010005, Utility Provider: Valley Electric District, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  - {Type: Service Voltage, Attribute: 240 Volts}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: ved_cedar_row_b_master
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Electric Master, Measure Type: Electricity,
+    Meter Number: SYN-VED-M-0040006, Provider Meter Number: VED-BADGE-0040006, Meter Multiplier: '',
+    Billing Account: SYN-VED-A-0010006, Utility Provider: Valley Electric District, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  - {Type: Service Voltage, Attribute: 240 Volts}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: ved_cedar_row_common_house_main
+  installed:
+    meterId:
+  Building: Cedar Row Common House
+  Meter Definition: {Description: Common House Electric Main, Measure Type: Electricity,
+    Meter Number: SYN-VED-M-0040012, Provider Meter Number: VED-BADGE-0040012, Meter Multiplier: '',
+    Billing Account: SYN-VED-A-0010011, Utility Provider: Valley Electric District, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  - {Type: Service Voltage, Attribute: 240 Volts}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: ved_cedar_row_parking_lighting
+  installed:
+    meterId:
+  Building: Cedar Row Carport and Grounds
+  Meter Definition: {Description: Cedar Row Parking Lighting, Measure Type: Electricity,
+    Meter Number: SYN-VED-M-0040013, Provider Meter Number: VED-BADGE-0040013, Meter Multiplier: '',
+    Billing Account: SYN-VED-A-0010012, Utility Provider: Valley Electric District, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  - {Type: Service Voltage, Attribute: 240 Volts}
+  - {Type: System Component, Attribute: Lighting}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: ved_central_plant_main
+  installed:
+    meterId:
+  Building: Central Plant
+  Meter Definition: {Description: Central Plant Electric Service, Measure Type: Electricity,
+    Meter Number: SYN-VED-M-0040014, Provider Meter Number: VED-BADGE-0040014, Meter Multiplier: '',
+    Billing Account: SYN-VED-A-0010013, Utility Provider: Valley Electric District, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  - {Type: Service Voltage, Attribute: 12 kV}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: ved_ridgeline_interconnection
+  installed:
+    meterId:
+  Building: Ridgeline Substation
+  Meter Definition: {Description: Ridgeline Interconnection Meter, Measure Type: Electricity,
+    Meter Number: SYN-VED-M-0040015, Provider Meter Number: VED-BADGE-0040015, Meter Multiplier: 12000,
+    Billing Account: SYN-VED-A-0010014, Utility Provider: Valley Electric District, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  - {Type: Service Voltage, Attribute: 34.5 kV}
+  Status:
+  - {Status: Open, As of Date: 2024-07-01}
+- key: sgu_admin_hall_gas
+  installed:
+    meterId:
+  Building: Admin Hall
+  Meter Definition: {Description: Admin Hall Gas, Measure Type: Natural Gas, Meter Number: SYN-SGU-M-0050001,
+    Provider Meter Number: SGU-SET-0050001, Meter Multiplier: '', Billing Account: SYN-SGU-A-0020001,
+    Utility Provider: Sierra Gas Utility, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: sgu_science_center_gas
+  installed:
+    meterId:
+  Building: Science Center
+  Meter Definition: {Description: Science Center Gas, Measure Type: Natural Gas, Meter Number: SYN-SGU-M-0050002,
+    Provider Meter Number: SGU-SET-0050002, Meter Multiplier: '', Billing Account: SYN-SGU-A-0020002,
+    Utility Provider: Sierra Gas Utility, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: sgu_library_gas
+  installed:
+    meterId:
+  Building: Library
+  Meter Definition: {Description: Library Gas, Measure Type: Natural Gas, Meter Number: SYN-SGU-M-0050003,
+    Provider Meter Number: SGU-SET-0050003, Meter Multiplier: '', Billing Account: SYN-SGU-A-0020003,
+    Utility Provider: Sierra Gas Utility, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: sgu_student_center_gas
+  installed:
+    meterId:
+  Building: Student Center
+  Meter Definition: {Description: Student Center Kitchen Gas, Measure Type: Natural Gas,
+    Meter Number: SYN-SGU-M-0050004, Provider Meter Number: SGU-SET-0050004, Meter Multiplier: '',
+    Billing Account: SYN-SGU-A-0020004, Utility Provider: Sierra Gas Utility, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: sgu_lakeview_hall_gas
+  installed:
+    meterId:
+  Building: Lakeview Residence Hall
+  Meter Definition: {Description: Lakeview Hall Gas, Measure Type: Natural Gas, Meter Number: SYN-SGU-M-0050005,
+    Provider Meter Number: SGU-SET-0050005, Meter Multiplier: '', Billing Account: SYN-SGU-A-0020005,
+    Utility Provider: Sierra Gas Utility, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: sgu_recreation_center_pool_gas
+  installed:
+    meterId:
+  Building: Recreation and Aquatics Center
+  Meter Definition: {Description: Recreation Center Pool Gas, Measure Type: Natural Gas,
+    Meter Number: SYN-SGU-M-0050006, Provider Meter Number: SGU-SET-0050006, Meter Multiplier: '',
+    Billing Account: SYN-SGU-A-0020006, Utility Provider: Sierra Gas Utility, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: sgu_cedar_row_a_house_gas
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Gas House, Measure Type: Natural Gas, Meter Number: SYN-SGU-M-0050007,
+    Provider Meter Number: SGU-SET-0050007, Meter Multiplier: '', Billing Account: SYN-SGU-A-0020007,
+    Utility Provider: Sierra Gas Utility, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: sgu_cedar_row_b_house_gas
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Gas House, Measure Type: Natural Gas, Meter Number: SYN-SGU-M-0050008,
+    Provider Meter Number: SGU-SET-0050008, Meter Multiplier: '', Billing Account: SYN-SGU-A-0020008,
+    Utility Provider: Sierra Gas Utility, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: sgu_cedar_row_common_house_gas
+  installed:
+    meterId:
+  Building: Cedar Row Common House
+  Meter Definition: {Description: Common House Gas, Measure Type: Natural Gas, Meter Number: SYN-SGU-M-0050009,
+    Provider Meter Number: SGU-SET-0050009, Meter Multiplier: '', Billing Account: SYN-SGU-A-0020009,
+    Utility Provider: Sierra Gas Utility, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: sgu_central_plant_boiler_gas
+  installed:
+    meterId:
+  Building: Central Plant
+  Meter Definition: {Description: Central Plant Boiler Gas, Measure Type: Natural Gas, Meter Number: SYN-SGU-M-0050010,
+    Provider Meter Number: SGU-SET-0050010, Meter Multiplier: 3.0367, Billing Account: SYN-SGU-A-0020010,
+    Utility Provider: Sierra Gas Utility, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  - {Type: Service Pressure, Attribute: 30 psig}
+  - {Type: System Component, Attribute: Gas Boiler}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: rcu_admin_hall_water
+  installed:
+    meterId:
+  Building: Admin Hall
+  Meter Definition: {Description: Admin Hall Domestic Water, Measure Type: Potable Water,
+    Meter Number: SYN-RCU-M-0060001, Provider Meter Number: RCU-DEV-0060001, Meter Multiplier: '',
+    Billing Account: SYN-RCU-A-0030001, Utility Provider: River City Utilities, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: rcu_science_center_water
+  installed:
+    meterId:
+  Building: Science Center
+  Meter Definition: {Description: Science Center Domestic Water, Measure Type: Potable Water,
+    Meter Number: SYN-RCU-M-0060005, Provider Meter Number: RCU-DEV-0060005, Meter Multiplier: '',
+    Billing Account: SYN-RCU-A-0030005, Utility Provider: River City Utilities, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: rcu_library_water
+  installed:
+    meterId:
+  Building: Library
+  Meter Definition: {Description: Library Domestic Water, Measure Type: Potable Water, Meter Number: SYN-RCU-M-0060006,
+    Provider Meter Number: RCU-DEV-0060006, Meter Multiplier: '', Billing Account: SYN-RCU-A-0030006,
+    Utility Provider: River City Utilities, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: rcu_student_center_water
+  installed:
+    meterId:
+  Building: Student Center
+  Meter Definition: {Description: Student Center Domestic Water, Measure Type: Potable Water,
+    Meter Number: SYN-RCU-M-0060002, Provider Meter Number: RCU-DEV-0060002, Meter Multiplier: '',
+    Billing Account: SYN-RCU-A-0030002, Utility Provider: River City Utilities, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: rcu_lakeview_hall_water
+  installed:
+    meterId:
+  Building: Lakeview Residence Hall
+  Meter Definition: {Description: Lakeview Hall Domestic Water, Measure Type: Potable Water,
+    Meter Number: SYN-RCU-M-0060007, Provider Meter Number: RCU-DEV-0060007, Meter Multiplier: '',
+    Billing Account: SYN-RCU-A-0030007, Utility Provider: River City Utilities, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: rcu_recreation_center_water
+  installed:
+    meterId:
+  Building: Recreation and Aquatics Center
+  Meter Definition: {Description: Recreation Center Domestic Water, Measure Type: Potable Water,
+    Meter Number: SYN-RCU-M-0060008, Provider Meter Number: RCU-DEV-0060008, Meter Multiplier: '',
+    Billing Account: SYN-RCU-A-0030008, Utility Provider: River City Utilities, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: rcu_irrigation_north_quad
+  installed:
+    meterId:
+  Building: Campus Grounds
+  Meter Definition: {Description: Campus Grounds Irrigation North Quad, Measure Type: Potable Water,
+    Meter Number: SYN-RCU-M-0060009, Provider Meter Number: RCU-DEV-0060009, Meter Multiplier: '',
+    Billing Account: SYN-RCU-A-0030009, Utility Provider: River City Utilities, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: rcu_irrigation_south_fields
+  installed:
+    meterId:
+  Building: Campus Grounds
+  Meter Definition: {Description: Campus Grounds Irrigation South Fields, Measure Type: Potable Water,
+    Meter Number: SYN-RCU-M-0060010, Provider Meter Number: RCU-DEV-0060010, Meter Multiplier: '',
+    Billing Account: SYN-RCU-A-0030009, Utility Provider: River City Utilities, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: rcu_irrigation_athletics
+  installed:
+    meterId:
+  Building: Campus Grounds
+  Meter Definition: {Description: Campus Grounds Irrigation Athletics, Measure Type: Potable Water,
+    Meter Number: SYN-RCU-M-0060011, Provider Meter Number: RCU-DEV-0060011, Meter Multiplier: '',
+    Billing Account: SYN-RCU-A-0030009, Utility Provider: River City Utilities, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: rcu_admin_hall_fire_service
+  installed:
+    meterId:
+  Building: Admin Hall
+  Meter Definition: {Description: Admin Hall Fire Service, Measure Type: Potable Water, Meter Number: SYN-RCU-M-0060012,
+    Provider Meter Number: RCU-DEV-0060012, Meter Multiplier: '', Billing Account: SYN-RCU-A-0030010,
+    Utility Provider: River City Utilities, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: rcu_science_center_fire_service
+  installed:
+    meterId:
+  Building: Science Center
+  Meter Definition: {Description: Science Center Fire Service, Measure Type: Potable Water,
+    Meter Number: SYN-RCU-M-0060013, Provider Meter Number: RCU-DEV-0060013, Meter Multiplier: '',
+    Billing Account: SYN-RCU-A-0030011, Utility Provider: River City Utilities, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: rcu_lakeview_hall_fire_service
+  installed:
+    meterId:
+  Building: Lakeview Residence Hall
+  Meter Definition: {Description: Lakeview Hall Fire Service, Measure Type: Potable Water,
+    Meter Number: SYN-RCU-M-0060014, Provider Meter Number: RCU-DEV-0060014, Meter Multiplier: '',
+    Billing Account: SYN-RCU-A-0030012, Utility Provider: River City Utilities, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: rcu_cedar_row_a_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Water Master, Measure Type: Potable Water,
+    Meter Number: SYN-RCU-M-0060003, Provider Meter Number: RCU-DEV-0060003, Meter Multiplier: '',
+    Billing Account: SYN-RCU-A-0030003, Utility Provider: River City Utilities, Bill Cycle: 2}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: rcu_cedar_row_b_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Water Master, Measure Type: Potable Water,
+    Meter Number: SYN-RCU-M-0060004, Provider Meter Number: RCU-DEV-0060004, Meter Multiplier: '',
+    Billing Account: SYN-RCU-A-0030004, Utility Provider: River City Utilities, Bill Cycle: 2}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: rcu_cedar_row_a_fire_service
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Fire Service, Measure Type: Potable Water,
+    Meter Number: SYN-RCU-M-0060015, Provider Meter Number: RCU-DEV-0060015, Meter Multiplier: '',
+    Billing Account: SYN-RCU-A-0030013, Utility Provider: River City Utilities, Bill Cycle: 2}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: rcu_cedar_row_b_fire_service
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Fire Service, Measure Type: Potable Water,
+    Meter Number: SYN-RCU-M-0060016, Provider Meter Number: RCU-DEV-0060016, Meter Multiplier: '',
+    Billing Account: SYN-RCU-A-0030014, Utility Provider: River City Utilities, Bill Cycle: 2}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: rcu_cedar_row_common_house_water
+  installed:
+    meterId:
+  Building: Cedar Row Common House
+  Meter Definition: {Description: Common House Domestic Water, Measure Type: Potable Water,
+    Meter Number: SYN-RCU-M-0060017, Provider Meter Number: RCU-DEV-0060017, Meter Multiplier: '',
+    Billing Account: SYN-RCU-A-0030015, Utility Provider: River City Utilities, Bill Cycle: 2}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: rcu_cedar_row_irrigation
+  installed:
+    meterId:
+  Building: Cedar Row Carport and Grounds
+  Meter Definition: {Description: Cedar Row Landscape Irrigation, Measure Type: Potable Water,
+    Meter Number: SYN-RCU-M-0060018, Provider Meter Number: RCU-DEV-0060018, Meter Multiplier: '',
+    Billing Account: SYN-RCU-A-0030016, Utility Provider: River City Utilities, Bill Cycle: 2}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: rcu_central_plant_makeup_water
+  installed:
+    meterId:
+  Building: Central Plant
+  Meter Definition: {Description: Central Plant Makeup Water, Measure Type: Potable Water,
+    Meter Number: SYN-RCU-M-0060019, Provider Meter Number: RCU-DEV-0060019, Meter Multiplier: '',
+    Billing Account: SYN-RCU-A-0030017, Utility Provider: River City Utilities, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: ntp_science_center_chilled_water
+  installed:
+    meterId:
+  Building: Science Center
+  Meter Definition: {Description: Science Center Chilled Water, Measure Type: Chilled Water,
+    Meter Number: SYN-NTP-M-0070001, Provider Meter Number: '', Meter Multiplier: '',
+    Billing Account: SYN-NTP-C-0000001, Utility Provider: Northlake Thermal Plant, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: ntp_science_center_steam
+  installed:
+    meterId:
+  Building: Science Center
+  Meter Definition: {Description: Science Center Steam, Measure Type: Steam, Meter Number: SYN-NTP-M-0070101,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: SYN-NTP-C-0000001,
+    Utility Provider: Northlake Thermal Plant, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: ntp_admin_hall_steam
+  installed:
+    meterId:
+  Building: Admin Hall
+  Meter Definition: {Description: Admin Hall Steam, Measure Type: Steam, Meter Number: SYN-NTP-M-0070002,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: SYN-NTP-C-0000002,
+    Utility Provider: Northlake Thermal Plant, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: ntp_library_steam
+  installed:
+    meterId:
+  Building: Library
+  Meter Definition: {Description: Library Steam, Measure Type: Steam, Meter Number: SYN-NTP-M-0070003,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: SYN-NTP-C-0000003,
+    Utility Provider: Northlake Thermal Plant, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: ntp_student_center_steam
+  installed:
+    meterId:
+  Building: Student Center
+  Meter Definition: {Description: Student Center Steam, Measure Type: Steam, Meter Number: SYN-NTP-M-0070004,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: SYN-NTP-C-0000004,
+    Utility Provider: Northlake Thermal Plant, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: ntp_lakeview_hall_steam
+  installed:
+    meterId:
+  Building: Lakeview Residence Hall
+  Meter Definition: {Description: Lakeview Hall Steam, Measure Type: Steam, Meter Number: SYN-NTP-M-0070005,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: SYN-NTP-C-0000005,
+    Utility Provider: Northlake Thermal Plant, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: ntp_recreation_center_chilled_water
+  installed:
+    meterId:
+  Building: Recreation and Aquatics Center
+  Meter Definition: {Description: Recreation Center Chilled Water, Measure Type: Chilled Water,
+    Meter Number: SYN-NTP-M-0070006, Provider Meter Number: '', Meter Multiplier: '',
+    Billing Account: SYN-NTP-C-0000006, Utility Provider: Northlake Thermal Plant, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: ntp_recreation_center_steam
+  installed:
+    meterId:
+  Building: Recreation and Aquatics Center
+  Meter Definition: {Description: Recreation Center Steam, Measure Type: Steam, Meter Number: SYN-NTP-M-0070106,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: SYN-NTP-C-0000006,
+    Utility Provider: Northlake Thermal Plant, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: hos_science_center_array
+  installed:
+    meterId:
+  Building: Science Center
+  Meter Definition: {Description: Science Center PV Array, Measure Type: Electricity, Meter Number: SYN-HOS-M-0080001,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: SYN-HOS-P-0000001,
+    Utility Provider: Helios Onsite Solar, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  - {Type: Generation Source, Attribute: Solar}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: hos_student_center_array
+  installed:
+    meterId:
+  Building: Student Center
+  Meter Definition: {Description: Student Center PV Array, Measure Type: Electricity, Meter Number: SYN-HOS-M-0080002,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: SYN-HOS-P-0000002,
+    Utility Provider: Helios Onsite Solar, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  - {Type: Generation Source, Attribute: Solar}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: hos_cedar_row_carport
+  installed:
+    meterId:
+  Building: Cedar Row Carport and Grounds
+  Meter Definition: {Description: Cedar Row Solar Carport, Measure Type: Electricity, Meter Number: SYN-HOS-M-0080003,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: SYN-HOS-P-0000003,
+    Utility Provider: Helios Onsite Solar, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  - {Type: Generation Source, Attribute: Solar}
+# ---- Ridgeline Wind (added 2026-10-01): the billing meter, then the ten turbine pad meters ----
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: rwl_farm_transfer
+  installed:
+    meterId:
+  Building: Ridgeline Turbine Field
+  Meter Definition: {Description: Ridgeline Farm Transfer Meter, Measure Type: Electricity,
+    Meter Number: SYN-RWL-M-0110000, Provider Meter Number: '', Meter Multiplier: '',
+    Billing Account: SYN-RWL-G-0000001, Utility Provider: Ridgeline Wind, Bill Cycle: 1}
+  Status:
+  - {Status: Open, As of Date: 2024-07-01}
+  Notes: Logical billing meter for the monthly transfer statement; its one point is the farm aggregate of the ten turbines.
+- key: rwl_wtg_01
+  installed:
+    meterId:
+  Building: Ridgeline Turbine Field
+  Meter Definition: {Description: Ridgeline WTG-01, Measure Type: Electricity, Meter Number: SYN-RWL-M-0110001,
+    Provider Meter Number: RWL-WTG-01, Meter Multiplier: '', Billing Account: SYN-RWL-G-0000001,
+    Utility Provider: Ridgeline Wind, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  - {Type: Generation Source, Attribute: Wind}
+  Status:
+  - {Status: Open, As of Date: 2024-07-01}
+- key: rwl_wtg_02
+  installed:
+    meterId:
+  Building: Ridgeline Turbine Field
+  Meter Definition: {Description: Ridgeline WTG-02, Measure Type: Electricity, Meter Number: SYN-RWL-M-0110002,
+    Provider Meter Number: RWL-WTG-02, Meter Multiplier: '', Billing Account: SYN-RWL-G-0000001,
+    Utility Provider: Ridgeline Wind, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  - {Type: Generation Source, Attribute: Wind}
+  Status:
+  - {Status: Open, As of Date: 2024-07-01}
+- key: rwl_wtg_03
+  installed:
+    meterId:
+  Building: Ridgeline Turbine Field
+  Meter Definition: {Description: Ridgeline WTG-03, Measure Type: Electricity, Meter Number: SYN-RWL-M-0110003,
+    Provider Meter Number: RWL-WTG-03, Meter Multiplier: '', Billing Account: SYN-RWL-G-0000001,
+    Utility Provider: Ridgeline Wind, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  - {Type: Generation Source, Attribute: Wind}
+  Status:
+  - {Status: Open, As of Date: 2024-07-01}
+- key: rwl_wtg_04
+  installed:
+    meterId:
+  Building: Ridgeline Turbine Field
+  Meter Definition: {Description: Ridgeline WTG-04, Measure Type: Electricity, Meter Number: SYN-RWL-M-0110004,
+    Provider Meter Number: RWL-WTG-04, Meter Multiplier: '', Billing Account: SYN-RWL-G-0000001,
+    Utility Provider: Ridgeline Wind, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  - {Type: Generation Source, Attribute: Wind}
+  Status:
+  - {Status: Open, As of Date: 2024-07-01}
+- key: rwl_wtg_05
+  installed:
+    meterId:
+  Building: Ridgeline Turbine Field
+  Meter Definition: {Description: Ridgeline WTG-05, Measure Type: Electricity, Meter Number: SYN-RWL-M-0110005,
+    Provider Meter Number: RWL-WTG-05, Meter Multiplier: '', Billing Account: SYN-RWL-G-0000001,
+    Utility Provider: Ridgeline Wind, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  - {Type: Generation Source, Attribute: Wind}
+  Status:
+  - {Status: Open, As of Date: 2024-07-01}
+- key: rwl_wtg_06
+  installed:
+    meterId:
+  Building: Ridgeline Turbine Field
+  Meter Definition: {Description: Ridgeline WTG-06, Measure Type: Electricity, Meter Number: SYN-RWL-M-0110006,
+    Provider Meter Number: RWL-WTG-06, Meter Multiplier: '', Billing Account: SYN-RWL-G-0000001,
+    Utility Provider: Ridgeline Wind, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  - {Type: Generation Source, Attribute: Wind}
+  Status:
+  - {Status: Open, As of Date: 2024-07-01}
+- key: rwl_wtg_07
+  installed:
+    meterId:
+  Building: Ridgeline Turbine Field
+  Meter Definition: {Description: Ridgeline WTG-07, Measure Type: Electricity, Meter Number: SYN-RWL-M-0110007,
+    Provider Meter Number: RWL-WTG-07, Meter Multiplier: '', Billing Account: SYN-RWL-G-0000001,
+    Utility Provider: Ridgeline Wind, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  - {Type: Generation Source, Attribute: Wind}
+  Status:
+  - {Status: Open, As of Date: 2024-07-01}
+  Notes: Gearbox failure 2025-02-11 to 2025-04-22. The meter stays Open; the outage is in its data (state Fault, zero energy), not its status.
+- key: rwl_wtg_08
+  installed:
+    meterId:
+  Building: Ridgeline Turbine Field
+  Meter Definition: {Description: Ridgeline WTG-08, Measure Type: Electricity, Meter Number: SYN-RWL-M-0110008,
+    Provider Meter Number: RWL-WTG-08, Meter Multiplier: '', Billing Account: SYN-RWL-G-0000001,
+    Utility Provider: Ridgeline Wind, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  - {Type: Generation Source, Attribute: Wind}
+  Status:
+  - {Status: Open, As of Date: 2024-07-01}
+- key: rwl_wtg_09
+  installed:
+    meterId:
+  Building: Ridgeline Turbine Field
+  Meter Definition: {Description: Ridgeline WTG-09, Measure Type: Electricity, Meter Number: SYN-RWL-M-0110009,
+    Provider Meter Number: RWL-WTG-09, Meter Multiplier: '', Billing Account: SYN-RWL-G-0000001,
+    Utility Provider: Ridgeline Wind, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  - {Type: Generation Source, Attribute: Wind}
+  Status:
+  - {Status: Open, As of Date: 2024-07-01}
+- key: rwl_wtg_10
+  installed:
+    meterId:
+  Building: Ridgeline Turbine Field
+  Meter Definition: {Description: Ridgeline WTG-10, Measure Type: Electricity, Meter Number: SYN-RWL-M-0110010,
+    Provider Meter Number: RWL-WTG-10, Meter Multiplier: '', Billing Account: SYN-RWL-G-0000001,
+    Utility Provider: Ridgeline Wind, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  - {Type: Generation Source, Attribute: Wind}
+  Status:
+  - {Status: Open, As of Date: 2024-07-01}
+- key: science_center_environmental_sensors
+  # Longer than 30 characters (Meter.SM_Code holds 60).
+  installed:
+    meterId:
+  Building: Science Center
+  Meter Definition: {Description: Science Center Lab Environment, Measure Type: Sensor,
+    Meter Number: SCIENCE-CENTER-ENVIRONMENTAL-SENSORS, Provider Meter Number: '', Meter Multiplier: '',
+    Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: library_historian_electric_interval
+  # Longer than 30 characters (Meter.SM_Code holds 60).
+  installed:
+    meterId:
+  Building: Library
+  Meter Definition: {Description: Library Electric Historian, Measure Type: Electricity,
+    Meter Number: LIBRARY-HISTORIAN-ELECTRIC-INTERVAL, Provider Meter Number: '', Meter Multiplier: '',
+    Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: student_center_kitchen_deduct_water
+  installed:
+    meterId:
+  Building: Student Center
+  Meter Definition: {Description: Student Center Kitchen Sewer Deduct, Measure Type: Potable Water,
+    Meter Number: SYN-DED-W-SC01, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Keywords:
+  - {Type: Meter Type, Attribute: Sub-Meter}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: fake_gateway_smoke_meter
+  installed:
+    meterId:
+  Building: Student Center
+  Meter Definition: {Description: Student Center Fake Gateway Smoke, Measure Type: Electricity,
+    Meter Number: FAKE-GATEWAY-SMOKE-METER, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: lakeview_hall_laundry_electric
+  installed:
+    meterId:
+  Building: Lakeview Residence Hall
+  Meter Definition: {Description: Lakeview Hall Laundry Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-LV01, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Keywords:
+  - {Type: Meter Type, Attribute: Sub-Meter}
+  - {Type: System Component, Attribute: Plug Load}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: recreation_center_pool_fill_water
+  installed:
+    meterId:
+  Building: Recreation and Aquatics Center
+  Meter Definition: {Description: Recreation Center Pool Fill Deduct, Measure Type: Potable Water,
+    Meter Number: SYN-DED-W-RC01, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Keywords:
+  - {Type: Meter Type, Attribute: Sub-Meter}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: parking_structure_ev_chargers
+  installed:
+    meterId:
+  Building: Parking Structure
+  Meter Definition: {Description: Parking Structure EV Chargers, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-PS01, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Keywords:
+  - {Type: Meter Type, Attribute: Sub-Meter}
+  - {Type: System Component, Attribute: Plug Load}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_101_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 101 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A101, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_102_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 102 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A102, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_103_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 103 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A103, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_104_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 104 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A104, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_105_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 105 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A105, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_106_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 106 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A106, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_107_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 107 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A107, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_108_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 108 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A108, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_109_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 109 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A109, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_110_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 110 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A110, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_111_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 111 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A111, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_112_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 112 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A112, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_113_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 113 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A113, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_114_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 114 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A114, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_115_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 115 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A115, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_116_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 116 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A116, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_117_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 117 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A117, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_118_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 118 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A118, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_119_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 119 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A119, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_120_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 120 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A120, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_201_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 201 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A201, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_202_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 202 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A202, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_203_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 203 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A203, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_204_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 204 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A204, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_205_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 205 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A205, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_206_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 206 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A206, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_207_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 207 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A207, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_208_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 208 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A208, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_209_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 209 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A209, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_210_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 210 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A210, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_211_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 211 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A211, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_212_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 212 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A212, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_213_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 213 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A213, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_214_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 214 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A214, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_215_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 215 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A215, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_216_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 216 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A216, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_217_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 217 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A217, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_218_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 218 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A218, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_219_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 219 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A219, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_220_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 220 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A220, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_301_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 301 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A301, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_302_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 302 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A302, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_303_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 303 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A303, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_304_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 304 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A304, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_305_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 305 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A305, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_306_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 306 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A306, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_307_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 307 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A307, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_308_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 308 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A308, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_309_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 309 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A309, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_310_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 310 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A310, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_311_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 311 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A311, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_312_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 312 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A312, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_313_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 313 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A313, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_314_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 314 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A314, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_315_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 315 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A315, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_316_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 316 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A316, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_317_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 317 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A317, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_318_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 318 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A318, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_319_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 319 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A319, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_320_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 320 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-A320, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_house_electric
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Electric House, Measure Type: Electricity, Meter Number: SYN-SUB-E-AH,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_101_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 101 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A101,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_102_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 102 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A102,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_103_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 103 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A103,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_104_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 104 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A104,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_105_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 105 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A105,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_106_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 106 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A106,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_107_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 107 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A107,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_108_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 108 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A108,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_109_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 109 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A109,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_110_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 110 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A110,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_111_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 111 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A111,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_112_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 112 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A112,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_113_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 113 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A113,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_114_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 114 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A114,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_115_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 115 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A115,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_116_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 116 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A116,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_117_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 117 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A117,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_118_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 118 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A118,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_119_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 119 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A119,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_120_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 120 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A120,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_201_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 201 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A201,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_202_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 202 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A202,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_203_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 203 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A203,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_204_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 204 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A204,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_205_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 205 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A205,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_206_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 206 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A206,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_207_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 207 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A207,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_208_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 208 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A208,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_209_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 209 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A209,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_210_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 210 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A210,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_211_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 211 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A211,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_212_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 212 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A212,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_213_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 213 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A213,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_214_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 214 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A214,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_215_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 215 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A215,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_216_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 216 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A216,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_217_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 217 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A217,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_218_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 218 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A218,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_219_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 219 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A219,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_220_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 220 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A220,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_301_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 301 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A301,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_302_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 302 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A302,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_303_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 303 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A303,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_304_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 304 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A304,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_305_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 305 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A305,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_306_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 306 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A306,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_307_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 307 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A307,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_308_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 308 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A308,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_309_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 309 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A309,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_310_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 310 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A310,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_311_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 311 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A311,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_312_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 312 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A312,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_313_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 313 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A313,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_314_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 314 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A314,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_315_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 315 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A315,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_316_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 316 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A316,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_317_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 317 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A317,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_318_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 318 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A318,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_319_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 319 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A319,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_unit_320_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Unit 320 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-A320,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_a_house_water
+  installed:
+    meterId:
+  Building: Cedar Row A
+  Meter Definition: {Description: Cedar Row A Water House, Measure Type: Potable Water, Meter Number: SYN-SUB-W-AH,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_101_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 101 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B101, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_102_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 102 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B102, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_103_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 103 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B103, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_104_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 104 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B104, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_105_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 105 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B105, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_106_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 106 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B106, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_107_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 107 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B107, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_108_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 108 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B108, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_109_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 109 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B109, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_110_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 110 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B110, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_111_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 111 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B111, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_112_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 112 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B112, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_113_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 113 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B113, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_114_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 114 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B114, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_115_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 115 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B115, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_116_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 116 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B116, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_201_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 201 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B201, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_202_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 202 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B202, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_203_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 203 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B203, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_204_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 204 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B204, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_205_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 205 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B205, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_206_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 206 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B206, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_207_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 207 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B207, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_208_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 208 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B208, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_209_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 209 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B209, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_210_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 210 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B210, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_211_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 211 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B211, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_212_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 212 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B212, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_213_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 213 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B213, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_214_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 214 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B214, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_215_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 215 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B215, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_216_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 216 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B216, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_301_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 301 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B301, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_302_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 302 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B302, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_303_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 303 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B303, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_304_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 304 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B304, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_305_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 305 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B305, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_306_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 306 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B306, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_307_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 307 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B307, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_308_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 308 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B308, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_309_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 309 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B309, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_310_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 310 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B310, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_311_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 311 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B311, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_312_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 312 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B312, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_313_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 313 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B313, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_314_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 314 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B314, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_315_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 315 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B315, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_316_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 316 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B316, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_401_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 401 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B401, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_402_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 402 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B402, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_403_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 403 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B403, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_404_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 404 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B404, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_405_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 405 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B405, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_406_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 406 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B406, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_407_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 407 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B407, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_408_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 408 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B408, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_409_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 409 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B409, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_410_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 410 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B410, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_411_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 411 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B411, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_412_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 412 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B412, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_413_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 413 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B413, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_414_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 414 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B414, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_415_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 415 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B415, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_416_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 416 Electric, Measure Type: Electricity,
+    Meter Number: SYN-SUB-E-B416, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_house_electric
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Electric House, Measure Type: Electricity, Meter Number: SYN-SUB-E-BH,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_101_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 101 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B101,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_102_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 102 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B102,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_103_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 103 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B103,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_104_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 104 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B104,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_105_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 105 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B105,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_106_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 106 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B106,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_107_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 107 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B107,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_108_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 108 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B108,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_109_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 109 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B109,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_110_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 110 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B110,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_111_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 111 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B111,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_112_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 112 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B112,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_113_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 113 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B113,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_114_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 114 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B114,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_115_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 115 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B115,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_116_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 116 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B116,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_201_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 201 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B201,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_202_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 202 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B202,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_203_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 203 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B203,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_204_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 204 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B204,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_205_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 205 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B205,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_206_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 206 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B206,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_207_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 207 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B207,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_208_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 208 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B208,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_209_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 209 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B209,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_210_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 210 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B210,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_211_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 211 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B211,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_212_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 212 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B212,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_213_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 213 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B213,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_214_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 214 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B214,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_215_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 215 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B215,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_216_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 216 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B216,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_301_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 301 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B301,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_302_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 302 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B302,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_303_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 303 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B303,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_304_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 304 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B304,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_305_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 305 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B305,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_306_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 306 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B306,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_307_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 307 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B307,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_308_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 308 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B308,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_309_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 309 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B309,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_310_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 310 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B310,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_311_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 311 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B311,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_312_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 312 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B312,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_313_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 313 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B313,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_314_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 314 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B314,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_315_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 315 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B315,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_316_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 316 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B316,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_401_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 401 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B401,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_402_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 402 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B402,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_403_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 403 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B403,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_404_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 404 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B404,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_405_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 405 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B405,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_406_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 406 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B406,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_407_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 407 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B407,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_408_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 408 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B408,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_409_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 409 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B409,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_410_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 410 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B410,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_411_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 411 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B411,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_412_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 412 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B412,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_413_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 413 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B413,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_414_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 414 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B414,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_415_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 415 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B415,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_unit_416_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Unit 416 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-B416,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: cedar_row_b_house_water
+  installed:
+    meterId:
+  Building: Cedar Row B
+  Meter Definition: {Description: Cedar Row B Water House, Measure Type: Potable Water, Meter Number: SYN-SUB-W-BH,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+# ---- Cedar Row C (added 2026-11-07): 48 apartment water submeters, the house and the laundry, open 2025-09-01 ----
+# Two meter batches: floors 1 and 2, the house and the laundry register gallons; floors 3 and 4 register ccf
+# (04-points.yaml). They inherit Sub-Meter from the building, as A and B's do.
+- key: cedar_row_c_unit_101_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 101 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C101,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_unit_102_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 102 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C102,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_unit_103_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 103 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C103,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_unit_104_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 104 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C104,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_unit_105_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 105 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C105,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_unit_106_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 106 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C106,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_unit_107_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 107 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C107,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_unit_108_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 108 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C108,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_unit_109_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 109 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C109,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_unit_110_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 110 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C110,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_unit_111_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 111 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C111,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_unit_112_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 112 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C112,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_unit_201_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 201 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C201,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_unit_202_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 202 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C202,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_unit_203_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 203 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C203,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_unit_204_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 204 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C204,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_unit_205_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 205 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C205,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_unit_206_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 206 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C206,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_unit_207_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 207 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C207,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_unit_208_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 208 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C208,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_unit_209_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 209 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C209,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_unit_210_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 210 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C210,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_unit_211_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 211 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C211,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_unit_212_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 212 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C212,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_unit_301_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 301 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C301,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_unit_302_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 302 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C302,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_unit_303_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 303 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C303,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_unit_304_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 304 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C304,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_unit_305_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 305 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C305,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_unit_306_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 306 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C306,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_unit_307_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 307 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C307,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_unit_308_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 308 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C308,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_unit_309_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 309 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C309,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_unit_310_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 310 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C310,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_unit_311_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 311 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C311,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_unit_312_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 312 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C312,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_unit_401_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 401 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C401,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_unit_402_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 402 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C402,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_unit_403_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 403 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C403,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_unit_404_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 404 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C404,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_unit_405_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 405 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C405,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_unit_406_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 406 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C406,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_unit_407_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 407 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C407,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_unit_408_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 408 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C408,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_unit_409_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 409 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C409,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_unit_410_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 410 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C410,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_unit_411_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 411 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C411,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_unit_412_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Unit 412 Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-C412,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_house_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Water House, Measure Type: Potable Water, Meter Number: SYN-SUB-W-CH,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+- key: cedar_row_c_laundry_water
+  installed:
+    meterId:
+  Building: Cedar Row C
+  Meter Definition: {Description: Cedar Row C Laundry Water, Measure Type: Potable Water, Meter Number: SYN-SUB-W-CL,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2025-09-01}
+# ---- Facilities meters read by hand (added 2026-11-07): Stage 3 Step 5 routes GEN and SWGR ----
+- key: library_emergency_generator
+  installed:
+    meterId:
+  Building: Library
+  Meter Definition: {Description: Library Emergency Generator, Measure Type: 'Fuel Oil #2', Meter Number: SYN-GEN-LIB01,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Keywords:
+  - {Type: Meter Type, Attribute: Sub-Meter}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+  Notes: Owned diesel standby generator. Facilities reads its run-hour meter and its fuel totalizer each month.
+- key: science_center_emergency_generator
+  installed:
+    meterId:
+  Building: Science Center
+  Meter Definition: {Description: Science Center Emergency Generator, Measure Type: 'Fuel Oil #2', Meter Number: SYN-GEN-SCI01,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Keywords:
+  - {Type: Meter Type, Attribute: Sub-Meter}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+  Notes: Owned diesel standby generator. Facilities reads its run-hour meter and its fuel totalizer each month.
+- key: central_plant_emergency_generator
+  installed:
+    meterId:
+  Building: Central Plant
+  Meter Definition: {Description: Central Plant Emergency Generator, Measure Type: 'Fuel Oil #2', Meter Number: SYN-GEN-CP01,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Keywords:
+  - {Type: Meter Type, Attribute: Sub-Meter}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+  Notes: Owned diesel standby generator. Facilities reads its run-hour meter and its fuel totalizer each month.
+- key: central_plant_main_switchgear
+  installed:
+    meterId:
+  Building: Central Plant
+  Meter Definition: {Description: Central Plant Main Switchgear, Measure Type: Electricity, Meter Number: SYN-SUB-E-CPSWGR,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Keywords:
+  - {Type: Meter Type, Attribute: Sub-Meter}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+  Notes: Owned revenue-grade check meter on the main switchgear. Facilities reads its ten display registers each month.
+- key: cedar_row_common_house_pool_fill_water
+  installed:
+    meterId:
+  Building: Cedar Row Common House
+  Meter Definition: {Description: Common House Pool Fill Deduct, Measure Type: Potable Water,
+    Meter Number: SYN-DED-W-CH01, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Keywords:
+  - {Type: Meter Type, Attribute: Sub-Meter}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: ntp_central_plant_chw_supply
+  installed:
+    meterId:
+  Building: Central Plant
+  Meter Definition: {Description: Central Plant Chilled Water Supply, Measure Type: Chilled Water,
+    Meter Number: SYN-NTP-P-0090001, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: ntp_central_plant_steam_production
+  installed:
+    meterId:
+  Building: Central Plant
+  Meter Definition: {Description: Central Plant Steam Production, Measure Type: Steam, Meter Number: SYN-NTP-P-0090002,
+    Provider Meter Number: '', Meter Multiplier: 10, Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: ntp_central_plant_condensate_return
+  installed:
+    meterId:
+  Building: Central Plant
+  Meter Definition: {Description: Central Plant Condensate Return, Measure Type: Potable Water,
+    Meter Number: SYN-NTP-P-0090003, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: ntp_central_plant_cooling_tower_deduct
+  installed:
+    meterId:
+  Building: Central Plant
+  Meter Definition: {Description: Central Plant Cooling Tower Deduct, Measure Type: Potable Water,
+    Meter Number: SYN-DED-W-CP01, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Keywords:
+  - {Type: Meter Type, Attribute: Sub-Meter}
+  - {Type: System Component, Attribute: Cooling Tower}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: ntp_modbus_chiller_controller
+  installed:
+    meterId:
+  Building: Central Plant
+  Meter Definition: {Description: Central Plant Chiller Controller, Measure Type: Electricity,
+    Meter Number: NTP-MODBUS-CHILLER-CONTROLLER, Provider Meter Number: '', Meter Multiplier: '', Billing Account: '',
+    Utility Provider: '', Bill Cycle: ''}
+  Keywords:
+  - {Type: System Component, Attribute: Electric Chiller}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: rwl_met_mast
+  installed:
+    meterId:
+  Building: Ridgeline Turbine Field
+  Meter Definition: {Description: Ridgeline Met Mast, Measure Type: Weather, Meter Number: RIDGELINE-MET-MAST,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-07-01}
+  Notes: Owned sensor meter on the met mast, not a weather station; do not choose it as a building weather station.
+- key: weather_ksac
+  installed:
+    meterId:
+  Building: Weather Reference
+  Meter Definition: {Description: KSAC Sacramento Executive Airport, Measure Type: Weather, Meter Number: KSAC,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: weather_ksmf
+  installed:
+    meterId:
+  Building: Weather Reference
+  Meter Definition: {Description: KSMF Sacramento International Airport, Measure Type: Weather, Meter Number: KSMF,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+- key: weather_ksuu
+  installed:
+    meterId:
+  Building: Weather Reference
+  Meter Definition: {Description: KSUU Travis Air Force Base, Measure Type: Weather, Meter Number: KSUU,
+    Provider Meter Number: '', Meter Multiplier: '', Billing Account: '', Utility Provider: '', Bill Cycle: ''}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+  Notes: Reference weather station for the Ridgeline Wind Site; wind is reported in knots.

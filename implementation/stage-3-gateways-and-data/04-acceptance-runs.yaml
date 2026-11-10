@@ -1,0 +1,841 @@
+# Stage 3, step 4: Acceptance runs (file delivery + Web > Task Manager > Run now + interval data screens).
+# The AcquiSuite acceptance is four cases run in one sequence on the live database (no restore), with exact
+# expected results from the customer's expected-results.json and handover sheet. Every other format case
+# is one record that says which sample file it needs and whether that file exists yet; only the AcquiSuite
+# files are generated today, so those records are open work, not entries. Five Ridgeline Wind cases close the
+# file, open work like the format cases; two of them check PRODUCT FINDING 45 and the UTC-plus-offset workaround that
+# PRODUCT FINDING 49 forces.
+stage: 3
+step: 4
+title: Acceptance runs
+app: Web (Task Manager, Reports) and the gateway input folders
+screen: Task Manager > Run now; Reports > Use Analysis > Time Interval and Summary
+source:
+- documents/intake-package/sample-data/acquisuite/expected-results.json
+- documents/intake-package/sample-data/acquisuite/acquisuite-sample-handover.pdf
+- documents/intake-package/sample-data/acquisuite/{complete,gap,backfill}/ASQVED01_STUDENT.log
+- documents/intake-package/source-system-inventory.pdf (which feeds have no sample yet)
+- 'data/scenarios/demo-university-v1.yaml (gatewayBindings.profiles: generatedArtifacts per profile)'
+- generators/documents/sources/implementation/northlake-onboarding-ui-checklist.md (section 4, retired into this file)
+- data/bills/northlake-itemized-bills-v1.yaml (the metered quantities and bill periods the Ridgeline period totals tie to)
+- generators/documents/sources/implementation/product-findings.md (findings 14, 19, 45, 48 and 49)
+notes:
+- 'Use the reusable Task with the named Schedule below. Run now from that saved schedule so its GatewayId,
+  RootDirectory and other overrides are used. Per-case Parameters and FIG Format changes are run overrides
+  or a temporary disabled schedule; never edit task defaults to switch a configured gateway or format.'
+- 'Deliver one case at a time: copy the sample file into the gateway''s Input folder (keep the original in documents/), wait
+  past the AgeThresholdSeconds (10 s) the gateway uses to decide a file has finished arriving, then open the task in Task
+  Manager and use Run now. The Workers service (EEMSuite Task Service (NorthLake)) executes it; the run appears in the Task
+  Dashboard and in the Task Log report.'
+- 'Stage 3 takes no configured-empty backup (decided 2026-11-05), so the four AcquiSuite cases run once, in order, on the
+  live database: gap, backfill, complete day, replay. The gap file must be the first AcquiSuite data for 2024-01-15. The
+  backfill brings the day to the complete-day numbers; the complete file then lands on a full day (the first replay) and
+  the replay delivers it again. The day ends in the same state as one complete load, and that data stays in Northlake.'
+- 'Sum kWh and take the maximum of kW. Never sum demand. Local day 2024-01-15 in Pacific time is UTC 2024-01-15 08:00 to
+  2024-01-16 07:45; the AcquiSuite file carries UTC interval-start timestamps and the gateway converts them with the point''s
+  time zone (TimeZoneID 33). Every interval''s kWh is its kW times 0.25 h, so the day sums to 2,020 kWh with a 120 kW peak.'
+- 'The AcquiSuite files are the deliberate interval-start case: each row is stamped when its fifteen minutes begin, as a
+  customer who assumes start-of-interval stamps would send them. EEM stores the stamp as given, and its rate engine,
+  Bill Generation and interval reports read every stamp as the end of its interval (UtilityRates_LoadData.sql:111-114,
+  wh_GetIntervalData.sql:155-156). No AcquiSuite setting moves the stamp: only FIG has an offset (OffsetTimeMinutes, per
+  point), MDEF assumes MV90''s interval-end stamps, and the other gateways have none (PRODUCT FINDING 73). So the file''s
+  first row, 00:00 Pacific, is EEM''s last interval of January 14: the stored rows are all there (96, 2,020 kWh, cut on
+  the file''s own day), but EEM''s January 15 holds 95 of them and 2,010 kWh. acquisuite_complete_day records both; once
+  a stamp setting exists, setting the node to interval start must bring EEM''s day to 96 and 2,020.'
+- 'What the gateway does with the file (AcquiSuiteGatewayComponent): it claims files matching FilePatterns from Input into
+  Working, reads column 0 as UTC and column Row Number + RowOffset as the value, publishes the readings, then zips processed
+  files into Archive/yyyy_MM_dd/RunGuid.zip after publication acceptance and moves unreadable originals to Error. A replayed file with the same name
+  is read again in full; the archive table''s primary key (PtID, UTCTimeStamp) is why the replay cannot add rows.'
+- 'A success in the task log is not acceptance. Acceptance is the stored intervals rendering on a screen with the expected
+  value: the Time Interval report for the counts and timestamps, the Summary report for the kWh sum and kW maximum.'
+- 'Records whose Sample file exists is false are open work for the generator (generators/northlake_packet.py writes only the
+  AcquiSuite deliveries today). Run them when the file or service exists, each from the then-current database; they add data
+  for other points and need no restore.'
+- 'fake_smoke needs the custom two-node FakeGateway to IntervalDataPublish workflow. MVRS publishes HMR events
+  inside its built-in workflow; the HMR acceptance case reuses task_mvrs through schedule_mvrs_sierra_gas and does not need another task
+  or a manually supplied companion file. The handheld cases still require Step 5 route configuration.'
+- 'Added 2026-10-01 (Ridgeline Wind): five cases close the file. Run ridgeline_scada_july_day first;
+  ridgeline_wtg07_outage reuses the turbine file; mdef_ridgeline_interconnection and noaa_ksuu_wind_knots are
+  independent of them; ridgeline_aggregates runs last, once the SCADA and MDEF cases have data. Like the other
+  format cases they add data for their own points and need no restore, and their sample files are not generated
+  yet (generators/northlake_packet.py writes only the AcquiSuite deliveries).'
+- 'The Ridgeline SCADA day is on a Pacific Standard clock all year (UTC-08:00), and each row is stamped at the end
+  of its ten minutes, the convention EEM''s rate engine and Bill Generation read (a day is the stamps after its
+  midnight up to and including the next: UtilityRates_LoadData.sql:111-114, UtilityGenBillDates_Set.sql:242). So
+  local day 2024-07-15 on that clock is the stamps UTC 2024-07-15 08:10 to 2024-07-16 08:00 although Pacific civil
+  time is on daylight time (UTC-07:00) in July, when the SCADA''s 00:00 is 01:00 on the Pacific clock. Read the
+  SCADA cases in UTC: checks.sql filters
+  them on UTCTimeStamp. The points keep their Pacific zone, carry OffsetTimeMinutes 480, and the task reads the
+  shifted stamp as UTC, so the stored local stamps, which EEM converts from that UTC, should
+  read Pacific civil time; ridgeline_scada_july_day confirms that on a July day and records what the Time
+  Interval report shows with Use point timestamp off (hours cut from UTC in the signed-in user''s own zone) and on
+  (hours cut from the stored stamps). The GMT zone is not an alternative: it resolves to London summer time
+  (PRODUCT FINDING 48), and FIG offers no standard-time stamp type (PRODUCT FINDING 49). Day counts are 144
+  ten-minute and 96 fifteen-minute rows; point, alias and offset facts are in 02-gateways.yaml.'
+- 'Two period rules for the Ridgeline totals. Valley Electric cycle 1 reads on the 5th, so a Valley Electric bill
+  runs from the 5th to the 4th (the first generator bill is 2024-07-01 to 2024-08-04, 35 days, and the winter
+  bill 2025-01-05 to 2025-02-04), while the hand-made Ridgeline statement is a calendar month. The statement
+  slices on Pacific civil months, which under this recipe are the points'' stored local time, so the July sums
+  are cut on Pacific days (after UTC 07:00 up to and including 07:00 in July), not on the SCADA clock''s UTC
+  hours. Bill Generation slices the same way, on the stored local stamps after the month''s first midnight up to
+  and including the next (UtilityGenBillDates_Set.sql:242; Stage 7). Every Ridgeline stamp is an interval end:
+  the SCADA file is written that way and the MDEF gateway stamps each reading at the end of its interval.'
+records:
+# The four AcquiSuite cases run in this order on the live database, with no restore between them:
+# gap, backfill, complete day (it lands on the day the first two filled), replay.
+- key: acquisuite_gap
+  installed:
+    runOn:
+    workflowRunId:
+    observed: {readingsPerPoint: , kWh: , peakKW: , missingFromLocal: , missingToLocal: }
+  Order: 1 of 4. Runs first, while no AcquiSuite data exists for 2024-01-15.
+  Gateway: gw_acquisuite_student_electric
+  Task: task_acquisuite
+  Schedule: schedule_acquisuite_campus_loggers
+  Deliver: documents/intake-package/sample-data/acquisuite/gap/ASQVED01_STUDENT.log
+  Delivered to: C:\ProgramData\EEM Suite\NorthLake\Gateways\AcquiSuite\Input\ASQVED01_STUDENT.log
+  File sha256: 11ee7c567a2c1dc5b63c8425a54789eea2896c323a3afdd84ec587fa9f350f6b
+  Points checked:
+  - ch_ved_student_center_kwh_15m
+  - ch_ved_student_center_kw_15m
+  Expected:
+    Readings per point: 88
+    Readings stored: 176
+    Energy kWh: 1780
+    Peak kW: 120
+    Missing intervals (local PST): 2024-01-15 12:00 through 13:45 (eight intervals; UTC 20:00 through 21:45)
+    Otherwise: Everything else identical to the complete day
+  Check: gap_then_backfill, task_runs
+- key: acquisuite_backfill
+  installed:
+    runOn:
+    workflowRunId:
+    observed: {readingsPerPoint: , kWh: , peakKW: }
+  Order: 2 of 4. Runs after acquisuite_gap passed.
+  Gateway: gw_acquisuite_student_electric
+  Task: task_acquisuite
+  Schedule: schedule_acquisuite_campus_loggers
+  Deliver: documents/intake-package/sample-data/acquisuite/backfill/ASQVED01_STUDENT.log
+  Delivered to: C:\ProgramData\EEM Suite\NorthLake\Gateways\AcquiSuite\Input\ASQVED01_STUDENT.log
+  File sha256: 023673308c393a1cfe145be1c7fa059b760f01cda54f98a783b4557539aa392c
+  Points checked:
+  - ch_ved_student_center_kwh_15m
+  - ch_ved_student_center_kw_15m
+  Expected:
+    Rows in the file: 8 (240 kWh, all at 120 kW; UTC 2024-01-15 20:00 through 21:45)
+    Readings per point after the run: 96
+    Energy kWh after the run: 2020
+    Peak kW after the run: 120
+    Gap closed: 12:00 through 13:45 PST now present
+  Check: gap_then_backfill, task_runs
+- key: acquisuite_complete_day
+  installed:
+    runOn:
+    workflowRunId:
+    observed: {readingsPerPoint: , kWh: , peakKW: , firstLocal: , lastLocal: , replayTreatment: }
+  Order: 3 of 4. Runs after acquisuite_backfill, so the complete file lands on a day that is already full; it is the first replay.
+  Gateway: gw_acquisuite_student_electric (02-gateways.yaml)
+  Task: task_acquisuite
+  Schedule: schedule_acquisuite_campus_loggers (03-workflows-and-tasks.yaml)
+  Deliver: documents/intake-package/sample-data/acquisuite/complete/ASQVED01_STUDENT.log
+  Delivered to: C:\ProgramData\EEM Suite\NorthLake\Gateways\AcquiSuite\Input\ASQVED01_STUDENT.log
+  File sha256: df945a50250552a78882a2a3d1948072dd052159c6f91d5de401821ec62884bc
+  Points checked:
+  - ch_ved_student_center_kwh_15m   # Student Center Electric Main > Delivered kWh 15m
+  - ch_ved_student_center_kw_15m    # Student Center Electric Main > Demand kW 15m
+  Expected:
+    Readings per point: 96
+    Readings stored: 192
+    Energy kWh (sum of the kWh point): 2020
+    Peak kW (max of the kW point): 120
+    First interval UTC: 2024-01-15 08:00
+    Last interval UTC: 2024-01-16 07:45
+    First interval local (PST): 2024-01-15 00:00
+    Last interval local (PST): 2024-01-15 23:45
+    EEM's day (interval-end reading): 'the stamps after 2024-01-15 00:00 up to and including 2024-01-16 00:00 hold 95 rows per point and 2,010 kWh (the 00:00 row, 10 kWh, is January 14''s last interval to EEM); the peak is still 120 kW. Record what the Summary and Time Interval reports show for 2024-01-15: 95 and 2,010 is PRODUCT FINDING 73, not a failed load'
+    Shape: 40 kW overnight, 80 kW morning opening, 120 kW working day, 100 kW evening, 60 kW late night
+    File after the run: gone from Input, inside Archive/yyyy_MM_dd/RunGuid.zip, nothing in Error
+    Rows added by this run: none; every interval already exists. Record how the product reports the overlap under installed.observed.replayTreatment
+  Check: acquisuite_complete_day, replay_no_duplicates, task_runs
+- key: acquisuite_replay
+  installed:
+    runOn:
+    workflowRunId:
+    observed: {uniqueTimestampsPerPoint: , kWh: , replayTreatment: }
+  Order: 4 of 4. Delivers the complete file again, under the same name, after acquisuite_complete_day passed.
+  Gateway: gw_acquisuite_student_electric
+  Task: task_acquisuite
+  Schedule: schedule_acquisuite_campus_loggers
+  Deliver: documents/intake-package/sample-data/acquisuite/complete/ASQVED01_STUDENT.log (the same file again)
+  Delivered to: C:\ProgramData\EEM Suite\NorthLake\Gateways\AcquiSuite\Input\ASQVED01_STUDENT.log
+  File sha256: df945a50250552a78882a2a3d1948072dd052159c6f91d5de401821ec62884bc
+  Points checked:
+  - ch_ved_student_center_kwh_15m
+  - ch_ved_student_center_kw_15m
+  Expected:
+    Unique timestamps per point: 96 (unchanged)
+    Energy kWh: 2020 (unchanged)
+    Peak kW: 120 (unchanged)
+    Rows in the archive per point: 96 (the replay updates, it does not insert)
+    Record: how the product reported the replay (rows updated, rows duplicated, or file skipped) under installed.observed.replayTreatment
+  Check: replay_no_duplicates, task_runs
+# ---- Remaining format cases: one record each. None has a generated sample yet; run when it exists. ----
+- key: mdef_valley_electric
+  installed: {runOn: , workflowRunId: }
+  Gateway: gw_mv90_valley_mdef
+  Task: task_mv90
+  Schedule: schedule_mv90_valley_mdef
+  Format: MV90 MDEF (binary .mde)
+  Sample file needed: artifacts/demo-university-v1/mv90/SCIENCE_VED_202401.mde (one file per recorder month for VEDSCIENCE01, VEDRECREATION01, VEDPLANT01)
+  Sample file exists: false
+  Points: ch_ved_science_center_kwh_15m, ch_ved_science_center_kw_15m, ch_ved_recreation_center_kwh_15m, ch_ved_recreation_center_kw_15m, ch_ved_central_plant_kwh_15m, ch_ved_central_plant_kw_15m
+  Expected: 96 intervals per point per day; local timestamps, so the DST days 2024-03-10 and 2024-11-03 need 92 and 100 intervals; sum kWh, max kW.
+- key: mv9_helios_generation
+  installed: {runOn: , workflowRunId: }
+  Gateway: gw_mv90_helios_mv9
+  Task: task_mv90
+  Schedule: schedule_mv90_helios_mv9
+  Format: MV90 MV9 (text .mv9)
+  Sample file needed: artifacts/demo-university-v1/mv90/HELIOS_202401.mv9
+  Sample file exists: false
+  Points: ch_hos_science_center_gen_kwh_15m, ch_hos_science_center_export_kwh_15m, ch_hos_science_center_poa_irradiance_15m, ch_hos_student_center_gen_kwh_15m, ch_hos_cedar_row_carport_gen_kwh_15m
+  Expected: generation positive, zero overnight, midday curve; export never exceeds generation in the same interval;
+    irradiance in W/m2 (a Northlake unit) peaks at midday and is zero overnight.
+- key: bacnet_thermal_plant
+  installed: {runOn: , workflowRunId: }
+  Gateway: gw_bacnet_thermal_plant
+  Task: task_bacnet
+  Schedule: schedule_bacnet_thermal_plant
+  Format: BACnet/IP device polling (live)
+  Sample file needed: none; services/bacnet supplies three live devices on BVirtualPC Ethernet 3 (172.21.29.4), discovered over UDP 47808 with device IDs 530101, 530102 and 530103
+  Sample file exists: false
+  Points: ch_ntp_science_center_chw_ton_hours_hourly, ch_ntp_science_center_chw_tons_hourly, ch_ntp_recreation_center_chw_ton_hours_hourly, ch_ntp_recreation_center_chw_tons_hourly, ch_ntp_plant_chw_ton_hours_hourly, ch_ntp_plant_chw_tons_hourly, ch_ntp_plant_steam_klb_hourly, ch_ntp_plant_steam_lb_per_hour_hourly, ch_ntp_plant_steam_header_psig_15m, ch_ntp_plant_condensate_kgal_hourly
+  Expected: one reading per point per poll, stamped at poll time; history for 2024-2025 comes through a file path, not the poll.
+  History must match the bills: 'the Thermal Plant allocates from these meters, so the 2024-2025 history must reproduce its itemized statements (data/bills/northlake-thermal-plant-v1.yaml). Science Center chilled water sums to 180,860 ton-hours with a 542-ton hourly peak (2024-07-18 15:00) over July 2024 and to 58,640 ton-hours with a 214-ton peak over March 2025, each month cut the way EEM cuts it (the stamps after its first midnight up to and including the last).'   # assumed until the history file exists
+- key: noaa_ksac
+  installed: {runOn: , workflowRunId: }
+  Gateway: gw_noaa_ksac_observations
+  Task: task_noaa
+  Schedule: schedule_noaa_ksac
+  Format: NWS observation collections and hourly forecasts (HTTPS)
+  Sample file needed: none; NWS public station observations and hourly forecast services
+  Sample file exists: false
+  Points: ch_weather_ksac_temp_f_hourly, ch_weather_ksac_dewpoint_f_hourly, ch_weather_ksac_rh_hourly, ch_weather_ksac_wind_mph_hourly, ch_weather_ksac_forecast_temp_f_hourly, ch_weather_ksac_forecast_dewpoint_f_hourly, ch_weather_ksac_forecast_rh_hourly, ch_weather_ksac_forecast_wind_mph_hourly, ch_weather_ksac_forecast_wind_direction_hourly, ch_weather_ksac_forecast_precip_probability_hourly
+  Expected: latest valid observation independently per metric and hourly interval, with source time rounded up to the UTC interval end. Forecast periods write only to the separate forecast points using period end times; current collection runs every 15 minutes and forecasts refresh hourly.
+  Forecast units: Temperature = Fahrenheit, Dew Point = Fahrenheit, Relative Humidity = Percent, Wind Speed = MilesPerHour, Wind Direction = Degrees, Precipitation Probability = Percent
+  Forecast validation:
+  - Compare all six forecast points with the same NWS hourly periods using period end timestamps.
+  - Keep valid zero wind speed and zero precipitation probability; leave missing/rejected values missing independently per measurement.
+  - Direction is degrees clockwise from north. Do not turn variable/unknown direction into zero.
+  - Confirm all four observation/forecast associations for this station through 06-weather-associations-check.sql; direction and precipitation probability forecasts remain independent.
+- key: noaa_observation_history
+  installed: {runOn: , workflowRunId: }
+  Gateway: gw_noaa_ksac_observations
+  Task: task_noaa
+  Schedule: schedule_noaa_history
+  Format: NCEI GHCN-hourly history (HTTPS)
+  Sample file needed: none; public archives for USW00023232, USW00093225 and USW00023202
+  Sample file exists: false
+  Parameters: {Operation: History, HistoryStartUtc: '2024-01-01T08:00:00Z', ArchiveDelayDays: 3}
+  Expected: twelve observation points receive their available quality-accepted historical measurements in the requested UTC window; missing source values remain missing. History does not write the eighteen forecast points.
+  Notes:
+  - Run only once Steps 5 and 6 are entered. Keep recurring history reconciliation disabled until this initial backfill is accepted.
+  - Compare each observation with its matching station, metric, output unit and interval-end timestamp; do not expect historical forecasts.
+  - Record the actual requested end and accepted row counts on this run.
+- key: noaa_ksmf
+  installed: {runOn: , workflowRunId: }
+  Gateway: gw_noaa_ksac_observations
+  Task: task_noaa
+  Schedule: schedule_noaa_ksac
+  Format: NWS observation collections and hourly forecasts (HTTPS)
+  Sample file needed: none; NWS public station observations and hourly forecast services
+  Sample file exists: false
+  Points: ch_weather_ksmf_temp_c_hourly, ch_weather_ksmf_dewpoint_c_hourly, ch_weather_ksmf_rh_hourly, ch_weather_ksmf_wind_kph_hourly, ch_weather_ksmf_forecast_temp_f_hourly, ch_weather_ksmf_forecast_dewpoint_c_hourly, ch_weather_ksmf_forecast_rh_hourly, ch_weather_ksmf_forecast_wind_kph_hourly, ch_weather_ksmf_forecast_wind_direction_hourly, ch_weather_ksmf_forecast_precip_probability_hourly
+  Expected: observation valid times and forecast valid times stay on their own points; the observation arrives in degrees
+    Celsius and its daily HDD/CDD children in HDD(C)/CDD(C), wind in km/h. Preserve the temperature forecast in
+    degrees Fahrenheit; the new dew-point forecast uses Celsius.
+  Forecast units: Temperature = Fahrenheit, Dew Point = Celsius, Relative Humidity = Percent, Wind Speed = KilometersPerHour, Wind Direction = Degrees, Precipitation Probability = Percent
+  Forecast validation:
+  - Compare all six forecast points with the same NWS hourly periods using period end timestamps.
+  - Keep valid zero wind speed and zero precipitation probability; leave missing/rejected values missing independently per measurement.
+  - Direction is degrees clockwise from north. Do not turn variable/unknown direction into zero.
+  - Confirm all four observation/forecast associations for this station through 06-weather-associations-check.sql; direction and precipitation probability forecasts remain independent.
+- key: spinwave_science_lab
+  installed: {runOn: , workflowRunId: }
+  Gateway: gw_spinwave_science_lab
+  Task: task_spinwave
+  Schedule: schedule_spinwave_science_lab
+  Format: Spinwave CSV
+  Sample file needed: artifacts/demo-university-v1/spinwave/SCIENCE/science-lab-env.csv
+  Sample file exists: false
+  Points: ch_spinwave_science_lab_temp_f_10m, ch_spinwave_science_lab_rh_10m
+  Expected: 144 readings per point per day (10-minute); the value ranges come with the generated file (the scenario defines no shape yet).
+- key: fig_cedar_row_water_fig
+  installed: {runOn: , workflowRunId: }
+  Gateway: gw_fig_multi_format
+  Task: task_fig
+  Schedule: schedule_fig_multi_format
+  Format: FIG
+  Parameters: {Format: FIG}
+  Sample file needed: artifacts/demo-university-v1/fig/cedar-row-water.fig.csv
+  Sample file exists: false
+  Points: ch_fig_cedar_row_a_water_kgal_60m
+  Expected: 24 hourly kgal readings per day. The seven FIG formats carry the same day, so each must land the same 24 values; run them on separate days.
+- key: fig_cedar_row_water_siemens
+  installed: {runOn: , workflowRunId: }
+  Gateway: gw_fig_multi_format
+  Task: task_fig
+  Schedule: schedule_fig_multi_format
+  Format: SIEMANSREPORT
+  Parameters: {Format: SIEMANSREPORT}
+  Sample file needed: artifacts/demo-university-v1/fig/cedar-row-water.siemens.csv
+  Sample file exists: false
+  Points: ch_fig_cedar_row_a_water_kgal_60m
+  Expected: same 24 values as fig_cedar_row_water_fig.
+- key: fig_cedar_row_water_mediator
+  installed: {runOn: , workflowRunId: }
+  Gateway: gw_fig_multi_format
+  Task: task_fig
+  Schedule: schedule_fig_multi_format
+  Format: MEDIATOR
+  Parameters: {Format: MEDIATOR}
+  Sample file needed: artifacts/demo-university-v1/fig/cedar-row-water.mediator.csv
+  Sample file exists: false
+  Points: ch_fig_cedar_row_a_water_kgal_60m
+  Expected: same 24 values as fig_cedar_row_water_fig.
+- key: fig_cedar_row_water_eaton
+  installed: {runOn: , workflowRunId: }
+  Gateway: gw_fig_multi_format
+  Task: task_fig
+  Schedule: schedule_fig_multi_format
+  Format: EATON
+  Parameters: {Format: EATON}
+  Sample file needed: artifacts/demo-university-v1/fig/cedar-row-water.eaton.csv
+  Sample file exists: false
+  Points: ch_fig_cedar_row_a_water_kgal_60m
+  Expected: same 24 values as fig_cedar_row_water_fig.
+- key: fig_cedar_row_water_xml
+  installed: {runOn: , workflowRunId: }
+  Gateway: gw_fig_multi_format
+  Task: task_fig
+  Schedule: schedule_fig_multi_format
+  Format: XML
+  Parameters: {Format: XML}
+  Sample file needed: artifacts/demo-university-v1/fig/cedar-row-water.xml
+  Sample file exists: false
+  Points: ch_fig_cedar_row_a_water_kgal_60m
+  Expected: same 24 values as fig_cedar_row_water_fig.
+- key: fig_cedar_row_water_fixednetworks
+  installed: {runOn: , workflowRunId: }
+  Gateway: gw_fig_multi_format
+  Task: task_fig
+  Schedule: schedule_fig_multi_format
+  Format: FIXEDNETWORKS
+  Parameters: {Format: FIXEDNETWORKS}
+  Sample file needed: artifacts/demo-university-v1/fig/cedar-row-water.fixednetworks.xml
+  Sample file exists: false
+  Points: ch_fig_cedar_row_a_water_kgal_60m
+  Expected: same 24 values as fig_cedar_row_water_fig.
+- key: fig_cedar_row_water_cmep
+  installed: {runOn: , workflowRunId: }
+  Gateway: gw_fig_multi_format
+  Task: task_fig
+  Schedule: schedule_fig_multi_format
+  Format: CMEP
+  Parameters: {Format: CMEP}
+  Sample file needed: artifacts/demo-university-v1/fig/cedar-row-water.cmep.csv
+  Sample file exists: false
+  Points: ch_fig_cedar_row_a_water_kgal_60m
+  Expected: same 24 values as fig_cedar_row_water_fig.
+- key: modbus_chiller
+  installed: {runOn: , workflowRunId: }
+  Gateway: gw_modbus_thermal_plant
+  Task: task_modbus
+  Schedule: schedule_modbus_thermal_plant
+  Format: Modbus TCP register polling (live)
+  Sample file needed: none; needs a Modbus TCP server at 10.57.0.20:502 serving a float32 at register 40001
+  Sample file exists: false
+  Points: ch_modbus_ntp_chiller_kw_1m
+  Expected: one kW reading per poll at poll time, archived on the 1-minute interval.
+- key: odbc_library_historian
+  installed: {runOn: , workflowRunId: }
+  Gateway: gw_odbc_library_historian
+  Task: task_odbc
+  Schedule: schedule_odbc_library_historian
+  Format: ODBC query against a separate historian database
+  Sample file needed: none; needs the SyntheticIntervalReadings table in a historian database reachable through the SyntheticCustomerHistorian profile
+  Sample file exists: false
+  Points: ch_odbc_library_electric_kwh_30m
+  Expected: rows newer than the saved cursor only; a second run adds nothing when the source has not moved.
+- key: fake_smoke
+  installed: {runOn: , workflowRunId: }
+  Gateway: gw_fake_smoke
+  Task: task_fake
+  Schedule: schedule_fake_smoke
+  Format: EEM Fake gateway (generates its own data)
+  Sample file needed: none
+  Sample file exists: not applicable
+  Points: ch_fake_gateway_smoke_kwh_15m
+  Expected: 96 sinusoidal readings between 12 and 36 for 2024-01-01; excluded from every customer consumption total.
+- key: neptune_cedar_row_b_water
+  installed: {runOn: , workflowRunId: }
+  Gateway: gw_neptune_river_city_water
+  Task: task_neptune
+  Schedule: schedule_neptune_river_city_water
+  Format: Neptune handheld upload file
+  Sample file needed: artifacts/demo-university-v1/neptune/cedar-row-b-upload.txt (produced by reading the route exported in 05-handheld-routes.yaml)
+  Sample file exists: false
+  Points: ch_rcu_cedar_row_b_water_register (reading), ch_rcu_cedar_row_b_water_kgal_route (usage)
+  Expected: Run handheldAcceptance opening, normal, replay, zero-usage and database-previous cases. Verify both register and generated delta history, not only task success.
+- key: mvrs_student_center_gas
+  installed: {runOn: , workflowRunId: }
+  Gateway: gw_mvrs_sierra_gas
+  Task: task_mvrs
+  Schedule: schedule_mvrs_sierra_gas
+  Format: MVRS handheld upload file
+  Sample file needed: artifacts/demo-university-v1/mvrs/student-center-gas-upload.txt
+  Sample file exists: false
+  Points: ch_sgu_student_center_gas_register (reading), ch_sgu_student_center_therms_route (usage)
+  Expected: Run handheldAcceptance opening, normal, skipped, late-actual, replay and direct-demand cases. The built-in workflow publishes the resulting HMR log events.
+- key: fixed_network_submeters
+  installed: {runOn: , workflowRunId: }
+  Gateway: gw_fig_fixed_network_submeters
+  Task: task_fig
+  Schedule: schedule_fig_fixed_network_submeters
+  Format: FIXEDNETWORKS (fixed-network submeter export)
+  Sample file needed: artifacts/demo-university-v1/fig/cedar-row-submeters.fixednetworks.xml and artifacts/demo-university-v1/fig/campus-submeters.fixednetworks.xml
+  Sample file exists: false
+  Points: 124 apartment electric submeters (60 in Cedar Row A, 64 in Cedar Row B), the two house submeters, ch_lakeview_hall_laundry_kwh_60m, ch_parking_structure_ev_kwh_60m
+  Expected: 24 hourly kWh readings per point per day; the apartment submeters sum to less than the building's utility master meter.
+- key: neptune_cedar_row_submeters
+  installed: {runOn: , workflowRunId: }
+  Gateway: gw_neptune_cedar_row_submeters
+  Task: task_neptune
+  Schedule: schedule_neptune_cedar_row_submeters
+  Format: Neptune handheld upload file (apartment water route)
+  Sample file needed: artifacts/demo-university-v1/neptune/cedar-row-submeter-route.txt
+  Sample file exists: false
+  Points: 124 apartment water register and usage pairs plus the two house pairs (05-handheld-routes.yaml)
+  Expected: every register on the route receives one read; usage equals the read difference.
+# ---- The handheld routes added 2026-11-07 (05-handheld-routes.yaml); their cases are in handheldAcceptance ----
+- key: neptune_cedar_row_c
+  installed: {runOn: , workflowRunId: }
+  Gateway: gw_neptune_cedar_row_submeters
+  Task: task_neptune
+  Schedule: schedule_neptune_cedar_row_submeters
+  Format: Neptune handheld upload file (Cedar Row C, as its installer built the route)
+  Sample file needed: artifacts/demo-university-v1/neptune/cedar-row-c-route.txt
+  Sample file exists: false
+  Points: Cedar Row C's 50 water registers and their Deltas, ccf upstairs and gallons downstairs (05-handheld-routes.yaml)
+  Expected: Run handheldAcceptance cedar_row_c_round. The 48 meters on cycle 02's route file are read; unit 412 (cycle 20) and the disabled laundry meter are not.
+- key: neptune_irrigation
+  installed: {runOn: , workflowRunId: }
+  Gateway: gw_neptune_river_city_water
+  Task: task_neptune
+  Schedule: schedule_neptune_river_city_water
+  Format: Neptune handheld upload file (irrigation route, ccf)
+  Sample file needed: artifacts/demo-university-v1/neptune/irrigation-route.txt
+  Sample file exists: false
+  Points: the four irrigation registers and their Deltas, in ccf
+  Expected: Run handheldAcceptance irrigation_season_read.
+- key: mvrs_facilities_rounds
+  installed: {runOn: , workflowRunId: }
+  Gateway: gw_mvrs_sierra_gas
+  Task: task_mvrs
+  Schedule: schedule_mvrs_sierra_gas
+  Format: MVRS handheld upload file (routes CHECK, SWGR and GEN, one file per case)
+  Sample file needed: artifacts/demo-university-v1/mvrs/check-route.txt, switchgear-route.txt and generator-route.txt
+  Sample file exists: false
+  Points: the two check registers, the switchgear's six registers and four demand points, the generators' six registers
+  Expected: Run handheldAcceptance utility_check_constants, switchgear_round and generator_round. The built-in workflow publishes their HMR log events too.
+- key: hmr_events_publish
+  installed: {runOn: , workflowRunId: }
+  Gateway: gw_mvrs_sierra_gas
+  Task: task_mvrs
+  Schedule: schedule_mvrs_sierra_gas
+  Format: HMR reading events (JSON lines to the message broker)
+  Sample file needed: the MVRS gas upload used by mvrs_student_center_gas; the workflow produces and publishes the companion events file
+  Sample file exists: false
+  Points: no additional point bindings; the events describe the MVRS gas reads
+  Expected: The publisher may deliver again on replay. Verify no duplicate persisted HMR logs or interval rows for the same payload, rather than claiming the broker delivered exactly once.
+# ---- Ridgeline Wind cases (see the notes above): run each from the then-current database when its sample file or service exists. ----
+- key: ridgeline_scada_july_day
+  installed:
+    runOn:
+    workflowRunId:
+    observed: {readingsPerPoint: , readingsStored: , firstUTC: , lastUTC: , firstStoredLocal: , lastStoredLocal: , firstHourOnTimeInterval: }
+  Gateway: gw_fig_ridgeline_scada
+  Task: task_fig
+  Schedule: schedule_fig_ridgeline_scada
+  Format: FIG sentinel CSV, two files cut to one SCADA day
+  Sample file needed: artifacts/demo-university-v1/fig/ridgeline-scada-turbines.fig.csv (60 aliases) and artifacts/demo-university-v1/fig/ridgeline-met-mast.fig.csv (6 aliases), each holding the rows of 2024-07-15 on the SCADA clock   # assumed day; any July 2024 day does, change the dates in checks.sql to match
+  Sample file exists: false
+  Delivered to: C:\ProgramData\EEM Suite\NorthLake\Gateways\FIG-Ridgeline\Input\
+  Points: the 60 turbine points (kwh, kw, possible_kw, nacelle_wind_ms, rotor_rpm and state, each _10m, on ch_rwl_wtg01 through ch_rwl_wtg10) and the 6 met mast points (ch_rwl_met_wind_ms_10m, ch_rwl_met_wind_direction_10m, ch_rwl_met_air_temp_c_10m, ch_rwl_met_pressure_kpa_10m, ch_rwl_met_air_density_10m, ch_rwl_met_rh_10m)
+  Before the run: 'vendor_setup shows Channel, UOM, Multiplier and OffsetTimeMinutes on the FIG Gateway vendor; ridgeline_nodes_bound shows the 60 and 6 points still on Pacific, TimeZoneID 33, as Stage 2 left them; the task parameter Timestamp Type is utc and each point carries OffsetTimeMinutes 480.'
+  Expected:
+    Readings per point: 144
+    Readings stored: 9504 (66 points x 144; 8064 in AnalogArchive_TBL and the 1440 Turbine State rows in DigitalArchive_TBL)
+    First interval UTC: 2024-07-15 08:10   # each row is stamped at the end of its ten minutes (data/providers/ridgeline-wind.yaml), the stamp EEM's rate engine, Bill Generation and interval reports read
+    Last interval UTC: 2024-07-16 08:00
+    UTC rule: the SCADA clock is UTC-08:00 all year, so its 00:00 is 08:00 UTC even in July, when the Pacific civil clock reads 01:00; the day's rows are stamped 00:10 through the next day's 00:00
+    Task log: FIGGateway collected 9504 FIG reading(s) from 2 claimed file(s), with no unknown-alias warning (a mistyped alias among the 66 shows there; the log is a cross-check, not acceptance)
+    Stored local stamps: 'the right Pacific civil time, 2024-07-15 01:10 through 2024-07-16 01:00 (daylight time, UTC-07:00), because EEM converts the UTC into the point''s Pacific zone. This is what verifies the UTC-plus-offset workaround (PRODUCT FINDING 49); predicted from the converter code, assumed until observed. Read AnalogArchive_TBL.LocalTimeStamp (checks.sql ridgeline_scada_day) and record it.'
+    Time Interval, results by hour: 'Use point timestamp off (hours cut from UTC in the signed-in user''s own zone) and on (hours cut from the stored local stamps) agree for a Pacific user: the SCADA day starts at 01:00 daylight time and each hour counts 6 intervals, because the report counts a stamp in the hour it ends (wh_GetIntervalData.sql:155-156); record the first hour shown. Predicted from rp_TimeInterval and wh_GetIntervalData, to confirm on screen.'
+    Wrong-setting signatures: 'UTC starting 15:10 (15:10 through 15:00) means Timestamp Type was left at local, so the shifted stamp was read as Pacific wall-clock time; UTC starting 07:10 means local with the offset left out, an hour early while Pacific is on daylight time; UTC starting 00:10 means the offset was left out under utc. Restore and run again rather than running over the wrong rows: the archive key is (PtID, UTCTimeStamp), so a corrected run overwrites only the rows whose UTC it shares.'
+    January control: 'optional, any January day (assumed 2025-01-15): the same UTC rule (08:10 through 08:00) and stored local stamps of 00:10 through the next day''s 00:00, the SCADA''s own, because Pacific is on standard time and the two clocks agree.'
+    Full history start: 'when the 2024-2025 SCADA history is loaded, its first row is stamped 2024-06-30 23:10 on the SCADA clock (the ten minutes from 23:00, Pacific midnight on July 1), not the SCADA''s own 2024-07-01 00:10, and its last row is stamped 2026-01-01 00:00 (the ten minutes ending at midnight on December 31, when the clocks agree). Stage 7 generates the transfer statement on Pacific civil months and asks for every interval (Available % 100), so July 2024 needs all 4,464 intervals per point, the stamps after 2024-07-01 00:00 Pacific up to and including 2024-08-01 00:00; a history starting on the SCADA''s own July 1 would leave July''s first hour empty and July would not generate. With the stamps at interval ends, that history is exactly July 2024 to December 2025, with no extra row at either end.'
+  Check: ridgeline_scada_day, ridgeline_scada_day_short_points, ridgeline_nodes_bound, task_runs
+- key: ridgeline_wtg07_outage
+  installed:
+    runOn:
+    workflowRunId:
+    observed: {readingsPerPoint: , daysCovered: , stateValues: , generatedKWhSum: , possibleKWSum: }
+  Gateway: gw_fig_ridgeline_scada
+  Task: task_fig
+  Schedule: schedule_fig_ridgeline_scada
+  Format: FIG sentinel CSV, the turbine file over the outage
+  Sample file needed: artifacts/demo-university-v1/fig/ridgeline-scada-turbines.fig.csv holding 2025-02-11 through 2025-04-22 on the SCADA clock (the file carries all ten turbines, so WTG-06 is the control; deliver it in as many files as the generator cuts)
+  Sample file exists: false
+  Delivered to: C:\ProgramData\EEM Suite\NorthLake\Gateways\FIG-Ridgeline\Input\
+  Points: ch_rwl_wtg07_kwh_10m, ch_rwl_wtg07_kw_10m, ch_rwl_wtg07_possible_kw_10m and ch_rwl_wtg07_state_10m, with the same four on ch_rwl_wtg06 as the control; WTG-07's nacelle wind and rotor speed load too, and the scenario does not constrain them
+  Expected:
+    Window: the stamps after UTC 2025-02-11 08:00 up to and including 2025-04-23 08:00, which is 71 SCADA days   # assumed: both end days are outage days in the file
+    Readings per point: 10224 (71 x 144) on every WTG-07 point and the same on WTG-06; nothing is missing or skipped, because a fault is lost production, not missing data
+    Turbine State: 2 (Fault) on every WTG-07 row in the window   # assumed: the generator marks whole days
+    Generated kWh and Active Power kW: 0 on every WTG-07 row, so the sum and the maximum are both 0 and the zeros are stored rows
+    Possible kW: stored on every WTG-07 row and not all zero, because the controller keeps reporting what the wind would have given
+    Not a gap: a gap is an absent row, which a Required aggregate member would turn into a missing interval; zeros and state 2 are present rows, and the farm aggregates (ridgeline_aggregates, pointed at a day inside the window) keep all 144 intervals
+    Spring forward: 'the window crosses 2025-03-09, when Pacific time moves forward. With Timestamp Type utc nothing is lost, because UTC always converts into Pacific. With the default local the nonexistent Pacific hour would drop 6 rows from every point (10218 readings), a further signature of the wrong setting.'
+  Check: ridgeline_wtg07_outage, task_runs
+- key: noaa_ksuu_wind_knots
+  installed:
+    runOn:
+    workflowRunId:
+    observed: {sourceWindKt: , storedValue: , storedUnit: , mastHubHeightMs: }
+  Gateway: gw_noaa_ksac_observations
+  Task: task_noaa
+  Schedule: schedule_noaa_ksac
+  Format: NWS observations and hourly forecasts, separate Observation and Forecast nodes for KSUU
+  Sample file needed: none; NWS public KSUU station observations. Compare with the met mast only where both have data for the same hour.
+  Sample file exists: false
+  Points: ch_weather_ksuu_temp_c_hourly, ch_weather_ksuu_rh_hourly, ch_weather_ksuu_wind_knots_hourly, ch_weather_ksuu_dewpoint_c_hourly, ch_weather_ksuu_forecast_temp_c_hourly, ch_weather_ksuu_forecast_dewpoint_c_hourly, ch_weather_ksuu_forecast_rh_hourly, ch_weather_ksuu_forecast_wind_knots_hourly, ch_weather_ksuu_forecast_wind_direction_hourly, ch_weather_ksuu_forecast_precip_probability_hourly
+  Expected:
+    Per run: latest valid observation independently per metric and hourly interval, like noaa_ksac; each forecast measurement uses its own separate hourly point
+    Wind in knots: convert the valid NWS wind value from its declared source unit to explicit Knots. Keep a valid zero and leave missing or rejected measurements missing.
+    Against the met mast: 'order of magnitude only. The mast''s Hub-Height Wind Speed 10m for the same hour, in m/s times 1.943844, lands in the same range as the KSUU knots figure; an airport anemometer and a hub-height mast stand in different places at different heights, so this catches a gross unit error, not a small one (checks.sql ksuu_wind_knots shows both side by side).'
+    Temperature and dew point: degrees Celsius; forecast temperature also uses Celsius
+    Direction: forecast only, degrees clockwise from north; variable or missing direction remains missing
+  Check: ksuu_wind_knots, task_runs
+  Forecast units: Temperature = Celsius, Dew Point = Celsius, Relative Humidity = Percent, Wind Speed = Knots, Wind Direction = Degrees, Precipitation Probability = Percent
+  Forecast validation:
+  - Compare all six forecast points with the same NWS hourly periods using period end timestamps.
+  - Keep valid zero wind speed and zero precipitation probability; leave missing/rejected values missing independently per measurement.
+  - Direction is degrees clockwise from north. Do not turn variable/unknown direction into zero.
+  - Confirm all four observation/forecast associations for this station through 06-weather-associations-check.sql; direction and precipitation probability forecasts remain independent.
+- key: mdef_ridgeline_interconnection
+  installed: {runOn: , workflowRunId: }
+  Gateway: gw_mv90_valley_mdef
+  Task: task_mv90
+  Schedule: schedule_mv90_valley_mdef
+  Format: MV90 MDEF (binary .mde), recorder VEDRIDGE01
+  Sample file needed: artifacts/demo-university-v1/mv90/RIDGELINE_VED_202407.mde and RIDGELINE_VED_202408.mde, then RIDGELINE_VED_202501.mde and RIDGELINE_VED_202502.mde (one file per recorder month for VEDRIDGE01; the first bill period runs into August and the winter one into February)   # assumed names, following SCIENCE_VED_202401.mde
+  Sample file exists: false
+  Points: ch_ved_ridgeline_received_kwh_15m (channel 1), ch_ved_ridgeline_delivered_kwh_15m (channel 2), ch_ved_ridgeline_kvarh_15m (channel 3)
+  Expected:
+    Per day: 96 intervals per point, with local timestamps like the other MDEF recorders (node TimeStampType local, point zone Pacific), the first stamped 2024-07-01 00:15, the day the meter opens; the MDEF gateway stamps each reading at the end of its fifteen minutes (MdefFileParser takes the record's start minute, 01, adds the interval and subtracts one), so a day is 00:15 through the next day's 00:00
+    Daylight-saving days inside Ridgeline's window: 2024-11-03 and 2025-11-02 need 100 intervals, and 2025-03-09 needs 92
+    Valley Electric periods: cycle 1 reads on the 5th, so a Valley Electric bill runs from the 5th to the 4th and not a calendar month; the sums below are over Pacific local days, first and last day included (data/bills/northlake-itemized-bills-v1.yaml)
+    First generator bill: 'ved_ridgeline_generator_2024_07 covers 2024-07-01 to 2024-08-04 (35 days, 3360 readings per point) with Exported kWh (channel 1) 2496612, Station Service kWh (channel 2) 4428 and Reactive kVArh (channel 3) 858948.'
+    Winter generator bill: 'ved_ridgeline_generator_2025_01 covers 2025-01-05 to 2025-02-04 (31 days, 2976 readings per point) with 418836, 46920 and 131664.'
+    Calendar July 2024: 'over the 31 days (2976 readings) channel 1 sums to 2208612 and channel 2 to 3876, a net of 2204736 kWh; the export is the substation figure the hand-made transfer statement sets against the turbine pads'' 2251384 (collection losses 1.9%). The 2024-08-01 to 2024-08-04 remainder of the first bill is therefore 288000 kWh of export and 552 kWh of station service. There is no calendar-month figure for channel 3.'
+    Channels on their own points: export far exceeds station service in both bills, so a swap of channels 1 and 2 shows at once
+    Multiplier: the generated file carries the billed (primary-side) values, so the sums need no scaling by the meter's 12000   # assumed; the generator and the first run settle it
+  Check: ridgeline_mdef_channels, task_runs
+- key: ridgeline_aggregates
+  installed:
+    runOn:
+    observed: {registered: , farmGeneratedRows: , farmActiveKwRows: , farmPossibleKwRows: , netExportRows: , recalculate: }
+  Gateway: gw_fig_ridgeline_scada and gw_mv90_valley_mdef (the members arrive through both)
+  Task: none in 03-workflows-and-tasks.yaml; Recalculate on the Aggregates workspace (Database Administrator) over the loaded range
+  Sample file needed: none of its own; it reads what ridgeline_scada_july_day, ridgeline_wtg07_outage and mdef_ridgeline_interconnection stored
+  Sample file exists: not applicable
+  Points: agg_ntp_ridgeline_generated_kwh_10m (Ridgeline Farm Generated kWh 10m), agg_ntp_ridgeline_active_kw_10m (Ridgeline Farm Active Power kW 10m), agg_ntp_ridgeline_possible_kw_10m (Ridgeline Farm Possible Power kW 10m) and agg_ntp_ridgeline_net_export_kwh_15m (Ridgeline Net Export kWh 15m); members as in implementation/stage-2-hierarchy/06-aggregates.yaml
+  Expected:
+    Registered: 'each of the four has its PointAggregates_TBL row (checks.sql ridgeline_aggregates shows Registered 1). PRODUCT FINDING 14 blocks this first: Database Administrator writes the members but not that row, so Recalculate fails with error 51081 until the product writes it. Record the case as blocked, not worked around.'
+    Time zone: the four aggregates and all their members are on Pacific, as the Aggregates workspace needs (its Add Points drawer offers only points in the aggregate's own zone), so Stage 2 enters them with no special zone
+    Farm Generated kWh 10m: 144 readings for the SCADA day, each the sum of the ten turbines' Generated kWh 10m at that interval (multiplier 1 on every member)
+    Farm Active Power kW 10m: 144 readings, each the sum of the ten turbines' Active Power kW at that interval (coincident power; read the day's maximum, never sum it across time)
+    Farm Possible Power kW 10m: 144 readings, each the sum of the ten turbines' Possible kW, WTG-07's included
+    Ridgeline Net Export kWh 15m: 96 readings for the Pacific day of the MDEF file, each Exported kWh minus Station Service kWh at that interval (multipliers 1 and -1)
+    Required members: every member is Required, so an interval missing from any member leaves no aggregate row; through the WTG-07 outage the farm aggregates keep all 144 rows a day, because WTG-07's zero rows are present, so Farm Generated kWh is the nine running turbines plus zero and Farm Possible Power still counts WTG-07
+    Period tie-out: 'once the full files are loaded (checks.sql ridgeline_period_totals), cut on Pacific days, the points'' stored local time, the stamps after the first midnight up to and including the last. Farm Generated kWh 10m over Pacific July sums to 2251384, the ten turbine figures of the hand-made July transfer statement (238412, 233905, 229768, 226341, 224087, 225530, 222196, 219874, 217402, 213869), because the statement slices on Pacific civil months and Bill Generation cuts the month the same way (Stage 7); Farm Possible Power kW 10m summed and divided by 6 gives the statement''s 2327960 kWh of possible energy; Ridgeline Net Export is the export less the station service of the same days, 2208612 minus 3876, 2204736 kWh, for Pacific July, 2496612 minus 4428, 2492184 kWh, for the first generator bill 2024-07-01 to 2024-08-04, and 418836 minus 46920, 371916 kWh, for the winter bill 2025-01-05 to 2025-02-04.'   # assumed: the generator builds the files to the statement and the generator bills
+  Check: ridgeline_aggregates, ridgeline_period_totals
+
+# HMR exercises run on the live database: Stage 3 takes no restore point (decided 2026-11-05). The three cases that
+# change settings temporarily (direct_demand, multiplier, rollover) wait until a backup exists to restore afterward.
+# Numbers below are deliberately small synthetic probes, not billing/source-model history.
+handheldAcceptance:
+  status: Specified; uploads still need generating from the saved Northlake meter IDs.
+  Environment: implementation/stage-3-gateways-and-data/handheld-test-environment.md
+  First simulator slice: Two-route workflow from the environment design; preserve the dependencies and chronology when selecting cases below.
+  Pilot: The two-route pilot for the first simulator proof needs no checkpoint; its readings stay in the two masters' history.
+  Retained history: Blocked on the separate raw-unit, precision, gas-conversion and conserved-water gate in the environment design.
+  restorePolicy: 'No restore. The main sequence runs on the live database, and its probe readings (February to
+    June 2024 on the two masters, February 2024 on the 126 submeters) stay in their history after the Step 5
+    starting readings, as do the new routes'' (February 2024 on CHECK, SWGR and GEN, May 2024 on IRRIG, October 2025
+    on Cedar Row C). Keep schedules disabled except for the run being exercised. Do not mix these synthetic
+    register values with the continuous source service or use them for bill reconciliation; if that history is
+    later loaded from the source model, remove or replace the probe values and starting readings first.'
+  prerequisites:
+  - All permanent Step 5 configuration checks pass, and the three handheld schedules are saved disabled.
+  - Capture physical MeterID, reading PtID, delta PtID, HMR_MeterID and HMR_ReadingID from checks.sql.
+  - 'Generate actual Neptune and MVRS fixed-width uploads using those physical meter IDs and exact
+    Text Prompts. Exported routes are outbound configuration, not ready-made inbound sample files.'
+  - 'The Step 5 starting readings are the seed: every register holds a dated value on 2024-01-01 (the masters
+    12000 kgal and 1000 therms), Cedar Row C''s on 2025-09-01, and no usage. Demand reads have none. Selecting a
+    Read Type is not a seed.'
+  - 'A case''s Readings list one register each: Meter is the physical meter number, Prompt the register''s prompt,
+    and Previous register its Step 5 starting reading. Multiplier is the register''s Meter Constant, which the
+    exported route file carries and the returned file repeats. A demand read has Value instead: stored as read.'
+  - 'Use saved-schedule Run now. Change parameters with a per-run override or temporary disabled
+    schedule on the same reusable task; restore those overrides before leaving the exercise.'
+  - 'For each file record task/run ID, file hash, parameter values, archive/error location, register and
+    usage values/timestamps, and applicable HMR log rows. Wait for ingestion and event persistence.'
+  - 'Exercise the collector plus IntervalBatchCalculator: HMR MeterConstant and PointDef.DeltaMultiplier
+    are separate calculation paths to the usage point. Confirm the opening result, order, chunks and
+    replay agree; collector JSONL alone is not proof that the stored usage matches.'
+  mainSequence:
+  - opening
+  - route_export
+  - normal
+  - replay
+  - zero_usage
+  - database_previous
+  - skipped
+  - late_actual
+  - submeter_batch
+  # The five cases for the routes added 2026-11-07 need only Step 5's starting readings, so they are independent too.
+  independentCases: [direct_demand, multiplier, rollover, invalid_input, configuration_validation,
+                     utility_check_constants, switchgear_round, generator_round, irrigation_season_read, cedar_row_c_round]
+  deferredUntilBackup: [direct_demand, multiplier, rollover]
+  cases:
+  - key: opening
+    Action: No upload. Check the starting readings Step 5 entered on the two masters.
+    Local timestamp: '2024-01-01T00:00:00'
+    Expected UTC timestamp: '2024-01-01T08:00:00Z'
+    Water: {Register: 12000}
+    Gas: {Register: 1000}
+    Verify: Each master's Register Reading holds its starting reading at that time as its first archive row, and its Register Reading Delta has no value at that time.
+  - key: route_export
+    Requires: opening
+    Action: 'Use Handheld Meter Reading Export; save the complete file and compare all 203 exported registers
+      with Step 5 (204 configured, less the disabled Cedar Row C laundry meter). Verify each register''s starting
+      reading appears as its previous reading; the grid filter must not be treated as a download filter. Inspect
+      output record lengths and route/channel fields, the switchgear''s ten readings on one meter record (demand
+      reads first) and the two-digit channel 10.'
+    Expected: 191 enabled meters on ten routes and six cycles (01 to 05, and Cedar Row C unit 412 alone on cycle 20); no cycle 99; no truncation or point-node IDs substituted for meter IDs.
+  - key: normal
+    Schedules: [schedule_neptune_river_city_water, schedule_mvrs_sierra_gas]
+    Parameters: {UseSqlValues: false}
+    Local timestamp: '2024-02-01T00:00:00'
+    Expected UTC timestamp: '2024-02-01T08:00:00Z'
+    Water: {Previous register: 12000, Current register: 12100, Multiplier: 1, Expected usage: 100}
+    Gas: {Previous register: 1000, Current register: 1153, Multiplier: 1, Expected usage: 153}
+    MVRS fields: {Read Code: N, Skip Code: '00', Audit Code: '0', Meter Reader: NLTEST01}
+    Verify: Exact register and usage values in point history; MVRS Reading log; successful publication before the input is archived.
+  - key: replay
+    Requires: normal
+    Action: Repeat the exact normal uploads with the same parameters immediately after normal has fully persisted.
+    Expected: 'No additional archive rows at the same point/timestamp and no duplicate matching
+      HMR log rows. Do not assert that the collector or broker performs no work on a replay.'
+  - key: zero_usage
+    Schedules: [schedule_neptune_river_city_water, schedule_mvrs_sierra_gas]
+    Parameters: {UseSqlValues: false}
+    Local timestamp: '2024-03-01T00:00:00'
+    Expected UTC timestamp: '2024-03-01T08:00:00Z'
+    Water: {Previous register: 12100, Current register: 12100, Multiplier: 1, Expected usage: 0}
+    Gas: {Previous register: 1153, Current register: 1153, Multiplier: 1, Expected usage: 0}
+    Verify: A real zero-usage interval exists; it is not represented as a missing read.
+  - key: database_previous
+    Requires: zero_usage
+    Schedules: [schedule_neptune_river_city_water, schedule_mvrs_sierra_gas]
+    Parameters: {UseSqlValues: true}
+    Local timestamp: '2024-04-01T00:00:00'
+    Expected UTC timestamp: '2024-04-01T07:00:00Z'
+    Water: {File previous register: 0, Database previous register: 12100, Current register: 12225, Expected usage: 125}
+    Gas: {File previous register: 0, Database previous register: 1153, Current register: 1200, Expected usage: 47}
+    Verify: 'The new run uses the persisted register instead of the deliberate zero in the file.
+      Inspect the current runtime value before running. Restore UseSqlValues=false afterward.'
+  - key: skipped
+    Schedule: schedule_mvrs_sierra_gas
+    Parameters: {UseSqlValues: false}
+    Local timestamp: '2024-05-01T00:00:00'
+    MVRS fields: {Read Code: S, Skip Code: '01', Audit Code: '0', Meter Reader: NLTEST01}
+    Previous register: 1200
+    Current register: 1200
+    Expected: 'A Skip Code log with code 01 and the correct meter/date; no register or usage
+      observation at that timestamp. No automatic estimated consumption is expected.'
+  - key: late_actual
+    Schedule: schedule_mvrs_sierra_gas
+    Parameters: {UseSqlValues: false}
+    Local timestamp: '2024-06-01T00:00:00'
+    MVRS fields: {Read Code: C, Skip Code: '00', Audit Code: '1', Meter Reader: NLTEST01}
+    Previous register: 1200
+    Current register: 1267
+    Expected usage: 67
+    Trouble text: Prior visit inaccessible
+    Note encoding: Emit MVRS MTM after the applicable RDG so reader/date context is established; do not use MTS for a visit note.
+    Expected: 'Register 1267 and usage 67 across the elapsed read period, with Reading, Read Code,
+      Audit Code and Meter Trouble Text evidence. The skipped May timestamp stays
+      unfilled; the importer does not distribute consumption or run the Massport estimate workflow.'
+  - key: submeter_batch
+    Schedule: schedule_neptune_cedar_row_submeters
+    Parameters: {UseSqlValues: false}
+    Local timestamp: '2024-02-01T00:00:00'
+    Reading pairs: 126
+    Previous register rule: the register's Step 5 starting reading, the Starting Reading column of 05-handheld-meters.csv (1010 to 1610 on CRAWTR, 1620 to 2260 on CRBWTR).
+    Current register rule: previous register + 5
+    Expected: All 126 apartment/house registers receive the correct reading and each generated delta receives 5 kgal; include both houses and each floor's first/last unit.
+  - key: direct_demand
+    Schedule: schedule_mvrs_sierra_gas
+    Parameters: {UseSqlValues: false}
+    Setup: 'Deferred until a backup exists to restore afterward: its synthetic demand reading would
+      otherwise stay in the AcquiSuite Demand kW 15m point''s history. On that restore, create the
+      temporary directDemand assignment from Step 5 through the app. It uses the existing Demand kW 15m
+      point and leaves Reading Point empty. No AcquiSuite run may occur in this exercise. Restore again
+      afterward.'
+    Local timestamp: '2024-02-01T00:00:00'
+    Raw current value: 12345
+    File decimals: 2
+    File multiplier: 1
+    Text Prompt: KW
+    Expected demand kW: 123.45
+    Expected: One direct demand observation; no register observation or previous-reading subtraction. Use a maximum when summarizing demand.
+  - key: multiplier
+    Schedule: schedule_mvrs_sierra_gas
+    Setup: 'Deferred until a backup exists to restore afterward. On that restore, temporarily align the HMR
+      MeterConstant and the register point DeltaMultiplier to 2 through the app, and restore again afterward;
+      neither permanent setting changes.'
+    Parameters: {UseSqlValues: false}
+    Previous register: 1000
+    Current register: 1100
+    File multiplier: 2
+    Expected usage: 200
+    Expected: The file multiplier is used in file-value mode; restore after collecting evidence.
+  - key: rollover
+    Schedule: schedule_mvrs_sierra_gas
+    Setup: Deferred until a backup exists to restore afterward; on that restore use the six-digit gas read type, then restore again after evidence.
+    Parameters: {UseSqlValues: false}
+    Previous register: 999990
+    Current register: 5
+    File multiplier: 1
+    Expected usage: 15
+    Expected: 'The ordinary rollover branch produces 15 therms. This does not prove meter replacement
+      or reset support; those events need an explicit opening-read/history policy.'
+  - key: invalid_input
+    Schedules: [schedule_neptune_river_city_water, schedule_mvrs_sierra_gas]
+    Setup: No restore needed, since rejected input writes nothing. Use separate files for each failure so valid records cannot obscure the result.
+    Cases:
+    - Unknown physical meter ID produces no new observations; retain the unmatched-meter warning.
+    - Known meter plus unknown Text Prompt produces no new observations; retain the warning.
+    - Malformed fixed-width record is reported as a parse error; verify Error retention and no unintended point writes.
+    Expected: Evidence identifies the rejected input and affected meter; task completion alone is not acceptance.
+  - key: configuration_validation
+    Setup: Exercise on a temporary app entry and cancel or remove it before moving on.
+    Cases:
+    - Duplicate Text Prompt on the same meter is rejected without changing the existing mapping.
+    - A missing Channel or consumption/demand point is rejected.
+    - Using the same point for register and usage is rejected.
+    - Demand read type leaves Reading Point empty.
+    Expected: Saved valid assignments remain intact after failed saves and after reopen.
+  # ---- The routes added 2026-11-07 ----
+  - key: utility_check_constants
+    Route: 01/CHECK
+    Schedule: schedule_mvrs_sierra_gas
+    Parameters: {UseSqlValues: false}
+    Local timestamp: '2024-02-01T00:00:00'
+    Expected UTC timestamp: '2024-02-01T08:00:00Z'
+    Readings:
+    - {Meter: SYN-VED-M-0040007, Prompt: KWH, Previous register: 48210, Current register: 48585, Multiplier: 40, Expected usage: 15000}
+    - {Meter: SYN-SGU-M-0050010, Prompt: CCF, Previous register: 15320, Current register: 16120, Multiplier: 3.0367, Expected usage: 2429.36}
+    Verify: 'Each register stores the raw dial (48585 and 16120) and each Delta the multiplied usage: 15,000 kWh
+      on the lab wing (375 x 40, its CT ratio) and 2,429.36 ccf on the boiler gas (800 x 3.0367, its pressure
+      factor). The register points keep Delta Multiplier 1, so this is the import''s constant at work. If a Delta
+      holds 375 or 800, the interval calculator''s own difference won over the import: record that as a product
+      finding and do not change the point.'
+  - key: switchgear_round
+    Route: 03/SWGR
+    Schedule: schedule_mvrs_sierra_gas
+    Parameters: {UseSqlValues: false}
+    Local timestamp: '2024-02-01T00:00:00'
+    Expected UTC timestamp: '2024-02-01T08:00:00Z'
+    Readings:
+    - {Meter: SYN-SUB-E-CPSWGR, Prompt: KWH, Previous register: 412600, Current register: 473600, Multiplier: 1, Expected usage: 61000}
+    - {Meter: SYN-SUB-E-CPSWGR, Prompt: KWHP, Previous register: 98400, Current register: 112400, Multiplier: 1, Expected usage: 14000}
+    - {Meter: SYN-SUB-E-CPSWGR, Prompt: KWHM, Previous register: 121700, Current register: 140200, Multiplier: 1, Expected usage: 18500}
+    - {Meter: SYN-SUB-E-CPSWGR, Prompt: KWHO, Previous register: 192500, Current register: 221000, Multiplier: 1, Expected usage: 28500}
+    - {Meter: SYN-SUB-E-CPSWGR, Prompt: KVRH, Previous register: 187300, Current register: 214500, Multiplier: 1, Expected usage: 27200}
+    - {Meter: SYN-SUB-E-CPSWGR, Prompt: KVAH, Previous register: 453900, Current register: 520700, Multiplier: 1, Expected usage: 66800}
+    - {Meter: SYN-SUB-E-CPSWGR, Prompt: KW, Value: 1187.40, File decimals: 2}
+    - {Meter: SYN-SUB-E-CPSWGR, Prompt: KWP, Value: 1172.15, File decimals: 2}
+    - {Meter: SYN-SUB-E-CPSWGR, Prompt: KVA, Value: 1304.80, File decimals: 2}
+    - {Meter: SYN-SUB-E-CPSWGR, Prompt: PF, Value: 0.91, File decimals: 2}
+    Verify: 'Ten observations from one meter record: six Deltas (61,000, 14,000, 18,500, 28,500, 27,200 and 66,800)
+      beside their registers, and four values stored as read on the Analog points, with no register row and no
+      previous-reading subtraction. The readings agree with each other, which is the point of keying them all:
+      on-peak + mid-peak + off-peak = total (61,000 kWh); kWh / kVAh = 0.913, the power factor read (0.91); kW / PF
+      = 1,304.8, the kVA read. Summarize the demand points with a maximum, not a sum.'
+  - key: generator_round
+    Route: 05/GEN
+    Schedule: schedule_mvrs_sierra_gas
+    Parameters: {UseSqlValues: false}
+    Local timestamp: '2024-02-01T00:00:00'
+    Expected UTC timestamp: '2024-02-01T08:00:00Z'
+    Readings:
+    - {Meter: SYN-GEN-LIB01, Prompt: RUN, Previous register: 1186, Current register: 1189, Multiplier: 1, Expected usage: 3}
+    - {Meter: SYN-GEN-LIB01, Prompt: FUEL, Previous register: 23840, Current register: 23858, Multiplier: 1, Expected usage: 18}
+    - {Meter: SYN-GEN-SCI01, Prompt: RUN, Previous register: 942, Current register: 945, Multiplier: 1, Expected usage: 3}
+    - {Meter: SYN-GEN-SCI01, Prompt: FUEL, Previous register: 17410, Current register: 17427, Multiplier: 1, Expected usage: 17}
+    - {Meter: SYN-GEN-CP01, Prompt: RUN, Previous register: 2731, Current register: 2735, Multiplier: 1, Expected usage: 4}
+    - {Meter: SYN-GEN-CP01, Prompt: FUEL, Previous register: 61250, Current register: 61274, Multiplier: 1, Expected usage: 24}
+    Verify: 'Each generator''s two readings land on their own registers by prompt: run hours in Hour, fuel in Fuel
+      Oil #2 gallons. The prompt is the only thing that tells the two registers of one meter apart, so a file with
+      RUN and FUEL swapped would store each value on the other register without an error; check the units on the
+      Deltas, not only that the task succeeded.'
+  - key: irrigation_season_read
+    Route: 04/IRRIG
+    Schedule: schedule_neptune_river_city_water
+    Parameters: {UseSqlValues: false}
+    Local timestamp: '2024-05-01T00:00:00'
+    Expected UTC timestamp: '2024-05-01T07:00:00Z'
+    Readings:
+    - {Meter: SYN-RCU-M-0060009, Prompt: CCF, Previous register: 3100, Current register: 3142, Multiplier: 1, Expected usage: 42}
+    - {Meter: SYN-RCU-M-0060010, Prompt: CCF, Previous register: 4500, Current register: 4565, Multiplier: 1, Expected usage: 65}
+    - {Meter: SYN-RCU-M-0060011, Prompt: CCF, Previous register: 5900, Current register: 6020, Multiplier: 1, Expected usage: 120}
+    - {Meter: SYN-RCU-M-0060018, Prompt: CCF, Previous register: 7300, Current register: 7318, Multiplier: 1, Expected usage: 18}
+    Verify: 'The season''s first read covers January 1 to May 1: one Delta per meter in ccf (42, 65, 120 and 18).
+      The route is read April to October, so the missing winter reads are not gaps to fill or flag.'
+  - key: cedar_row_c_round
+    Route: 02/CRCWTR as built
+    Schedule: schedule_neptune_cedar_row_submeters
+    Parameters: {UseSqlValues: false}
+    Local timestamp: '2025-10-01T00:00:00'
+    Expected UTC timestamp: '2025-10-01T07:00:00Z'
+    Reading pairs: 48
+    Previous register rule: the register's Step 5 starting reading of 2025-09-01 (05-handheld-starting-readings-2025-09-01.txt).
+    Current register rule: previous + 3 on a CCF register, previous + 2200 on a GAL register, previous + 5400 on the house meter.
+    Increments: {CCF: 3, GAL: 2200, SYN-SUB-W-CH: 5400}
+    Not read: [SYN-SUB-W-C412, SYN-SUB-W-CL]
+    Verify: 'The reader read what the cycle 02 route file carried: 48 meters. 23 CCF Deltas of 3 ccf, 24 GAL Deltas
+      of 2,200 gal and the house''s 5,400 gal, each in its own unit. Unit 412 (cycle 20) and the laundry meter
+      (disabled) keep only their starting readings: that is the installer''s route showing up in the data, and the
+      Stage 12 fix starts from it. A report that sums Cedar Row C in kgal reads 109.82 (69 ccf = 51.62 kgal, plus
+      58.2 kgal) only if the unit system converts both units; record what it shows.'
+  excludedCustomerExtensions:
+  - 'Massport skipped-read candidate generation, estimate approval, LOTO and its custom correction
+    screens are customer-specific. Northlake records and displays skips now; an estimate/approval
+    workflow would be a separate requirement.'
+  - Real handheld hardware/radio provisioning; this pack tests the supported file exchange and keyed formats.
+  - 'Hourly gap expectations on manually read monthly channels. Keep the existing disabled Next Batch
+    Method; inspect the missing skipped timestamp without treating the route as an hourly sensor.'

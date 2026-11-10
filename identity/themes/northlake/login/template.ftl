@@ -45,7 +45,7 @@
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
     <meta name="color-scheme" content="light${darkMode?then(' dark', '')}">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#1F3A5F">
+    <meta name="theme-color" content="#14263F">
     <meta name="robots" content="noindex, nofollow">
 
     <#if properties.meta?has_content>
@@ -172,9 +172,9 @@
   <header class="nl-masthead">
     <div class="nl-masthead__inner">
       <a class="nl-lockup" href="${properties.kcLogoLink!'/'}">
-        <img class="nl-lockup__image" src="${url.resourcesPath}/branding/northlake-logo-reversed.svg" alt="Northlake University" width="237" height="64">
+        <img class="nl-lockup__image" src="${url.resourcesPath}/brands/northlake/logo.svg" alt="Northlake University" width="238" height="64">
       </a>
-      <p class="nl-masthead__service"><#if realm.displayName?has_content>${realm.displayName}<#else>${msg("nl.singleSignOn")}</#if></p>
+      <p class="nl-masthead__service">${msg("nl.itServices")}</p>
     </div>
   </header>
 
@@ -326,7 +326,7 @@
 
   <footer class="nl-page-footer">
     <div class="nl-page-footer__inner">
-      <p class="nl-page-footer__legal">&copy; ${.now?string("yyyy")} Northlake University &middot; ${msg("nl.footerNote")}</p>
+      <p class="nl-page-footer__legal">&copy; ${.now?string("yyyy")} Northlake University &middot; <#if realm.displayName?has_content>${realm.displayName}<#else>${msg("nl.singleSignOn")}</#if> &middot; ${msg("nl.footerNote")}</p>
       <a class="nl-page-footer__link" href="${properties.kcLogoLink!'/'}">${msg("nl.backToNorthlake")}</a>
     </div>
   </footer>

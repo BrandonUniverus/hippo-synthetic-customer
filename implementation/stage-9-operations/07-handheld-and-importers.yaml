@@ -1,0 +1,100 @@
+# Stage 9, step 7: operate the HMR configuration established in Stage 3, then exercise generic imports.
+stage: 9
+step: 7
+title: Handheld reading operations and importers
+app: Web and the Northlake handheld simulator
+screen: Handheld Meter Setup; Handheld Meter Reading Export; Task Manager; MyImports
+source:
+- implementation/stage-3-gateways-and-data/05-handheld-routes.yaml
+- implementation/stage-3-gateways-and-data/handheld-test-environment.md
+- implementation/stage-3-gateways-and-data/04-acceptance-runs.yaml
+- implementation/stage-3-gateways-and-data/03-workflows-and-tasks.yaml
+- data/scenarios/demo-university-v1.yaml
+configuration:
+  Authoritative setup: implementation/stage-3-gateways-and-data/05-handheld-routes.yaml
+  Full setup checker: implementation/stage-3-gateways-and-data/checks.sql
+  Binding manifest producer: generators/handheld_bindings.py
+  Environment design: implementation/stage-3-gateways-and-data/handheld-test-environment.md
+  Simulator URL: http://localhost:18082/
+  Simulator status: Implementation in the testing-environment session; installed Northlake round-trip acceptance pending.
+  Scope: Reuse the 192 permanent Stage 3 meters and their 204 registers, and the existing reusable tasks.
+notes:
+- 'This stage operates the saved HMR configuration. Do not create duplicate assignments or copy the
+  retired CRB-W, CRA-SUB, SC-GAS or Volumetric Dial Read placeholders from older versions.'
+- 'Stage 3 defines the physical meter IDs, register/delta pairs, read types, units, cycles and routes.
+  The environment binding manifest resolves current IDs; neither source keys nor old database IDs
+  may substitute for the physical meter MetaWorldID.'
+- 'The first simulator slice covers CRBMW through Neptune and SCGAS through MVRS with controlled whole
+  units. Retained monthly history and the 126-submeter round require the precision and water-conservation
+  gate in the environment design before they can be used for allocation or bill reconciliation.'
+- 'The routes added on 2026-11-07 (CRCWTR, IRRIG, CHECK, SWGR, GEN) are read in the same rounds once the
+  simulator handles meters with several registers and demand reads; until then key them on the handheld
+  or leave them out of the round. Cedar Row C is read as the installer built it: the reader zig-zags between
+  the meter banks, unit 412 is on cycle 20 and the laundry meter is not in the route file. Those are the
+  findings the Stage 12 route-fix scenario starts from; do not correct them here.'
+- 'Export creates the common outbound device file. Filtering the grid does not filter the download.
+  The simulator converts a selected route into a native return file; exporting alone does not collect data.'
+- 'A reader chosen in the simulator is a fictional field-reader identifier, not an EEM login. Use the
+  intended Northlake operator account for EEM actions and verify actual edit/read permissions.'
+- 'Use the existing disabled schedules with explicit Run now. Do not add a task per route or start
+  continuous delivery. Prepare, download, delivery, task success and verified storage are distinct states.'
+- 'MVRS visit notes use MTM after RDG. MTS changes persistent meter instructions and is not a routine
+  visit note. Neptune notes stay in simulator/source evidence; do not expect MVRS-style HMR log rows.'
+- 'MyImports remains a separate generic upload exercise. A successful generic import does not prove
+  that the Neptune/MVRS export, collector or HMR event path works.'
+- 'GreenButton (ESPI XML) and EnergyAI enrollment retain their existing product findings; no new upload
+  or enrollment workflow is implied by the handheld simulator.'
+records:
+- key: hmr_configuration_reused
+  kind: handheld_preflight
+  Reference: implementation/stage-3-gateways-and-data/05-handheld-routes.yaml
+  Action: Run the full Stage 3 handheld configuration checks before starting the round.
+  Expected: Nine configured read types, 204 registers on 192 meters and no extra test assignments.
+- key: handheld_export_for_round
+  kind: handheld_export
+  Screen: '#/HandheldMeterReadingExport'
+  Action: Export the actual configured route file, retain its bytes/hash, and run the read-only binding-manifest producer with explicit pilot opening values.
+  Expected: The complete export matches the Stage 3 route/channel inventory; selected simulator routes are explicit.
+- key: handheld_reader_round
+  kind: handheld_simulator
+  Environment: implementation/stage-3-gateways-and-data/handheld-test-environment.md
+  Action: Import export and binding manifest, select reader and route, enter readings/skips and visit notes, review and finalize.
+  Expected: Draft work resumes; finalization freezes an identified submission and does not change an earlier return file.
+- key: handheld_native_return
+  kind: handheld_delivery
+  Schedules:
+  - schedule_neptune_river_city_water
+  - schedule_mvrs_sierra_gas
+  - schedule_neptune_cedar_row_submeters
+  Schedule definitions: implementation/stage-3-gateways-and-data/03-workflows-and-tasks.yaml
+  Action: Select one native return format and target; explicitly download/deliver into its RootDirectory/Input and run the matching saved schedule.
+  Expected: A delivery receipt identifies exact file/hash/target; normal collectors handle claim, publication, archive and errors.
+- key: handheld_round_verified
+  kind: handheld_review
+  Action: Compare returned readings with actual Northlake register and usage history and relevant MVRS logs.
+  Expected: Correct physical meter/point IDs, values, units and timestamps; skips remain distinguishable from actual zero usage.
+  Evidence: Original export hash, submission/revision, reader, return hash, delivery receipt, task run ID, point values and log rows.
+- key: handheld_exception_and_correction
+  kind: handheld_review
+  Action: Review a skipped visit, a later actual and a correction to a previously imported value.
+  Expected: The operator can identify the outstanding read and its resolution; correction evidence checks both register and usage plus any affected later period.
+  Notes: No automatic estimate approval, LOTO or Massport-specific report behavior is assumed.
+- key: handheld_resume_and_replay
+  kind: handheld_review
+  Action: Resume a draft, finalize unchanged work again, then explicitly replay a completed return.
+  Expected: Re-finalization returns identical bytes; replay creates no duplicate stored interval or matching HMR log, with prior delivery evidence retained.
+- key: handheld_history_handoff
+  kind: handheld_reconciliation
+  Requires: Approved retained-history resolution/conversion/conservation gate from the environment design.
+  Action: Keep the verified monthly observed history and compare matching periods with supplier bills and Cedar Row master/submeter totals.
+  Expected: Stage 5 bill comparison and Stage 7 allocation use the approved observed history with declared tolerances; disposable test values are absent.
+- key: myimport_intervaldata_template
+  kind: myimport_template
+  installed:
+    myImportExportId:
+  MyImports: {Template: myimport_intervaldata, Action: "download XLSX, fill a week of Science Center electric interval rows, upload"}
+- key: myimport_meterreadings_template
+  kind: myimport_template
+  installed:
+    myImportExportId:
+  MyImports: {Template: myimport_MeterReadings, Action: "download XLSX, fill a month of readings for one RCU water meter, upload"}

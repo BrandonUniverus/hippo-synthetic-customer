@@ -1,70 +1,50 @@
-/* Northlake University brand tokens and type.
-   Sources: documents/brand/Brand Assets.dc.html and
-   documents/brand/eem-application-branding.pdf. */
+/* Northlake University tokens under the --nl-* names these pages already use.
 
-@font-face {
-  font-family: "Open Sans";
-  src: url("fonts/OpenSans-Regular.woff2") format("woff2");
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-}
+   The design system itself lives in brands/northlake/ (tokens.css, fonts.css,
+   logos). This file imports it and maps the older names onto it, so the
+   Keycloak themes, the site, the configuration pages, the customer lab and the
+   handheld simulator all follow brands/northlake/tokens.css.
 
-@font-face {
-  font-family: "Open Sans";
-  src: url("fonts/OpenSans-Semibold.woff2") format("woff2");
-  font-style: normal;
-  font-weight: 600;
-  font-display: swap;
-}
+   The paths are relative so they resolve both where Caddy serves this file
+   (/branding/ beside /brands/) and inside the Keycloak themes
+   (resources/branding beside resources/brands). The fallback values keep a page
+   readable if it is served without the brands folder. */
 
-@font-face {
-  font-family: "Open Sans";
-  src: url("fonts/OpenSans-Bold.woff2") format("woff2");
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: "Open Sans";
-  src: url("fonts/OpenSans-ExtraBold.woff2") format("woff2");
-  font-style: normal;
-  font-weight: 800 900;
-  font-display: swap;
-}
+@import url("../brands/northlake/fonts.css");
+@import url("../brands/northlake/tokens.css");
 
 :root {
   color-scheme: light;
 
   /* Palette */
-  --nl-navy: #1f3a5f;
-  --nl-navy-hover: #152b48;
-  --nl-navy-deep: #14263f;
-  --nl-gold: #c9a227;
-  --nl-gold-hover: #b8941f;
-  --nl-gold-ink: #806414;
-  --nl-slate: #5b6573;
-  --nl-ink: #2b3340;
-  --nl-canvas: #f5f6f8;
-  --nl-white: #ffffff;
-  --nl-line: #d6dde7;
-  --nl-line-strong: #a5b2c3;
-  --nl-tint: #edf1f6;
-  --nl-gold-tint: #faf5e5;
-  --nl-danger: #a52a32;
-  --nl-danger-tint: #fff0f1;
-  --nl-success: #286244;
-  --nl-success-tint: #edf7f0;
+  --nl-navy: var(--primary, #14263f);
+  --nl-navy-hover: var(--primary-strong, #0b1828);
+  --nl-navy-deep: #08121f;
+  --nl-gold: var(--accent, #c8a24a);
+  --nl-gold-hover: #b38d36;
+  --nl-gold-ink: var(--accent-ink, #7a5d12);
+  --nl-slate: var(--muted, #59606b);
+  --nl-ink: var(--ink, #1c2430);
+  --nl-canvas: var(--canvas, #f7f4ec);
+  --nl-white: var(--surface, #ffffff);
+  --nl-line: var(--line, #ddd5c4);
+  --nl-line-strong: var(--line-strong, #a3967c);
+  --nl-tint: var(--tint, #efe9db);
+  --nl-gold-tint: var(--caution-tint, #f7efd9);
+  --nl-danger: var(--negative, #a3302a);
+  --nl-danger-tint: var(--negative-tint, #fbedec);
+  --nl-success: var(--positive, #2f6b3e);
+  --nl-success-tint: var(--positive-tint, #edf5ef);
   --nl-on-navy: rgba(255, 255, 255, 0.78);
 
-  /* Effects */
-  --nl-shadow: 0 12px 32px rgba(31, 58, 95, 0.08);
-  --nl-focus-ring: 0 0 0 3px rgba(31, 58, 95, 0.18);
+  /* Effects: flat, a hairline does the work */
+  --nl-shadow: 0 1px 2px rgba(20, 38, 63, 0.06);
+  --nl-focus-ring: 0 0 0 3px rgba(20, 38, 63, 0.18);
 
   /* Type */
-  --nl-font: "Open Sans", "Segoe UI", Arial, sans-serif;
-  --nl-font-mono: "Cascadia Code", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --nl-font: var(--font-text, "IBM Plex Sans", "Segoe UI", Arial, sans-serif);
+  --nl-font-display: var(--font-display, "Spectral", Georgia, "Times New Roman", serif);
+  --nl-font-mono: var(--font-mono, "IBM Plex Mono", Consolas, monospace);
 }
 
 /* Lockup image used in mastheads: pass the SVG through unchanged. */

@@ -1,0 +1,149 @@
+# Ridgeline Wind — UNIQUE provider identity #3: plant-owned off-site wind generation.
+# A small wind company the Northlake Thermal Plant bought on 2024-07-01 with university capital
+# funding: ten 660 kW turbines in the Montezuma Hills (Solano County), about fifty miles southwest
+# of campus. It sells its output to its owner, the plant, at an internal transfer price, and the
+# site doubles as the Mechanical Engineering department's Wind Energy Research Lab.
+id: ridgeline_wind
+displayName: Ridgeline Wind
+shortName: RWL
+identityClass: unique
+providerKind: offsite_generation_internal
+ownership: internal_campus_owned
+billingModel: internal_generation_transfer
+currency: USD
+billingCadence: monthly
+acquiredOn: "2024-07-01"
+uniqueIdentity: >
+  Generation owned by the customer itself, off site. Energy leaves the turbines, crosses a
+  Valley Electric interconnection (the plant's generator account there pays for station service
+  and is credited for export), and the plant's own books buy it from Ridgeline at a transfer
+  price. Nobody mails a bill: EEM generates the monthly transfer statement from the ten turbine
+  meters (Bill Generation). The site reports in metric (m/s, degC, kPa, kg/m3) on a 10-minute
+  turbine-SCADA grain, carries a met mast that is its own weather station, and gives researchers
+  read-only access across the company boundary.
+
+website: https://ridgeline.northlake.example.edu
+icon: fa-wind
+
+billing:
+  remitAddress:              # where bills are paid; entered on the Utility Provider editor and chosen per billing account
+    line1: Ridgeline Wind Accounting, Campus Mail Stop 46    # Stage 1 splits it into Address and Address 2, as for the plant
+    city: Sacramento
+    state: CA
+    postalCode: "95822"
+  businessAddress:           # the account representative's office, at the site
+    line1: 8400 Montezuma Hills Road
+    city: Rio Vista
+    state: CA
+    postalCode: "94571"
+
+  billCycles:                # the provider owns the calendar; a meter stores only the cycle number
+    periods: calendar months from the acquisition (2024-07) to the end of the scenario date range
+    cycles:
+      - { number: 1, description: "Internal transfer, closed with the calendar month" }
+  companyAccounts:           # CompanyProvider: what each company is to this provider
+    northlake_thermal_plant: { vendorNumber: RWL-INTERNAL, alias: RWL }
+
+supplies:
+  - commodity: wind_generation
+    role: generation_transfer
+    usageUnit: kWh
+    demandUnit: kW
+    dataTypes: [interval_10min, monthly_generated_statement]
+    intervalMinutes: 10
+    direction: generated
+    servedBuildings: [ridgeline_turbine_field]
+    notes: Each turbine's revenue-grade pad meter feeds the transfer statement; the farm's net export is metered by Valley Electric at the Ridgeline substation.
+
+accountModel:
+  numberFormat: "SYN-RWL-G-#######"     # G = generation transfer agreement, not a utility account
+  example: "SYN-RWL-G-0000001"
+  grouping: one_transfer_agreement_per_site
+  meta: [site_id, nameplate_kw, transfer_start, transfer_price]
+
+meterModel:
+  numberFormat: "SYN-RWL-M-#######"
+  example: "SYN-RWL-M-0110003"
+  providerNumberFormat: "RWL-WTG-##"    # the turbine's position tag at the site
+  meterTypes: [turbine_pad_meter]
+  note: One revenue-grade meter at each turbine pad; the nacelle anemometer, rotor speed, run state and the controller's possible power come from the turbine SCADA beside it.
+
+channels:
+  - id: wind_kwh
+    commodity: wind_generation
+    unit: kWh
+    direction: generated
+    intervalMinutes: 10
+  - id: wind_kw
+    commodity: wind_generation
+    unit: kW
+    direction: generated
+    intervalMinutes: 10
+  - id: wind_possible_kw
+    commodity: wind_generation
+    unit: kW
+    direction: possible
+    intervalMinutes: 10
+  - id: nacelle_wind_ms           # SCADA beside the pad meter: the turbine's own anemometer
+    commodity: weather
+    unit: m_per_s
+    intervalMinutes: 10
+  - id: rotor_rpm
+    commodity: wind_generation
+    unit: rpm
+    intervalMinutes: 10
+  - id: turbine_state             # 0 Stopped, 1 Running, 2 Fault, 3 Curtailed
+    commodity: wind_generation
+    unit: state
+    intervalMinutes: 10
+
+rateSchedules:
+  - id: RWL-XFER-2024
+    name: Ridgeline Internal Energy Transfer
+    type: internal_transfer
+    effective: "2024-07-01..2025-12-31"
+    components:
+      transferEnergy: { unit: $/kWh, rate: 0.058, basis: metered_generation }
+      researchCredit: { unit: $/month, rate: -1250.00, basis: wind_energy_research_lab_use }
+
+billCharges:
+  - { code: transfer_energy, type: generation, unit: $/kWh }
+  - { code: research_credit, type: credit, unit: $ }
+
+fileFormats:
+  interval:
+    name: Ridgeline turbine SCADA 10-minute export
+    format: csv
+    grain: one_row_per_turbine_per_10_minutes
+    artifactType: fig
+    timestamp: interval_ending
+    keyColumns: [turbine_id, timestamp_local, active_energy_kwh, active_power_kw, possible_power_kw, nacelle_wind_ms, rotor_rpm, turbine_state]
+  metMast:
+    name: Ridgeline met mast logger 10-minute table
+    format: csv
+    grain: one_row_per_10_minutes
+    artifactType: fig
+    timestamp: interval_ending
+    keyColumns: [timestamp_local, wind_speed_ms, wind_direction_deg, air_temp_c, pressure_kpa, air_density_kgm3, rh_pct]
+
+environmental:
+  scope: "2_reduction"
+  attributes:
+    - { name: renewable_energy_certificates, unit: rec_per_mwh, value: 1.0 }
+    - { name: avoided_co2e, unit: kgCO2e/kWh, basis: "the grid factor of the year, valley-electric-district.yaml environmental.co2eFactor (eGRID CAMX); Ridgeline issues no environmental statement" }
+
+scenarioHooks:
+  - { scenario: wind_generation_interval, role: primary, note: "10-minute SCADA energy, power, possible power, wind and state for ten turbines" }
+  - { scenario: generated_bills, role: primary, note: "Monthly transfer statements generated by EEM from the turbine meters (Bill Generation)" }
+  - { scenario: account_opened_mid_window, role: primary, note: "Acquired 2024-07-01: accounts, meters and bills start halfway through the scenario" }
+  - { scenario: turbine_outage, role: primary, note: "WTG-07 gearbox failure 2025-02-11 to 2025-04-22: state Fault, zero output, possible power still reported" }
+  - { scenario: expected_versus_actual_energy, role: primary, note: "Generated energy against the energy possible at the measured wind, per turbine and for the farm" }
+
+dataQuirks:
+  - Bills are generated, never received; the first statement covers July 2024. A hand-made July 2024 statement is the acceptance sample.
+  - Metric site (m/s, degC, kPa, kg/m3) on a 10-minute grain beside an imperial, 15-minute campus.
+  - The SCADA server keeps Pacific Standard Time all year and never moves to daylight time; summer files run an hour behind the campus feeds.
+  - Each row is stamped at the end of its ten minutes (the row stamped 00:10 covers 00:00 to 00:10), so a SCADA day runs from 00:10 to the next day's 00:00.
+  - Possible power is the turbine controller's own expected output at the measured wind; actual over possible is the turbine's performance ratio.
+  - Output follows the Delta's summer afternoon sea breeze, strongest May to August.
+  - WTG-07 was stopped by a gearbox failure from 2025-02-11 to 2025-04-22. Its rows keep arriving with state 2 (Fault) and zero energy; the gap is lost production, not missing data.

@@ -1,0 +1,90 @@
+/* ==========================================================================
+   River City Utilities: design tokens
+
+   Character: the city's water, sewer and stormwater department ("River City"
+   is Sacramento's nickname). Practical and municipal, like street signage:
+   Barlow (a California highway-sign grotesk), uppercase headings, teal, and
+   one colour per service on statements and service tabs.
+   ========================================================================== */
+:root {
+  /* Colour: brand ------------------------------------------------------- */
+  --primary: #0E6F7A;          /* River Teal: header band, buttons (bills keep their teal) */
+  --primary-strong: #0A555E;
+  --on-primary: #FFFFFF;
+  --accent: #3FB8C8;           /* Clear Water: rules and the wave in the mark */
+  --accent-ink: #0B5D66;
+  --on-accent: #062F34;
+  --support: #1F6FB5;          /* service colours, used together: */
+  --service-water: #1F6FB5;    /*   potable water */
+  --service-sewer: #7B6A45;    /*   sanitary sewer */
+  --service-storm: #3C8A55;    /*   stormwater */
+
+  /* Colour: neutrals ---------------------------------------------------- */
+  --ink: #102A2E;
+  --muted: #4B6064;
+  --canvas: #F0F5F5;
+  --surface: #FFFFFF;
+  --tint: #E1EFF0;
+  --line: #C5D9DB;
+  --line-strong: #86A4A8;
+  --link: #0E6F7A;
+  --heading-ink: #0A555E;      /* headings are deep teal */
+
+  /* Colour: status ------------------------------------------------------ */
+  --positive: #2E7347;
+  --negative: #B0322B;
+  --caution: #8A5F00;
+  --positive-tint: #EAF4EE;
+  --negative-tint: #FBECEB;
+  --caution-tint: #FBF2DE;
+
+  /* Page chrome --------------------------------------------------------- */
+  --topbar-bg: #0A555E;
+  --topbar-ink: #DDF1F3;
+  --header-bg: #0E6F7A;        /* the header itself is teal */
+  --header-ink: #FFFFFF;
+  --header-rule: #3FB8C8;
+  --footer-bg: #102A2E;
+  --footer-ink: #CFE3E5;
+
+  /* Type ---------------------------------------------------------------- */
+  --font-display: "Barlow Semi Condensed", "Barlow", "Arial Narrow", Arial, sans-serif;
+  --font-text: "Barlow", Arial, sans-serif;
+  --font-mono: "Barlow", Arial, sans-serif;   /* tabular figures */
+  --weight-display: 700;
+  --weight-strong: 600;
+  --tracking-display: 0.01em;
+  --case-heading: uppercase;   /* signage */
+  --case-label: uppercase;
+  --case-button: uppercase;
+  --size-h1: 40px;
+  --size-h2: 28px;
+  --size-h3: 20px;
+  --size-body: 17px;
+  --size-small: 15px;
+  --size-label: 13px;
+  --leading-body: 1.5;
+
+  /* Space: 8-point, compact ------------------------------------------ */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 28px;
+  --space-7: 40px;
+  --space-8: 56px;
+  --content-width: 1180px;
+
+  /* Shape --------------------------------------------------------------- */
+  --radius: 2px;             /* signage corners */
+  --rule: 1px;
+  --rule-accent: 4px;
+
+  /* Logo use ------------------------------------------------------------ */
+  --logo-height: 40px;
+  --logo-min-height: 22px;
+  /* Clear space: one wave height. Reversed logo (white) on the teal header;
+     full-colour logo on white documents. Service colours never recolour the
+     logo; they mark the service only. */
+}

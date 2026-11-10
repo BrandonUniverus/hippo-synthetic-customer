@@ -1,8 +1,7 @@
 # Northlake packet and first meter sample
 
-The first generator builds the facilities/meter register, customer source
-mapping, gateway coverage, a blank UI-ID capture template, and three AcquiSuite
-deliveries. It never opens a database or configures an EEM instance. Every other
+The first generator builds the facilities/meter register, the customer source
+mapping and three AcquiSuite deliveries. It never opens a database or configures an EEM instance. Every other
 Northlake document is rendered from its Markdown source; see
 [`documents/README.md`](documents/README.md).
 
@@ -16,11 +15,12 @@ Northlake document is rendered from its Markdown source; see
 | `data/eem/northlake-eem-metaworld-stage1b-v1.yaml` | EEM mapping only: measure types, which channel roles become points and how they are named, which points EEM creates itself, the archive intervals and index the editor allows, meter multipliers and bill-cycle rules, rate schedule and billing account kinds, weather stations and assignments, aggregates and baselines |
 | `data/scenarios/northlake-onboarding-v1.yaml` | Packet decisions, contact responsibilities and department ownership, source descriptions, known events and first sample contract |
 | `data/security/northlake-eem-security-v1.yaml` | Existing fictional people's names, titles, personal email and company ownership, reused for Northlake contacts |
-| `data/eem/northlake-bill-entry-v1.yaml` | How each provider's bills arrive (import, manual, allocation), which sets every account's Bill Entry Type |
+| `data/eem/northlake-bill-entry-v1.yaml` | How each provider's bills arrive (import, manual, allocation, generation), which sets every account's Bill Entry Type |
 | `data/eem/northlake-ap-gl-v1.yaml` | The GL chart, each account's AP upload flag and default GL accounts, and the bill validation tests set at account scope |
+| `data/bills/*.yaml` | Every sample bill, one file per provider plus the Ridgeline-era set (every line, quantity, rate and total), which `render_bills.py` draws |
 
 These files own different fields and never re-list each other's facts; the
-rules are in [`implementation/northlake-inventory-standard.pdf`](../implementation/northlake-inventory-standard.pdf).
+rules are in [`implementation/stage-2-hierarchy/northlake-inventory-standard.pdf`](../implementation/stage-2-hierarchy/northlake-inventory-standard.pdf).
 The generator joins them: it expands the per-apartment submeter and gateway
 templates (one electric and one water submeter for each of the 124 Cedar Row
 apartments), builds the hierarchy from the scenario sites and buildings under
@@ -77,6 +77,33 @@ table value and every preserved sheet before reporting success.
 Excel locks the workbook while it is open. Close it first, or pass
 `--output <path>` to write the updated copy elsewhere and copy it over later.
 
+## Render the bills
+
+`render_bills.py` draws every bill in `data/bills/` into
+`documents/utility-bills/<provider>/` as one-page PDFs with a text layer: the
+provider's band, the account facts, a meter summary (with register reads, read
+periods and the gas therm factor where a bill has them) and the charge detail.
+Before drawing anything it checks the source: quantity x rate rounds to each
+amount, a percentage line matches its base, the lines sum to the total, a
+corrected bill covers the period of the bill it supersedes, and a credit
+transferred out of one account arrives, with the opposite sign, on the bill it
+names. A description with a comma must be quoted in its flow mapping; an
+unknown line key fails the check rather than silently splitting the text.
+`generators/tests/test_render_bills.py` adds what the customer's documents
+require: every rate is the tariff's own, every period is one of its provider's
+Stage 1 bill-cycle periods, every bill is dated no later than Stage 5 enters it,
+and every meter, badge and multiplier is Stage 2's. While one provider's file is
+being written, `--only data/bills/<file>.yaml` renders just that file and
+`BILLS_ONLY=data/bills/<file>.yaml` limits the tests to it.
+
+```powershell
+python generators/render_bills.py
+python generators/render_bills.py --check
+python -m unittest generators.tests.test_render_bills -v
+```
+
+The test also ties every rate on a bill to the provider file's own schedule.
+
 ## Render the intake binder
 
 `render_intake_package.py` packages the customer documents listed in the
@@ -103,12 +130,12 @@ inventory print on landscape pages.
 
 AcquiSuite is the first file emitter. MV90 MDEF/MV9, FIG variants, Spinwave,
 Neptune, MVRS, bill import, the ODBC historian, weather fixtures, and live
-BACnet/Modbus sources remain planned in
-[`implementation/synthetic-meter-system-plan.pdf`](../implementation/synthetic-meter-system-plan.pdf).
+BACnet/Modbus sources are specified per format in the
+[Stage 3 chapter](../implementation/stage-3-gateways-and-data/stage-3-gateways-and-data.pdf).
 Add one real intake format and its independently checked expected results at a
 time. Do not bypass the gateway or bill importer by inserting EEM customer data.
 
-Generated samples do not establish installed acceptance. Use
-[`implementation/northlake-onboarding-ui-checklist.pdf`](../implementation/northlake-onboarding-ui-checklist.pdf)
-to create the customer through the UI, exercise ingestion, record actual IDs
-and results, and promote a tested restore baseline.
+Generated samples do not establish installed acceptance. The
+[implementation guide](../implementation/northlake-implementation-guide.pdf)
+and its stage chapters are how the customer is created through the UI, how
+ingestion is exercised, and how the final restore baseline is promoted.

@@ -39,13 +39,15 @@ Private customer data must not be copied into this repository, even if anonymize
 
 ## Rollout Plan
 
-1. Define `DemoUniversityV1` with a small campus and apartment complex.
-2. Create the synthetic source schema.
-3. Generate a minimal set of bills and interval data.
-4. Produce one or two ingestion artifact types.
-5. Load the customer into a dev environment through normal ingestion paths.
-6. Add assertions for rollups, reports, idempotency, and integration exports.
-7. Expand coverage until every major gateway and integration has at least one scenario.
+Northlake is built once, through the EEM applications, in ten stages plus one for the services outside the database: the
+foundation (companies, providers, calendars, security), the hierarchy, the
+gateways and their first data, rates, bills, the financial interface, tenant
+allocation, sustainability, operations, and finally the backup that becomes the
+reference database, and then the identity provider, broker, mail and other
+services a second server needs beside it. The [roadmap](roadmap.pdf) says what each stage unlocks and
+the [implementation guide](northlake-implementation-guide.pdf) says how to work
+one. When a capability is added to EEM, Northlake gets the data that exercises
+it, in the stage it belongs to.
 
 ## Quality Bar
 

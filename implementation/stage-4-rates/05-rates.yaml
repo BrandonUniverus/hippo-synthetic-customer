@@ -1,0 +1,1505 @@
+# Stage 4, step 5: Rates (Database Administrator > RateModeler > Rate Edit).
+# The tree is Utility Provider > Rate > Rate Class > Determinant > Effective Date. Toggle "Show all providers"
+# first: the tree defaults to providers that already have a rate, and none of Northlake's six do yet.
+# This file holds the six real providers' sixteen tariffs. The Rate Lab provider's rates are in 08-rate-lab.yaml.
+stage: 4
+step: 5
+title: Rates
+app: Database Administrator
+screen: RateModeler > Rate Edit
+source:
+- data/providers/valley-electric-district.yaml
+- data/providers/sierra-gas-utility.yaml
+- data/providers/river-city-utilities.yaml
+- data/providers/northlake-thermal-plant.yaml
+- data/providers/helios-onsite-solar.yaml
+- data/providers/ridgeline-wind.yaml
+- services/sources/billing.py (how the providers' bills are worked out: percentage lines, sizes, counts, seasons)
+- services/sources/tariffs.py (the 2026 step and the Helios escalator)
+- data/scenarios/demo-university-v1.yaml (meter sizes, fixture and ERU counts)
+- data/bills/northlake-itemized-bills-v1.yaml (the Ridgeline-era bills the last three rates are tested against)
+notes:
+- 'Reworked 2026-11-09. Each real tariff is entered the way its own tariff and bills read, so a generated bill can be
+  set against the provider''s bill. Before, several were simplified (two time-of-use periods, one meter size, one flat
+  amount for a per-fixture price) and nine feature rates sat under the real providers; those moved to the Rate Lab.'
+- 'Order inside the editor: pick the provider, Add Rate (Rate Name only at first save), then fill Currency and Measure
+  Type before adding any charge; both lock once the rate has one. Add Rate creates the rate''s class All itself, the
+  always-applied class, so a rate whose classes are [All] needs no class entered. Add a class only where a record
+  lists more, for its Rate Options; every added class prices a meter only as its option''s default or when the meter
+  is bound to it. Add each charge under its class, then one Effective Date per price, and for a tiered charge its
+  Block rows on that date.'
+- 'What the real rates exercise between them: three time-of-use periods with holidays (Valley Electric); Bill Adj and
+  Taxes with member charges (Valley Electric, Sierra Gas); tiers (River City water); Rate Options with a default class
+  and meters bound to another (River City meter and line sizes); User Defined per-meter prices (lighting fixtures,
+  stormwater ERUs, the plant''s fixed share); negative prices (Helios, the generator credit); two or three price
+  dates on every priced charge; a commodity mapping on every charge, with Exclude and two added commodities.'
+- 'Price dates: 2024-01-01 as the tariff states; 2025-01-01 where the tariff steps (VED-TOU-GS, Helios); 2026-01-01
+  at 3% over the last price for Valley Electric, Sierra Gas, River City and the Thermal Plant, as the source tariffs
+  for 2026 carry it. Ridgeline does not escalate. Percentage lines do not change.'
+- 'Percentage charges (700 Bill Adj, 800 Taxes) multiply the total of the charges they apply to by the value as typed,
+  so 5% is 0.05 and 1.5% is 0.015. Their Units box offers only the rate''s currency.'
+- 'Commodity Mapping: a charge becomes a bill line only through its mapping; one with no mapping adds to the bill
+  total and writes no line. Every charge here has one. A fixed, adjustment or tax charge maps its amount to the
+  measure type''s Misc Chgs/Credits commodity; a usage charge maps quantity and amount to its usage commodity. Where
+  two charges price the same quantity, the second is marked Exclude so the quantity is reported once.'
+- 'Rate Categories (Transmission, Distribution, Commodity) are not stated in the source documents. # assumed:
+  Distribution and Commodity on; Transmission on for VED-TOU-PRI only; Distribution off for the Thermal Plant,
+  Helios and Ridgeline. Nothing in the engine reads them.'
+- 'The engine has no per-unit count (fixtures, ERUs) in Electricity or Potable Water units, so those charges are
+  User Defined and priced per meter.'
+- 'The last three records (VED-GEN-IC, VED-BCT, RWL-XFER-2024) were added 2026-10-01 for Ridgeline Wind and are
+  kept as written then, with what the engine cannot do recorded on each: one channel of a bidirectional meter,
+  reactive energy beyond a power factor, a credit moved between accounts, and one bill per meter.'
+records:
+- key: ved_tou_gs
+  installed:
+    providerId: 1
+    rateId: null
+  provider: valley_electric_district
+  Rate:
+    Rate Name: VED-TOU-GS
+    Currency: US Dollar
+    Measure Type: Electricity
+    Rate Categories:
+      Transmission: false
+      Distribution: true
+      Commodity: true
+  Rate Classes:
+  - Rate Class Name: All
+  Determinants:
+  - Charge Name: Facility Charge
+    Charge Type: 400 Fixed By Period
+    Units: US Dollar
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Elec Misc Chgs/Credits
+        Commodity: Elec Misc Chgs/Credits
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 64.0
+    - Effective Date: 2025-01-01
+      Value: 67.5
+    - Effective Date: 2026-01-01
+      Value: 69.525
+  - Charge Name: Energy Peak (Summer)
+    Charge Type: 200 Charge Period
+    Units: KilowattHours
+    Aggregation Rule: Summing
+    Schedule: Summer Peak
+    Significance: Super On Peak
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Elec Energy (On Peak)
+        Commodity: On Pk kWh
+      Commodity (Usage):
+        Category: Elec Energy (On Peak)
+        Commodity: On Pk kWh
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 0.241
+    - Effective Date: 2025-01-01
+      Value: 0.258
+    - Effective Date: 2026-01-01
+      Value: 0.26574
+  - Charge Name: Energy Part-Peak (Summer)
+    Charge Type: 200 Charge Period
+    Units: KilowattHours
+    Aggregation Rule: Summing
+    Schedule: Summer Part-Peak
+    Significance: On Peak
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Elec Energy (Partial Peak)
+        Commodity: Part Pk kWh
+      Commodity (Usage):
+        Category: Elec Energy (Partial Peak)
+        Commodity: Part Pk kWh
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 0.168
+    - Effective Date: 2025-01-01
+      Value: 0.179
+    - Effective Date: 2026-01-01
+      Value: 0.18437
+  - Charge Name: Energy Off-Peak (Summer)
+    Charge Type: 200 Charge Period
+    Units: KilowattHours
+    Aggregation Rule: Summing
+    Schedule: Summer Off-Peak
+    Significance: Off Peak
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Elec Energy (Off Peak)
+        Commodity: Off Pk kWh
+      Commodity (Usage):
+        Category: Elec Energy (Off Peak)
+        Commodity: Off Pk kWh
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 0.112
+    - Effective Date: 2025-01-01
+      Value: 0.118
+    - Effective Date: 2026-01-01
+      Value: 0.12154
+  - Charge Name: Energy Part-Peak (Winter)
+    Charge Type: 200 Charge Period
+    Units: KilowattHours
+    Aggregation Rule: Summing
+    Schedule: Winter Part-Peak
+    Significance: On Peak
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Elec Energy (Partial Peak)
+        Commodity: Part Pk kWh
+      Commodity (Usage):
+        Category: Elec Energy (Partial Peak)
+        Commodity: Part Pk kWh
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 0.168
+    - Effective Date: 2025-01-01
+      Value: 0.179
+    - Effective Date: 2026-01-01
+      Value: 0.18437
+  - Charge Name: Energy Off-Peak (Winter)
+    Charge Type: 200 Charge Period
+    Units: KilowattHours
+    Aggregation Rule: Summing
+    Schedule: Winter Off-Peak
+    Significance: Off Peak
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Elec Energy (Off Peak)
+        Commodity: Off Pk kWh
+      Commodity (Usage):
+        Category: Elec Energy (Off Peak)
+        Commodity: Off Pk kWh
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 0.112
+    - Effective Date: 2025-01-01
+      Value: 0.118
+    - Effective Date: 2026-01-01
+      Value: 0.12154
+  - Charge Name: Demand
+    Charge Type: 200 Charge Period
+    Units: Kilowatt
+    Aggregation Rule: Maximum
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Elec Demand (Non-TOU)
+        Commodity: Non-TOU kW Billed
+      Commodity (Usage):
+        Category: Elec Demand (Non-TOU)
+        Commodity: Non-TOU kW Billed
+    IsDemand: true
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 18.4
+    - Effective Date: 2025-01-01
+      Value: 19.75
+    - Effective Date: 2026-01-01
+      Value: 20.3425
+  - Charge Name: Public Purpose Program
+    Charge Type: 700 Bill Adj
+    Units: US Dollar
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Apply Charges:
+    - Energy Peak (Summer)
+    - Energy Part-Peak (Summer)
+    - Energy Off-Peak (Summer)
+    - Energy Part-Peak (Winter)
+    - Energy Off-Peak (Winter)
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Elec Misc Chgs/Credits
+        Commodity: Elec Misc Chgs/Credits
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 0.015
+    notes:
+    - 1.5% of the five energy charges, as the provider's bills carry it; the tariff sheet says "as applicable".
+  - Charge Name: Utility Users Tax
+    Charge Type: 800 Taxes
+    Units: US Dollar
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Apply Charges: Apply to All
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Elec Misc Chgs/Credits
+        Commodity: Elec Misc Chgs/Credits
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 0.05
+    notes:
+    - 5% of every charge before it, the Public Purpose Program included.
+  notes:
+  - 'Time-of-Use General Service, entered as the tariff reads: three periods in summer, two in winter, one demand charge
+    on the highest 15-minute kW, a facility charge, and the two percentage lines the bills carry.'
+  - 'Three price dates on every priced charge: 2024, the FY2025 step (the provider''s VED-TOU-GS-FY25 schedule is this rate''s
+    second price date, not a second rate) and the 3% synthetic step for 2026 that the source tariffs carry.'
+  - 'Significance follows 04-schedules.yaml: peak is Super On Peak and part-peak is On Peak so both leave holidays out;
+    the commodity mapping still reads On Peak, Partial Peak and Off Peak.'
+- key: ved_tou_pri
+  installed:
+    providerId: 1
+    rateId: null
+  provider: valley_electric_district
+  Rate:
+    Rate Name: VED-TOU-PRI
+    Currency: US Dollar
+    Measure Type: Electricity
+    Rate Categories:
+      Transmission: true
+      Distribution: true
+      Commodity: true
+  Rate Classes:
+  - Rate Class Name: All
+  Determinants:
+  - Charge Name: Facility Charge
+    Charge Type: 400 Fixed By Period
+    Units: US Dollar
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Elec Misc Chgs/Credits
+        Commodity: Elec Misc Chgs/Credits
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 410.0
+    - Effective Date: 2026-01-01
+      Value: 422.3
+  - Charge Name: Energy Peak (Summer)
+    Charge Type: 200 Charge Period
+    Units: KilowattHours
+    Aggregation Rule: Summing
+    Schedule: Summer Peak
+    Significance: Super On Peak
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Elec Energy (On Peak)
+        Commodity: On Pk kWh
+      Commodity (Usage):
+        Category: Elec Energy (On Peak)
+        Commodity: On Pk kWh
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 0.214
+    - Effective Date: 2026-01-01
+      Value: 0.22042
+  - Charge Name: Energy Part-Peak (Summer)
+    Charge Type: 200 Charge Period
+    Units: KilowattHours
+    Aggregation Rule: Summing
+    Schedule: Summer Part-Peak
+    Significance: On Peak
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Elec Energy (Partial Peak)
+        Commodity: Part Pk kWh
+      Commodity (Usage):
+        Category: Elec Energy (Partial Peak)
+        Commodity: Part Pk kWh
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 0.149
+    - Effective Date: 2026-01-01
+      Value: 0.15347
+  - Charge Name: Energy Off-Peak (Summer)
+    Charge Type: 200 Charge Period
+    Units: KilowattHours
+    Aggregation Rule: Summing
+    Schedule: Summer Off-Peak
+    Significance: Off Peak
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Elec Energy (Off Peak)
+        Commodity: Off Pk kWh
+      Commodity (Usage):
+        Category: Elec Energy (Off Peak)
+        Commodity: Off Pk kWh
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 0.098
+    - Effective Date: 2026-01-01
+      Value: 0.10094
+  - Charge Name: Energy Part-Peak (Winter)
+    Charge Type: 200 Charge Period
+    Units: KilowattHours
+    Aggregation Rule: Summing
+    Schedule: Winter Part-Peak
+    Significance: On Peak
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Elec Energy (Partial Peak)
+        Commodity: Part Pk kWh
+      Commodity (Usage):
+        Category: Elec Energy (Partial Peak)
+        Commodity: Part Pk kWh
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 0.149
+    - Effective Date: 2026-01-01
+      Value: 0.15347
+  - Charge Name: Energy Off-Peak (Winter)
+    Charge Type: 200 Charge Period
+    Units: KilowattHours
+    Aggregation Rule: Summing
+    Schedule: Winter Off-Peak
+    Significance: Off Peak
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Elec Energy (Off Peak)
+        Commodity: Off Pk kWh
+      Commodity (Usage):
+        Category: Elec Energy (Off Peak)
+        Commodity: Off Pk kWh
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 0.098
+    - Effective Date: 2026-01-01
+      Value: 0.10094
+  - Charge Name: Demand
+    Charge Type: 200 Charge Period
+    Units: Kilowatt
+    Aggregation Rule: Maximum
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Elec Demand (Non-TOU)
+        Commodity: Non-TOU kW Billed
+      Commodity (Usage):
+        Category: Elec Demand (Non-TOU)
+        Commodity: Non-TOU kW Billed
+    IsDemand: true
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 21.9
+    - Effective Date: 2026-01-01
+      Value: 22.557
+  - Charge Name: Public Purpose Program
+    Charge Type: 700 Bill Adj
+    Units: US Dollar
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Apply Charges:
+    - Energy Peak (Summer)
+    - Energy Part-Peak (Summer)
+    - Energy Off-Peak (Summer)
+    - Energy Part-Peak (Winter)
+    - Energy Off-Peak (Winter)
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Elec Misc Chgs/Credits
+        Commodity: Elec Misc Chgs/Credits
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 0.015
+    notes:
+    - 1.5% of the five energy charges, as the provider's bills carry it; the tariff sheet says "as applicable".
+  - Charge Name: Utility Users Tax
+    Charge Type: 800 Taxes
+    Units: US Dollar
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Apply Charges: Apply to All
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Elec Misc Chgs/Credits
+        Commodity: Elec Misc Chgs/Credits
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 0.05
+    notes:
+    - 5% of every charge before it, the Public Purpose Program included.
+  notes:
+  - Time-of-Use Primary Service, the Central Plant's rate; assigned to the Central Plant main meter.
+  - 'No FY2025 step: 2024 prices hold through 2025, then the 3% synthetic step for 2026.'
+  - The Central Plant's itemized bill for 2024-08-05 to 2024-09-04 is priced on this rate and VED-BCT. With three periods
+    entered, the rate test should now reproduce its energy lines instead of over-pricing them by $39,743.08.
+- key: ved_al_1
+  installed:
+    providerId: 1
+    rateId: null
+  provider: valley_electric_district
+  Rate:
+    Rate Name: VED-AL-1
+    Currency: US Dollar
+    Measure Type: Electricity
+    Rate Categories:
+      Transmission: false
+      Distribution: true
+      Commodity: true
+  Rate Classes:
+  - Rate Class Name: All
+  Determinants:
+  - Charge Name: Fixture Charge
+    Charge Type: 400 Fixed By Period
+    Units: US Dollar
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Elec Misc Chgs/Credits
+        Commodity: Elec Misc Chgs/Credits
+    User Defined: true
+    notes:
+    - '$14.60 a fixture a month. A User Defined charge: its price is the meter''s own (count x the tariff''s unit price),
+      listed per meter in 06-rate-assignments.yaml. If no screen can enter a per-meter price, that is a product finding
+      and the charge falls back to one flat amount per rate.'
+    - The value here is the price of one fixture.
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 14.6
+    - Effective Date: 2026-01-01
+      Value: 15.038
+  - Charge Name: Utility Users Tax
+    Charge Type: 800 Taxes
+    Units: US Dollar
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Apply Charges: Apply to All
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Elec Misc Chgs/Credits
+        Commodity: Elec Misc Chgs/Credits
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 0.05
+    notes:
+    - 5% of the fixture charge.
+  notes:
+  - 'Unmetered area lighting, billed by fixture count: 48 fixtures on the campus grounds account and 20 on Cedar Row''s
+    parking lighting.'
+- key: sgu_gn_1
+  installed:
+    providerId: 2
+    rateId: null
+  provider: sierra_gas_utility
+  Rate:
+    Rate Name: SGU-GN-1
+    Currency: US Dollar
+    Measure Type: Natural Gas
+    Rate Categories:
+      Transmission: false
+      Distribution: true
+      Commodity: true
+  Rate Classes:
+  - Rate Class Name: All
+  Determinants:
+  - Charge Name: Customer Charge
+    Charge Type: 400 Fixed By Period
+    Units: US Dollar
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Nat Gas Misc Chgs/Credits
+        Commodity: Nat Gas Misc Chgs/Credits
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 38.0
+    - Effective Date: 2026-01-01
+      Value: 39.14
+  - Charge Name: Commodity (Winter)
+    Charge Type: 200 Charge Period
+    Units: Therm
+    Aggregation Rule: Summing
+    Schedule: Gas Winter
+    Significance: All Hour
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Natural Gas Energy
+        Commodity: Gas therm
+      Commodity (Usage):
+        Category: Natural Gas Energy
+        Commodity: Gas therm
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 1.142
+    - Effective Date: 2026-01-01
+      Value: 1.17626
+  - Charge Name: Commodity (Summer)
+    Charge Type: 200 Charge Period
+    Units: Therm
+    Aggregation Rule: Summing
+    Schedule: Gas Summer
+    Significance: All Hour
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Natural Gas Energy
+        Commodity: Gas therm
+      Commodity (Usage):
+        Category: Natural Gas Energy
+        Commodity: Gas therm
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 0.876
+    - Effective Date: 2026-01-01
+      Value: 0.90228
+  - Charge Name: Transport
+    Charge Type: 200 Charge Period
+    Units: Therm
+    Aggregation Rule: Summing
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Nat Gas Misc Chgs/Credits
+        Commodity: Nat Gas Misc Chgs/Credits
+      Commodity (Usage):
+        Category: Natural Gas Energy
+        Commodity: Gas therm
+      Exclude: true
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 0.214
+    - Effective Date: 2026-01-01
+      Value: 0.22042
+    notes:
+    - Transport prices the same therms the commodity charge already reports, so its usage is marked Exclude and only its
+      amount is carried.
+  - Charge Name: Public Purpose Surcharge
+    Charge Type: 700 Bill Adj
+    Units: US Dollar
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Apply Charges:
+    - Commodity (Winter)
+    - Commodity (Summer)
+    - Transport
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Nat Gas Misc Chgs/Credits
+        Commodity: Nat Gas Misc Chgs/Credits
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 0.015
+    notes:
+    - 1.5% of commodity and transport, as the provider's bills carry it.
+  - Charge Name: Utility Users Tax
+    Charge Type: 800 Taxes
+    Units: US Dollar
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Apply Charges: Apply to All
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Nat Gas Misc Chgs/Credits
+        Commodity: Nat Gas Misc Chgs/Credits
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 0.05
+    notes:
+    - 5% of every charge before it, the surcharge included.
+  notes:
+  - 'General Non-Residential Firm Service: the nine building and house gas meters.'
+  - The provider's bill prices the whole bill at the season of its end date. The engine prices each day at its own season,
+    so a bill that crosses November 1 or April 1 will differ; the rate test for such a period records by how much.
+- key: sgu_gl_1
+  installed:
+    providerId: 2
+    rateId: null
+  provider: sierra_gas_utility
+  Rate:
+    Rate Name: SGU-GL-1
+    Currency: US Dollar
+    Measure Type: Natural Gas
+    Rate Categories:
+      Transmission: false
+      Distribution: true
+      Commodity: true
+  Rate Classes:
+  - Rate Class Name: All
+  Determinants:
+  - Charge Name: Customer Charge
+    Charge Type: 400 Fixed By Period
+    Units: US Dollar
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Nat Gas Misc Chgs/Credits
+        Commodity: Nat Gas Misc Chgs/Credits
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 245.0
+    - Effective Date: 2026-01-01
+      Value: 252.35
+  - Charge Name: Commodity (Winter)
+    Charge Type: 200 Charge Period
+    Units: Therm
+    Aggregation Rule: Summing
+    Schedule: Gas Winter
+    Significance: All Hour
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Natural Gas Energy
+        Commodity: Gas therm
+      Commodity (Usage):
+        Category: Natural Gas Energy
+        Commodity: Gas therm
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 0.982
+    - Effective Date: 2026-01-01
+      Value: 1.01146
+  - Charge Name: Commodity (Summer)
+    Charge Type: 200 Charge Period
+    Units: Therm
+    Aggregation Rule: Summing
+    Schedule: Gas Summer
+    Significance: All Hour
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Natural Gas Energy
+        Commodity: Gas therm
+      Commodity (Usage):
+        Category: Natural Gas Energy
+        Commodity: Gas therm
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 0.741
+    - Effective Date: 2026-01-01
+      Value: 0.76323
+  - Charge Name: Transport
+    Charge Type: 200 Charge Period
+    Units: Therm
+    Aggregation Rule: Summing
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Nat Gas Misc Chgs/Credits
+        Commodity: Nat Gas Misc Chgs/Credits
+      Commodity (Usage):
+        Category: Natural Gas Energy
+        Commodity: Gas therm
+      Exclude: true
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 0.163
+    - Effective Date: 2026-01-01
+      Value: 0.16789
+    notes:
+    - Transport prices the same therms the commodity charge already reports, so its usage is marked Exclude and only its
+      amount is carried.
+  - Charge Name: Public Purpose Surcharge
+    Charge Type: 700 Bill Adj
+    Units: US Dollar
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Apply Charges:
+    - Commodity (Winter)
+    - Commodity (Summer)
+    - Transport
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Nat Gas Misc Chgs/Credits
+        Commodity: Nat Gas Misc Chgs/Credits
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 0.015
+    notes:
+    - 1.5% of commodity and transport, as the provider's bills carry it.
+  - Charge Name: Utility Users Tax
+    Charge Type: 800 Taxes
+    Units: US Dollar
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Apply Charges: Apply to All
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Nat Gas Misc Chgs/Credits
+        Commodity: Nat Gas Misc Chgs/Credits
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 0.05
+    notes:
+    - 5% of every charge before it, the surcharge included.
+  notes:
+  - 'Large Volume Firm Service: the Central Plant boiler.'
+  - The provider's bill prices the whole bill at the season of its end date. The engine prices each day at its own season,
+    so a bill that crosses November 1 or April 1 will differ; the rate test for such a period records by how much.
+- key: rcu_w_tier
+  installed:
+    providerId: 3
+    rateId: null
+  provider: river_city_utilities
+  Rate:
+    Rate Name: RCU-W-TIER
+    Currency: US Dollar
+    Measure Type: Potable Water
+    Rate Categories:
+      Transmission: false
+      Distribution: true
+      Commodity: true
+  Rate Classes:
+  - Rate Class Name: All
+  - Rate Class Name: 1-inch
+  - Rate Class Name: 2-inch
+  - Rate Class Name: 3-inch
+  - Rate Class Name: 4-inch
+  Rate Options:
+  - Option Name: Meter
+    Min Classes: 1
+    Max Classes: 1
+    Classes:
+    - 1-inch
+    - 2-inch
+    - 3-inch
+    - 4-inch
+    Default: 2-inch
+  Determinants:
+  - Charge Name: Meter Charge (1-inch)
+    Charge Type: 400 Fixed By Period
+    Units: US Dollar
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Water Misc Chgs/Credits
+        Commodity: Water Misc Chgs/Credits
+    Rate Class: 1-inch
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 42.0
+    - Effective Date: 2026-01-01
+      Value: 43.26
+  - Charge Name: Meter Charge (2-inch)
+    Charge Type: 400 Fixed By Period
+    Units: US Dollar
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Water Misc Chgs/Credits
+        Commodity: Water Misc Chgs/Credits
+    Rate Class: 2-inch
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 96.0
+    - Effective Date: 2026-01-01
+      Value: 98.88
+  - Charge Name: Meter Charge (3-inch)
+    Charge Type: 400 Fixed By Period
+    Units: US Dollar
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Water Misc Chgs/Credits
+        Commodity: Water Misc Chgs/Credits
+    Rate Class: 3-inch
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 168.0
+    - Effective Date: 2026-01-01
+      Value: 173.04
+  - Charge Name: Meter Charge (4-inch)
+    Charge Type: 400 Fixed By Period
+    Units: US Dollar
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Water Misc Chgs/Credits
+        Commodity: Water Misc Chgs/Credits
+    Rate Class: 4-inch
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 260.0
+    - Effective Date: 2026-01-01
+      Value: 267.8
+  - Charge Name: Water Tiered Commodity
+    Charge Type: 200 Charge Period
+    Units: Thousands of Gallons
+    Aggregation Rule: Summing
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Water Usage
+        Commodity: Water kgal
+      Commodity (Usage):
+        Category: Water Usage
+        Commodity: Water kgal
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Blocks:
+      - Block Number: 1
+        Block Size: 50
+        Block Value: 4.85
+      - Block Number: 2
+        Block Size: 150
+        Block Value: 6.4
+      - Block Number: 3
+        Block Size: null
+        Block Value: 8.15
+    - Effective Date: 2026-01-01
+      Blocks:
+      - Block Number: 1
+        Block Size: 50
+        Block Value: 4.9955
+      - Block Number: 2
+        Block Size: 150
+        Block Value: 6.592
+      - Block Number: 3
+        Block Size: null
+        Block Value: 8.3945
+    notes:
+    - One charge with three blocks (0-50, 50-200, over 200 kgal); the last block's size is left blank.
+  notes:
+  - 'Non-Residential Water. The charge that depends on the meter''s size is a Rate Option: one class per size, exactly one
+    per meter, the commonest size as the default. A meter of the default size needs no class entered; the others are bound
+    to their size in 06-rate-assignments.yaml.'
+- key: rcu_s_vol
+  installed:
+    providerId: 3
+    rateId: null
+  provider: river_city_utilities
+  Rate:
+    Rate Name: RCU-S-VOL
+    Currency: US Dollar
+    Measure Type: Sewer Water
+    Rate Categories:
+      Transmission: false
+      Distribution: true
+      Commodity: true
+  Rate Classes:
+  - Rate Class Name: All
+  Determinants:
+  - Charge Name: Sewer Base
+    Charge Type: 400 Fixed By Period
+    Units: US Dollar
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Sewer Misc Chgs/Credits
+        Commodity: Sewer Misc Chgs/Credits
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 28.5
+    - Effective Date: 2026-01-01
+      Value: 29.355
+  - Charge Name: Sewer Volume
+    Charge Type: 200 Charge Period
+    Units: Thousands of Gallons
+    Aggregation Rule: Summing
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Sewer Volume
+        Commodity: Sewer kgal
+      Commodity (Usage):
+        Category: Sewer Volume
+        Commodity: Sewer kgal
+    notes:
+    - 'The catalog has no Sewer kgal commodity (ccf, gallon, litre and m3 only): add it from the mapping''s Add commodity
+      drawer, under Sewer Volume.'
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 7.95
+    - Effective Date: 2026-01-01
+      Value: 8.1885
+  notes:
+  - Sanitary Sewer, billed on the metered water volume.
+- key: rcu_sw_eru
+  installed:
+    providerId: 3
+    rateId: null
+  provider: river_city_utilities
+  Rate:
+    Rate Name: RCU-SW-ERU
+    Currency: US Dollar
+    Measure Type: Potable Water
+    Rate Categories:
+      Transmission: false
+      Distribution: true
+      Commodity: true
+  Rate Classes:
+  - Rate Class Name: All
+  Determinants:
+  - Charge Name: Stormwater ERU Charge
+    Charge Type: 400 Fixed By Period
+    Units: US Dollar
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Water Misc Chgs/Credits
+        Commodity: Water Misc Chgs/Credits
+    User Defined: true
+    notes:
+    - '$11.20 an equivalent residential unit a month. A User Defined charge: its price is the meter''s own (count x the
+      tariff''s unit price), listed per meter in 06-rate-assignments.yaml. If no screen can enter a per-meter price, that
+      is a product finding and the charge falls back to one flat amount per rate.'
+    - The value here is the price of one ERU.
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 11.2
+    - Effective Date: 2026-01-01
+      Value: 11.536
+  notes:
+  - 'Stormwater by impervious area: 14 to 26 ERUs on the six university buildings that carry it.'
+- key: rcu_irr
+  installed:
+    providerId: 3
+    rateId: null
+  provider: river_city_utilities
+  Rate:
+    Rate Name: RCU-IRR
+    Currency: US Dollar
+    Measure Type: Potable Water
+    Rate Categories:
+      Transmission: false
+      Distribution: true
+      Commodity: true
+  Rate Classes:
+  - Rate Class Name: All
+  - Rate Class Name: 2-inch
+  - Rate Class Name: 3-inch
+  Rate Options:
+  - Option Name: Meter
+    Min Classes: 1
+    Max Classes: 1
+    Classes:
+    - 2-inch
+    - 3-inch
+    Default: 2-inch
+  Determinants:
+  - Charge Name: Meter Charge (2-inch)
+    Charge Type: 400 Fixed By Period
+    Units: US Dollar
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Water Misc Chgs/Credits
+        Commodity: Water Misc Chgs/Credits
+    Rate Class: 2-inch
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 96.0
+    - Effective Date: 2026-01-01
+      Value: 98.88
+  - Charge Name: Meter Charge (3-inch)
+    Charge Type: 400 Fixed By Period
+    Units: US Dollar
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Water Misc Chgs/Credits
+        Commodity: Water Misc Chgs/Credits
+    Rate Class: 3-inch
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 168.0
+    - Effective Date: 2026-01-01
+      Value: 173.04
+  - Charge Name: Irrigation Volume
+    Charge Type: 200 Charge Period
+    Units: Thousands of Gallons
+    Aggregation Rule: Summing
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Water Usage
+        Commodity: Water kgal
+      Commodity (Usage):
+        Category: Water Usage
+        Commodity: Water kgal
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 5.3
+    - Effective Date: 2026-01-01
+      Value: 5.459
+  notes:
+  - 'Irrigation water, no sewer. The charge that depends on the meter''s size is a Rate Option: one class per size, exactly
+    one per meter, the commonest size as the default. A meter of the default size needs no class entered; the others are
+    bound to their size in 06-rate-assignments.yaml.'
+- key: rcu_fire
+  installed:
+    providerId: 3
+    rateId: null
+  provider: river_city_utilities
+  Rate:
+    Rate Name: RCU-FIRE
+    Currency: US Dollar
+    Measure Type: Potable Water
+    Rate Categories:
+      Transmission: false
+      Distribution: true
+      Commodity: true
+  Rate Classes:
+  - Rate Class Name: All
+  - Rate Class Name: 4-inch
+  - Rate Class Name: 6-inch
+  - Rate Class Name: 8-inch
+  Rate Options:
+  - Option Name: Line
+    Min Classes: 1
+    Max Classes: 1
+    Classes:
+    - 4-inch
+    - 6-inch
+    - 8-inch
+    Default: 4-inch
+  Determinants:
+  - Charge Name: Line Charge (4-inch)
+    Charge Type: 400 Fixed By Period
+    Units: US Dollar
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Water Misc Chgs/Credits
+        Commodity: Water Misc Chgs/Credits
+    Rate Class: 4-inch
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 38.0
+    - Effective Date: 2026-01-01
+      Value: 39.14
+  - Charge Name: Line Charge (6-inch)
+    Charge Type: 400 Fixed By Period
+    Units: US Dollar
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Water Misc Chgs/Credits
+        Commodity: Water Misc Chgs/Credits
+    Rate Class: 6-inch
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 62.0
+    - Effective Date: 2026-01-01
+      Value: 63.86
+  - Charge Name: Line Charge (8-inch)
+    Charge Type: 400 Fixed By Period
+    Units: US Dollar
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Water Misc Chgs/Credits
+        Commodity: Water Misc Chgs/Credits
+    Rate Class: 8-inch
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 95.0
+    - Effective Date: 2026-01-01
+      Value: 97.85
+  notes:
+  - 'Private fire service line, a flat charge by line size and no usage. The charge that depends on the meter''s size is
+    a Rate Option: one class per size, exactly one per meter, the commonest size as the default. A meter of the default
+    size needs no class entered; the others are bound to their size in 06-rate-assignments.yaml.'
+- key: ntp_alloc_chw
+  installed:
+    providerId: 4
+    rateId: null
+  provider: northlake_thermal_plant
+  Rate:
+    Rate Name: NTP-ALLOC-CHW
+    Currency: US Dollar
+    Measure Type: Chilled Water
+    Rate Categories:
+      Transmission: false
+      Distribution: false
+      Commodity: true
+  Rate Classes:
+  - Rate Class Name: All
+  Determinants:
+  - Charge Name: CHW Consumption
+    Charge Type: 200 Charge Period
+    Units: Ton-Hour
+    Aggregation Rule: Summing
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Chilled Water Energy
+        Commodity: Chilled Water ton-hours
+      Commodity (Usage):
+        Category: Chilled Water Energy
+        Commodity: Chilled Water ton-hours
+    notes:
+    - 'The catalog has only Chilled Water MJ: add Chilled Water ton-hours from the Add commodity drawer.'
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 0.168
+    - Effective Date: 2026-01-01
+      Value: 0.17304
+  - Charge Name: CHW Demand
+    Charge Type: 200 Charge Period
+    Units: Cooling Ton
+    Aggregation Rule: Maximum
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Chilled Water Demand
+        Commodity: Chilled Water tons
+      Commodity (Usage):
+        Category: Chilled Water Demand
+        Commodity: Chilled Water tons
+    IsDemand: true
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 9.5
+    - Effective Date: 2026-01-01
+      Value: 9.785
+  - Charge Name: Fixed O&M Share
+    Charge Type: 400 Fixed By Period
+    Units: US Dollar
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Chilled Wtr Misc Chgs/Credits
+        Commodity: Chilled Wtr Misc Chgs/Credits
+    User Defined: true
+    notes:
+    - 'The plant''s fixed operations and maintenance share: $340 a month for each 120,000 square feet of the building served,
+      rounded to $10. A User Defined charge: its price is the meter''s own (count x the tariff''s unit price), listed per
+      meter in 06-rate-assignments.yaml. If no screen can enter a per-meter price, that is a product finding and the charge
+      falls back to one flat amount per rate.'
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 340.0
+    - Effective Date: 2026-01-01
+      Value: 350.2
+  notes:
+  - 'Internal cost recovery for chilled water: consumption, peak tons and the fixed share.'
+- key: ntp_alloc_steam
+  installed:
+    providerId: 4
+    rateId: null
+  provider: northlake_thermal_plant
+  Rate:
+    Rate Name: NTP-ALLOC-STEAM
+    Currency: US Dollar
+    Measure Type: Steam
+    Rate Categories:
+      Transmission: false
+      Distribution: false
+      Commodity: true
+  Rate Classes:
+  - Rate Class Name: All
+  Determinants:
+  - Charge Name: Steam Consumption
+    Charge Type: 200 Charge Period
+    Units: Steam Thousands of Pounds
+    Aggregation Rule: Summing
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Steam Energy
+        Commodity: Steam klb
+      Commodity (Usage):
+        Category: Steam Energy
+        Commodity: Steam klb
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 14.2
+    - Effective Date: 2026-01-01
+      Value: 14.626
+  - Charge Name: Fixed O&M Share
+    Charge Type: 400 Fixed By Period
+    Units: US Dollar
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Steam Misc Chgs/Credits
+        Commodity: Steam Misc Chgs/Credits
+    User Defined: true
+    notes:
+    - 'The plant''s fixed operations and maintenance share: $340 a month for each 120,000 square feet of the building served,
+      rounded to $10. A User Defined charge: its price is the meter''s own (count x the tariff''s unit price), listed per
+      meter in 06-rate-assignments.yaml. If no screen can enter a per-meter price, that is a product finding and the charge
+      falls back to one flat amount per rate.'
+    - A building billed for both chilled water and steam carries the share once, on its chilled water rate.
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 340.0
+    - Effective Date: 2026-01-01
+      Value: 350.2
+  notes:
+  - Internal cost recovery for steam.
+- key: hos_ppa_2024
+  installed:
+    providerId: 5
+    rateId: null
+  provider: helios_onsite_solar
+  Rate:
+    Rate Name: HOS-PPA-2024
+    Currency: US Dollar
+    Measure Type: Electricity
+    Rate Categories:
+      Transmission: false
+      Distribution: false
+      Commodity: true
+  Rate Classes:
+  - Rate Class Name: All
+  Determinants:
+  - Charge Name: PPA Energy
+    Charge Type: 200 Charge Period
+    Units: KilowattHours
+    Aggregation Rule: Summing
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Elec Energy (Non-TOU)
+        Commodity: Non-TOU kWh
+      Commodity (Usage):
+        Category: Elec Energy (Non-TOU)
+        Commodity: Non-TOU kWh
+    notes:
+    - 'The agreement''s 2% a year escalator: 0.119, 0.12138, 0.123808. The bills use these figures.'
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 0.119
+    - Effective Date: 2025-01-01
+      Value: 0.12138
+    - Effective Date: 2026-01-01
+      Value: 0.123808
+  - Charge Name: Net Metering Credit
+    Charge Type: 200 Charge Period
+    Units: KilowattHours
+    Aggregation Rule: Summing
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Elec Misc Chgs/Credits
+        Commodity: Elec Misc Chgs/Credits
+      Commodity (Usage):
+        Category: Elec Energy (Non-TOU)
+        Commodity: Non-TOU kWh
+      Exclude: true
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: -0.092
+    notes:
+    - A negative price on exported kWh; not escalated. Its kWh are marked Exclude so the bill reports generation once.
+  notes:
+  - 'Solar power purchase agreement: generated kWh at the escalating price, less a credit on exported kWh.'
+# ---- Ridgeline Wind rates ----
+- key: ved_gen_ic
+  installed:
+    providerId: 1
+    rateId: null
+  provider: valley_electric_district
+  Rate:
+    Rate Name: VED-GEN-IC
+    Currency: US Dollar
+    Measure Type: Electricity
+    Rate Categories:
+      Transmission: false
+      Distribution: true
+      Commodity: true
+  Rate Classes:
+  - Rate Class Name: All
+  Determinants:
+  - Charge Name: Generator Customer Charge
+    Charge Type: 400 Fixed By Period
+    Units: US Dollar
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Effective Dates:
+    - Effective Date: 2024-07-01
+      Value: 285.0
+  - Charge Name: Station Service Energy
+    Charge Type: 200 Charge Period
+    Units: KilowattHours
+    Aggregation Rule: Summing
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Effective Dates:
+    - Effective Date: 2024-07-01
+      Value: 0.131
+    notes:
+    - Delivered kWh in the tariff (station service drawn while the turbines are idle); see the rate's note on channels.
+  - Charge Name: Generation Credit
+    Charge Type: 200 Charge Period
+    Units: KilowattHours
+    Aggregation Rule: Summing
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Effective Dates:
+    - Effective Date: 2024-07-01
+      Value: -0.0612
+    notes:
+    - '# synthetic stand-in: an ordinary usage determinant priced negative, the construct HOS-PPA-2024''s Net Metering
+      Credit uses. The tariff prices it on received (export) kWh only; the engine cannot restrict it to that channel
+      (see the rate''s note on channels).'
+  - Charge Name: Utility Users Tax
+    Charge Type: 800 Taxes
+    Units: US Dollar
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Apply Charges:
+    - Generator Customer Charge
+    - Station Service Energy
+    Effective Dates:
+    - Effective Date: 2024-07-01
+      Value: 0.05
+  notes:
+  - 'Generator interconnection for the Ridgeline Substation account (SYN-VED-A-0010014), effective 2024-07-01 to
+    2025-12-31 (no end date is entered, like every rate here). The components are the provider file''s: a $285.00
+    monthly customer charge, station service energy at $0.131 on delivered kWh, reactive power at $0.0042 per kVArh
+    beyond power factor 0.95, and a -$0.0612 generation credit on received (export) kWh. Utility Users Tax is the 5% the
+    itemized bills apply.'
+  - 'Gap, channels (finding 62): a usage determinant takes every point under the meter whose unit class is the measure
+    type''s usage class (kWh, class 3) and Summing adds them (UtilityRates_GetPoints, UtilityRates_LoadDataValues).
+    Exported kWh and Station Service kWh are both class 3, so Station Service Energy and Generation Credit each price
+    the sum of the two, not their own channel. A point can only be excluded from every rate in a bill scenario (Tenant
+    Rebill, Point Assignment), never from one determinant. Both determinants stay as the tariff states them. A
+    data-dependent workaround (untested) is Minimum on Station Service Energy and Maximum on Generation Credit, which
+    would make the engine pick the smaller and the larger channel and so holds only while a period''s export exceeds
+    its station service.'
+  - 'Gap, reactive power (finding 63): the tariff''s Reactive Power Charge (per kVArh beyond the kVArh allowed at power
+    factor 0.95, allowed = export kWh x 0.3286841) has no determinant. kVArh is unit class 21, outside the classes a
+    charge may use (the UtilityChargeUnits view allows 3, 4, 7 and 8); the engine reads only the Electricity usage and
+    demand classes, 3 and 4; and it has no power factor or allowance math. The commodity catalog does hold Elec rkVAh
+    (kVArh) and Elec Power Factor, so a bill can carry those quantities, but no determinant can price them. The
+    itemized bills'' reactive line ($161.07 on the first bill, $0.00 on the winter bill) comes from the Valley Electric
+    bill itself.'
+  - 'Utility Users Tax applies to the customer charge and station service only. The bills also tax the reactive line and
+    never the credit, so on the first bill the engine''s tax is $43.25 against the bill''s $51.31, the $8.06 being tax on
+    the $161.07 reactive line; on the winter bill, where reactive is zero, the two agree.'
+  - 'Gap, credit transfer (finding 64): under VED-BCT the whole Generation Credit leaves this account
+    (bct_credit_transferred, +$152,792.65 on the first bill) and lands on the Central Plant''s bill. A Bill Adj of -1.0
+    on Generation Credit would cancel it here, since the engine can apply a percentage to its own rate''s charges, but
+    that line belongs to VED-BCT, which cannot run beside this rate (see VED-BCT).'
+- key: ved_bct
+  installed:
+    providerId: 1
+    rateId: null
+  provider: valley_electric_district
+  Rate:
+    Rate Name: VED-BCT
+    Currency: US Dollar
+    Measure Type: Electricity
+    Rate Categories:
+      Transmission: false
+      Distribution: true
+      Commodity: true
+  Rate Classes:
+  - Rate Class Name: All
+  Determinants:
+  - Charge Name: BCT Administrative Fee
+    Charge Type: 400 Fixed By Period
+    Units: US Dollar
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Effective Dates:
+    - Effective Date: 2024-07-01
+      Value: 12.5
+  notes:
+  - 'Rider on the generator account (SYN-VED-A-0010014) and the Central Plant (SYN-VED-A-0010013), effective 2024-07-01
+    to 2025-12-31: the generator''s whole Generation Credit moves to the Central Plant''s bill one cycle later (the first
+    bill''s credit is on the Sep-24 period bill), and a $12.50 administrative fee posts per benefiting account per month.'
+  - 'Only the fee is a charge the engine can compute, and it belongs to the benefiting account: assigned to the generator
+    account''s meter it would post a fee that account''s bills do not carry.'
+  - 'Gap, credit transfer (finding 64): the engine prices one meter at a time from that meter''s own points
+    (UtilityRate_Exec) and writes the result to that meter''s own account (UtilityGenBill_Create), and a Bill Adj can
+    apply only to charges priced in the same run (UtilityRates_Run_700). Nothing reads one account''s amount into
+    another account''s bill, so bct_credit_transferred (+$152,792.65 on the first generator bill) and
+    bct_credit_received (-$152,792.65 on the Central Plant''s Sep-24 period bill) are not determinants here. The Central
+    Plant''s credit arrives as a line on its imported Valley Electric bill. Bill Allocation, the product''s one
+    cross-account feature, splits every line of a source meter''s bill across destination accounts by percent; it is
+    configured rather than rate-driven and has no one-cycle lag.'
+  - 'Gap, one rate at a time (finding 65): a meter carries one rate per bill scenario, so this rider cannot be assigned
+    beside VED-GEN-IC or the Central Plant''s base rate as the provider file lists it (06-rate-assignments.yaml). The rate
+    exists for its name, dates and fee; the product-shaped alternative is to put the fee, and the credit lines for a
+    specific account, into that account''s own base rate.'
+- key: rwl_xfer_2024
+  installed:
+    providerId: null
+    rateId: null
+    note: the Ridgeline Wind provider is created in Stage 1 (02-utility-providers.yaml); take its id from there
+  provider: ridgeline_wind
+  Rate:
+    Rate Name: RWL-XFER-2024
+    Currency: US Dollar
+    Measure Type: Electricity
+    Rate Categories:
+      Transmission: false
+      Distribution: false
+      Commodity: true
+  Rate Classes:
+  - Rate Class Name: All   # created by Add Rate; the always-applied class (ClassType 0), not entered
+  Determinants:
+  - Charge Name: Transfer Energy
+    Charge Type: 200 Charge Period
+    Units: KilowattHours
+    Aggregation Rule: Summing
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Elec Energy (Non-TOU)
+        Commodity: Non-TOU kWh
+      Commodity (Usage):
+        Category: Elec Energy (Non-TOU)
+        Commodity: Non-TOU kWh
+    Effective Dates:
+    - Effective Date: 2024-07-01
+      Value: 0.058
+  - Charge Name: Research Credit
+    Charge Type: 400 Fixed By Period
+    Units: US Dollar
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Elec Misc Chgs/Credits
+        Commodity: Elec Misc Chgs/Credits
+    Effective Dates:
+    - Effective Date: 2024-07-01
+      Value: -1250.0
+    notes:
+    - A negative fixed amount; the tariff's basis is the Wind Energy Research Lab's use of the site.
+  notes:
+  - 'Internal transfer of the Ridgeline turbines'' output to the plant: $0.058 per kWh of the farm''s generated energy (the
+    sum of the ten turbine pad meters), less a $1,250.00 monthly credit for the Wind Energy Research Lab''s use of the
+    site, effective 2024-07-01 to 2025-12-31 (no end date is entered). # assumed: Commodity only for the rate
+    categories, like the plant''s other internal rates; the provider file states none.'
+  - 'Assigned to one logical billing meter, not the ten turbines: EEM prices the points under one meter and writes one
+    bill per meter and month (UtilityRate_Exec, UtilityGenBill_Create; UtilityMeterRatesBillGen holds one row per meter;
+    finding 66), so the rate goes on the Ridgeline Farm Transfer Meter (SYN-RWL-M-0110000), whose one point is the
+    aggregate Ridgeline Farm Generated kWh 10m, the ten turbines'' kWh (Stage 2). Priced there, Transfer Energy is one
+    line on the farm total and Research Credit posts once. On the ten pad meters the statement would be ten bills with
+    ten credits, and the ten Transfer Energy lines, each rounded to the cent, would add to $130,580.28 against the
+    hand-made $130,580.27 for the farm. Test Rates prices the farm total as one stream, which is how 07-rate-tests.yaml
+    reproduces the statement to the cent; it rounds every line to the cent, while Bill Generation carries four decimals,
+    so confirm the total on the first generated statement.'
+  - 'Rate class: Add Rate creates the rate''s class All itself, and it is the always-applied type (UtilityRate_Save.sql:89-90
+    inserts it with ClassType 0; the desktop saves with FromImport 0; every rate in the demo database has one).
+    UtilityRate_Exec takes an All-type class into every meter''s determinant list (UtilityRate_Exec.sql:303-307), so both
+    determinants go under All and the rate needs no Rate Option. Do not add a class: an added class is Unique and prices a
+    meter only as its Rate Option''s default (finding 69), and the option editor never offers All. Test Rates names its
+    classes itself, so it would pass either way; the generated bill is what proves this.'
+  - 'Commodity Mapping: a determinant becomes a bill line only through its mapping (UtilityBillLineItems_Get joins each
+    quantity and amount to dbo.UtilityCommodityMap and dbo.Commodity). One with no mapping adds its amount to the bill
+    total and writes no line, so the lines stop adding up to the total. Transfer Energy maps quantity and charge to one
+    commodity, Non-TOU kWh, so its one line carries the kWh and the amount; Research Credit, a fixed charge, maps its
+    charge to Elec Misc Chgs/Credits, a money line. Both commodities and their categories are in the installed catalog
+    (dbo.Commodity and dbo.CommodityCategory, both system entries).'

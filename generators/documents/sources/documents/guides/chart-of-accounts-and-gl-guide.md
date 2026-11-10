@@ -30,6 +30,7 @@ import format during the design phase.
 | 5120-WATER | Expense | Water / sewer / stormwater expense |
 | 5130-THERMAL | Expense | Chilled water / steam (internal allocation) |
 | 5140-SOLAR | Expense | Solar PPA expense |
+| 5150-WIND | Expense | Ridgeline wind energy transfer (internal) |
 | 2000-AP | Liability | Accounts payable control |
 
 ## Cost-coding segments
@@ -53,6 +54,8 @@ Every cost line is coded with our **five segments** in addition to the GL accoun
 | Cedar Row Apartments | by commodity | 250 Auxiliary | Housing |
 | Thermal plant allocations (six cost centers, one per served building) | 5130-THERMAL | 700 Plant | Facilities |
 | Solar PPA | 5140-SOLAR | 110 Operating | Facilities |
+| Ridgeline transfer statement | 5150-WIND | 700 Plant | Ridgeline Wind |
+| Ridgeline generator account (Valley Electric) | 5100-ELEC | 700 Plant | Ridgeline Wind |
 
 Some segment values are intentionally left blank on certain accounts (e.g.
 Activity/Project) — that is expected, not an error.
@@ -62,6 +65,11 @@ Activity/Project) — that is expected, not an error.
 - Each utility account should be flagged for the right interface: most are **AP
   upload**; campus electric and thermal accounts are **both AP and GL**; one Cedar
   Row account is intentionally **no upload** (kept off the interface as a control).
+- Ridgeline's transfer statement is **GL only**: it is a journal between the plant
+  and its own wind company, and no payment leaves the plant. The Valley Electric
+  generator account pays only its own small charges: its export credit moves to
+  the Central Plant account (the bill credit transfer), so code the credit once,
+  where it lands.
 - A bill should not be exported until it is **approved** (see access request — the
   person who enters a bill is not the person who approves it), and a bill with an
   open validation alert must be **held** from export.

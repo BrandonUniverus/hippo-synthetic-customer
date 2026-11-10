@@ -27,7 +27,8 @@ to support property setup, rating requests, and score history.
 | Central Plant | Other - Utility, outside the campus boundary | metrics only (no 1–100 score) |
 
 The campus buildings roll up to the campus parent. Cedar Row A, Cedar Row B and
-the Common House are the buildings within the Cedar Row property.
+the Common House are the buildings within the Cedar Row property. The Ridgeline
+Wind Site is a generating site, not a building, and is not benchmarked.
 
 We understand **scores come from Portfolio Manager** (not entered by hand) and
 that Portfolio Manager scores only some property types. Please plan to connect
@@ -50,6 +51,13 @@ We report emissions by scope and want them computed from our usage:
 - Onsite **solar** should show as a **market-based Scope 2 reduction**; we
   **retain the RECs** (per the Helios PPA), so please reflect that in market-based
   accounting and avoided-emissions reporting.
+- Off-site **wind** from Ridgeline gets the same treatment: we retain those RECs,
+  and its generation should be reported as **avoided emissions** at the grid
+  factor. Ridgeline's station service is ordinary Scope 2 electricity. Count the
+  turbine meters' generation, not the Valley Electric bill credit, which is money.
+- By the grid factor we mean the same dated eGRID factor as Scope 2. Helios's
+  statements print an avoided-CO2e figure of their own; keep it as Helios's
+  disclosure, but report ours at the grid factor.
 
 ## Targets & cadence
 
@@ -57,7 +65,11 @@ We report emissions by scope and want them computed from our usage:
   across our buildings.
 - Annual emissions report by scope and property; quarterly ENERGY STAR scores.
 - We have energy projects (LED retrofit, central plant chiller upgrade, solar expansion,
-  recommissioning) and want **measurement & verification** against a baseline.
+  recommissioning, the WTG-07 gearbox replacement) and want **measurement &
+  verification** against a baseline.
+- For the wind farm, the target is **performance against what the wind made
+  possible**: generated energy over the turbines' own possible power, per turbine
+  and for the farm, over any period we choose.
 
 ## Open items
 

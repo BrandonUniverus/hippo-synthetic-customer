@@ -17,11 +17,13 @@ Identity Provider (IdP).
 - An unauthenticated, loopback-only configuration page for the ordinary
   provider name, realm, public URL, application URLs, and baseline OIDC/SAML
   registrations, with separate fictional-user and fictional-group pages.
-- A small Northlake launchpad that establishes a provider session and directs
-  the tester to EnergyHippo without handling passwords or tokens itself.
-- 19 checked-in Northlake identities: 18 active and one deliberately disabled,
+- The Northlake site (Facilities and Energy Services) at the root: Energy Hippo
+  shortcuts that sign in through the Northlake provider and land on a chosen
+  page, a utility directory and a document library. It handles no passwords or
+  tokens.
+- 23 checked-in Northlake identities: 22 active and one deliberately disabled,
   plus ignored local additions managed through the Phase 2 page.
-- 27 checked-in groups plus ignored local additions, editable synthetic
+- 29 checked-in groups plus ignored local additions, editable synthetic
   membership, and claim shapes for company IDs and EEM permission-profile intent.
 - Stable UUIDv5 user, group, role, client, scope, and realm IDs.
 - Two bounded confidential OIDC profiles whose IDs, callbacks, post-logout
@@ -59,9 +61,11 @@ Identity Provider (IdP).
   in each disposable realm. Its different hostname creates a real cross-site
   boundary for browser session, silent-auth, and Front-Channel Logout evidence.
 
-- Northlake University branding on every page a tester sees: the Keycloak
-  sign-in flows, the account and administration consoles, the launchpad, the
-  configuration pages and the customer lab (see `identity/branding/README.md`).
+- Northlake University branding on every page a tester sees: the site, the
+  Keycloak sign-in flows, the account and administration consoles, the
+  configuration pages and the customer lab. The design system is
+  `brands/northlake/`; the page chrome is described in
+  `identity/branding/README.md`.
 
 The built-in Keycloak administration console is the initial admin page. This
 repository does not reimplement passwords, sessions, consent, or user storage.
@@ -103,7 +107,8 @@ weakening certificate validation.
 
 Then open:
 
-- Northlake launchpad: `https://localhost:8443/`
+- Northlake site: `https://localhost:8443/`
+- Brand systems: `https://localhost:8443/brands/`
 - Local provider configuration: `https://localhost:8443/configure`
 - OIDC profile configuration: `https://localhost:8443/configure/oidc`
 - SAML profile configuration: `https://localhost:8443/configure/saml`
@@ -159,7 +164,7 @@ claim-shaping relationships without implying EnergyHippo authorization.
 
 ## Synthetic group management
 
-`https://localhost:8443/configure/groups` lists the 27 checked-in fictional
+`https://localhost:8443/configure/groups` lists the 29 checked-in fictional
 provider groups and lets a developer add, rename, or remove ignored local groups.
 Checked-in group definitions remain immutable, while membership for either a
 checked-in or local group can be changed through an ignored overlay. Local groups
@@ -355,27 +360,46 @@ property. OIDC Session Management, Back-Channel Logout, embedded Keycloak login,
 and installed-EnergyHippo session behavior remain explicit non-claims or proof
 gaps.
 
-## Northlake SSO launchpad
+## Northlake site
 
-The root page is intentionally a launchpad rather than a second authentication
-application:
+The root page, `https://localhost:8443/`, is Northlake University's Facilities
+and Energy Services page. It is a static page that Caddy serves as a template
+(`portal/index.html`, see `Caddyfile`): it has no sign-in of its own and never
+sees a password, authorization code or token.
 
-1. **Sign in to Northlake** opens Keycloak's account console in a new tab. A
-   successful login establishes the normal Northlake realm SSO session.
-2. **Open EnergyHippo** sends the tester to `EEMSUITE_APPLICATION_HOME_URL`.
-3. The tester chooses Northlake on EnergyHippo's third-party login page.
-   EnergyHippo still starts and validates its own OIDC authorization request,
-   but Keycloak can complete that request without another password prompt while
-   the provider session remains valid.
+- **Energy Hippo shortcuts** are SP-initiated sign-ins that land on one page:
+  `<EEMSUITE_APPLICATION_HOME_URL>/Account/ExternalAutoLogin?provider=<NORTHLAKE_EEM_PROVIDER_KEY>&returnRoute=<encoded #/route>`.
+  Energy Hippo starts and validates its own SAML AuthnRequest (or OIDC request,
+  for an OIDC provider key), Keycloak completes it without another password
+  while the Northlake session is valid, and Energy Hippo opens the route. Its
+  RelayState is its own opaque handle; the route travels in its protected state.
+- **Campus energy dashboard** links to `<home URL>/Public/Dashboard/<id>` once
+  `NORTHLAKE_PUBLIC_DASHBOARD_ID` names a dashboard made public in Energy Hippo.
+  Until then the page says the dashboard is coming.
+- **Utilities** link to each provider's pages at `NORTHLAKE_SOURCES_URL`
+  (default `/utilities`), with each provider's own logo from `brands/`.
+  `/utilities/` is the source bundle (port 18081) served through this site: the
+  bundle's pages were rendered with an older copy of the Northlake look, so the
+  site serves today's `branding/`, `brands/northlake` and
+  `services/sources/web/sources.css` in their place, and the bundle's own
+  directory page redirects to the Utilities section.
+- **Meter reading** is the handheld tool (port 18082) at `/meter-reading/`.
+- **Documents** link to Northlake's guides, rate sheets and onboarding package,
+  served read-only from `documents/` at `/documents/`.
 
-The relying party must not force `prompt=login` or `max_age=0` when session
-reuse is desired. Logout, session expiry, or a browser that does not carry the
-Northlake cookie correctly requires authentication again.
+Caddy reaches the two host ports through `NORTHLAKE_SOURCES_UPSTREAM` and
+`NORTHLAKE_HANDHELD_UPSTREAM` (default `host.docker.internal:18081` and
+`:18082`). When one of them is stopped, only its pages answer 502.
 
-This keeps the trust boundary realistic: the launchpad never sees a password,
-authorization code, or token. A future Northlake customer website can be added
-as a separate synthetic relying party with its own client and callback instead
-of coupling API, upload, and webhook scenarios to the identity provider.
+Set the four variables in the ignored `identity/.env` (the first comes from the
+`/configure` application home URL when one is saved), then recreate Caddy. The
+relying party must not force `prompt=login` or `max_age=0` when session reuse
+is desired. Energy Hippo cannot be framed by another site and treats any
+IdP-supplied RelayState as its own handle, so the site links into Energy Hippo
+rather than embedding it, and IdP-initiated SAML lands only on the home page.
+
+The provider test steps and the SAML contract that used to sit on the root page
+are now at the bottom of `/configure`.
 
 View the generated local credentials:
 
@@ -391,15 +415,17 @@ Secrets are stored only in ignored files:
 
 ## Northlake branding
 
-Every page a tester sees carries the Northlake University identity: the
-Keycloak sign-in pages (including password reset, forced password update,
+Every page a tester sees carries the Northlake University identity: the site,
+the Keycloak sign-in pages (including password reset, forced password update,
 authenticator setup, one-time codes, passkeys, recovery codes, consent, error
 and expired pages), the account and realm administration consoles, the
-launchpad, the configuration pages and the customer browser lab. The shared
-tokens, lockups, fonts and page chrome live in `identity/branding/`; the three
-Keycloak themes live in `identity/themes/northlake/` and are assigned to every
-generated realm. See [identity/branding/README.md](branding/README.md) for the
-file map, the theme layout, the cache rules and the screenshot gallery script.
+configuration pages and the customer browser lab. The design system (tokens,
+fonts, lockups) is `brands/northlake/`; the shared page chrome lives in
+`identity/branding/`; the three Keycloak themes live in
+`identity/themes/northlake/` and are assigned to every generated realm. See
+[identity/branding/README.md](branding/README.md) for the file map, the theme
+layout, the cache rules and the screenshot gallery script, and
+`https://localhost:8443/brands/` for all seven brand systems.
 
 ## OIDC connection profiles
 
@@ -459,9 +485,10 @@ The generated clients also register:
 `https://localhost:7310` is a verifier callback, not a permanently running
 application. Keycloak's **Back to Application** link instead uses
 `EEMSUITE_APPLICATION_HOME_URL`, which defaults to
-`https://localdev.energyhippo.com/Hippo/`. The launchpad's **Open EnergyHippo**
-action uses the same value. Change that ignored `.env` setting when another
-EEMSuite origin is active.
+`https://localdev.energyhippo.com/Hippo/`. The Northlake site's Energy Hippo
+links (and the older `/open-energyhippo` redirect) use the same value. Change it
+on `/configure` or in the ignored `.env` when another EEMSuite origin is active,
+for example `https://northlake.energyhippo.com/Hippo/` for the Northlake instance.
 
 Use `/configure/oidc` for exact callback, post-logout callback, and scope changes.
 The `.env` values remain the defaults when no ignored Phase 4 document exists.
@@ -493,10 +520,14 @@ complete registrations under `clients.saml` (`Standard`) and, when enabled,
 }
 ```
 
-The first Standard ACS and logout URLs are verifier callbacks. The generated
-clients also register EEMSuite's real dynamic-provider routes:
+By default the first Standard ACS and logout URLs are verifier callbacks. The
+generated clients also register EEMSuite's real dynamic-provider routes:
 `/Hippo/saml/{providerKey}/acs`, `/metadata`, and `/logout`. Use
-`/configure/saml` to change these exact values. The named
+`/configure/saml` to change these exact values. Keycloak treats the first ACS
+and logout URL as the client's own: IdP-initiated sign-ins post to that ACS and
+logout responses go to that logout URL. When an installed Energy Hippo is the
+target, list its URLs first (the [runbook](../RUNBOOK.md) does this for
+Northlake); the verifiers stop at Keycloak's response and never call it. The named
 `EEMSUITE_SAML_STANDARD_*` or `EEMSUITE_SAML2INT_*` variables remain defaults
 when no ignored Phase 5 document exists. Exact URLs are intentional; no wildcard
 SAML callbacks are registered.

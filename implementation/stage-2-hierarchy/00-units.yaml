@@ -1,0 +1,164 @@
+# Stage 2, step 0: Units (Database Administrator > Units). One record per unit Northlake adds to the seeded catalog
+# or extends. Northlake deliberately carries units the catalog does not ship, so the unit system itself is exercised:
+# a new base unit, a compound unit built from a numerator and a denominator, a User-defined unit, existing units
+# associated with another measure type, conversions by multiplier and by offset, a custom Activity Level unit that
+# drives an index, and a
+# billing unit for a flat fee. Ridgeline Wind uses knots, an Angle unit and air density, and
+# two seeded units that share the label kg/m3. The handheld routes add Power Factor. Enter before the points
+# (04-points.yaml), which pick these units.
+stage: 2
+step: 0
+title: Units
+app: Database Administrator
+screen: Units
+source:
+- data/scenarios/demo-university-v1.yaml (weather, solar, plant and activity channels)
+- data/providers/river-city-utilities.yaml (stormwater usageUnit eru)
+- data/eem/northlake-eem-metaworld-stage1b-v1.yaml (unitLabels)
+notes:
+- 'Apply the weather measurement catalog upgrade first. Reuse its Dew Point, Wind Speed, Wind Direction and
+  Precipitation Probability categories and their unit mappings; do not create duplicate units. Preserve existing
+  unit IDs and custom conversions. Station forecast points use these explicit categories, while existing met-mast
+  and turbine points keep their current Weather category.'
+- 'Add Unit, then fill the row: Unit Name, Label (the abbreviation a point''s Units list shows in parentheses), Unit
+  Class, and Rate, Numerator and Denominator Unit where the record names them. Save, then open the unit''s sections:
+  Add measure type for each association (a unit appears in a point''s Units list only for its associated measure
+  types) and add each conversion. Save again.'
+- 'A unit''s Conversions section defines it against one reference unit of the same class: pick the Reference, then enter
+  Multiplier and Offset so that Reference = this unit x Multiplier + Offset; the screen reads it back as "1 mi =
+  1.609344 km". Saving writes that row (UnitConversion.UN_UnitID = Reference, UC_ConversionFromID = this unit), its
+  inverse, and a conversion to every other unit in the class that the reference already converts to. Seeded
+  (protected) units cannot be defined this way.'
+- 'Records marked Existing are seeded units that Northlake only extends: open them with View rather than Add Unit.'
+- 'Enter in file order: Miles before Miles per Hour (its numerator), and every unit before the units defined against it.'
+- 'How the catalog does it, for reference: Kilowatt is KilowattHours over Hour; kW/ton is Kilowatt over Cooling Ton in
+  the Equipment Efficiency class; a consumption unit names its demand unit as Rate Unit (KilowattHours has Rate Unit
+  Kilowatt), and degF is degC x 1.8 + 32.'
+records:
+- key: miles
+  installed:
+    unitId:
+  Definitions: {Unit Name: Miles, Label: mi, Unit Class: Length}
+  Conversions:
+  - {Reference: Kilometers, Multiplier: 1.609344, Offset: 0}  # 1 mi = 1.609344 km; meters, feet and the rest follow
+- key: miles_per_hour
+  Existing: true
+  installed:
+    unitId:
+  Definitions: {Unit Name: Miles per Hour, Label: mph, Unit Class: Speed, Numerator Unit: Miles, Denominator Unit: Hour}
+  Measure Types:
+  - {Measure Type: Weather, Is Commodity: false}
+  - {Measure Type: Wind Speed, Is Commodity: false}
+  Conversions:
+  - {Reference: Kilometers per Hour, Multiplier: 1.609344, Offset: 0}  # 1 mph = 1.609344 km/h; m/s follows
+  Notes: KSAC Wind Speed (NOAA observations in mph).
+- key: kilometers_per_hour
+  Existing: true
+  Definitions: {Unit Name: Kilometers per Hour, Label: km/h}
+  Measure Types:
+  - {Measure Type: Weather, Is Commodity: false}
+  - {Measure Type: Wind Speed, Is Commodity: false}
+  Notes: KSMF observed and forecast wind speed; NOAA OutputUnit is KilometersPerHour.
+- key: watts_per_square_meter
+  installed:
+    unitId:
+  Definitions: {Unit Name: Watts per Square Meter, Label: W/m2, Unit Class: User-defined}
+  Measure Types:
+  - {Measure Type: Weather, Is Commodity: false}
+  Notes: >-
+    Plane-of-array irradiance on the Science Center PV array (Helios recorder channel). No seeded class is power per
+    area (EnergyUseIndex is energy per area), so it is User-defined. A unit class sets which numerator and denominator
+    a unit may have, and User-defined has neither, so the editor shows both as N/A. A numerator would mark the unit as
+    a rate for conversions, aggregate points and rate determinants, none of which this weather reading uses.
+- key: psig
+  Existing: true
+  Definitions: {Unit Name: PSIG, Label: PSIG}
+  Measure Types:
+  - {Measure Type: Pressure, Is Commodity: false}
+  Notes: >-
+    Central Plant steam header pressure. Seeded in the Pressure class but associated only with Air Flow. The seed
+    converts PSIG to psi, Pascal, kPa and the rest exactly as it converts psi (Offset 0). That is right only if those
+    units are gauge too; whether the seed means gauge or absolute is unconfirmed (PRODUCT FINDING 37), and gauge is
+    absolute minus 14.696 psi. PSIG is a protected seeded unit, so its
+    Conversions section cannot redefine it: add only the measure type and leave the seed's conversions as they are.
+- key: events
+  installed:
+    unitId:
+  Definitions: {Unit Name: Events, Label: events, Unit Class: Unit}
+  Measure Types:
+  - {Measure Type: Activity Level, Is Commodity: true}
+  Notes: Student Center Event Count, the activity index behind the Student Center baselines.
+- key: equivalent_runoff_unit
+  installed:
+    unitId:
+  Definitions: {Unit Name: Equivalent Runoff Unit, Label: ERU, Unit Class: Area}
+  Measure Types:
+  - {Measure Type: Potable Water, Is Commodity: true}
+  Conversions:
+  - {Reference: Square Feet, Multiplier: 2500, Offset: 0}  # assumed 1 ERU = 2,500 sq ft; the tariff gives no size
+  Notes: River City stormwater (RCU-SW-ERU, $11.20 per ERU per month); used by Stage 4 rates and Stage 5 bill lines, not by a Stage 2 point.
+# ---- Ridgeline Wind (2026-10-01) ----
+- key: meters_per_second
+  Existing: true
+  Definitions: {Unit Name: Meters per Second, Label: m/s}
+  Measure Types:
+  - {Measure Type: Weather, Is Commodity: false}
+  - {Measure Type: Wind Speed, Is Commodity: false}
+  Notes: Ridgeline nacelle and met-mast wind points retain their Weather mapping; the updated catalog also maps this unit to Wind Speed.
+- key: knots
+  Existing: true
+  installed:
+    unitId:
+  Definitions: {Unit Name: Knots, Label: kn, Unit Class: Speed}
+  Measure Types:
+  - {Measure Type: Weather, Is Commodity: false}
+  - {Measure Type: Wind Speed, Is Commodity: false}
+  Conversions:
+  - {Reference: Meters per Second, Multiplier: 0.514444, Offset: 0}  # 1 kn = 0.514444 m/s: met mast against KSUU
+  Notes: KSUU observed and forecast wind speed; NOAA OutputUnit is explicitly Knots. Reuse the existing unit and conversions.
+- key: degrees
+  Existing: true
+  Definitions: {Unit Name: Degrees, Label: "°"}
+  Measure Types:
+  - {Measure Type: Weather, Is Commodity: false}
+  - {Measure Type: Wind Direction, Is Commodity: false}
+  Notes: Met-mast direction retains its Weather mapping; station forecasts use Wind Direction. The label is the degree sign.
+- key: kilogram_per_cubic_meter
+  Existing: true
+  Definitions: {Unit Name: Kilogram per cubic meter, Label: kg/m3}
+  Measure Types:
+  - {Measure Type: Weather, Is Commodity: false}
+  Notes: >-
+    Met mast air density. Seeded in the Density class for fuels and water. Pick this one, not Kilograms per Gas cubic
+    meter (EmissionFactor class), which shows the same label kg/m3; the point's Units list tells them apart only by
+    the long name.
+# ---- Additional seeded weather measurement mappings ----
+- key: forecast_dewpoint_fahrenheit
+  Existing: true
+  Definitions: {Unit Name: Degrees Fahrenheit, Label: degF}
+  Measure Types:
+  - {Measure Type: Dew Point, Is Commodity: false}
+  Notes: KSAC forecast dew point.
+- key: forecast_dewpoint_centigrade
+  Existing: true
+  Definitions: {Unit Name: Degrees Centigrade, Label: degC}
+  Measure Types:
+  - {Measure Type: Dew Point, Is Commodity: false}
+  Notes: KSMF and KSUU forecast dew point, and KSUU's existing observed dew point.
+- key: forecast_precipitation_percent
+  Existing: true
+  Definitions: {Unit Name: Percent, Label: '%'}
+  Measure Types:
+  - {Measure Type: Precipitation Probability, Is Commodity: false}
+  Notes: Forecast precipitation probability at all three stations; humidity continues to use Relative Humidity / Percent.
+# ---- Handheld routes (2026-11-07) ----
+- key: power_factor
+  installed:
+    unitId:
+  Definitions: {Unit Name: Power Factor, Label: PF, Unit Class: User-defined}
+  Measure Types:
+  - {Measure Type: Electricity, Is Commodity: false}
+  Notes: >-
+    Central Plant Main Switchgear's power factor at maximum demand, a register read by hand on the SWGR route (Stage 3
+    Step 5). Real over apparent power has no seeded unit and no class that is a plain ratio, so it is User-defined,
+    like Watts per Square Meter. The other switchgear units (kVArh, kVAh, kVA) are seeded under Electricity already.

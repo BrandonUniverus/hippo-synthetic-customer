@@ -8,13 +8,13 @@ purpose: >
   DBAdmin before bills, archive data, gateways, workflows, or scheduled tasks
   are configured. The physical estate (sites, buildings, meters) is owned by the
   scenario manifest; this file adds only the EEM company shells, level names and
-  security groups. See implementation/northlake-inventory-standard.pdf.
+  security groups. See implementation/stage-2-hierarchy/northlake-inventory-standard.pdf.
 
 sourceReferences:
   customerInventoryWorkbook: documents/intake-package/data-collection-workbook.xlsx
   sourceScenarioManifest: data/scenarios/demo-university-v1.yaml
   securityManifest: data/security/northlake-eem-security-v1.yaml
-  inventoryStandard: implementation/northlake-inventory-standard.pdf
+  inventoryStandard: implementation/stage-2-hierarchy/northlake-inventory-standard.pdf
 
 setupPrinciples:
   - Drive this through the EEM applications, not direct seed inserts.
@@ -157,7 +157,7 @@ companiesToCreate:
     additionalSites:
       - id: weather_reference
         name: Weather Reference
-        purpose: Shared KSAC and KSMF station meters; see Stage 1B weatherIndexTargets.
+        purpose: Shared KSAC, KSMF and KSUU station meters; see Stage 1B weatherIndexTargets.
     groupsFromSecurityManifest:
       - id: nlu_company_admins
         displayName: NLU Company Admins
@@ -249,7 +249,7 @@ companiesToCreate:
         phone: 916-555-4500
       levels:
         useDefaultsFrom: companyDefaults.levels
-    hierarchySitesFromScenario: [northlake_central_plant]
+    hierarchySitesFromScenario: [northlake_central_plant, ridgeline_wind_site]
     groupsFromSecurityManifest:
       - id: ntp_company_admins
         displayName: Thermal Plant Company Admins
@@ -261,6 +261,10 @@ companiesToCreate:
         displayName: Thermal Plant Reports
       - id: ntp_audit_readonly
         displayName: Thermal Plant Audit Read Only
+      - id: ntp_wind_ops
+        displayName: Ridgeline Wind Operations
+      - id: ntp_wind_research
+        displayName: Ridgeline Wind Research Access
 
 securitySetup:
   sourceManifest: data/security/northlake-eem-security-v1.yaml
@@ -288,6 +292,6 @@ validationChecklist:
   - Alarm severity text and colors match the DBAdmin Definitions screen defaults.
   - Each created company has the same four Levels rows (Site, Building, Meter, Point) and Font Awesome icons before hierarchy nodes are created.
   - Each physical building exists once, under the site the scenario assigns it to, in the company that owns that site.
-  - The served-building chilled-water and steam meters belong to the university buildings; the plant company contains only the Central Plant.
+  - The served-building chilled-water and steam meters belong to the university buildings; the plant company contains only the Central Plant and the Ridgeline Wind Site.
   - Cedar Row hierarchy, meters, bills, points, and gateway bindings are owned only by the Cedar Row company, not duplicated under Northlake University.
   - Billing accounts, GL accounts, bill validation, weather stations, bills, archives, gateways, workflows, and task schedules remain empty or default-only.

@@ -35,8 +35,8 @@ class SyntheticUserStoreTests(unittest.TestCase):
     def test_lists_checked_in_users_without_exposing_passwords(self) -> None:
         users = self.store.public_users()
 
-        self.assertEqual(19, len(users))
-        self.assertEqual(18, sum(user["enabled"] for user in users))
+        self.assertEqual(23, len(users))
+        self.assertEqual(22, sum(user["enabled"] for user in users))
         self.assertTrue(all(user["source"] == "base" for user in users))
         serialized = json.dumps(users).lower()
         self.assertNotIn("password", serialized)
@@ -50,7 +50,7 @@ class SyntheticUserStoreTests(unittest.TestCase):
         self.assertNotIn("password", json.dumps(user).lower())
         overlay = json.loads(self.overlay_path.read_text(encoding="utf-8"))
         self.assertEqual(password, overlay["users"][0]["password"])
-        self.assertEqual(20, len(self.store.public_users()))
+        self.assertEqual(24, len(self.store.public_users()))
 
     def test_update_disable_reenable_and_password_reset_keep_the_same_identity(self) -> None:
         created, original_password = self.store.create(self.values)

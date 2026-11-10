@@ -1,0 +1,1886 @@
+# Stage 2, step 1: Billing Accounts (Database Administrator > Nodes > company node > Utility
+# Accountant tab; BillAccountViewModel). One record per account. Section keys are the tab's own
+# pages in the order it presents them: Definitions (save first), Service Address, Account
+# Address, Account Contact. GL Accounts and Bill Validation Tests belong to Stage 6.
+stage: 2
+step: 1
+title: Billing accounts
+app: Database Administrator
+screen: Nodes > company node > Utility Accountant tab
+source:
+- data/scenarios/demo-university-v1.yaml (accounts)
+- data/eem/northlake-eem-metaworld-stage1b-v1.yaml (billingAccountKinds, billingAccountSetup)
+- data/eem/northlake-bill-entry-v1.yaml (preferredEntry)
+- implementation/stage-1-foundation/02-utility-providers.yaml (remit addresses and contacts)
+notes:
+- Select the company on Nodes, open its Utility Accountant tab, click Add, fill Definitions and save; the other
+  pages (Service Address, Account Address, Account Contact, Notes, Status) unlock after the first save.
+- 'Currency Unit: a new account starts as Australian Dollar, the first currency by name. Set US
+  Dollar before the first save. US Dollar is assumed; nothing in the source model states a currency.'
+- 'Service Address is typed text, not a picker: it repeats the building''s street address from
+  02-sites-and-buildings.yaml, but nothing links the two records. Latitude and Longitude are that building''s own
+  coordinates; type them, or use Find and correct what it returns.'
+- 'Account Address and Account Contact are the provider''s business address and Stage 1 contact. The Thermal Plant''s
+  representative is its plant manager: the plant line 916-555-4500 as Phone (Stage 1) and his direct line
+  916-555-0104 as Cell (facilities-and-meter-register.pdf p4). The Thermal Plant''s mail stop goes in Address 2, the
+  same split as its Stage 1 provider address.'
+- 'SYN-VED-A-0010012 (Cedar Row Carport and Grounds / VED) has no Account Contact: an unmetered lighting service Valley
+  Electric assigns no representative. Its Account Address stays.'
+- Remit Address is a combo of the provider's remit addresses, shown as one line ending in the country; every Northlake
+  provider has exactly one, so the combo offers a single choice.
+- 'Bill Invoice Template: two rows are seeded, Bill Table Invoice Default (BillInvoice.trdp) and Billing Charges Report
+  (BillingCharges.trdp). The six Thermal Plant cost centers use Billing Charges Report, because their charges come from
+  the plant''s allocation rate schedules (Stage 4), and so does Ridgeline''s transfer agreement, the other internal
+  counterparty; every other account uses the default.'
+- 'Bill Service Type (Global_Type_Code BA: 0 No AP Upload, 1 AP Upload Only, 2 Bill Payment). The AP/GL plan
+  (data/eem/northlake-ap-gl-v1.yaml) speaks in AP, AP and GL, GL and No Upload, which EEM does not have; they map to
+  AP Upload Only (AP, and AP and GL: the GL side is Stage 6), Bill Payment (GL: "payment runs outside AP") and No AP
+  Upload. So: AP Upload Only for every external utility account and the six Thermal Plant cost centers ("most are AP
+  upload; campus electric and thermal accounts are both AP and GL", chart-of-accounts-and-gl-guide.pdf p2); Bill
+  Payment for the three Helios PPA accounts and for Ridgeline''s transfer agreement, which the GL guide makes GL only
+  (a journal; no payment leaves the plant); No AP Upload for SYN-RCU-A-0030004 (Cedar Row B / RCU), the Cedar Row
+  account the guide keeps off the interface as a control (named in the AP/GL plan, not in the guide).'
+- 'Bill Entry Type (Global_Status_Code BA2: 0 Bill Entry, 1 Bill Importer, 2 Bill Generation, 3 Bill Allocation, 10
+  Other). Bill Importer for every Valley Electric District and River City Utilities account in all three companies:
+  the register names Nora Chen as the bill import specialist for Northlake University and Cedar Row
+  (facilities-and-meter-register.pdf p4), and the Central Plant''s VED and RCU bills are ordinary utility bills. Bill
+  Entry for every Sierra Gas Utility and Helios Onsite Solar account. Bill Allocation for the six Thermal Plant cost
+  centers, which receive the plant''s allocated cost. Bill Generation for Ridgeline''s transfer agreement, whose
+  statement EEM generates from the turbine meters (Stage 7''s Town Center tenants use it too); Other is unused.'
+- 'Bill Entry lists only Bill Entry accounts (BillType_Code 0), so the 31 Bill Importer, 6 Bill Allocation and 1 Bill
+  Generation accounts never appear there. That is by design: their bills come through Bill Importer (Stage 5),
+  allocation and generation (Stage 7).'
+- 'Status (the Status page; saving needs an administrator): every account gets Active Billing Account as of
+  2024-01-01, the account start the register gives (facilities-and-meter-register.pdf pp9-13), except the two
+  Ridgeline accounts, which start with the acquisition on 2024-07-01. The first save already writes an Active row
+  dated the day it is saved; bill validation''s account-opening test reads the earliest Active date, so without the
+  backdated row every 2024-2025 bill would predate its account.'
+- 'Ridgeline (added 2026-10-01): SYN-VED-A-0010014 is the generator account Valley Electric opened for the plant when
+  it bought the site; the seller''s account, SYN-VED-A-0019014, goes in Previous Account Number (assumed, from the
+  transfer letter). SYN-RWL-G-0000001''s representative is Mateo Alvarez, the site manager, at the site address.'
+- 'SYN-RCU-A-0030003 (Cedar Row A / RCU) was renumbered at the July 2024 lease renewal (river-city-utilities.pdf p2;
+  the facilities overview p5 leaves the old number open). Previous Account Number (the field labelled Previous
+  Account #) holds the old number, SYN-RCU-A-0030103 (assumed), and a note records the change. River City''s
+  September 2024 bill (03-River-City-Cedar-Row-A-Account-Renewal.pdf, 2024-08-15 to 2024-09-14) cites the renewal and
+  the old number the same way. (The hand-made image it replaced named SYN-RCU-A-0030013, the Cedar Row A fire service,
+  and dated the change 03/01/2025.)'
+- 'GL Accounts (Liability and Default Expense Account) appear only once the company has GL accounts, and Bill
+  Validation Tests belong to Stage 6; leave both at their defaults here.'
+- 'PRODUCT FINDING 34: payment terms, cycle day, current balance, the remit and bill-review contacts and the bank
+  account have columns but no field, and every save of this editor writes them as NULL.'
+records:
+- key: ved_admin_hall
+  installed:
+    billingAccountId:
+  Company: Northlake University
+  Definitions:
+    Account Number: SYN-VED-A-0010001
+    Description: Admin Hall / VED
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: Valley Electric District
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Importer
+    Bill Invoice Template: Bill Table Invoice Default
+    Remit Address: PO Box 41027, Sacramento, CA 95841, USA
+  Service Address:
+    Address: 100 Synthetic Campus Drive
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.5359
+    Longitude: -121.4945
+  Account Address:
+    Address: 2400 Feather River Road
+    City: Sacramento
+    Region: CA
+    Postal Code: '95833'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Owen
+    Last Name: Blake
+    Title: Electric account representative
+    Phone: 916-555-6100
+    Email: owen.blake@valleyelectric.example
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+- key: ved_science_center
+  installed:
+    billingAccountId:
+  Company: Northlake University
+  Definitions:
+    Account Number: SYN-VED-A-0010002
+    Description: Science Center / VED
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: Valley Electric District
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Importer
+    Bill Invoice Template: Bill Table Invoice Default
+    Remit Address: PO Box 41027, Sacramento, CA 95841, USA
+  Service Address:
+    Address: 120 Synthetic Campus Drive
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.53655
+    Longitude: -121.4928
+  Account Address:
+    Address: 2400 Feather River Road
+    City: Sacramento
+    Region: CA
+    Postal Code: '95833'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Owen
+    Last Name: Blake
+    Title: Electric account representative
+    Phone: 916-555-6100
+    Email: owen.blake@valleyelectric.example
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+- key: ved_library
+  installed:
+    billingAccountId:
+  Company: Northlake University
+  Definitions:
+    Account Number: SYN-VED-A-0010003
+    Description: Library / VED
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: Valley Electric District
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Importer
+    Bill Invoice Template: Bill Table Invoice Default
+    Remit Address: PO Box 41027, Sacramento, CA 95841, USA
+  Service Address:
+    Address: 140 Synthetic Campus Drive
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.5348
+    Longitude: -121.4931
+  Account Address:
+    Address: 2400 Feather River Road
+    City: Sacramento
+    Region: CA
+    Postal Code: '95833'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Owen
+    Last Name: Blake
+    Title: Electric account representative
+    Phone: 916-555-6100
+    Email: owen.blake@valleyelectric.example
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+- key: ved_student_center
+  installed:
+    billingAccountId:
+  Company: Northlake University
+  Definitions:
+    Account Number: SYN-VED-A-0010004
+    Description: Student Center / VED
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: Valley Electric District
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Importer
+    Bill Invoice Template: Bill Table Invoice Default
+    Remit Address: PO Box 41027, Sacramento, CA 95841, USA
+  Service Address:
+    Address: 160 Synthetic Campus Drive
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.5342
+    Longitude: -121.4953
+  Account Address:
+    Address: 2400 Feather River Road
+    City: Sacramento
+    Region: CA
+    Postal Code: '95833'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Owen
+    Last Name: Blake
+    Title: Electric account representative
+    Phone: 916-555-6100
+    Email: owen.blake@valleyelectric.example
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+- key: ved_lakeview_hall
+  installed:
+    billingAccountId:
+  Company: Northlake University
+  Definitions:
+    Account Number: SYN-VED-A-0010007
+    Description: Lakeview Residence Hall / VED
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: Valley Electric District
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Importer
+    Bill Invoice Template: Bill Table Invoice Default
+    Remit Address: PO Box 41027, Sacramento, CA 95841, USA
+  Service Address:
+    Address: 180 Synthetic Campus Drive
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.5338
+    Longitude: -121.4922
+  Account Address:
+    Address: 2400 Feather River Road
+    City: Sacramento
+    Region: CA
+    Postal Code: '95833'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Owen
+    Last Name: Blake
+    Title: Electric account representative
+    Phone: 916-555-6100
+    Email: owen.blake@valleyelectric.example
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+- key: ved_recreation_center
+  installed:
+    billingAccountId:
+  Company: Northlake University
+  Definitions:
+    Account Number: SYN-VED-A-0010008
+    Description: Recreation and Aquatics Center / VED
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: Valley Electric District
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Importer
+    Bill Invoice Template: Bill Table Invoice Default
+    Remit Address: PO Box 41027, Sacramento, CA 95841, USA
+  Service Address:
+    Address: 200 Synthetic Campus Drive
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.5333
+    Longitude: -121.4944
+  Account Address:
+    Address: 2400 Feather River Road
+    City: Sacramento
+    Region: CA
+    Postal Code: '95833'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Owen
+    Last Name: Blake
+    Title: Electric account representative
+    Phone: 916-555-6100
+    Email: owen.blake@valleyelectric.example
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+- key: ved_parking_structure
+  installed:
+    billingAccountId:
+  Company: Northlake University
+  Definitions:
+    Account Number: SYN-VED-A-0010009
+    Description: Parking Structure / VED
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: Valley Electric District
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Importer
+    Bill Invoice Template: Bill Table Invoice Default
+    Remit Address: PO Box 41027, Sacramento, CA 95841, USA
+  Service Address:
+    Address: 220 Synthetic Campus Drive
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.5346
+    Longitude: -121.496
+  Account Address:
+    Address: 2400 Feather River Road
+    City: Sacramento
+    Region: CA
+    Postal Code: '95833'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Owen
+    Last Name: Blake
+    Title: Electric account representative
+    Phone: 916-555-6100
+    Email: owen.blake@valleyelectric.example
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+- key: ved_campus_area_lighting
+  installed:
+    billingAccountId:
+  Company: Northlake University
+  Definitions:
+    Account Number: SYN-VED-A-0010010
+    Description: Campus Grounds / VED
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: Valley Electric District
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Importer
+    Bill Invoice Template: Bill Table Invoice Default
+    Remit Address: PO Box 41027, Sacramento, CA 95841, USA
+  Service Address:
+    Address: 4100 North Shore Drive
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.5352
+    Longitude: -121.4939
+  Account Address:
+    Address: 2400 Feather River Road
+    City: Sacramento
+    Region: CA
+    Postal Code: '95833'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Owen
+    Last Name: Blake
+    Title: Electric account representative
+    Phone: 916-555-6100
+    Email: owen.blake@valleyelectric.example
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+- key: ved_cedar_row_a
+  installed:
+    billingAccountId:
+  Company: Cedar Row Apartments
+  Definitions:
+    Account Number: SYN-VED-A-0010005
+    Description: Cedar Row A / VED
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: Valley Electric District
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Importer
+    Bill Invoice Template: Bill Table Invoice Default
+    Remit Address: PO Box 41027, Sacramento, CA 95841, USA
+  Service Address:
+    Address: 400 Synthetic Grove Avenue
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.54765
+    Longitude: -121.4702
+  Account Address:
+    Address: 2400 Feather River Road
+    City: Sacramento
+    Region: CA
+    Postal Code: '95833'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Owen
+    Last Name: Blake
+    Title: Electric account representative
+    Phone: 916-555-6100
+    Email: owen.blake@valleyelectric.example
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+- key: ved_cedar_row_b
+  installed:
+    billingAccountId:
+  Company: Cedar Row Apartments
+  Definitions:
+    Account Number: SYN-VED-A-0010006
+    Description: Cedar Row B / VED
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: Valley Electric District
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Importer
+    Bill Invoice Template: Bill Table Invoice Default
+    Remit Address: PO Box 41027, Sacramento, CA 95841, USA
+  Service Address:
+    Address: 420 Synthetic Grove Avenue
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.54685
+    Longitude: -121.46955
+  Account Address:
+    Address: 2400 Feather River Road
+    City: Sacramento
+    Region: CA
+    Postal Code: '95833'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Owen
+    Last Name: Blake
+    Title: Electric account representative
+    Phone: 916-555-6100
+    Email: owen.blake@valleyelectric.example
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+- key: ved_cedar_row_common_house
+  installed:
+    billingAccountId:
+  Company: Cedar Row Apartments
+  Definitions:
+    Account Number: SYN-VED-A-0010011
+    Description: Cedar Row Common House / VED
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: Valley Electric District
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Importer
+    Bill Invoice Template: Bill Table Invoice Default
+    Remit Address: PO Box 41027, Sacramento, CA 95841, USA
+  Service Address:
+    Address: 1304 Cedar Row Lane
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.54715
+    Longitude: -121.47085
+  Account Address:
+    Address: 2400 Feather River Road
+    City: Sacramento
+    Region: CA
+    Postal Code: '95833'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Owen
+    Last Name: Blake
+    Title: Electric account representative
+    Phone: 916-555-6100
+    Email: owen.blake@valleyelectric.example
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+- key: ved_cedar_row_parking_lighting
+  installed:
+    billingAccountId:
+  Company: Cedar Row Apartments
+  Definitions:
+    Account Number: SYN-VED-A-0010012
+    Description: Cedar Row Carport and Grounds / VED
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: Valley Electric District
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Importer
+    Bill Invoice Template: Bill Table Invoice Default
+    Remit Address: PO Box 41027, Sacramento, CA 95841, USA
+  Service Address:
+    Address: 1280 Cedar Row Lane
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.5474
+    Longitude: -121.4711
+  Account Address:
+    Address: 2400 Feather River Road
+    City: Sacramento
+    Region: CA
+    Postal Code: '95833'
+    Country: UNITED STATES
+  # No Account Contact on purpose: the one account that leaves the optional contact page empty (billing-account
+  # variety; generators/tests/test_stage2_hierarchy.py counts it).
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+- key: ved_central_plant
+  installed:
+    billingAccountId:
+  Company: Northlake Thermal Plant
+  Definitions:
+    Account Number: SYN-VED-A-0010013
+    Description: Central Plant / VED
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: Valley Electric District
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Importer
+    Bill Invoice Template: Bill Table Invoice Default
+    Remit Address: PO Box 41027, Sacramento, CA 95841, USA
+  Service Address:
+    Address: 4122 Plant Service Road
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.53725
+    Longitude: -121.49685
+  Account Address:
+    Address: 2400 Feather River Road
+    City: Sacramento
+    Region: CA
+    Postal Code: '95833'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Owen
+    Last Name: Blake
+    Title: Electric account representative
+    Phone: 916-555-6100
+    Email: owen.blake@valleyelectric.example
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+# Added 2026-10-01: the Ridgeline Wind generator account, opened when the plant bought the site.
+- key: ved_ridgeline_generator
+  installed:
+    billingAccountId:
+  Company: Northlake Thermal Plant
+  Definitions:
+    Account Number: SYN-VED-A-0010014
+    Description: Ridgeline Substation / VED
+    Previous Account Number: SYN-VED-A-0019014  # the seller's account, from the transfer letter (assumed)
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: Valley Electric District
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Importer
+    Bill Invoice Template: Bill Table Invoice Default
+    Remit Address: PO Box 41027, Sacramento, CA 95841, USA
+  Service Address:
+    Address: 8460 Montezuma Hills Road
+    City: Rio Vista
+    Region: CA
+    Postal Code: '94571'
+    Country: UNITED STATES
+    Latitude: 38.1148
+    Longitude: -121.7921
+  Account Address:
+    Address: 2400 Feather River Road
+    City: Sacramento
+    Region: CA
+    Postal Code: '95833'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Owen
+    Last Name: Blake
+    Title: Electric account representative
+    Phone: 916-555-6100
+    Email: owen.blake@valleyelectric.example
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-07-01}
+  Notes:
+  - {Note: 'Transferred to the Thermal Plant at the 2024-07-01 acquisition of Ridgeline Wind; the account of the seller, SYN-VED-A-0019014, closed 2024-06-30. Its export credit moves to SYN-VED-A-0010013 under VED-BCT.'}
+- key: sgu_admin_hall
+  installed:
+    billingAccountId:
+  Company: Northlake University
+  Definitions:
+    Account Number: SYN-SGU-A-0020001
+    Description: Admin Hall / SGU
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: Sierra Gas Utility
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Entry
+    Bill Invoice Template: Bill Table Invoice Default
+    Remit Address: PO Box 60915, Sacramento, CA 95860, USA
+  Service Address:
+    Address: 100 Synthetic Campus Drive
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.5359
+    Longitude: -121.4945
+  Account Address:
+    Address: 1850 Pinnacle Way
+    City: Sacramento
+    Region: CA
+    Postal Code: '95834'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Marisol
+    Last Name: Vega
+    Title: Gas account representative
+    Phone: 916-555-6150
+    Email: marisol.vega@sierragas.example
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+- key: sgu_science_center
+  installed:
+    billingAccountId:
+  Company: Northlake University
+  Definitions:
+    Account Number: SYN-SGU-A-0020002
+    Description: Science Center / SGU
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: Sierra Gas Utility
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Entry
+    Bill Invoice Template: Bill Table Invoice Default
+    Remit Address: PO Box 60915, Sacramento, CA 95860, USA
+  Service Address:
+    Address: 120 Synthetic Campus Drive
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.53655
+    Longitude: -121.4928
+  Account Address:
+    Address: 1850 Pinnacle Way
+    City: Sacramento
+    Region: CA
+    Postal Code: '95834'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Marisol
+    Last Name: Vega
+    Title: Gas account representative
+    Phone: 916-555-6150
+    Email: marisol.vega@sierragas.example
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+- key: sgu_library
+  installed:
+    billingAccountId:
+  Company: Northlake University
+  Definitions:
+    Account Number: SYN-SGU-A-0020003
+    Description: Library / SGU
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: Sierra Gas Utility
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Entry
+    Bill Invoice Template: Bill Table Invoice Default
+    Remit Address: PO Box 60915, Sacramento, CA 95860, USA
+  Service Address:
+    Address: 140 Synthetic Campus Drive
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.5348
+    Longitude: -121.4931
+  Account Address:
+    Address: 1850 Pinnacle Way
+    City: Sacramento
+    Region: CA
+    Postal Code: '95834'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Marisol
+    Last Name: Vega
+    Title: Gas account representative
+    Phone: 916-555-6150
+    Email: marisol.vega@sierragas.example
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+- key: sgu_student_center
+  installed:
+    billingAccountId:
+  Company: Northlake University
+  Definitions:
+    Account Number: SYN-SGU-A-0020004
+    Description: Student Center / SGU
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: Sierra Gas Utility
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Entry
+    Bill Invoice Template: Bill Table Invoice Default
+    Remit Address: PO Box 60915, Sacramento, CA 95860, USA
+  Service Address:
+    Address: 160 Synthetic Campus Drive
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.5342
+    Longitude: -121.4953
+  Account Address:
+    Address: 1850 Pinnacle Way
+    City: Sacramento
+    Region: CA
+    Postal Code: '95834'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Marisol
+    Last Name: Vega
+    Title: Gas account representative
+    Phone: 916-555-6150
+    Email: marisol.vega@sierragas.example
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+- key: sgu_lakeview_hall
+  installed:
+    billingAccountId:
+  Company: Northlake University
+  Definitions:
+    Account Number: SYN-SGU-A-0020005
+    Description: Lakeview Residence Hall / SGU
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: Sierra Gas Utility
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Entry
+    Bill Invoice Template: Bill Table Invoice Default
+    Remit Address: PO Box 60915, Sacramento, CA 95860, USA
+  Service Address:
+    Address: 180 Synthetic Campus Drive
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.5338
+    Longitude: -121.4922
+  Account Address:
+    Address: 1850 Pinnacle Way
+    City: Sacramento
+    Region: CA
+    Postal Code: '95834'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Marisol
+    Last Name: Vega
+    Title: Gas account representative
+    Phone: 916-555-6150
+    Email: marisol.vega@sierragas.example
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+- key: sgu_recreation_center
+  installed:
+    billingAccountId:
+  Company: Northlake University
+  Definitions:
+    Account Number: SYN-SGU-A-0020006
+    Description: Recreation and Aquatics Center / SGU
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: Sierra Gas Utility
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Entry
+    Bill Invoice Template: Bill Table Invoice Default
+    Remit Address: PO Box 60915, Sacramento, CA 95860, USA
+  Service Address:
+    Address: 200 Synthetic Campus Drive
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.5333
+    Longitude: -121.4944
+  Account Address:
+    Address: 1850 Pinnacle Way
+    City: Sacramento
+    Region: CA
+    Postal Code: '95834'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Marisol
+    Last Name: Vega
+    Title: Gas account representative
+    Phone: 916-555-6150
+    Email: marisol.vega@sierragas.example
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+- key: sgu_cedar_row_a
+  installed:
+    billingAccountId:
+  Company: Cedar Row Apartments
+  Definitions:
+    Account Number: SYN-SGU-A-0020007
+    Description: Cedar Row A / SGU
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: Sierra Gas Utility
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Entry
+    Bill Invoice Template: Bill Table Invoice Default
+    Remit Address: PO Box 60915, Sacramento, CA 95860, USA
+  Service Address:
+    Address: 400 Synthetic Grove Avenue
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.54765
+    Longitude: -121.4702
+  Account Address:
+    Address: 1850 Pinnacle Way
+    City: Sacramento
+    Region: CA
+    Postal Code: '95834'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Marisol
+    Last Name: Vega
+    Title: Gas account representative
+    Phone: 916-555-6150
+    Email: marisol.vega@sierragas.example
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+- key: sgu_cedar_row_b
+  installed:
+    billingAccountId:
+  Company: Cedar Row Apartments
+  Definitions:
+    Account Number: SYN-SGU-A-0020008
+    Description: Cedar Row B / SGU
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: Sierra Gas Utility
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Entry
+    Bill Invoice Template: Bill Table Invoice Default
+    Remit Address: PO Box 60915, Sacramento, CA 95860, USA
+  Service Address:
+    Address: 420 Synthetic Grove Avenue
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.54685
+    Longitude: -121.46955
+  Account Address:
+    Address: 1850 Pinnacle Way
+    City: Sacramento
+    Region: CA
+    Postal Code: '95834'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Marisol
+    Last Name: Vega
+    Title: Gas account representative
+    Phone: 916-555-6150
+    Email: marisol.vega@sierragas.example
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+- key: sgu_cedar_row_common_house
+  installed:
+    billingAccountId:
+  Company: Cedar Row Apartments
+  Definitions:
+    Account Number: SYN-SGU-A-0020009
+    Description: Cedar Row Common House / SGU
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: Sierra Gas Utility
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Entry
+    Bill Invoice Template: Bill Table Invoice Default
+    Remit Address: PO Box 60915, Sacramento, CA 95860, USA
+  Service Address:
+    Address: 1304 Cedar Row Lane
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.54715
+    Longitude: -121.47085
+  Account Address:
+    Address: 1850 Pinnacle Way
+    City: Sacramento
+    Region: CA
+    Postal Code: '95834'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Marisol
+    Last Name: Vega
+    Title: Gas account representative
+    Phone: 916-555-6150
+    Email: marisol.vega@sierragas.example
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+- key: sgu_central_plant
+  installed:
+    billingAccountId:
+  Company: Northlake Thermal Plant
+  Definitions:
+    Account Number: SYN-SGU-A-0020010
+    Description: Central Plant / SGU
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: Sierra Gas Utility
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Entry
+    Bill Invoice Template: Bill Table Invoice Default
+    Remit Address: PO Box 60915, Sacramento, CA 95860, USA
+  Service Address:
+    Address: 4122 Plant Service Road
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.53725
+    Longitude: -121.49685
+  Account Address:
+    Address: 1850 Pinnacle Way
+    City: Sacramento
+    Region: CA
+    Postal Code: '95834'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Marisol
+    Last Name: Vega
+    Title: Gas account representative
+    Phone: 916-555-6150
+    Email: marisol.vega@sierragas.example
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+- key: rcu_admin_hall
+  installed:
+    billingAccountId:
+  Company: Northlake University
+  Definitions:
+    Account Number: SYN-RCU-A-0030001
+    Description: Admin Hall / RCU
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: River City Utilities
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Importer
+    Bill Invoice Template: Bill Table Invoice Default
+    Remit Address: PO Box 2216, Sacramento, CA 95812, USA
+  Service Address:
+    Address: 100 Synthetic Campus Drive
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.5359
+    Longitude: -121.4945
+  Account Address:
+    Address: 915 Levee Street
+    City: Sacramento
+    Region: CA
+    Postal Code: '95814'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Dana
+    Last Name: Perez
+    Title: Municipal utility representative
+    Phone: 916-555-6200
+    Email: dana.perez@rivercity.example
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+- key: rcu_science_center
+  installed:
+    billingAccountId:
+  Company: Northlake University
+  Definitions:
+    Account Number: SYN-RCU-A-0030005
+    Description: Science Center / RCU
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: River City Utilities
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Importer
+    Bill Invoice Template: Bill Table Invoice Default
+    Remit Address: PO Box 2216, Sacramento, CA 95812, USA
+  Service Address:
+    Address: 120 Synthetic Campus Drive
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.53655
+    Longitude: -121.4928
+  Account Address:
+    Address: 915 Levee Street
+    City: Sacramento
+    Region: CA
+    Postal Code: '95814'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Dana
+    Last Name: Perez
+    Title: Municipal utility representative
+    Phone: 916-555-6200
+    Email: dana.perez@rivercity.example
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+- key: rcu_library
+  installed:
+    billingAccountId:
+  Company: Northlake University
+  Definitions:
+    Account Number: SYN-RCU-A-0030006
+    Description: Library / RCU
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: River City Utilities
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Importer
+    Bill Invoice Template: Bill Table Invoice Default
+    Remit Address: PO Box 2216, Sacramento, CA 95812, USA
+  Service Address:
+    Address: 140 Synthetic Campus Drive
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.5348
+    Longitude: -121.4931
+  Account Address:
+    Address: 915 Levee Street
+    City: Sacramento
+    Region: CA
+    Postal Code: '95814'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Dana
+    Last Name: Perez
+    Title: Municipal utility representative
+    Phone: 916-555-6200
+    Email: dana.perez@rivercity.example
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+- key: rcu_student_center
+  installed:
+    billingAccountId:
+  Company: Northlake University
+  Definitions:
+    Account Number: SYN-RCU-A-0030002
+    Description: Student Center / RCU
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: River City Utilities
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Importer
+    Bill Invoice Template: Bill Table Invoice Default
+    Remit Address: PO Box 2216, Sacramento, CA 95812, USA
+  Service Address:
+    Address: 160 Synthetic Campus Drive
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.5342
+    Longitude: -121.4953
+  Account Address:
+    Address: 915 Levee Street
+    City: Sacramento
+    Region: CA
+    Postal Code: '95814'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Dana
+    Last Name: Perez
+    Title: Municipal utility representative
+    Phone: 916-555-6200
+    Email: dana.perez@rivercity.example
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+- key: rcu_lakeview_hall
+  installed:
+    billingAccountId:
+  Company: Northlake University
+  Definitions:
+    Account Number: SYN-RCU-A-0030007
+    Description: Lakeview Residence Hall / RCU
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: River City Utilities
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Importer
+    Bill Invoice Template: Bill Table Invoice Default
+    Remit Address: PO Box 2216, Sacramento, CA 95812, USA
+  Service Address:
+    Address: 180 Synthetic Campus Drive
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.5338
+    Longitude: -121.4922
+  Account Address:
+    Address: 915 Levee Street
+    City: Sacramento
+    Region: CA
+    Postal Code: '95814'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Dana
+    Last Name: Perez
+    Title: Municipal utility representative
+    Phone: 916-555-6200
+    Email: dana.perez@rivercity.example
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+- key: rcu_recreation_center
+  installed:
+    billingAccountId:
+  Company: Northlake University
+  Definitions:
+    Account Number: SYN-RCU-A-0030008
+    Description: Recreation and Aquatics Center / RCU
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: River City Utilities
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Importer
+    Bill Invoice Template: Bill Table Invoice Default
+    Remit Address: PO Box 2216, Sacramento, CA 95812, USA
+  Service Address:
+    Address: 200 Synthetic Campus Drive
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.5333
+    Longitude: -121.4944
+  Account Address:
+    Address: 915 Levee Street
+    City: Sacramento
+    Region: CA
+    Postal Code: '95814'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Dana
+    Last Name: Perez
+    Title: Municipal utility representative
+    Phone: 916-555-6200
+    Email: dana.perez@rivercity.example
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+- key: rcu_campus_irrigation
+  installed:
+    billingAccountId:
+  Company: Northlake University
+  Definitions:
+    Account Number: SYN-RCU-A-0030009
+    Description: Campus Grounds / RCU
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: River City Utilities
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Importer
+    Bill Invoice Template: Bill Table Invoice Default
+    Remit Address: PO Box 2216, Sacramento, CA 95812, USA
+  Service Address:
+    Address: 4100 North Shore Drive
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.5352
+    Longitude: -121.4939
+  Account Address:
+    Address: 915 Levee Street
+    City: Sacramento
+    Region: CA
+    Postal Code: '95814'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Dana
+    Last Name: Perez
+    Title: Municipal utility representative
+    Phone: 916-555-6200
+    Email: dana.perez@rivercity.example
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+- key: rcu_admin_hall_fire
+  installed:
+    billingAccountId:
+  Company: Northlake University
+  Definitions:
+    Account Number: SYN-RCU-A-0030010
+    Description: Admin Hall / RCU
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: River City Utilities
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Importer
+    Bill Invoice Template: Bill Table Invoice Default
+    Remit Address: PO Box 2216, Sacramento, CA 95812, USA
+  Service Address:
+    Address: 100 Synthetic Campus Drive
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.5359
+    Longitude: -121.4945
+  Account Address:
+    Address: 915 Levee Street
+    City: Sacramento
+    Region: CA
+    Postal Code: '95814'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Dana
+    Last Name: Perez
+    Title: Municipal utility representative
+    Phone: 916-555-6200
+    Email: dana.perez@rivercity.example
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+- key: rcu_science_center_fire
+  installed:
+    billingAccountId:
+  Company: Northlake University
+  Definitions:
+    Account Number: SYN-RCU-A-0030011
+    Description: Science Center / RCU
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: River City Utilities
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Importer
+    Bill Invoice Template: Bill Table Invoice Default
+    Remit Address: PO Box 2216, Sacramento, CA 95812, USA
+  Service Address:
+    Address: 120 Synthetic Campus Drive
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.53655
+    Longitude: -121.4928
+  Account Address:
+    Address: 915 Levee Street
+    City: Sacramento
+    Region: CA
+    Postal Code: '95814'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Dana
+    Last Name: Perez
+    Title: Municipal utility representative
+    Phone: 916-555-6200
+    Email: dana.perez@rivercity.example
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+- key: rcu_lakeview_hall_fire
+  installed:
+    billingAccountId:
+  Company: Northlake University
+  Definitions:
+    Account Number: SYN-RCU-A-0030012
+    Description: Lakeview Residence Hall / RCU
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: River City Utilities
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Importer
+    Bill Invoice Template: Bill Table Invoice Default
+    Remit Address: PO Box 2216, Sacramento, CA 95812, USA
+  Service Address:
+    Address: 180 Synthetic Campus Drive
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.5338
+    Longitude: -121.4922
+  Account Address:
+    Address: 915 Levee Street
+    City: Sacramento
+    Region: CA
+    Postal Code: '95814'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Dana
+    Last Name: Perez
+    Title: Municipal utility representative
+    Phone: 916-555-6200
+    Email: dana.perez@rivercity.example
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+- key: rcu_cedar_row_a
+  installed:
+    billingAccountId:
+  Company: Cedar Row Apartments
+  Definitions:
+    Account Number: SYN-RCU-A-0030003
+    Description: Cedar Row A / RCU
+    Previous Account Number: SYN-RCU-A-0030103  # assumed
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: River City Utilities
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Importer
+    Bill Invoice Template: Bill Table Invoice Default
+    Remit Address: PO Box 2216, Sacramento, CA 95812, USA
+  Service Address:
+    Address: 400 Synthetic Grove Avenue
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.54765
+    Longitude: -121.4702
+  Account Address:
+    Address: 915 Levee Street
+    City: Sacramento
+    Region: CA
+    Postal Code: '95814'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Dana
+    Last Name: Perez
+    Title: Municipal utility representative
+    Phone: 916-555-6200
+    Email: dana.perez@rivercity.example
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+  Notes:
+  - {Note: 'Renumbered by River City at the July 2024 lease renewal; bills before July 2024 carry the previous number SYN-RCU-A-0030103.'}
+- key: rcu_cedar_row_b
+  installed:
+    billingAccountId:
+  Company: Cedar Row Apartments
+  Definitions:
+    Account Number: SYN-RCU-A-0030004
+    Description: Cedar Row B / RCU
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: River City Utilities
+    Bill Service Type: No AP Upload
+    Bill Entry Type: Bill Importer
+    Bill Invoice Template: Bill Table Invoice Default
+    Remit Address: PO Box 2216, Sacramento, CA 95812, USA
+  Service Address:
+    Address: 420 Synthetic Grove Avenue
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.54685
+    Longitude: -121.46955
+  Account Address:
+    Address: 915 Levee Street
+    City: Sacramento
+    Region: CA
+    Postal Code: '95814'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Dana
+    Last Name: Perez
+    Title: Municipal utility representative
+    Phone: 916-555-6200
+    Email: dana.perez@rivercity.example
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+  Notes:
+  - {Note: 'Kept off the AP interface on purpose: the negative control that must never reach an export file.'}
+- key: rcu_cedar_row_a_fire
+  installed:
+    billingAccountId:
+  Company: Cedar Row Apartments
+  Definitions:
+    Account Number: SYN-RCU-A-0030013
+    Description: Cedar Row A / RCU
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: River City Utilities
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Importer
+    Bill Invoice Template: Bill Table Invoice Default
+    Remit Address: PO Box 2216, Sacramento, CA 95812, USA
+  Service Address:
+    Address: 400 Synthetic Grove Avenue
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.54765
+    Longitude: -121.4702
+  Account Address:
+    Address: 915 Levee Street
+    City: Sacramento
+    Region: CA
+    Postal Code: '95814'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Dana
+    Last Name: Perez
+    Title: Municipal utility representative
+    Phone: 916-555-6200
+    Email: dana.perez@rivercity.example
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+- key: rcu_cedar_row_b_fire
+  installed:
+    billingAccountId:
+  Company: Cedar Row Apartments
+  Definitions:
+    Account Number: SYN-RCU-A-0030014
+    Description: Cedar Row B / RCU
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: River City Utilities
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Importer
+    Bill Invoice Template: Bill Table Invoice Default
+    Remit Address: PO Box 2216, Sacramento, CA 95812, USA
+  Service Address:
+    Address: 420 Synthetic Grove Avenue
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.54685
+    Longitude: -121.46955
+  Account Address:
+    Address: 915 Levee Street
+    City: Sacramento
+    Region: CA
+    Postal Code: '95814'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Dana
+    Last Name: Perez
+    Title: Municipal utility representative
+    Phone: 916-555-6200
+    Email: dana.perez@rivercity.example
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+- key: rcu_cedar_row_common_house
+  installed:
+    billingAccountId:
+  Company: Cedar Row Apartments
+  Definitions:
+    Account Number: SYN-RCU-A-0030015
+    Description: Cedar Row Common House / RCU
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: River City Utilities
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Importer
+    Bill Invoice Template: Bill Table Invoice Default
+    Remit Address: PO Box 2216, Sacramento, CA 95812, USA
+  Service Address:
+    Address: 1304 Cedar Row Lane
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.54715
+    Longitude: -121.47085
+  Account Address:
+    Address: 915 Levee Street
+    City: Sacramento
+    Region: CA
+    Postal Code: '95814'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Dana
+    Last Name: Perez
+    Title: Municipal utility representative
+    Phone: 916-555-6200
+    Email: dana.perez@rivercity.example
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+- key: rcu_cedar_row_irrigation
+  installed:
+    billingAccountId:
+  Company: Cedar Row Apartments
+  Definitions:
+    Account Number: SYN-RCU-A-0030016
+    Description: Cedar Row Carport and Grounds / RCU
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: River City Utilities
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Importer
+    Bill Invoice Template: Bill Table Invoice Default
+    Remit Address: PO Box 2216, Sacramento, CA 95812, USA
+  Service Address:
+    Address: 1280 Cedar Row Lane
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.5474
+    Longitude: -121.4711
+  Account Address:
+    Address: 915 Levee Street
+    City: Sacramento
+    Region: CA
+    Postal Code: '95814'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Dana
+    Last Name: Perez
+    Title: Municipal utility representative
+    Phone: 916-555-6200
+    Email: dana.perez@rivercity.example
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+- key: rcu_central_plant
+  installed:
+    billingAccountId:
+  Company: Northlake Thermal Plant
+  Definitions:
+    Account Number: SYN-RCU-A-0030017
+    Description: Central Plant / RCU
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: River City Utilities
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Importer
+    Bill Invoice Template: Bill Table Invoice Default
+    Remit Address: PO Box 2216, Sacramento, CA 95812, USA
+  Service Address:
+    Address: 4122 Plant Service Road
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.53725
+    Longitude: -121.49685
+  Account Address:
+    Address: 915 Levee Street
+    City: Sacramento
+    Region: CA
+    Postal Code: '95814'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Dana
+    Last Name: Perez
+    Title: Municipal utility representative
+    Phone: 916-555-6200
+    Email: dana.perez@rivercity.example
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+- key: ntp_science_center
+  installed:
+    billingAccountId:
+  Company: Northlake University
+  Definitions:
+    Account Number: SYN-NTP-C-0000001
+    Description: Science Center / NTP
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: Northlake Thermal Plant
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Allocation
+    Bill Invoice Template: Billing Charges Report
+    Remit Address: Utility Cost Recovery, Campus Mail Stop 42, Sacramento, CA 95822, USA
+  Service Address:
+    Address: 120 Synthetic Campus Drive
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.53655
+    Longitude: -121.4928
+  Account Address:
+    Address: Central Plant Operations
+    Address 2: Campus Mail Stop 44
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Devon
+    Last Name: Brooks
+    Title: Thermal Plant Manager
+    Phone: 916-555-4500
+    Cell: 916-555-0104
+    Email: devon.brooks@northlake.example.edu
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+- key: ntp_admin_hall
+  installed:
+    billingAccountId:
+  Company: Northlake University
+  Definitions:
+    Account Number: SYN-NTP-C-0000002
+    Description: Admin Hall / NTP
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: Northlake Thermal Plant
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Allocation
+    Bill Invoice Template: Billing Charges Report
+    Remit Address: Utility Cost Recovery, Campus Mail Stop 42, Sacramento, CA 95822, USA
+  Service Address:
+    Address: 100 Synthetic Campus Drive
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.5359
+    Longitude: -121.4945
+  Account Address:
+    Address: Central Plant Operations
+    Address 2: Campus Mail Stop 44
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Devon
+    Last Name: Brooks
+    Title: Thermal Plant Manager
+    Phone: 916-555-4500
+    Cell: 916-555-0104
+    Email: devon.brooks@northlake.example.edu
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+- key: ntp_library
+  installed:
+    billingAccountId:
+  Company: Northlake University
+  Definitions:
+    Account Number: SYN-NTP-C-0000003
+    Description: Library / NTP
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: Northlake Thermal Plant
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Allocation
+    Bill Invoice Template: Billing Charges Report
+    Remit Address: Utility Cost Recovery, Campus Mail Stop 42, Sacramento, CA 95822, USA
+  Service Address:
+    Address: 140 Synthetic Campus Drive
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.5348
+    Longitude: -121.4931
+  Account Address:
+    Address: Central Plant Operations
+    Address 2: Campus Mail Stop 44
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Devon
+    Last Name: Brooks
+    Title: Thermal Plant Manager
+    Phone: 916-555-4500
+    Cell: 916-555-0104
+    Email: devon.brooks@northlake.example.edu
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+- key: ntp_student_center
+  installed:
+    billingAccountId:
+  Company: Northlake University
+  Definitions:
+    Account Number: SYN-NTP-C-0000004
+    Description: Student Center / NTP
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: Northlake Thermal Plant
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Allocation
+    Bill Invoice Template: Billing Charges Report
+    Remit Address: Utility Cost Recovery, Campus Mail Stop 42, Sacramento, CA 95822, USA
+  Service Address:
+    Address: 160 Synthetic Campus Drive
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.5342
+    Longitude: -121.4953
+  Account Address:
+    Address: Central Plant Operations
+    Address 2: Campus Mail Stop 44
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Devon
+    Last Name: Brooks
+    Title: Thermal Plant Manager
+    Phone: 916-555-4500
+    Cell: 916-555-0104
+    Email: devon.brooks@northlake.example.edu
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+- key: ntp_lakeview_hall
+  installed:
+    billingAccountId:
+  Company: Northlake University
+  Definitions:
+    Account Number: SYN-NTP-C-0000005
+    Description: Lakeview Residence Hall / NTP
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: Northlake Thermal Plant
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Allocation
+    Bill Invoice Template: Billing Charges Report
+    Remit Address: Utility Cost Recovery, Campus Mail Stop 42, Sacramento, CA 95822, USA
+  Service Address:
+    Address: 180 Synthetic Campus Drive
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.5338
+    Longitude: -121.4922
+  Account Address:
+    Address: Central Plant Operations
+    Address 2: Campus Mail Stop 44
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Devon
+    Last Name: Brooks
+    Title: Thermal Plant Manager
+    Phone: 916-555-4500
+    Cell: 916-555-0104
+    Email: devon.brooks@northlake.example.edu
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+- key: ntp_recreation_center
+  installed:
+    billingAccountId:
+  Company: Northlake University
+  Definitions:
+    Account Number: SYN-NTP-C-0000006
+    Description: Recreation and Aquatics Center / NTP
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: Northlake Thermal Plant
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Allocation
+    Bill Invoice Template: Billing Charges Report
+    Remit Address: Utility Cost Recovery, Campus Mail Stop 42, Sacramento, CA 95822, USA
+  Service Address:
+    Address: 200 Synthetic Campus Drive
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.5333
+    Longitude: -121.4944
+  Account Address:
+    Address: Central Plant Operations
+    Address 2: Campus Mail Stop 44
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Devon
+    Last Name: Brooks
+    Title: Thermal Plant Manager
+    Phone: 916-555-4500
+    Cell: 916-555-0104
+    Email: devon.brooks@northlake.example.edu
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+- key: hos_science_center
+  installed:
+    billingAccountId:
+  Company: Northlake University
+  Definitions:
+    Account Number: SYN-HOS-P-0000001
+    Description: Science Center / HOS
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: Helios Onsite Solar
+    Bill Service Type: Bill Payment  # assumed
+    Bill Entry Type: Bill Entry
+    Bill Invoice Template: Bill Table Invoice Default
+    Remit Address: PO Box 3391, Davis, CA 95617, USA
+  Service Address:
+    Address: 120 Synthetic Campus Drive
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.53655
+    Longitude: -121.4928
+  Account Address:
+    Address: 77 Solar Grove Court
+    City: Davis
+    Region: CA
+    Postal Code: '95618'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Simone
+    Last Name: Hart
+    Title: Solar PPA representative
+    Phone: 916-555-6300
+    Email: simone.hart@helios.example
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+  Notes:
+  - {Note: 'Paid by Helios debit under the PPA (Bill Payment), not through the AP upload.'}
+- key: hos_student_center
+  installed:
+    billingAccountId:
+  Company: Northlake University
+  Definitions:
+    Account Number: SYN-HOS-P-0000002
+    Description: Student Center / HOS
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: Helios Onsite Solar
+    Bill Service Type: Bill Payment  # assumed
+    Bill Entry Type: Bill Entry
+    Bill Invoice Template: Bill Table Invoice Default
+    Remit Address: PO Box 3391, Davis, CA 95617, USA
+  Service Address:
+    Address: 160 Synthetic Campus Drive
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.5342
+    Longitude: -121.4953
+  Account Address:
+    Address: 77 Solar Grove Court
+    City: Davis
+    Region: CA
+    Postal Code: '95618'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Simone
+    Last Name: Hart
+    Title: Solar PPA representative
+    Phone: 916-555-6300
+    Email: simone.hart@helios.example
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+  Notes:
+  - {Note: 'Paid by Helios debit under the PPA (Bill Payment), not through the AP upload.'}
+- key: hos_cedar_row_carport
+  installed:
+    billingAccountId:
+  Company: Cedar Row Apartments
+  Definitions:
+    Account Number: SYN-HOS-P-0000003
+    Description: Cedar Row Carport and Grounds / HOS
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: Helios Onsite Solar
+    Bill Service Type: Bill Payment  # assumed
+    Bill Entry Type: Bill Entry
+    Bill Invoice Template: Bill Table Invoice Default
+    Remit Address: PO Box 3391, Davis, CA 95617, USA
+  Service Address:
+    Address: 1280 Cedar Row Lane
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.5474
+    Longitude: -121.4711
+  Account Address:
+    Address: 77 Solar Grove Court
+    City: Davis
+    Region: CA
+    Postal Code: '95618'
+    Country: UNITED STATES
+  Account Contact:
+    First Name: Simone
+    Last Name: Hart
+    Title: Solar PPA representative
+    Phone: 916-555-6300
+    Email: simone.hart@helios.example
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-01-01}
+  Notes:
+  - {Note: 'Paid by Helios debit under the PPA (Bill Payment), not through the AP upload.'}
+# Added 2026-10-01: Ridgeline's transfer agreement. EEM generates its statement from the ten turbine meters (Bill
+# Generation), so this is the only Bill Generation account; it posts as a journal (Bill Payment, the AP/GL plan's GL).
+- key: rwl_ridgeline_transfer
+  installed:
+    billingAccountId:
+  Company: Northlake Thermal Plant
+  Definitions:
+    Account Number: SYN-RWL-G-0000001
+    Description: Ridgeline Turbine Field / RWL
+    Currency Unit: US Dollar  # assumed
+    Utility Provider: Ridgeline Wind
+    Bill Service Type: Bill Payment
+    Bill Entry Type: Bill Generation
+    Bill Invoice Template: Billing Charges Report
+    Remit Address: Ridgeline Wind Accounting, Campus Mail Stop 46, Sacramento, CA 95822, USA
+  Service Address:
+    Address: 8400 Montezuma Hills Road
+    City: Rio Vista
+    Region: CA
+    Postal Code: '94571'
+    Country: UNITED STATES
+    Latitude: 38.1226
+    Longitude: -121.8134
+  # The same address as the service address, so both share one address row and its coordinates.
+  Account Address:
+    Address: 8400 Montezuma Hills Road
+    City: Rio Vista
+    Region: CA
+    Postal Code: '94571'
+    Country: UNITED STATES
+    Latitude: 38.1226
+    Longitude: -121.8134
+  Account Contact:
+    First Name: Mateo
+    Last Name: Alvarez
+    Title: Ridgeline Wind Site Manager
+    Phone: 707-555-0146
+    Email: mateo.alvarez@northlake.example.edu
+  Status:
+  - {Status: Active Billing Account, As of Date: 2024-07-01}
+  Notes:
+  - {Note: 'Internal transfer from the wind company the plant owns, priced on the Ridgeline Farm Transfer Meter, the total of the ten turbine pad meters (RWL-XFER-2024). Generated by EEM; the hand-made July 2024 statement is the acceptance sample.'}

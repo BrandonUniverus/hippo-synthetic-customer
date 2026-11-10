@@ -1,0 +1,75 @@
+# Stage 6, step 2: GL user-defined fields and values. NOT ENTERABLE TODAY - see Findings. This file states the
+# target: what would be entered if the view existed, so the content is ready the moment it is built.
+#
+# Verified in C:\Hippo\Git\univerus\energyhippo\src: Models/Companies/GLUserDefinedModel.cs and
+# GLAccountUDFValueModel.cs exist, and the full API round-trip exists (SaveGLAccountFieldAsync /
+# SaveGLAccountFieldValueAsync on IGLAccountsDTORepository / IGLAccountsDTOService, wired through
+# GLAccountsDTOController and DapperGLAccountsDTORepository). A repo-wide search for GLUserDefined,
+# GLAccountUDFValueModel or either Save*Async method across every .xaml file returns nothing - no WPF view binds
+# to them. Product-gap-backlog.md item 3 already names this the same way ("missed-screen... just the view").
+# GLAccountUDField has no CompanyID column (verified against EEMSuite_Northlake): the 5 segment definitions
+# (GLUDF1-5) are one set for the whole install, not per company; only the values (GLAccountUDValue, keyed by
+# GL_AccountID) vary per account.
+stage: 6
+step: 2
+title: GL user-defined fields
+app: Database Administrator (target - no view is wired)
+screen: 'GL Accounts tab (target: a segment editor beside the account grid)'
+source:
+- data/eem/northlake-ap-gl-v1.yaml
+- generators/documents/sources/implementation/dream-customer/phase3-ap-gl-validation-spec.md
+- documents/guides/chart-of-accounts-and-gl-guide.pdf
+notes:
+- Field aliases GLUDF1-5 are fixed by the Sacramento-County-style exporter the AP/GL plan targets (nl_ap_gludf,
+  04-ap-export-formats.yaml) - do not rename them even once the view exists.
+- 'The guide''s own coding table gives Fund and Department by property; Program, Activity/Project and Object are
+  this stage''s own choices, with Activity/Project and Object deliberately left blank on several accounts, per
+  the guide itself: "Some segment values are intentionally left blank on certain accounts... that is expected,
+  not an error."'
+- 'Added 2026-10-01 (Ridgeline Wind): the guide''s coding table gains two rows, both Fund 700 Plant and Department
+  Ridgeline Wind: the transfer statement on 5150-WIND, and the Valley Electric generator account on 5100-ELEC.
+  ntp_gl_field_values therefore gains the 5150-WIND line and a generator override, the same shape as the Science
+  Center override in nlu_gl_field_values.'
+records:
+- key: gl_field_definitions
+  installed: {}
+  Segments (one set, global):
+  - {Alias: GLUDF1, Name: Fund}
+  - {Alias: GLUDF2, Name: Department}
+  - {Alias: GLUDF3, Name: Program}
+  - {Alias: GLUDF4, Name: Activity / Project}
+  - {Alias: GLUDF5, Name: Object}
+- key: nlu_gl_field_values
+  installed: {}
+  Company: Northlake University
+  Values:
+  - {GL Account: 5100-ELEC, Fund: 110 Operating, Department: Facilities, Program: Administration, Activity / Project: '', Object: ''}
+  - {GL Account: 5110-GAS, Fund: 110 Operating, Department: Facilities, Program: Administration, Activity / Project: '', Object: ''}
+  - {GL Account: 5120-WATER, Fund: 110 Operating, Department: Facilities, Program: Administration, Activity / Project: '', Object: ''}
+  - {GL Account: 5130-THERMAL, Fund: 700 Plant, Department: Facilities, Program: Administration, Activity / Project: Central Plant Allocation, Object: ''}
+  - {GL Account: 5140-SOLAR, Fund: 110 Operating, Department: Facilities, Program: Instruction, Activity / Project: Solar PPA, Object: ''}
+  - {GL Account: 2000-AP, Fund: 110 Operating, Department: Facilities, Program: '', Activity / Project: '', Object: ''}
+  Science Center override: the two Science Center expense lines (5100-ELEC, 5130-THERMAL for its lab wing and
+    chilled-water usage) use Department Labs and Program Research instead of the Facilities/Administration
+    default above.
+- key: cra_gl_field_values
+  installed: {}
+  Company: Cedar Row Apartments
+  Values:
+  - {GL Account: 5100-ELEC, Fund: 250 Auxiliary, Department: Housing, Program: Residential, Activity / Project: '', Object: ''}
+  - {GL Account: 5110-GAS, Fund: 250 Auxiliary, Department: Housing, Program: Residential, Activity / Project: '', Object: ''}
+  - {GL Account: 5120-WATER, Fund: 250 Auxiliary, Department: Housing, Program: Residential, Activity / Project: '', Object: ''}
+  - {GL Account: 5140-SOLAR, Fund: 250 Auxiliary, Department: Housing, Program: Residential, Activity / Project: Solar PPA, Object: ''}
+  - {GL Account: 2000-AP, Fund: 250 Auxiliary, Department: Housing, Program: '', Activity / Project: '', Object: ''}
+- key: ntp_gl_field_values
+  installed: {}
+  Company: Northlake Thermal Plant
+  Values:
+  - {GL Account: 5100-ELEC, Fund: 700 Plant, Department: Facilities, Program: Administration, Activity / Project: '', Object: ''}
+  - {GL Account: 5110-GAS, Fund: 700 Plant, Department: Facilities, Program: Administration, Activity / Project: '', Object: ''}
+  - {GL Account: 5120-WATER, Fund: 700 Plant, Department: Facilities, Program: Administration, Activity / Project: '', Object: ''}
+  - {GL Account: 5150-WIND, Fund: 700 Plant, Department: Ridgeline Wind, Program: Administration, Activity / Project: '', Object: ''}  # Fund and Department from the guide; Program assumed, as on the plant's other expense lines
+  - {GL Account: 2000-AP, Fund: 700 Plant, Department: Facilities, Program: '', Activity / Project: '', Object: ''}
+  Ridgeline generator override: the Valley Electric generator account's own 5100-ELEC lines (SYN-VED-A-0010014) use
+    Department Ridgeline Wind instead of the Facilities default above (the guide codes the generator account
+    5100-ELEC, 700 Plant, Ridgeline Wind); its Fund stays 700 Plant and its Program stays Administration.

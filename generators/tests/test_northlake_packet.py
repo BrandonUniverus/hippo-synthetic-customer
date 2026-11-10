@@ -35,9 +35,9 @@ class NorthlakePacketTests(unittest.TestCase):
         cls.sheets = cls.packet["sheets"]
 
     def test_counts_and_table_shapes_come_from_one_join(self):
-        expected = {"companies": 3, "sites": 3, "buildings": 13, "providers": 5, "accounts": 49, "utilityMeters": 55, "ownedMeters": 265, "weatherStations": 2,
-                    "meters": 322, "points": 431, "pointsToEnter": 299, "pointsGeneratedByEem": 264, "apartments": 124, "relatedMeasurements": 139,
-                    "aggregates": 7, "gatewayProfiles": 15, "gatewayFormats": 21, "eventPublishers": 1, "baseRates": 14, "contacts": 12, "organizationUnits": 6}
+        expected = {"companies": 3, "sites": 4, "buildings": 15, "providers": 6, "accounts": 51, "utilityMeters": 67, "ownedMeters": 266, "weatherStations": 3,
+                    "meters": 336, "points": 527, "pointsToEnter": 395, "pointsGeneratedByEem": 264, "apartments": 124, "relatedMeasurements": 141,
+                    "aggregates": 11, "gatewayProfiles": 15, "gatewayFormats": 21, "eventPublishers": 1, "baseRates": 17, "contacts": 14, "organizationUnits": 8}
         self.assertEqual(expected, self.packet["counts"])
         for name, sheet in self.sheets.items():
             for row in sheet["rows"]:
@@ -51,12 +51,12 @@ class NorthlakePacketTests(unittest.TestCase):
         hierarchy = {f"{row[5]} / {row[1]}": row for row in rows}
         self.assertEqual(len(rows), len(hierarchy))
         self.assertEqual(3, sum(row[4] == "Company" for row in rows))
-        self.assertEqual({"Northlake Main Campus", "Weather Reference", "Cedar Row Apartments", "Northlake Central Plant"}, {row[1] for row in rows if row[4] == "Site"})
+        self.assertEqual({"Northlake Main Campus", "Weather Reference", "Cedar Row Apartments", "Northlake Central Plant", "Ridgeline Wind Site"}, {row[1] for row in rows if row[4] == "Site"})
         buildings = [row for row in rows if row[4] == "Location"]
-        self.assertEqual(13, len(buildings))
-        self.assertEqual(13, len({row[1] for row in buildings}))
+        self.assertEqual(15, len(buildings))
+        self.assertEqual(15, len({row[1] for row in buildings}))
         self.assertTrue(all(row[3] == "Building" for row in buildings))
-        self.assertEqual(["Central Plant"], [row[1] for row in buildings if row[0] == "Northlake Thermal Plant"])
+        self.assertEqual(["Central Plant", "Ridgeline Turbine Field", "Ridgeline Substation"], [row[1] for row in buildings if row[0] == "Northlake Thermal Plant"])
         self.assertTrue({"Science Center", "Library"} <= {row[1] for row in buildings})
         for path, row in hierarchy.items():
             self.assertTrue(row[5] == "System" or row[5] in hierarchy, path)
@@ -69,41 +69,50 @@ class NorthlakePacketTests(unittest.TestCase):
         self.assertEqual(1, len(served))
         self.assertEqual(["Northlake Thermal Plant", "Utility meter", "Northlake University"], served[0][5:8])
         self.assertEqual("System / Northlake University / Northlake Main Campus / Science Center", served[0][-1])
-        plant = [row for row in meters.values() if row[7] == "Northlake Thermal Plant"]
+        plant = [row for row in meters.values() if row[7] == "Northlake Thermal Plant" and row[4] == "Central Plant"]
         self.assertEqual(8, len(plant))
-        self.assertTrue(all(row[4] == "Central Plant" for row in plant))
         self.assertEqual({"Utility meter", "Production meter", "Plant controller", "Sewer-deduct submeter"}, {row[6] for row in plant})
+        ridgeline = [row for row in meters.values() if row[7] == "Northlake Thermal Plant" and row[3] == "Ridgeline Wind Site"]
+        self.assertEqual(13, len(ridgeline))                       # ten turbines, the farm transfer meter, the interconnection meter, the met mast
+        self.assertEqual(21, sum(row[7] == "Northlake Thermal Plant" for row in meters.values()))
+        self.assertEqual({"Utility meter", "Met mast"}, {row[6] for row in ridgeline})
         self.assertTrue(all(row[1] in meters for row in self.sheets["Measured Points"]["rows"]))
 
     def test_billing_accounts_carry_their_editor_setup(self):
         accounts = {row[3]: row for row in self.sheets["Accounts And Agreements"]["rows"]}
         details = {row[0]: row for row in self.sheets["Account Billing Details"]["rows"]}
-        self.assertEqual(49, len(accounts))
+        self.assertEqual(51, len(accounts))
         self.assertEqual(set(accounts), set(details))
+        ridgeline = {"SYN-RWL-G-0000001", "SYN-VED-A-0010014"}                     # the wind site is in Rio Vista, not on campus
         for number, row in details.items():
-            self.assertTrue(row[2].endswith(", CA 95822") and row[3] and row[4] and "@" in row[5], number)
+            self.assertTrue(row[2].endswith(", CA 94571" if number in ridgeline else ", CA 95822") and row[3] and row[4] and "@" in row[5], number)
         self.assertEqual("100 Synthetic Campus Drive, Sacramento, CA 95822", details["SYN-VED-A-0010001"][2])
         self.assertEqual("PO Box 41027, Sacramento, CA 95841", details["SYN-VED-A-0010001"][3])
         self.assertEqual("Owen Blake", details["SYN-VED-A-0010001"][4])
         self.assertEqual("Devon Brooks", details["SYN-NTP-C-0000001"][4])
+        self.assertEqual("Mateo Alvarez", details["SYN-RWL-G-0000001"][4])        # an internal counterparty's own manager
 
         setup = {row[0]: row for row in self.packet["accountSetup"]["rows"]}
         self.assertEqual(set(accounts), set(setup))
         self.assertEqual({"AP", "AP and GL", "GL", "No Upload"}, {row[4] for row in setup.values()})
-        self.assertEqual({"Bill Importer", "Bill Entry", "Bill Allocation"}, {row[3] for row in setup.values()})
+        self.assertEqual({"Bill Importer", "Bill Entry", "Bill Allocation", "Bill Generation"}, {row[3] for row in setup.values()})
+        self.assertEqual(["Bill Generation", "GL"], setup["SYN-RWL-G-0000001"][3:5])  # generated by EEM, journalled, never paid
+        self.assertEqual(["Bill Importer", "AP and GL"], setup["SYN-VED-A-0010014"][3:5])
         self.assertEqual("Bill Importer", setup["SYN-VED-A-0010001"][3])          # campus electric arrives as a file
-        self.assertEqual("Bill Entry", setup["SYN-VED-A-0010005"][3])             # Cedar Row is keyed by hand
+        self.assertEqual("Bill Importer", setup["SYN-VED-A-0010005"][3])          # Cedar Row's utility bills are imported too
+        self.assertEqual("Bill Entry", setup["SYN-SGU-A-0020007"][3])             # Cedar Row keys its own gas bills
         self.assertEqual("Bill Allocation", setup["SYN-NTP-C-0000001"][3])
         self.assertEqual("No Upload", setup["SYN-RCU-A-0030004"][4])              # the never-exported negative control
-        self.assertTrue(all(row[5] == "Energy Hippo Default Template" for row in setup.values()))
+        self.assertEqual({"Bill Table Invoice Default", "Billing Charges Report"}, {row[5] for row in setup.values()})
+        self.assertTrue(all((row[5] == "Billing Charges Report") == number.startswith(("SYN-NTP-", "SYN-RWL-")) for number, row in setup.items()))
         self.assertTrue(all(row[6] == "2000-AP" for row in setup.values()))
-        self.assertEqual({"5100-ELEC", "5110-GAS", "5120-WATER", "5130-THERMAL", "5140-SOLAR"}, {row[7] for row in setup.values()})
+        self.assertEqual({"5100-ELEC", "5110-GAS", "5120-WATER", "5130-THERMAL", "5140-SOLAR", "5150-WIND"}, {row[7] for row in setup.values()})
 
         overrides = self.packet["validationOverrides"]["rows"]
-        self.assertEqual(4, len(overrides))
+        self.assertEqual(6, len(overrides))                                      # the Ridgeline generator turns off two
         self.assertEqual({"On", "Off"}, {row[3] for row in overrides})
         self.assertTrue(all(row[0] in accounts and row[5] for row in overrides))
-        self.assertEqual(45, sum(row[8] == "Inherits company" for row in setup.values()))
+        self.assertEqual(46, sum(row[8] == "Inherits company" for row in setup.values()))
 
     def test_bill_only_meters_have_no_points(self):
         points = {}
@@ -118,6 +127,31 @@ class NorthlakePacketTests(unittest.TestCase):
         self.assertFalse(set(steam) & set(points))
         self.assertIn("Central Plant Steam Production", points)
         self.assertEqual(sum(len(names) for names in points.values()), self.packet["counts"]["points"])
+
+    def test_ridgeline_wind_site_exercises_the_wind_measurements(self):
+        meters = {row[0]: row for row in self.sheets["Meters"]["rows"]}
+        points = {}
+        for row in self.sheets["Measured Points"]["rows"]:
+            points.setdefault(row[1], []).append(row)
+        turbines = [name for name in meters if name.startswith("Ridgeline WTG-")]
+        self.assertEqual(10, len(turbines))
+        for name in turbines:
+            self.assertEqual(["Generated kWh 10m", "Active Power kW 10m", "Possible kW 10m", "Nacelle Wind Speed 10m", "Rotor Speed 10m", "Turbine State"], [row[0] for row in points[name]])
+            self.assertTrue(all(row[5] == "10 minutes" for row in points[name]))
+            self.assertEqual("Ridgeline turbine SCADA and met mast", meters[name][8])
+        self.assertEqual("Met mast", meters["Ridgeline Met Mast"][6])
+        self.assertEqual({"Hub-Height Wind Speed 10m": "m/s", "Wind Direction 10m": "deg", "Air Temperature 10m": "degC", "Barometric Pressure 10m": "kPa", "Air Density 10m": "kg/m3", "Relative Humidity 10m": "pct"},
+                         {row[0]: row[4] for row in points["Ridgeline Met Mast"]})
+        knots = [row[0] for rows in points.values() for row in rows if row[4] == "knots"]
+        self.assertEqual({"KSUU Wind Speed", "KSUU Forecast Wind Speed"}, set(knots))
+        self.assertEqual(["Exported kWh 15m", "Station Service kWh 15m", "Reactive kVArh 15m"], [row[0] for row in points["Ridgeline Interconnection Meter"]])
+        rollups = {}
+        for row in self.sheets["Rollup Members"]["rows"]:
+            rollups.setdefault(row[0], []).append(row)
+        self.assertEqual(10, len(rollups["Ridgeline Farm Possible Power kW 10m"]))     # the expected side of the goal
+        self.assertEqual([1, -1], [row[3] for row in rollups["Ridgeline Net Export kWh 15m"]])
+        sources = {row[0]: row for row in self.sheets["Data Sources"]["rows"]}
+        self.assertIn("Pacific Standard Time all year", sources["Ridgeline turbine SCADA and met mast"][9])
 
     def test_cedar_row_is_master_metered_with_owned_unit_submeters(self):
         units = self.sheets["Units and Submeters"]["rows"]
@@ -138,7 +172,7 @@ class NorthlakePacketTests(unittest.TestCase):
         rollups = {}
         for row in self.sheets["Rollup Members"]["rows"]:
             rollups.setdefault(row[0], []).append(row)
-        self.assertEqual(7, len(rollups))
+        self.assertEqual(11, len(rollups))
         self.assertEqual([61, 65], [len(rollups["Cedar Row A Submetered kWh Total"]), len(rollups["Cedar Row B Submetered kWh Total"])])
         sources = self.sheets["Source Measurements"]["rows"]
         self.assertEqual(128, sum(row[0] == "Fixed-network electric submeters" for row in sources))
@@ -148,42 +182,44 @@ class NorthlakePacketTests(unittest.TestCase):
     def test_relationships_and_format_cases_are_explicit(self):
         relationships = self.sheets["Related Measurements"]["rows"]
         self.assertEqual(132, sum(row[4] == "Usage from register difference" for row in relationships))
-        self.assertEqual(4, sum("degree days" in row[4] for row in relationships))
+        self.assertEqual(6, sum("degree days" in row[4] for row in relationships))
         self.assertEqual(3, sum(row[4] == "Measured versus baseline" for row in relationships))
         assignments = self.sheets["Weather Assignments"]["rows"]
-        self.assertEqual(13, len(assignments))
-        self.assertTrue(all(row[2] == "KSAC" for row in assignments))
+        self.assertEqual(15, len(assignments))
+        self.assertEqual({"KSAC": 9, "KSMF": 4, "KSUU": 2}, {station: sum(row[2] == station for row in assignments) for station in ("KSAC", "KSMF", "KSUU")})
         coverage = self.packet["coverage"]["rows"]
         formats = {row[1] for row in coverage}
         self.assertTrue({"ACQUISUITE", "MDEF", "MV9", "BACNET", "MODBUS", "FIG", "SIEMANSREPORT", "MEDIATOR", "EATON", "XML", "FIXEDNETWORKS", "CMEP", "NEPTUNE", "MVRS", "HMR_EVENTS"} <= formats)
         self.assertTrue(all(row[-2:] == ["Not run", "Not run"] for row in coverage))
         self.assertEqual(["Generated"], [row[4] for row in coverage if row[0] == "gw_acquisuite_student_electric"])
         records = self.packet["instanceMapping"]["rows"]
-        self.assertEqual(322 + 431 + 4 + 3 + 7, len(records))  # meters + points + degree-day + baseline + aggregate points.
+        self.assertEqual(336 + 527 + 6 + 3 + 11, len(records))  # meters + points + degree-day + baseline + aggregate points.
         self.assertEqual(len(records), len({row[1] for row in records}))
         self.assertTrue(all(row[19:23] == ["", "", "", ""] for row in records))   # the installed IDs stay blank
 
     def test_meters_and_points_carry_their_editor_setup(self):
         meters = {row[0]: row for row in self.packet["meterSetup"]["rows"]}
-        self.assertEqual(322, len(meters))
-        self.assertEqual(55, sum(1 for row in meters.values() if row[7] != ""))          # a bill cycle needs a provider
-        self.assertEqual(44, sum(1 for row in meters.values() if row[4]))                # provider badge numbers
+        self.assertEqual(336, len(meters))
+        self.assertEqual(67, sum(1 for row in meters.values() if row[7] != ""))          # a bill cycle needs a provider
+        self.assertEqual(55, sum(1 for row in meters.values() if row[4]))                # provider badge numbers (none on the logical farm meter)
+        self.assertEqual(["", 1, "SYN-RWL-G-0000001"], [meters["SYN-RWL-M-0110000"][i] for i in (4, 7, 8)])
         self.assertEqual("VED-BADGE-0040001", meters["SYN-VED-M-0040001"][4])
+        self.assertEqual("RWL-WTG-10", meters["SYN-RWL-M-0110010"][4])                   # a turbine's position tag, not a badge
         self.assertEqual(1, meters["SYN-VED-M-0040001"][7])
         self.assertEqual(2, meters["SYN-RCU-M-0060003"][7])                              # Cedar Row runs the second cycle
-        self.assertEqual([40, 10], [row[5] for row in meters.values() if row[5]])
+        self.assertEqual([40, 12000, 3.0367, 10], [row[5] for row in meters.values() if row[5]])
 
         points = self.packet["pointSetup"]["rows"]
         entered = sum(row[6] for row in points if row[5].startswith("Enter"))
         generated = sum(row[6] for row in points if row[5].startswith("Generated"))
-        self.assertEqual([299, 132], [entered, generated])
-        self.assertEqual({5, 15, 60, "None"}, {row[3] for row in points})             # only intervals the editor offers
+        self.assertEqual([395, 132], [entered, generated])
+        self.assertEqual({1, 5, 10, 15, 30, 60, "None"}, {row[3] for row in points})  # only intervals the editor offers
         self.assertTrue(all(row[1] == "Digital" and row[2] == "State" for row in points if row[0] == "Digital"))
         self.assertTrue(all(row[1] == "Temperature" for row in points if row[4] != "None"))
-        self.assertEqual(2, sum(row[6] for row in points if row[4] != "None"))           # the two degree-day drivers
+        self.assertEqual(3, sum(row[6] for row in points if row[4] != "None"))           # the three degree-day drivers
 
         providers = {row[0]: row for row in self.packet["providerSetup"]["rows"]}
-        self.assertEqual(5, len(providers))
+        self.assertEqual(6, len(providers))
         self.assertTrue(all(row[3] and row[4] and row[5] for row in providers.values()))  # remit, cycles, vendor numbers
         self.assertIn("2 Cedar Row", providers["River City Utilities"][4])
         self.assertEqual("None - internal counterparty", providers["Northlake Thermal Plant"][1])
@@ -192,31 +228,33 @@ class NorthlakePacketTests(unittest.TestCase):
         buildings = {row[0]: row for row in self.sheets["Buildings"]["rows"]}
         self.assertEqual([95000, 58000, 110000, ""], [buildings["Student Center"][5], buildings["Cedar Row A"][5], buildings["Lakeview Residence Hall"][5], buildings["Campus Grounds"][5]])
         schedules = {row[1] for row in self.sheets["Rate Schedules"]["rows"]}
-        self.assertTrue({"VED-TOU-GS", "VED-TOU-GS-FY25", "VED-TOU-PRI", "VED-AL-1", "SGU-GL-1", "RCU-IRR", "RCU-FIRE", "NTP-ALLOC-CHW"} <= schedules)
+        self.assertTrue({"VED-TOU-GS", "VED-TOU-GS-FY25", "VED-TOU-PRI", "VED-AL-1", "VED-GEN-IC", "VED-BCT", "SGU-GL-1", "RCU-IRR", "RCU-FIRE", "NTP-ALLOC-CHW", "RWL-XFER-2024"} <= schedules)
         charges = self.sheets["Rate Components"]["rows"]
         peak = next(row for row in charges if row[1] == "VED-TOU-GS" and row[2] == "Energy / peak")
         self.assertEqual(0.241, peak[3])
         self.assertTrue(all(isinstance(row[3], (int, float)) for row in charges))
         accounts = self.sheets["Accounts And Agreements"]["rows"]
-        self.assertEqual(49, len({row[3] for row in accounts}))
-        self.assertEqual({"External utility account", "Internal cost center", "PPA agreement"}, {row[2] for row in accounts})
+        self.assertEqual(51, len({row[3] for row in accounts}))
+        self.assertEqual({"External utility account", "Internal cost center", "PPA agreement", "Generation transfer agreement"}, {row[2] for row in accounts})
 
     def test_drifted_identifiers_and_ownership_are_rejected(self):
         with self.assertRaisesRegex(AssertionError, "Account identifier drift: ved_student_center"):
             packet_from_edited_sources("data/scenarios/demo-university-v1.yaml", "SYN-VED-A-0010004", "WRONG-ACCOUNT")
         with self.assertRaisesRegex(AssertionError, "Stage 1 sites differ from scenario ownership: northlake_thermal_plant"):
-            packet_from_edited_sources("data/eem/northlake-eem-stage1-setup-v1.yaml", "hierarchySitesFromScenario: [northlake_central_plant]", "hierarchySitesFromScenario: [northlake_central_plant, northlake_main_campus]")
+            packet_from_edited_sources("data/eem/northlake-eem-stage1-setup-v1.yaml", "hierarchySitesFromScenario: [northlake_central_plant, ridgeline_wind_site]", "hierarchySitesFromScenario: [northlake_central_plant, ridgeline_wind_site, northlake_main_campus]")
         with self.assertRaisesRegex(AssertionError, "Aggregate parent is not a hierarchy node: agg_nlu_science_net_electric_kwh_15m"):
             packet_from_edited_sources("data/eem/northlake-eem-metaworld-stage1b-v1.yaml", "parentPath: System / Northlake University / Northlake Main Campus / Science Center", "parentPath: System / Northlake University / Northlake Main Campus / Applied Science Center")
         with self.assertRaisesRegex(AssertionError, "Duplicate building path"):
             packet_from_edited_sources("data/scenarios/demo-university-v1.yaml", "        displayName: Library\n", "        displayName: Science Center\n")
         with self.assertRaisesRegex(AssertionError, "Security scope buildings differ from scenario ownership: northlake_thermal_plant"):
-            packet_from_edited_sources("data/security/northlake-eem-security-v1.yaml", "      buildings: [central_plant]", "      buildings: [central_plant, science_center]")
+            packet_from_edited_sources("data/security/northlake-eem-security-v1.yaml", "      buildings: [central_plant, ridgeline_turbine_field, ridgeline_substation]", "      buildings: [central_plant, ridgeline_turbine_field, ridgeline_substation, science_center]")
+        with self.assertRaisesRegex(AssertionError, "Group node scope names a node outside its company: ntp_wind_research"):
+            packet_from_edited_sources("data/security/northlake-eem-security-v1.yaml", "nodeScope: [ridgeline_wind_site]     # cross-company", "nodeScope: [northlake_main_campus]     # cross-company")
 
     def test_company_contacts_cover_the_handover_and_department_ownership(self):
         contacts = {row[1]: row for row in self.sheets["Contacts"]["rows"]}
-        self.assertEqual(12, len(contacts))
-        self.assertTrue({"Samantha Ireland", "Jordan Hale", "Priya Nandakumar", "Iris Morales", "Nora Chen", "Leo Martinez", "Maya Chen", "Devon Brooks"} <= contacts.keys())
+        self.assertEqual(14, len(contacts))
+        self.assertTrue({"Samantha Ireland", "Jordan Hale", "Priya Nandakumar", "Iris Morales", "Nora Chen", "Leo Martinez", "Maya Chen", "Devon Brooks", "Mateo Alvarez", "Elena Vasquez"} <= contacts.keys())
         self.assertEqual("samantha.ireland@northlake.example.edu", contacts["Samantha Ireland"][3])
         self.assertEqual("Cedar Row Apartments", contacts["Maya Chen"][0])
         self.assertEqual("Northlake Thermal Plant", contacts["Devon Brooks"][0])
@@ -224,7 +262,7 @@ class NorthlakePacketTests(unittest.TestCase):
         self.assertTrue(all(row[3] and row[4] and "TBD" not in row for row in contacts.values()))
         self.assertTrue({"Valley Electric District", "Sierra Gas Utility", "River City Utilities", "Helios Onsite Solar", "Northlake Thermal Plant"} <= {row[0] for row in contacts.values()})
         units = self.sheets["Departments & Responsibilities"]["rows"]
-        self.assertEqual(6, len(units))
+        self.assertEqual(8, len(units))
         self.assertEqual({"Northlake University", "Cedar Row Apartments", "Northlake Thermal Plant"}, {row[0] for row in units})
         for row in units:
             contact = contacts[row[3]]

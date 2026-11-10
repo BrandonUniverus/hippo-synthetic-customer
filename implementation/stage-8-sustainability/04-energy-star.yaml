@@ -1,0 +1,97 @@
+# Stage 8, step 4: ENERGY STAR property setup and rating requests (Web, #/ESPropertySetup and #/ESNewRatingRequest),
+# plus the sandbox Portfolio Manager connection (Configuration Tool, System Constants) and the EnergyStar sync task
+# (Web, #/tasks/manager). See [ENERGY STAR integration](energystar-integration.pdf) for the full property mapping
+# this step enters. Property records come first (they must exist before a rating request can reference one), then
+# rating requests, then the Portfolio Manager connection record.
+stage: 8
+step: 4
+title: ENERGY STAR property setup, rating requests, Portfolio Manager connection
+app: Web, Configuration Tool
+screen: ESPropertySetup, ESNewRatingRequest, System Constants, tasks/manager
+source:
+- data/scenarios/demo-university-v1.yaml (energyStarProperties)
+- generators/documents/sources/implementation/stage-8-sustainability/energystar-integration.pdf
+- generators/documents/sources/implementation/dream-customer/product-gap-backlog.md (item 1)
+notes:
+- 'ESPropertySetup grid columns (viewESPropertySetup.ts): Parent/Site, Property, Primary Use, Auto Update, Rating,
+  Rating Date, Year Ending, Request Year Ending, and row actions Request Rating / View / Edit / History / Clear.
+  It lists the hierarchy''s sites and buildings; Edit maps a node to its ENERGY STAR property use(s), matching the
+  13 properties already modeled in data/scenarios/demo-university-v1.yaml energyStarProperties (campus parent + 7
+  campus buildings, the Cedar Row multifamily property + its 3 buildings, the Central Plant). PMPropertyID stays 0
+  until the pm_connection record below links it.'
+- 'ESNewRatingRequest queues a request per property per year-ending date; it is fully local (ESRequestType 3
+  Building, verified row in dbo.ESRequestType) and does not need Portfolio Manager to save. Submitting it for real
+  scoring does.'
+- 'EnergyStar sync task: Task 19 "Energy Star" (Energy Star Request Processor, EEMSuite.Tasks.EnergyStar,
+  RatingSyncService) and Task 20 "Energy Star Automation Task" (approves valid facilities), both verified rows in
+  Task_Tbl. Schedule Task 19 to run every 300 seconds once pm_connection is in place; Stage 9 step 4 schedules it
+  alongside the other standard tasks. Until then leave it unscheduled -- running it against no CustomerServer just
+  logs a skip, it does not error.'
+- 'Eligibility (per energystar.gov, and the source-model note on Admin Hall): a property scores only when more than
+  50% of gross floor area is a score-eligible type and non-scoring uses stay under 25%. In the US the eligible-type
+  set here is Office, Residence Hall/Dormitory and Multifamily Housing (Library scores only in Canada). Lakeview
+  Residence Hall and Cedar Row Apartments score; Admin Hall is Office-primary but its 25,000 sq ft classroom wing is
+  29% of its 85,000 sq ft, over the 25% cap, so it gets metrics only, not a score.'
+- 'The PM account username/password are the Energy Star task''s own configuration parameters, not a System
+  Constant (LegacyEncryptedCredentialProvider reads PMUsername/PMAccountPassword keyed EEMSuite.Tasks.EnergyStar)
+  -- set them on that task''s Parameters in Task Manager, not on pm_connection below.'
+- 'Added 2026-10-01 (Ridgeline Wind): the Ridgeline Wind Site is not an ENERGY STAR property (the Sustainability
+  Office: a generating site, not a building, not benchmarked), so this file gains no property and no rating request
+  and the count stays 13. Property Setup lists every level-2 node of the company, configured or not
+  (ESGetPropertyList.sql:13-27,88), so Ridgeline Turbine Field and Ridgeline Substation appear under Northlake
+  Thermal Plant with Primary Use N/a: leave them unconfigured, like Campus Grounds and Cedar Row Carport and
+  Grounds. The one per-meter generation marker EEM has lives in this module, for the follow-on meter mapping: a meter
+  on a property can carry the Renewables class, Electric on Site Solar (attribute 5) or Electric on Site Wind (6),
+  offered on every electric meter (ESFacilityMeterClassTypeByMeter_Get.sql:93-117), and the sync then sends it to
+  Portfolio Manager as the meter type in place of Electric (ESFacilityMeter_Get.sql:62; MeterMapping.cs:17;
+  TypeOfMeter.cs:55). It describes generation on the property''s own site, and the sync reports zero energy exported
+  off site for such a meter (MeterConsumptionMapping.cs:29-32). Ridgeline is about fifty miles from the campus and
+  exports all of its output, so no Ridgeline meter is ever mapped to a property and the override is never set. Nor
+  does Ridgeline change the Central Plant property: the VED-BCT credit on the plant''s Valley Electric bill is money,
+  and the readings sent to Portfolio Manager are the meter''s billed energy quantities
+  (ESMeterReading_Create.sql:120-135).'
+records:
+- {key: es_property_northlake_main_campus, installed: {esFacilityId: }, Property Setup: {Property: Northlake Main Campus, Parent/Site: (campus parent), Primary Use: College/University, Auto Update: false}, note: metrics only}
+- {key: es_property_admin_hall, installed: {esFacilityId: }, Property Setup: {Property: Admin Hall, Parent/Site: Northlake Main Campus, Primary Use: Office, Auto Update: false}, note: "metrics only; classroom wing 29% of area, over the 25% cap"}
+- {key: es_property_science_center, installed: {esFacilityId: }, Property Setup: {Property: Science Center, Parent/Site: Northlake Main Campus, Primary Use: Laboratory, Auto Update: false}, note: metrics only}
+- {key: es_property_library, installed: {esFacilityId: }, Property Setup: {Property: Library, Parent/Site: Northlake Main Campus, Primary Use: Library, Auto Update: false}, note: "metrics only in the US"}
+- {key: es_property_student_center, installed: {esFacilityId: }, Property Setup: {Property: Student Center, Parent/Site: Northlake Main Campus, Primary Use: Food Service, Auto Update: false}, note: metrics only}
+- {key: es_property_lakeview_hall, installed: {esFacilityId: }, Property Setup: {Property: Lakeview Hall, Parent/Site: Northlake Main Campus, Primary Use: Residence Hall/Dormitory, Auto Update: false}, note: "score-eligible; quarterly 1-100 score once PM-connected"}
+- {key: es_property_recreation_center, installed: {esFacilityId: }, Property Setup: {Property: Recreation Center, Parent/Site: Northlake Main Campus, Primary Use: Fitness Center/Health Club/Gym, Auto Update: false}, note: metrics only}
+- {key: es_property_parking_structure, installed: {esFacilityId: }, Property Setup: {Property: Parking Structure, Parent/Site: Northlake Main Campus, Primary Use: Parking, Auto Update: false}, note: metrics only}
+- {key: es_property_cedar_row_apartments, installed: {esFacilityId: }, Property Setup: {Property: Cedar Row Apartments, Parent/Site: (multifamily property), Primary Use: Multifamily Housing, Auto Update: false}, note: "score-eligible; quarterly 1-100 score once PM-connected"}
+- {key: es_property_cedar_row_a, installed: {esFacilityId: }, Property Setup: {Property: Cedar Row A, Parent/Site: Cedar Row Apartments, Primary Use: Multifamily Housing, Auto Update: false}, note: "rolls up to the property score, not scored on its own"}
+- {key: es_property_cedar_row_b, installed: {esFacilityId: }, Property Setup: {Property: Cedar Row B, Parent/Site: Cedar Row Apartments, Primary Use: Multifamily Housing, Auto Update: false}, note: "rolls up to the property score, not scored on its own"}
+- {key: es_property_cedar_row_common_house, installed: {esFacilityId: }, Property Setup: {Property: Cedar Row Common House, Parent/Site: Cedar Row Apartments, Primary Use: Other - Recreation, Auto Update: false}, note: metrics only}
+- {key: es_property_central_plant, installed: {esFacilityId: }, Property Setup: {Property: Central Plant, Parent/Site: (standalone property), Primary Use: Other - Utility, Auto Update: false}, note: "metrics only; excluded from the campus academic benchmarking boundary"}
+- {key: ridgeline_not_an_es_property, installed: {}, Property Setup: {Property: "Ridgeline Turbine Field; Ridgeline Substation", Parent/Site: Ridgeline Wind Site (Northlake Thermal Plant), Primary Use: "N/a (leave unconfigured)", Auto Update: false}, note: "not a property: no rating request, and no Ridgeline meter on any property, so Electric on Site Wind is never set"}
+- {key: es_request_lakeview_hall_2024q1, installed: {esRequestId: }, Rating Request: {Property: Lakeview Hall, Request Type: Building, Year Ending: 2024-03-31}, expect: "score once PM-connected"}
+- {key: es_request_lakeview_hall_2024q2, installed: {esRequestId: }, Rating Request: {Property: Lakeview Hall, Request Type: Building, Year Ending: 2024-06-30}, expect: "score once PM-connected"}
+- {key: es_request_lakeview_hall_2024q3, installed: {esRequestId: }, Rating Request: {Property: Lakeview Hall, Request Type: Building, Year Ending: 2024-09-30}, expect: "score once PM-connected"}
+- {key: es_request_lakeview_hall_2024q4, installed: {esRequestId: }, Rating Request: {Property: Lakeview Hall, Request Type: Building, Year Ending: 2024-12-31}, expect: "score ~72 once PM-connected"}
+- {key: es_request_lakeview_hall_2025q1, installed: {esRequestId: }, Rating Request: {Property: Lakeview Hall, Request Type: Building, Year Ending: 2025-03-31}, expect: "score trending up once PM-connected"}
+- {key: es_request_lakeview_hall_2025q2, installed: {esRequestId: }, Rating Request: {Property: Lakeview Hall, Request Type: Building, Year Ending: 2025-06-30}, expect: "score trending up once PM-connected"}
+- {key: es_request_lakeview_hall_2025q3, installed: {esRequestId: }, Rating Request: {Property: Lakeview Hall, Request Type: Building, Year Ending: 2025-09-30}, expect: "score trending up once PM-connected"}
+- {key: es_request_lakeview_hall_2025q4, installed: {esRequestId: }, Rating Request: {Property: Lakeview Hall, Request Type: Building, Year Ending: 2025-12-31}, expect: "score ~78 once PM-connected"}
+- {key: es_request_cedar_row_apartments_2024q1, installed: {esRequestId: }, Rating Request: {Property: Cedar Row Apartments, Request Type: Building, Year Ending: 2024-03-31}, expect: "score once PM-connected"}
+- {key: es_request_cedar_row_apartments_2024q2, installed: {esRequestId: }, Rating Request: {Property: Cedar Row Apartments, Request Type: Building, Year Ending: 2024-06-30}, expect: "score once PM-connected"}
+- {key: es_request_cedar_row_apartments_2024q3, installed: {esRequestId: }, Rating Request: {Property: Cedar Row Apartments, Request Type: Building, Year Ending: 2024-09-30}, expect: "score once PM-connected"}
+- {key: es_request_cedar_row_apartments_2024q4, installed: {esRequestId: }, Rating Request: {Property: Cedar Row Apartments, Request Type: Building, Year Ending: 2024-12-31}, expect: "score once PM-connected"}
+- {key: es_request_cedar_row_apartments_2025q1, installed: {esRequestId: }, Rating Request: {Property: Cedar Row Apartments, Request Type: Building, Year Ending: 2025-03-31}, expect: "score trending up once PM-connected"}
+- {key: es_request_cedar_row_apartments_2025q2, installed: {esRequestId: }, Rating Request: {Property: Cedar Row Apartments, Request Type: Building, Year Ending: 2025-06-30}, expect: "score trending up once PM-connected"}
+- {key: es_request_cedar_row_apartments_2025q3, installed: {esRequestId: }, Rating Request: {Property: Cedar Row Apartments, Request Type: Building, Year Ending: 2025-09-30}, expect: "score trending up once PM-connected"}
+- {key: es_request_cedar_row_apartments_2025q4, installed: {esRequestId: }, Rating Request: {Property: Cedar Row Apartments, Request Type: Building, Year Ending: 2025-12-31}, expect: "score trending up once PM-connected"}
+- {key: es_request_admin_hall_2024, installed: {esRequestId: }, Rating Request: {Property: Admin Hall, Request Type: Building, Year Ending: 2024-12-31}, expect: "metrics only, eligible=false, no score"}
+- {key: es_request_admin_hall_2025, installed: {esRequestId: }, Rating Request: {Property: Admin Hall, Request Type: Building, Year Ending: 2025-12-31}, expect: "metrics only, eligible=false, no score"}
+- {key: es_request_science_center_2025_pending, installed: {esRequestId: }, Rating Request: {Property: Science Center, Request Type: Building, Year Ending: 2025-12-31}, expect: "left pending; rp_ESRatingRequestLog shows a pending row"}
+- {key: es_request_central_plant_2025_error, installed: {esRequestId: }, Rating Request: {Property: Central Plant, Request Type: Building, Year Ending: 2025-12-31}, expect: "submitted with an incomplete meter map on purpose; rp_ESRatingRequestLog shows an error row"}
+- key: pm_connection
+  installed:
+    systemConstantSet: false
+  System Constants:
+    Item: CustomerServer
+    Type: String
+    Value: "(blank until a sandbox/real Portfolio Manager account is obtained -- product backlog item 1)"
+  note: "SystemConstantService.IsCustomerServerSetAsync() is what #/ESNewRatingRequest checks before it will submit
+    (EnergyStarController.IsConfiguredForRequests). Obtaining the sandbox account is Brandon's own action item;
+    the field stays blank in this pass."

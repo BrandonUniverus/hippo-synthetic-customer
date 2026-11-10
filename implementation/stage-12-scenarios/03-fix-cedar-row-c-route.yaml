@@ -1,0 +1,64 @@
+# Stage 12, scenario 3: fix the Cedar Row C route the installer keyed badly, with bulk edit.
+# After the first rounds on Cedar Row C (Stage 9), the reader reported that the route zig-zags between the two meter
+# banks, that unit 412 is never on the handheld and that the laundry meter is missing. This scenario fixes all of it
+# on Handheld Meter Setup without touching the meters' points or history.
+stage: 12
+step: 3
+title: Fix a badly built route with bulk edit
+app: Web
+screen: Handheld Meter Setup (grid bulk edit, Paste from Excel); Handheld Meter Reading Export
+source:
+- implementation/stage-3-gateways-and-data/05-handheld-routes.yaml (hmr_cedar_row_c_upper_floors, hmr_cedar_row_c_lower_floors)
+- implementation/stage-2-hierarchy/02-sites-and-buildings.yaml (cedar_row_c: the two meter banks)
+- implementation/stage-12-scenarios/03-cedar-row-c-walking-order.csv
+requires:
+- Stage 3 Step 5 entered with Cedar Row C as the installer keyed it (all 213 Stage 3 handheld checks pass).
+notes:
+- 'Bulk edit works like the Configuration Tool: drag, Shift-click or Ctrl-click cells in ONE column, right-click,
+  Edit selected, type one value; the grid shows "Applying to N of M" and keeps the change until Save. Seq has
+  Number from and Step instead of one value.'
+- 'A paste with only some columns changes only those fields: a two-column paste (Meter # and Sequence) re-orders a
+  route without touching anything else. The save then renumbers the route 10, 20, 30.'
+- 'After this scenario Stage 3''s handheld checker reports Cedar Row C''s 50 meters as changed (sequence, cycle,
+  enabled, meter text): that is the expected result of the fix, not a regression. The other 154 registers must
+  still pass.'
+findings:
+- {Reported by: reader, Finding: 'The route crosses from the west bank to the east bank on every floor and ends back in the laundry room.'}
+- {Reported by: reader, Finding: 'Unit 412 is never on the handheld: it is on cycle 20, which nobody loads.'}
+- {Reported by: reader, Finding: 'The laundry meter is not in the route file: it is disabled.'}
+- {Reported by: office, Finding: 'Every Cedar Row C meter text says Cedar Row B.'}
+steps:
+- key: show_the_route
+  Where: Handheld Meter Setup, Cedar Row C selected, All meters
+  Action: 'Filter Route = CRCWTR. Sort by Cycle: unit 412 shows 20 while the other 49 show 02. The laundry meter shows
+    Enabled No.'
+- key: fix_cycle
+  Action: Click unit 412's Cycle cell and pick 02 (it is one cell, so no bulk edit is needed).
+- key: fix_enabled
+  Action: Click the laundry meter's Enabled cell and set Yes.
+- key: fix_meter_text
+  Action: 'Select every Cedar Row C Meter Text cell (click the first, Shift-click the last), right-click, Edit selected,
+    type the new text and apply: "Applying to 50 of 50".'
+  Meter Text: Cedar Row C water submeter. Confirm the unit on the meter before reading.
+- key: save_fixes
+  Action: Save. The save is all or nothing.
+- key: reorder
+  Where: Handheld Meter Setup > More > Paste from Excel
+  Action: 'Open 03-cedar-row-c-walking-order.csv in a text editor, copy all of it (Meter # and Sequence only) and paste.
+    Save.'
+  Walking order: 'The laundry room first (house 10, laundry 20); then the west bank, stack by stack, top floor down
+    (401, 301, 201, 101, then 402, 302, 202, 102 and so on to stack 06); then the east bank the same way (stacks 07
+    to 12). 50 meters, 10 to 500.'
+- key: export
+  Where: Handheld Meter Reading Export
+  Action: Export the route file and keep it as evidence.
+verify:
+- 'Cycle 02 CRCWTR has all 50 Cedar Row C meters, enabled, at 10 to 500 in walking order: house 10, laundry 20, unit 401
+  30, unit 301 40, unit 201 50, unit 101 60, unit 402 70, ..., unit 412 470, unit 312 480, unit 212 490, unit 112 500.'
+- There is no cycle 20 in the route file, and the file carries 50 Cedar Row C meters.
+- Every Cedar Row C meter text reads Cedar Row C.
+- 'Nothing else changed: the registers keep their read types (CCF upstairs, GAL downstairs), prompts, constants and
+  points, and the meters'' reading history is untouched.'
+leftAsIs:
+- 'The two meter batches stay as they are: ccf upstairs and gallons downstairs are the meters on the wall, not a
+  configuration mistake. Reports that sum the building convert both to one unit through the unit system.'

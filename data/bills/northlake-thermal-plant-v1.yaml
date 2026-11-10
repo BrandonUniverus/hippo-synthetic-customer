@@ -1,0 +1,145 @@
+manifestVersion: 1
+id: northlake_thermal_plant_bills_v1
+customerScenarioId: demo_university_v1
+purpose: >
+  The Northlake Thermal Plant's four sample allocation statements, rendered by
+  generators/render_bills.py into documents/utility-bills/northlake-thermal-plant/. They replace
+  hand-made images whose charge tables were empty and whose dates ran into 2026; every line here
+  is a fact: quantities, rates and amounts reconcile to the total, and the rates are the provider
+  file's own (NTP-ALLOC-CHW and NTP-ALLOC-STEAM). An allocation is a journal between the plant and
+  a served building's cost center, so none has a due date.
+
+# Each line: description, then quantity x rate = amount (rounded half-up to the cent), or a bare
+# amount for the fixed operations and maintenance share, which neither tariff schedule prices.
+# `code` is the provider's billCharges code (data/providers/northlake-thermal-plant.yaml).
+#
+# The plant's cycle 1 is the calendar month (Stage 1 02-utility-providers.yaml): a period runs from
+# the 1st to the last day and posts to the month it ends in. Stage 5 enters an allocation on its
+# period end + 6 days (data/eem/northlake-bill-entry-v1.yaml entryLagDays), so every statement is
+# dated inside that lag. None of these meters has a Provider Meter Number or a multiplier
+# (Stage 2 03-meters.yaml), so no meter row carries a badge.
+#
+# The fixed share is flat per building and month: 340.00 for the Science Center (Stage 5's worked
+# example), scaled by floor area for the others (85,000 and 95,000 sq ft against 120,000), to $10.
+bills:
+  # ------------------------------------------------------------------ Science Center: chilled water and steam
+  - id: ntp_science_center_2025_03
+    file: documents/utility-bills/northlake-thermal-plant/01-Northlake-Thermal-Science-Center-Chilled-And-Steam.pdf
+    providerId: northlake_thermal_plant
+    accountId: ntp_science_center
+    title: Chilled Water and Steam Allocation
+    preparedBy: Central Plant Operations, from the month-end sub-meter data
+    customer: Northlake University
+    accountNumber: SYN-NTP-C-0000001
+    rateSchedules: [NTP-ALLOC-CHW, NTP-ALLOC-STEAM]
+    billDate: 2025-04-04        # March 2025 closes March 31; entered by April 6
+    dueDate: null               # a journal, not a payable
+    period: {start: 2025-03-01, end: 2025-03-31}
+    notice: >
+      Chilled water and steam for the Science Center on one statement, in a March shoulder month
+      when the labs still cool while the building heats: chilled water is allocated on metered
+      ton-hours and the monthly hourly peak, steam on metered klb. The fixed operations and
+      maintenance line is the building's flat share of the plant's fixed costs; neither tariff
+      prices it, so it has no rate. Post as a journal to 5130-THERMAL; no payment is due.
+    meters:
+      - {meterNumber: SYN-NTP-M-0070001, channel: Chilled water delivered, quantity: 58640, unit: ton-hr}
+      - {meterNumber: SYN-NTP-M-0070001, channel: Peak hourly demand, quantity: 214, unit: ton}
+      - {meterNumber: SYN-NTP-M-0070101, channel: Steam delivered, quantity: 742, unit: klb}
+    lines:
+      - {code: chilled_water_consumption, description: Chilled water consumption (metered ton-hours), quantity: 58640, unit: ton-hr, rate: 0.168, amount: 9851.52}
+      - {code: chilled_water_demand, description: Chilled water demand (monthly hourly peak), quantity: 214, unit: ton, rate: 9.50, amount: 2033.00}
+      - {code: steam_consumption, description: Steam consumption (metered klb), quantity: 742, unit: klb, rate: 14.20, amount: 10536.40}
+      - {code: fixed_oandm_allocation, description: Fixed plant operations and maintenance share, amount: 340.00}
+    total: 22760.92
+
+  # ------------------------------------------------------------------ Science Center: summer cooling
+  # July 2024 is the month Stage 4's test_ntp_alloc_chw runs and the month of the Valley Electric
+  # Science Center summer bill. The quantities are the old image's own: 180,860 x 0.168 + 542 x 9.50
+  # was its whole total, 35,533.48; this statement adds the fixed share.
+  - id: ntp_science_center_2024_07
+    file: documents/utility-bills/northlake-thermal-plant/02-Northlake-Thermal-Science-Center-Summer-Cooling.pdf
+    providerId: northlake_thermal_plant
+    accountId: ntp_science_center
+    title: Summer Cooling Allocation
+    preparedBy: Central Plant Operations, from the month-end sub-meter data
+    customer: Northlake University
+    accountNumber: SYN-NTP-C-0000001
+    rateSchedules: [NTP-ALLOC-CHW]
+    billDate: 2024-08-05        # July 2024 closes July 31; entered by August 6
+    dueDate: null
+    period: {start: 2024-07-01, end: 2024-07-31}
+    notice: >
+      Summer cooling: 180,860 ton-hours for July, and a monthly peak of 542 tons recorded on July 18
+      between 15:00 and 16:00 (the hourly interval data is kept for cost-recovery audit). The
+      Science Center's steam meter recorded no steam in July, so there is no steam line. The fixed
+      operations and maintenance line is the building's flat share of the plant's fixed costs;
+      neither tariff prices it. Post as a journal to 5130-THERMAL; no payment is due.
+    meters:
+      - {meterNumber: SYN-NTP-M-0070001, channel: Chilled water delivered, quantity: 180860, unit: ton-hr}
+      - {meterNumber: SYN-NTP-M-0070001, channel: Peak hourly demand, quantity: 542, unit: ton}
+    lines:
+      - {code: chilled_water_consumption, description: Chilled water consumption (metered ton-hours), quantity: 180860, unit: ton-hr, rate: 0.168, amount: 30384.48}
+      - {code: chilled_water_demand, description: Chilled water demand (monthly hourly peak), quantity: 542, unit: ton, rate: 9.50, amount: 5149.00}
+      - {code: fixed_oandm_allocation, description: Fixed plant operations and maintenance share, amount: 340.00}
+    total: 35873.48
+    informational:             # not charged; what the hourly interval data must reproduce
+      - {label: Average chilled-water load over the month, value: 243, unit: tons}
+      - {label: Load factor (average load over the monthly peak), value: 44.9, unit: "%"}
+      - {label: Hourly interval records retained for cost-recovery audit, value: 744, unit: hours}
+
+  # ------------------------------------------------------------------ Admin Hall: steam only, winter
+  # 586 x 14.20 was the old image's whole total, 8,321.20; this statement adds the fixed share.
+  - id: ntp_admin_hall_2025_01
+    file: documents/utility-bills/northlake-thermal-plant/03-Northlake-Thermal-Admin-Hall-Steam-Only-Winter.pdf
+    providerId: northlake_thermal_plant
+    accountId: ntp_admin_hall
+    title: Steam Heating Allocation
+    preparedBy: Central Plant Operations, from the month-end sub-meter data
+    customer: Northlake University
+    accountNumber: SYN-NTP-C-0000002
+    rateSchedules: [NTP-ALLOC-STEAM]
+    billDate: 2025-02-05        # January 2025 closes January 31; entered by February 6
+    dueDate: null
+    period: {start: 2025-01-01, end: 2025-01-31}
+    notice: >
+      Steam only, in a winter month: Admin Hall heats from the campus steam loop and has no
+      chilled-water service (it cools with rooftop DX units), so there is no cooling line. The fixed
+      operations and maintenance line is the building's flat share of the plant's fixed costs; the
+      steam tariff does not price it. Post as a journal to 5130-THERMAL; no payment is due.
+    meters:
+      - {meterNumber: SYN-NTP-M-0070002, channel: Steam delivered, quantity: 586, unit: klb}
+    lines:
+      - {code: steam_consumption, description: Steam consumption (metered klb), quantity: 586, unit: klb, rate: 14.20, amount: 8321.20}
+      - {code: fixed_oandm_allocation, description: Fixed plant operations and maintenance share, amount: 240.00}
+    total: 8561.20
+
+  # ------------------------------------------------------------------ Student Center: steam from the plant's mixed inputs
+  - id: ntp_student_center_2024_11
+    file: documents/utility-bills/northlake-thermal-plant/04-Northlake-Thermal-Student-Center-Mixed-Heating.pdf
+    providerId: northlake_thermal_plant
+    accountId: ntp_student_center
+    title: Mixed Heating Allocation
+    preparedBy: Central Plant Operations, from the month-end sub-meter data
+    customer: Northlake University
+    accountNumber: SYN-NTP-C-0000004
+    rateSchedules: [NTP-ALLOC-STEAM]
+    billDate: 2024-12-05        # November 2024 closes November 30; entered by December 6
+    dueDate: null
+    period: {start: 2024-11-01, end: 2024-11-30}
+    notice: >
+      Mixed heating: the Student Center's steam for a November shoulder month, made at the plant
+      from purchased gas and electricity (listed for information only, not charged); the building
+      has no chilled-water service. The fixed operations and maintenance line is the building's flat
+      share of the plant's fixed costs; the steam tariff does not price it. Post as a journal to
+      5130-THERMAL; no payment is due.
+    meters:
+      - {meterNumber: SYN-NTP-M-0070004, channel: Steam delivered, quantity: 412, unit: klb}
+    lines:
+      - {code: steam_consumption, description: Steam consumption (metered klb), quantity: 412, unit: klb, rate: 14.20, amount: 5850.40}
+      - {code: fixed_oandm_allocation, description: Fixed plant operations and maintenance share, amount: 270.00}
+    total: 6120.40
+    informational:             # not charged; the Scope 1 and Scope 2 inputs the plant bought to make this steam
+      # 11.8 therms per klb is the provider file's plant_gas_input: a klb of steam is about 1 mmbtu
+      # (data/providers/README.md), made in boilers near 85% efficient.
+      - {label: "Natural-gas input to the plant boilers, purchased (11.8 therms per klb)", value: 4862, unit: therms}
+      - {label: "Electric input to boiler auxiliaries and pumping, purchased (7.0 kWh per klb)", value: 2884, unit: kWh}

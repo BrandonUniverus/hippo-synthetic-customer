@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Brand preview</title>
+  <script>
+    // One page for every brand: ?brand=<folder>. It loads that brand's fonts.css and
+    // tokens.css and nothing else, so what you see is exactly what the files say.
+    window.BRAND_CONTENT = {
+      "northlake": {
+        name: "Northlake University", darkHeader: false,
+        top: ["Northlake University · Sacramento, California", "Directory · Maps · Give · IT Service Desk"],
+        nav: ["About", "Academics", "Research", "Campus life", "Energy and sustainability"],
+        kicker: "Facilities and Energy Services", title: "One record of every meter on campus",
+        lede: "Electricity, gas, water, chilled water, steam, solar and wind for the main campus, Cedar Row, the Central Plant and Ridgeline Wind.",
+        actions: ["Open Energy Hippo", "Campus energy"],
+        cards: [["Utility providers", "", "Six organisations serve the campus; four of them bill Northlake each month."],
+                ["Documents", "", "Facilities guides, tariff summaries and the onboarding package."],
+                ["IT Service Desk", "", "servicedesk@northlake.example.edu"]],
+        statement: null,
+        foot: ["Northlake University · 100 Synthetic Campus Drive, Sacramento, CA 95822", "A fictional university for local development"]
+      },
+      "valley-electric": {
+        name: "Valley Electric District", darkHeader: false,
+        top: ["Report an outage: 1-888-555-0142", "Northlake University · Sign out"],
+        nav: ["Pay my bill", "Usage", "Outages", "Rates", "Start or stop service"],
+        kicker: "My account", title: "Bills and usage",
+        lede: "Statements, 15-minute interval data and rate schedules for each of your service accounts.",
+        actions: ["Pay my bill", "Download statements"],
+        cards: [["Amount due", "$6,888.42", "Due May 6, 2024 · Admin Hall"],
+                ["Rate schedule", "", "VED-TOU-GS, Time-of-Use General Service"],
+                ["Green power", "", "Interconnection and export credit for Ridgeline Wind"]],
+        statement: ["Electric Service Statement", "Account SYN-VED-A-0010001 · Period 03/05/2024 to 04/04/2024", "Amount due by May 6, 2024", "$6,888.42"],
+        foot: ["Valley Electric District · 2400 Feather River Road, Sacramento, CA 95833", "A fictional public power district"]
+      },
+      "river-city": {
+        name: "River City Utilities", darkHeader: true,
+        top: ["City of River City · Department of Utilities", "Water emergencies 24/7: 916-555-0177"],
+        nav: ["My account", "Pay", "Service changes", "Rates and fees"],
+        kicker: "Water · Sewer · Stormwater", title: "Combined utility statement",
+        lede: "One account, one statement: metered water, sewer billed on that water, and stormwater on impervious area.",
+        actions: ["View statement", "Rates and fees"],
+        cards: [["Water", "240 kgal", "2 in meter, three usage tiers"], ["Sewer", "240 kgal", "Billed on metered water"], ["Stormwater", "18 ERU", "Impervious area fee"]],
+        statement: ["Combined Utility Statement", "Account SYN-RCU-A-0030001 · Period 02/01/2025 to 02/28/2025", "Amount due by March 24, 2025", "$3,762.60"],
+        foot: ["River City Utilities · 915 Levee Street, Sacramento, CA 95814", "A fictional municipal utility"]
+      },
+      "sierra-gas": {
+        name: "Sierra Gas Utility", darkHeader: true,
+        top: ["Smell gas? Leave now, then call 1-800-555-0119.", "Business customers · Sign out"],
+        nav: ["Accounts", "Billing", "Rates", "Safety"],
+        kicker: "Business accounts", title: "Your gas statements",
+        lede: "Therms billed from metered ccf at the heating-value factor printed on each statement.",
+        actions: ["View statements", "Rate schedules"],
+        cards: [["Admin Hall", "1,243 therms", "March 15 to April 14, 2025 · factor 1.027"], ["Schedule", "", "SGU-GN-1, General Non-Residential Firm Service"], ["Estimated reads", "", "Marked on the statement and corrected on the next actual read."]],
+        statement: ["Gas Service Statement", "Account SYN-SGU-A-0020001 · Period 03/15/2025 to 04/14/2025", "Amount due by May 16, 2025", "$1,483.85"],
+        foot: ["Sierra Gas Utility · 1850 Pinnacle Way, Sacramento, CA 95834", "A fictional investor-owned utility"]
+      },
+      "helios": {
+        name: "Helios Onsite Solar", darkHeader: false,
+        top: null,
+        nav: ["Sites", "Generation", "Statements", "Certificates"],
+        kicker: "Science Center · 420 kW DC rooftop", title: "41,820 kWh generated in February",
+        lede: "35,280 kWh used on site, 6,540 kWh exported, 42 RECs conveyed to Northlake.",
+        actions: ["Download statement", "REC report"],
+        cards: [["PPA energy", "$5,076.11", "41,820 kWh at $0.12138"], ["Net metering", "−$601.68", "6,540 kWh exported"], ["Avoided emissions", "8.74 t", "CO2e, Helios's own estimate"]],
+        statement: ["PPA Statement", "Account SYN-HOS-P-0000001 · February 2025", "Amount due by March 25, 2025", "$4,474.43"],
+        foot: ["Helios Onsite Solar · 77 Solar Grove Court, Davis, CA 95618", "A fictional solar developer"]
+      },
+      "thermal-plant": {
+        name: "Northlake Thermal Plant", darkHeader: true,
+        top: ["Northlake University · Facilities and Energy Services", "Campus Mail Stop 44"],
+        nav: ["Chilled water", "Steam", "Cost allocation", "Outages"],
+        kicker: "Central Plant Operations", title: "Chilled water and steam allocation",
+        lede: "Monthly cost allocation to the buildings the plant serves, from sub-metered ton-hours and steam.",
+        actions: ["March statements", "Allocation rules"],
+        cards: [["Chilled water", "58,640 ton-hr", "Science Center, March 2025"], ["Steam", "742 klb", "Science Center, March 2025"], ["Transfer", "$22,760.92", "Journal to 5130-THERMAL; no payment"]],
+        statement: ["Chilled Water and Steam Allocation", "Cost centre SYN-NTP-C-0000001 · March 2025", "Transfer total (journal, no payment)", "$22,760.92"],
+        foot: ["Central Plant Operations · Campus Mail Stop 44, Sacramento, CA 95822", "Part of Northlake University"]
+      },
+      "ridgeline-wind": {
+        name: "Ridgeline Wind", darkHeader: true,
+        top: ["A Northlake Thermal Plant company", "Montezuma Hills · 10 × 660 kW"],
+        nav: ["The farm", "Performance", "Research lab", "Statements"],
+        kicker: "Turbine field · July 2024", title: "Monthly energy transfer",
+        lede: "Ten turbine pad meters, priced at the internal transfer rate to the Thermal Plant.",
+        actions: ["Statements", "Research lab"],
+        cards: [["RWL-WTG-01", "238,412 kWh", "SYN-RWL-M-0110001"], ["RWL-WTG-02", "233,905 kWh", "SYN-RWL-M-0110002"], ["Farm total", "2,251,384 kWh", "July 2024"]],
+        statement: ["Monthly Energy Transfer Statement", "Account SYN-RWL-G-0000001 · July 2024", "Transfer total (journal, no payment)", "$129,330.27"],
+        foot: ["Ridgeline Wind · 8400 Montezuma Hills Road, Rio Vista, CA 94571", "A fictional wind farm"]
+      }
+    };
+    window.BRAND_ID = Object.prototype.hasOwnProperty.call(window.BRAND_CONTENT, new URLSearchParams(location.search).get("brand"))
+      ? new URLSearchParams(location.search).get("brand") : "northlake";
+    for (const file of ["fonts.css", "tokens.css"]) {
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = window.BRAND_ID + "/" + file;
+      document.head.appendChild(link);
+    }
+  </script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; }
+    body { font-family: var(--font-text); color: var(--ink); background: var(--canvas); font-size: var(--size-body); line-height: var(--leading-body); }
+    .top { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 6px 24px; background: var(--topbar-bg); color: var(--topbar-ink); font-size: 13px; }
+    .head { display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; padding: 14px 24px; background: var(--header-bg); color: var(--header-ink); border-bottom: var(--rule-accent) solid var(--header-rule); }
+    .head img { display: block; height: var(--logo-height); width: auto; }
+    .nav { display: flex; gap: 20px; flex-wrap: wrap; font-size: 14px; font-weight: var(--weight-strong); text-transform: var(--case-button); }
+    main { padding: var(--space-7) 24px var(--space-6); }
+    .kicker { margin: 0 0 var(--space-2); font-size: var(--size-label); font-weight: var(--weight-strong); text-transform: var(--case-label); letter-spacing: 0.04em; color: var(--accent-ink); }
+    h1 { margin: 0 0 var(--space-3); font-family: var(--font-display); font-weight: var(--weight-display); font-size: calc(var(--size-h1) * 0.8); line-height: 1.12; letter-spacing: var(--tracking-display); text-transform: var(--case-heading); color: var(--heading-ink); font-stretch: var(--stretch-display, 100%); }
+    .lede { margin: 0 0 var(--space-5); max-width: 620px; color: var(--muted); }
+    .actions { display: flex; gap: var(--space-3); flex-wrap: wrap; }
+    .button { display: inline-flex; align-items: center; min-height: 42px; padding: 0 18px; border: 2px solid var(--primary); border-radius: var(--radius); background: var(--primary); color: var(--on-primary); font: inherit; font-size: 14px; font-weight: var(--weight-strong); text-transform: var(--case-button); }
+    .button.alt { background: transparent; color: var(--primary); }
+    .cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-4); margin-top: var(--space-6); }
+    .card { background: var(--surface); border: var(--rule) solid var(--line); border-radius: var(--radius); padding: var(--space-4); }
+    .card h2 { margin: 0 0 var(--space-1); font-family: var(--font-display); font-weight: var(--weight-display); font-size: 17px; text-transform: var(--case-heading); color: var(--heading-ink); font-stretch: var(--stretch-display, 100%); }
+    .card strong { display: block; font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 22px; color: var(--heading-ink); }
+    .card p { margin: 0; color: var(--muted); font-size: var(--size-small); }
+    .statement { margin-top: var(--space-6); background: #fff; border: 1px solid var(--line); }
+    .statement header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding: 14px 18px; background: var(--header-bg); color: var(--header-ink); border-bottom: var(--rule-accent) solid var(--header-rule); }
+    .statement header img { height: calc(var(--logo-height) * 0.9); width: auto; }
+    .statement b { display: block; text-align: right; font-family: var(--font-display); font-weight: var(--weight-display); text-transform: var(--case-heading); font-stretch: var(--stretch-display, 100%); }
+    .statement small { display: block; text-align: right; opacity: 0.85; }
+    .due { margin: 14px 18px; padding: 10px 12px; background: var(--tint); border-top: 3px solid var(--primary); text-align: right; color: var(--muted); }
+    .due strong { display: block; font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 24px; color: var(--heading-ink); }
+    .swatches { display: flex; flex-wrap: wrap; gap: 8px; margin-top: var(--space-6); }
+    .swatch { width: 112px; font-size: 12px; }
+    .swatch i { display: block; height: 44px; border: 1px solid rgba(0, 0, 0, 0.12); }
+    .swatch code { color: var(--muted); }
+    footer { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 24px; background: var(--footer-bg); color: var(--footer-ink); font-size: 12.5px; }
+    @media (max-width: 760px) { .cards { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <script>
+    (function () {
+      const c = window.BRAND_CONTENT[window.BRAND_ID];
+      const logo = window.BRAND_ID + "/" + (c.darkHeader ? "logo-reversed.svg" : "logo.svg");
+      const esc = (s) => String(s).replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[ch]));
+      document.title = c.name + " · brand preview";
+      let html = "";
+      if (c.top) html += `<div class="top"><span>${esc(c.top[0])}</span><span>${esc(c.top[1])}</span></div>`;
+      html += `<div class="head"><img src="${logo}" alt="${esc(c.name)}"><nav class="nav">${c.nav.map((n) => `<span>${esc(n)}</span>`).join("")}</nav></div>`;
+      html += `<main><p class="kicker">${esc(c.kicker)}</p><h1>${esc(c.title)}</h1><p class="lede">${esc(c.lede)}</p>`;
+      html += `<div class="actions"><span class="button">${esc(c.actions[0])}</span><span class="button alt">${esc(c.actions[1])}</span></div>`;
+      html += `<div class="cards">${c.cards.map(([t, f, p]) => `<div class="card"><h2>${esc(t)}</h2>${f ? `<strong>${esc(f)}</strong>` : ""}<p>${esc(p)}</p></div>`).join("")}</div>`;
+      if (c.statement) {
+        html += `<section class="statement"><header><img src="${logo}" alt=""><div><b>${esc(c.statement[0])}</b><small>${esc(c.statement[1])}</small></div></header>`;
+        html += `<div class="due">${esc(c.statement[2])}<strong>${esc(c.statement[3])}</strong></div></section>`;
+      }
+      html += `<div class="swatches" id="swatches"></div></main>`;
+      html += `<footer><span>${esc(c.foot[0])}</span><span>${esc(c.foot[1])}</span></footer>`;
+      document.body.insertAdjacentHTML("beforeend", html);
+      // Swatches read the live token values, so they always match tokens.css.
+      window.addEventListener("load", () => {
+        const style = getComputedStyle(document.documentElement);
+        const names = ["primary", "accent", "support", "heading-ink", "ink", "muted", "canvas", "tint", "line",
+          "service-water", "service-sewer", "service-storm", "commodity-chilled", "commodity-steam"];
+        document.getElementById("swatches").innerHTML = names
+          .map((name) => [name, style.getPropertyValue("--" + name).trim()])
+          .filter(([, value]) => value)
+          .map(([name, value]) => `<div class="swatch"><i style="background:${esc(value)}"></i>${esc(value)}<br><code>--${esc(name)}</code></div>`)
+          .join("");
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -38,9 +38,11 @@ KIND_LABELS = {
     "plant_controller": "Plant controller",
     "logical_source": "Logical source",
     "weather_station": "Weather station",
+    "met_mast": "Met mast",
 }
-ACCOUNT_KIND_LABELS = {"externalUtilityAccounts": "External utility account", "internalCostCenters": "Internal cost center", "ppaAgreements": "PPA agreement"}
-ACRONYMS = {"btu": "BTU", "chw": "CHW", "dc": "DC", "dx": "DX", "eru": "ERU", "ev": "EV", "hvac": "HVAC", "kw": "kW", "modbus": "Modbus", "ppa": "PPA", "pv": "PV", "sql": "SQL", "tou": "TOU"}
+ACCOUNT_KIND_LABELS = {"externalUtilityAccounts": "External utility account", "internalCostCenters": "Internal cost center", "ppaAgreements": "PPA agreement",
+                       "generationTransfers": "Generation transfer agreement"}
+ACRONYMS = {"btu": "BTU", "chw": "CHW", "dc": "DC", "dx": "DX", "eru": "ERU", "ev": "EV", "hvac": "HVAC", "kv": "kV", "kw": "kW", "modbus": "Modbus", "ppa": "PPA", "pv": "PV", "scada": "SCADA", "sql": "SQL", "tou": "TOU"}
 MANUAL_ROLES = {"manual_register_reading", "manual_usage_delta"}
 ROUTE_INTERVAL_MINUTES = 43200   # a monthly route read: a cadence, never an archive interval
 
@@ -156,14 +158,15 @@ def account_setup(accounts, buildings, providers, people, onboarding, model, fin
     assert set(representatives) | set(internal_reps) == set(providers), "Every provider needs an account representative"
     assert set(internal_reps.values()) <= set(people), "An internal account representative is not in the people register"
 
+    # A provider rule sets the default; a company-scoped rule overrides it for that company, limited to the
+    # providers it lists (all of them when it lists none).
     methods = {}
     for rule in bill_entry["bills"]["preferredEntry"]:
         method = rule["method"].split(" (")[0]
         assert method in entry_codes, f"Bill entry method has no Global_Type_Code 'BA2' mapping: {method}"
-        for provider_id in rule.get("providers", []):
-            methods[provider_id] = method
-        if rule.get("scope"):
-            methods[rule["scope"]] = method
+        scope = rule.get("scope")
+        for provider_id in rule.get("providers", []) if not scope else rule.get("providers") or list(providers):
+            methods[(scope, provider_id) if scope else provider_id] = method
     assert set(providers) <= set(methods), "Every provider needs a bill entry method"
 
     gl_chart = {entry["code"] for entry in financials["glChart"]}
@@ -192,7 +195,7 @@ def account_setup(accounts, buildings, providers, people, onboarding, model, fin
         building = buildings[account["buildingId"]]
         provider = providers[account["providerId"]]
         representative = representatives.get(provider["id"])
-        method = methods.get(building["companyId"], methods[provider["id"]])   # a company scope beats the provider default
+        method = methods.get((building["companyId"], provider["id"]), methods[provider["id"]])   # a company scope beats the provider default
         service_type = next((rule["value"] for rule in upload["rules"]
                              if all(value in (account["id"], provider["id"], building["companyId"]) for value in rule["match"].values())), upload["default"])
         resolved[account["id"]] = {
@@ -201,7 +204,7 @@ def account_setup(accounts, buildings, providers, people, onboarding, model, fin
             "representative": representative["name"] if representative else people[internal_reps[provider["id"]]]["displayName"],
             "representativeContact": (representative or people[internal_reps[provider["id"]]])["email"],
             "representativeAddress": format_address(provider["billing"]["businessAddress"]),
-            "invoiceTemplate": rules["invoiceTemplate"],
+            "invoiceTemplate": rules["internalCostCenterInvoiceTemplate"] if provider["id"] in internal_reps else rules["invoiceTemplate"],
             "billEntryType": entry_codes[method],
             "billServiceType": service_type,
             "apAccount": gl_defaults["apAccount"],
@@ -222,12 +225,16 @@ def meter_and_point_setup(meters, points, providers, model):
     for meter in meters:
         provider = providers.get(meter.get("providerId"))
         meter["multiplier"] = multipliers[meter["id"]]["value"] if meter["id"] in multipliers else ""
+        explicit = meter.pop("providerMeterNumber", None)   # a logical meter states its own (blank) number
         meter["providerMeterNumber"] = ""
         meter["billCycle"] = ""
         if provider is None:
             continue
         number_format = provider["meterModel"].get("providerNumberFormat")
-        if number_format:
+        if explicit is not None:
+            assert not explicit or not number_format or identifier_pattern(number_format).fullmatch(explicit), f"Provider meter number drift: {meter['id']}"
+            meter["providerMeterNumber"] = explicit
+        elif number_format:
             digits = re.sub(r"\D", "", meter["syntheticMeterNumber"])[-number_format.count("#"):]
             meter["providerMeterNumber"] = number_format.replace("#" * number_format.count("#"), digits)
             assert identifier_pattern(number_format).fullmatch(meter["providerMeterNumber"]), f"Provider meter number drift: {meter['id']}"
@@ -241,6 +248,7 @@ def meter_and_point_setup(meters, points, providers, model):
         meter = point["meter"]
         point["unitName"] = rules["unitLabels"].get(point.get("unit"), point.get("unit"))
         point["measureType"] = (measure_types["byPointType"].get(point["pointType"])
+                                or point.get("measureType")
                                 or measure_types["byUnit"].get(point.get("unit"))
                                 or meter["measureType"])
         interval = point.get("intervalMinutes")
@@ -299,7 +307,7 @@ def build_packet(root=ROOT):
         assert sorted(company["scope"]["sites"]) == owned_sites, f"Security scope sites differ from scenario ownership: {company['id']}"
         assert sorted(company["scope"]["buildings"]) == owned_buildings, f"Security scope buildings differ from scenario ownership: {company['id']}"
         for group in company["groups"]:
-            assert set(group.get("nodeScope", [])) <= set(owned_buildings), f"Group node scope names a building outside its company: {group['id']}"
+            assert set(group.get("nodeScope", [])) <= set(owned_sites) | set(owned_buildings), f"Group node scope names a node outside its company: {group['id']}"
     accounts = {a["id"]: a for a in scenario["accounts"]}
     profiles = {p["id"]: p for p in scenario["gatewayBindings"]["profiles"]}
     assert set(profiles) == set(onboarding["sources"]), "Every source profile needs a customer description"
@@ -515,7 +523,7 @@ def build_packet(root=ROOT):
     for meter in meters:
         source_ids = list(dict.fromkeys(s for c in meter["channels"] for s in point_sources.get(c["id"], [])))
         roles = {c.get("role") for c in meter["channels"]}
-        read_method = "; ".join(onboarding["sources"][s][0] for s in source_ids) or ("Manual monthly reading" if roles & MANUAL_ROLES else "Bill / allocation statement" if meter["hasBills"] else "Calculated or awaiting source setup")
+        read_method = meter.get("readMethod") or "; ".join(onboarding["sources"][s][0] for s in source_ids) or ("Manual monthly reading" if roles & MANUAL_ROLES else "Bill / allocation statement" if meter["hasBills"] else "Calculated or awaiting source setup")
         account = accounts.get(meter.get("accountId"))
         notes = f"Company: {companies[meter['companyId']]}. Account: {account['syntheticAccountNumber'] if account else 'No billing account'}."
         for relation in ["behindMeterId", "replacesMeterId", "overlapsMeterId"]:
@@ -526,7 +534,7 @@ def build_packet(root=ROOT):
             notes += f" Service dates: {meter['effectiveStart']} through {meter.get('effectiveEnd') or 'active'}."
         if meter.get("replacesMeterId"):
             notes += f" Replaces {meter_names[meter['replacesMeterId']]}; keep histories separate."
-        if not meter["channels"]:
+        if not meter["channels"] and meter.get("meterType") != "logical_billing_meter":
             notes += " Flat-rate service with no metered usage."
         if meter.get("notes"):
             notes += " " + meter["notes"]
@@ -556,7 +564,7 @@ def build_packet(root=ROOT):
                                  point["measureType"], point["pointType"], point["archiveInterval"], point["indexType"], point["howCreated"], "", "", "", "", "", "", "", "", "", "", "Not entered", ""])
             for related in point.get("createsRelatedPoints", []):
                 related_rows.append([meter["displayName"], point["name"], meter["displayName"], related, "Heating degree days" if related.startswith("HDD") else "Cooling degree days", "Daily", "Create through the temperature index setting; verify base and calculation method in the UI."])
-                mapping_rows.append(["Weather related point", f"{meter['id']}.{related}", companies[meter["companyId"]], meter["buildingName"], meter["displayName"], related, "Degree days (F)", 1440, "", "", 1440, "", "Generated by EEM from the temperature index", "", "", "", "", "", "", "", "", "", "", "Not entered", ""])
+                mapping_rows.append(["Weather related point", f"{meter['id']}.{related}", companies[meter["companyId"]], meter["buildingName"], meter["displayName"], related, "Degree days (C)" if "_C_" in related else "Degree days (F)", 1440, "", "", 1440, "", "Generated by EEM from the temperature index", "", "", "", "", "", "", "", "", "", "", "Not entered", ""])
         registers = [points[c["id"]] for c in meter["channels"] if c["id"] in points and points[c["id"]]["pointType"] == "Accumulator"]
         deltas = [points[c["id"]] for c in meter["channels"] if c["id"] in points and points[c["id"]]["pointType"] == "AccumulatorDelta"]
         assert len(registers) == len(deltas) <= 1, f"Register and usage points must come in pairs: {meter['id']}"
@@ -572,8 +580,9 @@ def build_packet(root=ROOT):
     sheets["Measured Points"] = table(["Point Name", "Meter Name", "Measurement", "Direction / Role", "Units", "Interval / Frequency", "How Created", "Use In Reporting", "Review Status", "Notes"], point_rows, "Point definitions for interval, route, register, sensor and equipment channels. Enter only the points marked Enter: EEM creates a usage and a rate-of-change point behind every register point, and the degree-day points behind a temperature index. Bill usage stays on the billing account and has no point here.")
     sheets["Related Measurements"] = table(["Source Meter", "Source Measurement", "Related Meter", "Related Measurement", "Relationship", "Frequency", "Requirement"], related_rows, "Business relationships to create through the product's supported point/index settings.")
     rollups = []
+    meter_paths = {f"{meter['parentPath']} / {meter['displayName']}" for meter in meters}   # a billing meter can hold an aggregate
     for aggregate in model["aggregateTargets"]:
-        assert aggregate["parentPath"] in hierarchy, f"Aggregate parent is not a hierarchy node: {aggregate['id']}"
+        assert aggregate["parentPath"] in hierarchy or aggregate["parentPath"] in meter_paths, f"Aggregate parent is not a hierarchy node: {aggregate['id']}"
         mapping_rows.append(["Aggregate point", aggregate["id"], companies[aggregate["companyId"]], aggregate["parentPath"].rsplit(" / ", 1)[-1], "", aggregate["aggregatePointName"], aggregate["unit"], aggregate["intervalMinutes"], "", "", aggregate["intervalMinutes"], "", "Enter as an aggregate point", "", "", "", "", "", "", "", "", "", "", "Not entered", ""])
         members = list(aggregate["members"])
         if "memberTemplate" in aggregate:
@@ -604,7 +613,7 @@ def build_packet(root=ROOT):
             device = node.get("values", {}).get("Serial Number", node["name"])
             source_mapping_rows.append([name, target["meter"]["displayName"], target["name"], device, selectors, target["unitName"], timestamps])
     for provider in providers.values():
-        source_rows.append([f"{provider['displayName']} billing", "Billing statement", "Monthly utility / allocation / PPA statement", "Finance", "Statement and supported bill-import file", "Monthly", provider["shortName"], "Finance", "Documented", "Existing illustrated bills are examples; reconcile their values before rate or bill acceptance."])
+        source_rows.append([f"{provider['displayName']} billing", "Billing statement", "Monthly utility / allocation / PPA statement", "Finance", "Statement and supported bill-import file", "Monthly", provider["shortName"], "Finance", "Documented", "Sample statements are itemized on the provider's read cycle and priced at its tariff."])
     sheets["Data Sources"] = table(["Source Name", "Source Type", "Service Category", "Owner / Vendor", "Delivery Method", "Expected Cadence", "File / System Reference", "Credential Owner", "Review Status", "Notes"], source_rows, "Source ownership and delivery information. Credentials are exchanged separately and are never stored in the workbook.")
     sheets["Source Measurements"] = table(["Source System", "Meter", "Measurement", "Device / Station", "Channel / Source Fields", "Unit", "Timestamp Convention"], source_mapping_rows, "Vendor-side identifiers matched to the customer's measurement inventory; installed database IDs belong in the implementation record.")
     packet["coverage"] = table(["Profile", "Format", "Destinations", "Measurements", "Artifact status", "UI setup", "Ingestion acceptance"], coverage_rows, "Independent format cases; planned coverage is not a claim of supported installed behavior.")
@@ -680,44 +689,10 @@ def source_inventory_markdown(packet):
     return "\n".join(sources) + "\n"
 
 
-def gateway_coverage_markdown(packet):
-    coverage = ["# Northlake Gateway Setup Coverage", "", "Generated from the scenario profiles. Each format is a separate acceptance case. No installed setup or ingestion result has been recorded.", "", markdown_table(packet["coverage"]), "", "FIG variants reuse one point in separate restored runs. HMR publishes reading events rather than interval measurements. Catalog entries without a represented runnable component remain outside this list and must be reconciled against the installed product before claiming complete gateway coverage."]
-    return "\n".join(coverage) + "\n"
-
-
-def billing_account_setup_markdown(packet):
-    setup = ["# Northlake Billing Account Setup", "",
-             f"Packet {packet['version']} | Issued {packet['issuedOn']} | Enter on the Billing Account editor", "",
-             "Every billing account carries more than its number and provider. This lists the rest of the editor for each account: where its bills arrive from, whether it reaches AP or the GL, which invoice template it prints with, and its default GL accounts. The service address, remit address and account representative are in the facilities and meter register.", "",
-             "The GL accounts and the validation overrides need their Phase 3 prerequisites in place: the chart of accounts must exist before an account can point at one, and the global validation tests before an account can override one.", "",
-             "## Account setup", "", packet["accountSetup"]["description"], "", markdown_table(packet["accountSetup"]), "",
-             "## Bill validation overrides", "", packet["validationOverrides"]["description"], "", markdown_table(packet["validationOverrides"])]
-    return "\n".join(setup) + "\n"
-
-
-def meter_and_point_setup_markdown(packet):
-    counts = packet["counts"]
-    setup = ["# Northlake Meter and Point Setup", "",
-             f"Packet {packet['version']} | Issued {packet['issuedOn']} | Enter on the Utility Provider, Meter and Point editors", "",
-             "What each meter and point needs beyond its name and its place in the hierarchy. The same values, one row per object and with blank columns for the installed IDs, are in data/eem/northlake-instance-mapping.template.csv.", "",
-             "The product creates some of these itself. Saving a register point creates its usage point and a rate-of-change point; a temperature index creates the degree-day points; a baseline setting creates its baseline point. "
-             f"Of the {counts['points']} points listed here, {counts['pointsToEnter']} are entered and EEM generates {counts['pointsGeneratedByEem']} more behind them, so never enter a point marked Generated.", "",
-             "Three limits the editors enforce: a point archives on 1, 5, 10, 15, 30, 60 or 1440 minutes and nothing else, so a monthly route read carries no interval at all; the degree-day index is offered only on a Temperature point; and a digital point must use the Digital measure type with the State unit.", "",
-             "## Utility providers", "", packet["providerSetup"]["description"], "", markdown_table(packet["providerSetup"]), "",
-             "## Points by editor combination", "", packet["pointSetup"]["description"], "", markdown_table(packet["pointSetup"]), "",
-             "## Meters", "", packet["meterSetup"]["description"], "",
-             "A meter's Bill Cycle stays locked until its utility provider is set, and saving a meter takes the provider from its billing account. Enter the account first and the provider follows.", "",
-             markdown_table(packet["meterSetup"])]
-    return "\n".join(setup) + "\n"
-
-
 # Documents rendered straight from the packet, with no Markdown source: PDF path -> (masthead, Markdown).
 GENERATED_DOCUMENTS = {
     "documents/intake-package/facilities-and-meter-register.pdf": ({"department": "Facilities Operations"}, register_markdown),
     "documents/intake-package/source-system-inventory.pdf": ({"department": "Facilities Operations"}, source_inventory_markdown),
-    "implementation/northlake-gateway-coverage.pdf": ({}, gateway_coverage_markdown),
-    "implementation/northlake-billing-account-setup.pdf": ({}, billing_account_setup_markdown),
-    "implementation/northlake-meter-and-point-setup.pdf": ({}, meter_and_point_setup_markdown),
 }
 
 
@@ -733,10 +708,6 @@ def write_packet(root=ROOT, dump_json=None):
         dump_json.write_text(json.dumps(packet, indent=2, default=str) + "\n", encoding="utf-8", newline="\n")
     for pdf in GENERATED_DOCUMENTS:
         render_generated_document(packet, pdf, root / pdf, root)
-    with (root / "data/eem/northlake-instance-mapping.template.csv").open("w", newline="", encoding="utf-8") as file:
-        writer = csv.writer(file)
-        writer.writerow(packet["instanceMapping"]["headers"])
-        writer.writerows(packet["instanceMapping"]["rows"])
     samples = sample_files(root)
     for case, sample in samples.items():
         directory = root / SAMPLES / case

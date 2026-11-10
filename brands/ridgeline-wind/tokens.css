@@ -1,0 +1,88 @@
+/* ==========================================================================
+   Ridgeline Wind: design tokens
+
+   Character: a small wind company the Thermal Plant bought in July 2024. It
+   kept its own name and look, with an endorsement line. Engineering-minded:
+   Archivo in its expanded width, metric units, SCADA tables, ridge green and
+   a pale sky. Its site lives under ridgeline.northlake.example.edu.
+   ========================================================================== */
+:root {
+  /* Colour: brand ------------------------------------------------------- */
+  --primary: #1F5E4B;          /* Ridge Green: header, buttons (bills keep their green) */
+  --primary-strong: #164637;
+  --on-primary: #FFFFFF;
+  --accent: #7CC4E4;           /* Sky: the rotor in the mark, rules on dark */
+  --accent-ink: #1C6A8C;
+  --on-accent: #0E2A36;
+  --support: #3B4A54;          /* Steel: SCADA tables, met-mast readings */
+
+  /* Colour: neutrals ---------------------------------------------------- */
+  --ink: #15211C;
+  --muted: #53615B;
+  --canvas: #F2F6F3;
+  --surface: #FFFFFF;
+  --tint: #E2EDE7;
+  --line: #C9D8D0;
+  --line-strong: #8AA196;
+  --link: #1F5E4B;
+  --heading-ink: #164637;      /* headings are deep ridge green */
+
+  /* Colour: status ------------------------------------------------------ */
+  --positive: #2C7A4B;
+  --negative: #B0322B;
+  --caution: #8A5F00;
+  --positive-tint: #E8F3EC;
+  --negative-tint: #FBECEB;
+  --caution-tint: #FBF2DE;
+
+  /* Page chrome --------------------------------------------------------- */
+  --topbar-bg: #15211C;        /* endorsement bar: "A Northlake Thermal Plant company" */
+  --topbar-ink: #CFE4DA;
+  --header-bg: #1F5E4B;
+  --header-ink: #FFFFFF;
+  --header-rule: #7CC4E4;
+  --footer-bg: #15211C;
+  --footer-ink: #CFE4DA;
+
+  /* Type ---------------------------------------------------------------- */
+  --font-display: "Archivo", "Arial Black", Arial, sans-serif;   /* expanded width, font-stretch 125% */
+  --font-text: "Archivo", Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", Consolas, monospace;              /* SCADA values */
+  --weight-display: 800;
+  --weight-strong: 600;
+  --tracking-display: 0.02em;
+  --stretch-display: 125%;
+  --case-heading: uppercase;
+  --case-label: uppercase;
+  --case-button: uppercase;
+  --size-h1: 38px;
+  --size-h2: 26px;
+  --size-h3: 18px;
+  --size-body: 16px;
+  --size-small: 14px;
+  --size-label: 12px;
+  --leading-body: 1.55;
+
+  /* Space: 8-point, standard ----------------------------------------- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+  --content-width: 1160px;
+
+  /* Shape --------------------------------------------------------------- */
+  --radius: 0;               /* square: engineering */
+  --rule: 1px;
+  --rule-accent: 3px;
+
+  /* Logo use ------------------------------------------------------------ */
+  --logo-height: 38px;
+  --logo-min-height: 22px;
+  /* Clear space: one blade length. The endorsement "A Northlake Thermal Plant
+     company" sits below or beside the wordmark at 40% of its cap height and
+     never inside the clear space. Reversed (white, sky rotor) on Ridge Green. */
+}

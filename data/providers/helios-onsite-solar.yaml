@@ -122,7 +122,7 @@ environmental:
   scope: "2_reduction"
   attributes:
     - { name: renewable_energy_certificates, unit: rec_per_mwh, value: 1.0 }
-    - { name: avoided_co2e, unit: kgCO2e/kWh, value: 0.231, basis: displaced_grid_factor }
+    - { name: avoided_co2e, unit: kgCO2e/kWh, value: 0.209, basis: "Helios's own displaced-grid estimate, printed on its statements; Northlake reports at the eGRID CAMX factor instead" }
 
 scenarioHooks:
   - { scenario: electric_interval_15min, role: paired, note: "Generation nets against Valley Electric consumption at Science/Student Center" }

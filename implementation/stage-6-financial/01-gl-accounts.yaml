@@ -1,0 +1,60 @@
+# Stage 6, step 1: GL Accounts (Database Administrator > Nodes > company node > GL Accounts tab). A simple grid:
+# Account Type (chip: Assets / Expenses / Liabilities), Account Code, Description; Add sits at the grid's trailing
+# edge, Delete on each row (GLAccountsView.xaml). GL_AccountID is scoped per company (verified: GLAccount has a
+# CompanyID column, zero rows for companies 6/3/5 today), so the same code (e.g. 5100-ELEC) is a separate row,
+# entered separately, in every company that needs it.
+stage: 6
+step: 1
+title: GL Accounts
+app: Database Administrator
+screen: Nodes > company node > GL Accounts
+source:
+- data/eem/northlake-ap-gl-v1.yaml
+- documents/guides/chart-of-accounts-and-gl-guide.pdf
+notes:
+- 'Account Type values verified in the guide and the AP/GL plan: 0 Assets, 1 Expenses, 2 Liabilities.'
+- 'Chart-of-accounts guide (documents/guides/chart-of-accounts-and-gl-guide.pdf): "Main Campus buildings
+  (electric/gas/water/gas) by commodity -> 110 Operating"; "Thermal plant allocations... -> 5130-THERMAL, 700
+  Plant"; "Solar PPA -> 5140-SOLAR, 110 Operating"; "Cedar Row Apartments by commodity -> 250 Auxiliary." Every
+  utility account should be flagged for the right interface... a bill should not be exported until approved...
+  a bill with an open validation alert must be held from export" (carried into 05-ap-approval-and-upload.yaml).'
+- 'Each company''s expense accounts are exactly the providers that bill it, plus 2000-AP. Northlake University
+  receives bills from five providers (Valley Electric, Sierra Gas, River City, the Thermal Plant''s
+  allocations, and Helios Solar) so it gets all five expense codes; Cedar Row Apartments has no Thermal Plant
+  account so it skips 5130-THERMAL; the Thermal Plant company buys its own electric/gas/water at the Central
+  Plant and, since the 2024-07-01 acquisition, its wind company''s output, but never bills itself an allocation
+  or a PPA, so it gets the three utility codes and 5150-WIND.'
+- 'Added 2026-10-01 (Ridgeline Wind): 5150-WIND "Ridgeline wind energy transfer" (Expenses) is entered in
+  Northlake Thermal Plant only. That is the one company Ridgeline Wind bills (vendor RWL-INTERNAL, Stage 1), so no
+  other chart needs the code. The chart-of-accounts guide codes the statement "Ridgeline transfer statement ->
+  5150-WIND, 700 Plant, Ridgeline Wind"; 5150-WIND is the Default Expense Account of SYN-RWL-G-0000001
+  (03-account-gl-defaults.yaml).'
+records:
+- key: nlu_gl_accounts
+  installed: {}
+  Company: Northlake University
+  Accounts:
+  - {Account Type: Expenses, Account Code: 5100-ELEC, Description: Electricity expense}
+  - {Account Type: Expenses, Account Code: 5110-GAS, Description: Natural gas expense}
+  - {Account Type: Expenses, Account Code: 5120-WATER, Description: Water / sewer / stormwater expense}
+  - {Account Type: Expenses, Account Code: 5130-THERMAL, Description: Chilled water / steam allocation}
+  - {Account Type: Expenses, Account Code: 5140-SOLAR, Description: Solar PPA expense}
+  - {Account Type: Liabilities, Account Code: 2000-AP, Description: Accounts payable control}
+- key: cra_gl_accounts
+  installed: {}
+  Company: Cedar Row Apartments
+  Accounts:
+  - {Account Type: Expenses, Account Code: 5100-ELEC, Description: Electricity expense}
+  - {Account Type: Expenses, Account Code: 5110-GAS, Description: Natural gas expense}
+  - {Account Type: Expenses, Account Code: 5120-WATER, Description: Water / sewer / stormwater expense}
+  - {Account Type: Expenses, Account Code: 5140-SOLAR, Description: Solar PPA expense}
+  - {Account Type: Liabilities, Account Code: 2000-AP, Description: Accounts payable control}
+- key: ntp_gl_accounts
+  installed: {}
+  Company: Northlake Thermal Plant
+  Accounts:
+  - {Account Type: Expenses, Account Code: 5100-ELEC, Description: Electricity expense (Central Plant's own service)}
+  - {Account Type: Expenses, Account Code: 5110-GAS, Description: Natural gas expense (Central Plant's own service)}
+  - {Account Type: Expenses, Account Code: 5120-WATER, Description: Water / sewer / stormwater expense (Central Plant's own service)}
+  - {Account Type: Expenses, Account Code: 5150-WIND, Description: Ridgeline wind energy transfer}
+  - {Account Type: Liabilities, Account Code: 2000-AP, Description: Accounts payable control}

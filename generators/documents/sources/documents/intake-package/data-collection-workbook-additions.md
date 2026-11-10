@@ -6,7 +6,7 @@ department: Facilities Operations
 
 Provided by: Northlake Facilities & Finance. Synthetic/illustrative. These
 requirements are already represented in the Data Collection Workbook. Packet
-0.3 gives the workbook 26 tabs: 21 tabs generated from the inventory (including
+0.4 gives the workbook 27 tabs: 22 tabs generated from the inventory (including
 Hierarchy, Service Profiles, Meters, Units and Submeters, Measured Points,
 related measurements, rollup members, weather assignments, rate schedules and
 components, and source mappings) and the 5 later-phase tabs below. Contacts and
@@ -22,8 +22,10 @@ are recorded separately.
 
 ## Rate schedules
 
-The Rate Schedules and Rate Components tabs are generated from our five
-providers' tariffs (14 base schedules); the rate tariff sheets carry the detail.
+The Rate Schedules and Rate Components tabs are generated from our six
+providers' tariffs (17 base schedules, Ridgeline's transfer price and the two
+Valley Electric generator schedules included); the rate tariff sheets carry the
+detail.
 Analysis-only rates we'd like added: a real-time/index electric option and a
 large-demand ratchet rate.
 
@@ -36,6 +38,7 @@ large-demand ratchet rate.
 | 5120-WATER | Expense | Water/sewer/stormwater | 110 Operating | Facilities |
 | 5130-THERMAL | Expense | Chilled water/steam | 700 Plant | Facilities |
 | 5140-SOLAR | Expense | Solar PPA | 110 Operating | Facilities |
+| 5150-WIND | Expense | Ridgeline wind energy transfer | 700 Plant | Ridgeline Wind |
 | 2000-AP | Liability | AP control | — | — |
 
 Coding segments: Fund, Department, Program, Activity/Project, Object.
@@ -63,6 +66,10 @@ Coding segments: Fund, Department, Program, Activity/Project, Object.
 | Avery Singh | EEM Database Administrator | Support | System DB admin | Active |
 | Morgan Patel | Implementation Consultant | Support | App setup | Active |
 | Taylor Bennett | Support Analyst | Support | Read-only support | Active |
+| Mateo Alvarez | Ridgeline Wind Site Manager | Plant (Ridgeline) | Wind operations, Ridgeline site only; plant reports | Active |
+| Renee Castillo | Wind Turbine Technician | Plant (Ridgeline) | Wind operations, Ridgeline site only | Active |
+| Elena Vasquez | Wind Energy Research Lab Director | University | Read-only research, Ridgeline site only | Active |
+| Kai Nakamura | Graduate Research Assistant | University | Read-only research, Ridgeline site only | Active |
 
 Plus ≈120 building representatives as **report-delivery recipients** (groups).
 
@@ -97,8 +104,11 @@ Cedar Row is part of this packet; Town Center is a later implementation phase.
 | Parking Structure | Parking | Metrics only | Scope 2 electric |
 | Cedar Row | Multifamily Housing | Yes | Scope 1 gas, Scope 2 electric, Scope 3 water |
 | Central Plant | Other - Utility | Metrics only | Scope 1 boiler gas, Scope 2 electric, Scope 3 makeup water |
+| Ridgeline Wind Site | — (no ENERGY STAR property) | No | Scope 2 station service; wind generation reported as avoided emissions |
 
-Solar = market-based Scope 2 reduction; Northlake retains RECs.
+Solar = market-based Scope 2 reduction; Northlake retains RECs. Wind = the same
+treatment for Ridgeline's generation (Northlake retains those RECs too); the
+Valley Electric bill credit is a cost item, not an emissions claim.
 
 ## Tab: Projects
 
@@ -108,3 +118,4 @@ Solar = market-based Scope 2 reduction; Northlake retains RECs.
 | Central Plant Chiller Upgrade | HVAC | $640k | $80k | plant kWh per CHW ton-hour |
 | Cedar Row Solar Expansion | Renewable | $410k | ITC | solar generation |
 | Admin Hall Recommissioning | Controls | $55k | $10k | gas + electric |
+| Ridgeline WTG-07 Gearbox Replacement | Generation | $310k | — | WTG-07 generated kWh against possible power |

@@ -1,0 +1,86 @@
+/* ==========================================================================
+   Helios Onsite Solar: design tokens
+
+   Character: a venture-backed solar developer that owns arrays on customer
+   sites and sells the output. Modern product brand: lowercase wordmark,
+   Manrope, black and sun yellow, big generation numbers.
+   ========================================================================== */
+:root {
+  /* Colour: brand ------------------------------------------------------- */
+  --primary: #16181D;          /* Midnight: buttons, headings, header text */
+  --primary-strong: #000000;
+  --on-primary: #FFFFFF;
+  --accent: #FFB21A;           /* Sun: highlights, the mark, focus (bills keep their amber) */
+  --accent-ink: #8A5A00;       /* sun for text on white */
+  --on-accent: #16181D;
+  --support: #4AA3DF;          /* Sky: exported energy in charts */
+
+  /* Colour: neutrals ---------------------------------------------------- */
+  --ink: #16181D;
+  --muted: #5D6470;
+  --canvas: #FFFBF2;           /* daylight */
+  --surface: #FFFFFF;
+  --tint: #FFF1D1;
+  --line: #ECE4D2;
+  --line-strong: #B4AA95;
+  --link: #16181D;
+  --heading-ink: #16181D;      /* headings are midnight */
+
+  /* Colour: status ------------------------------------------------------ */
+  --positive: #23794A;
+  --negative: #B3261E;
+  --caution: #8A5A00;
+  --positive-tint: #E8F5EE;
+  --negative-tint: #FBECEB;
+  --caution-tint: #FFF3D6;
+
+  /* Page chrome --------------------------------------------------------- */
+  --topbar-bg: #16181D;
+  --topbar-ink: #FFE3A6;
+  --header-bg: #FFFFFF;
+  --header-ink: #16181D;
+  --header-rule: #FFB21A;
+  --footer-bg: #16181D;
+  --footer-ink: #C9CDD3;
+
+  /* Type ---------------------------------------------------------------- */
+  --font-display: "Manrope", "Segoe UI", Arial, sans-serif;
+  --font-text: "Manrope", "Segoe UI", Arial, sans-serif;
+  --font-mono: "Manrope", "Segoe UI", Arial, sans-serif;   /* tabular figures */
+  --weight-display: 800;
+  --weight-strong: 700;
+  --tracking-display: -0.03em;
+  --case-heading: none;
+  --case-label: none;
+  --case-button: none;
+  --size-h1: 48px;
+  --size-h2: 30px;
+  --size-h3: 20px;
+  --size-body: 16px;
+  --size-small: 14px;
+  --size-label: 13px;
+  --leading-body: 1.6;
+
+  /* Space: 8-point, airy --------------------------------------------- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 40px;
+  --space-7: 56px;
+  --space-8: 88px;
+  --content-width: 1120px;
+
+  /* Shape --------------------------------------------------------------- */
+  --radius: 8px;             /* buttons, fields and cards: a modern product */
+  --rule: 1px;
+  --rule-accent: 4px;
+
+  /* Logo use ------------------------------------------------------------ */
+  --logo-height: 34px;
+  --logo-min-height: 20px;
+  /* Clear space: the sun's radius. Midnight wordmark on white or daylight;
+     white wordmark on Midnight. The sun is always Sun yellow. The wordmark
+     is always lowercase. */
+}

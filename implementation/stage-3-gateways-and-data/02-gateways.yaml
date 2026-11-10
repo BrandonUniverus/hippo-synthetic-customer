@@ -1,0 +1,1344 @@
+# Stage 3, step 2: Gateway types, then gateways. First gatewayTypes (Configuration Tool > Gateway Types): every
+# type Northlake's gateways use, with each node and point parameter its task component reads, so no gateway
+# below depends on what happens to exist in the database. Then records (Configuration Tool > Gateway
+# Configuration): 15 acquisition profiles. MVRS publishes its HMR events inside the built-in workflow.
+stage: 3
+step: 2
+title: Gateway types and gateways
+app: Configuration Tool
+screen: Gateway Types, then Gateway Configuration (Gateways / Nodes / Points)
+source:
+- data/scenarios/demo-university-v1.yaml (gatewayBindings.profiles; numeric gatewayId/gwNodeId/ptId there are
+  illustrative model values, not installation inputs)
+- 'data/eem/northlake-eem-metaworld-stage1b-v1.yaml (gatewayComponentsCovered: the 19 component/format pairs)'
+- implementation/stage-2-hierarchy/04-points.yaml (the Ridgeline points the new nodes attach to, by channel key)
+- src/Domain/EEMSuite.Domain/Manifests/Components/*GatewayManifest.cs, src/Tasks/EEMSuite.Tasks.Gateways/Components/*.cs,
+  src/Data/Dapper/Admin/Gateway/DapperGatewayConfigurationRepository.cs (verified against
+  C:\Hippo\Git\univerus\energyhippo\src)
+notes:
+- 'The current source service publishes MDEF/MV9 in UTC. Set TimeStampType=UTC on the five MV90 nodes below before delivering its files; the older Local values were correct only for the previous file assumption. FIG and FIXEDNETWORKS use the task TimeStampType=utc. Keep point time zones Pacific and the Ridgeline 480-minute offset.'
+- 'Where this actually lives (there is no table named "Gateway"): the gateway object is a row in ObjectRegistry
+  (hSiERtdb is its id, GwVendorID its gateway type); a node is a row in GwNodes with 15 free-text GwNodeParamN
+  columns; a point already exists from Stage 2 (PointDef_TBL) and this screen sets its GwNodeID (which gateway
+  node it sits on) and its 15 free-text GwPtParamN columns. What each column MEANS is defined once per gateway
+  type in GWVendor / GWVendorParam / GWVendorParamVal, the Gateway Types screen (gatewayTypes below). A gateway
+  shows and saves labeled values only through its type, and the task component reads them back by label
+  (GWPointNodes_Get turns each column into a value named by its label).'
+- 'Reading gatewayTypes: Name is the type''s name on Gateway Types (GWVendor.Description). Column is the
+  parameter''s column picker, Node or Point Parameter 1-15, and decides where the value is stored (GWParamID:
+  node -1..-15, point 1..15). Type is one of the screen''s four:
+  String, Boolean, Integer, Decimal. Values are its predefined values; a Boolean needs exactly two, and a
+  parameter with two or more accepts only those (or a number inside a [x..y] range). Labels are matched to the
+  code by exact spelling, ignoring case, so type them as written. The type''s Name and predefined values
+  serve the screens. Reads says what the component does with the value; a parameter
+  marked not read by 7.0 is left untouched; editor defaults in those fields have no runtime effect.'
+- 'Current editor contract (verified in installed 7.0.0.4090): Delimiter and legacy display order (GWParamPos)
+  have no entry fields and are not gateway-type acceptance requirements. Leave their stored values alone.
+  The Gateway picker beside Description is a helper for showing a component''s available parameters; its
+  selection is not saved and does not bind the type to a task. Add only the parameters listed below, rather
+  than every suggested default. Predefined values require a nonblank value, so Array Index uses -1 for its
+  Typically -1 choice; the point''s actual Array Index can still stay blank.'
+- 'Enablement: explicitly select IsEnabled = 1 (Enabled) wherever the component reads that parameter, on both
+  nodes and points. Although the components accept blank as enabled, installed 7.0.0.4090 saved the new-node
+  editor''s untouched None as 0 during entry on 2026-10-23. Leave parameters marked not read untouched. On FIG and
+  MDEF points select Disabled = 0 (Enabled); 1 disables the point.'
+- 'Weather types are separate: create NOAA / ECCC Weather Gateway for the NOAA collector, and keep Aeris
+  Weather Gateway for the Aeris collector. Create the NOAA type first and assign Northlake NOAA Weather to it;
+  then rename the former shared Weather Gateway type to Aeris Weather Gateway, preserving or restoring its Aeris fields.
+  Do not replace the shared type parameters with NOAA parameters while Aeris still uses that type. The optional
+  transitionGateways entry below checks the remaining Aeris profile until its points have moved and it is retired.'
+- 'The 2026-10-23 checkpoint verified 237 direct bindings across 13 typed profiles and 24 nodes. The 2026-11-01 weather
+  catch-up saved all 258 direct bindings across 12 required typed profiles and 26 nodes. The empty Aeris
+  transition profile and two nodes remain; they have no point bindings.
+  Gateway 7 is now Northlake NOAA Weather. The installed editor locks its type while nodes or points remain;
+  after approval on 2026-11-01, seven point links were temporarily unassigned, old nodes 13/14 removed,
+  the type switched, and all six NOAA nodes and 30 point bindings saved through Configuration Tool. Do not delete the old Aeris profile
+  until its point bindings are empty. Installed IDs below are historical; record newly created node IDs.'
+- 'Bulk assignments: run 02-gateway-point-assignments.sql against BVirtualPC / EEMSuite_Northlake with @Apply=0
+  to inspect IDs, existing values and required values. Set @Apply=1 only after reviewing the preview; optionally
+  set @ProfileKey to one record key. The script calls GwPtParam_Save in a transaction, refuses conflicting
+  assignments, skips already-correct points and verifies point definitions and aggregate membership.
+  The optional script reads previous values from 02-weather-binding-migration.yaml, outside this manual setup.
+  Set @AllowLegacyWeatherMigration=1 to permit only those nine exact previous snapshots;
+  the default rejects every conflicting binding. This flag never permits arbitrary overwrites.
+  Regenerate after editing these recipes with python -B -m generators.gateway_assignments.'
+- 'PointType is an optional Aeris parameter copied into interval-intake metadata. It is not NOAA OutputUnit;
+  leave it blank for the transitional Aeris points. NOAA declares Measurement and OutputUnit instead.'
+- 'No gateway runs until its kind is switched on in the system setting Gateway/Objects/Enablement (Profile
+  Manager > System Configuration); every kind defaults to off. Step 3 sets it first (gatewayEnablement in
+  03-workflows-and-tasks.yaml).'
+- 'Fake Gateway needs one custom workflow: FakeGateway followed by IntervalDataPublish. The installed MvrsGateway
+  already includes HmrEventsPublish; do not create a separate HMR workflow, gateway or task. See 03-workflows-and-tasks.yaml.'
+- 'Next Batch Method on every node below is left at Disabled: it is a legacy per-node scheduling hook that
+  predates Task Manager, and nothing in Northlake''s task-based scheduling reads it.'
+- 'Parameters shown under "Schedule parameters" are not entered on this gateway screen or as fixed
+  task defaults. They are the per-profile values to enter on a schedule of the reusable task in
+  03-workflows-and-tasks.yaml. Leave the reusable task GatewayId and RootDirectory blank; choose the
+  GatewayId by name on each schedule after its gateway is saved. The collector resolves its name and
+  GUID from that ID; do not enter separate identity overrides.'
+- 'Directory layout: Set only RootDirectory for each file gateway. Input/Working/Archive/Error/Output resolve below
+  that root; leave their optional overrides blank unless a folder must live elsewhere. The Schedule parameters
+  use the exact current workflow names. The workflow
+  connects its output to IntervalDataPublish automatically; no per-task OutputPath is needed. Device and HTTP
+  gateways also accept RootDirectory for their generated output. Record these paths beside any database backup.'
+- 'Point lookup: Description below is the exact Point Definition > Description from Stage 2, not a collector
+  label or a new name to enter. Use it together with Company and Meter (Description and Meter Number) to find
+  the existing point in the picker. channel is only the recipe key. Report names are not specified by Stage 2;
+  do not rename a point or its report name to match a gateway label. Gateway binding says where to attach it;
+  Point Parameters gives the exact field values the collector reads. Save the point after entering those values.'
+- 'For apartment/turbine templates, Description is the exact point name on every meter and Meter pattern
+  identifies the meter for each unit or NN.'
+- 'Apartment ranges follow Stage 2: Cedar Row A has 101-120, 201-220 and 301-320; Cedar Row B has 101-116,
+  201-216, 301-316 and 401-416. The fixed-network FIG profile has 128 direct points (124 apartments, two house
+  meters, laundry and EV). The naming rules below expand to the existing Stage 2 point keys, not sequential
+  unit 1-60/64.'
+- 'Neptune and MVRS gateways have no nodes and no points. Their collectors still walk nodes and then points,
+  but HMR_PointNode_Get builds that list itself: one made-up node (-1, HMR) holding every HMR_Reading row
+  configured in Handheld Meter Setup. It never reads GwNodes and does not filter by gateway. The
+  192 handheld meters and their 204 registers, with the existing points each register reads (a register and
+  its Delta, or a demand point), are listed in 05-handheld-routes.yaml and entered in Step 5 on the web''s
+  Handheld Meter Setup page, not in Configuration Tool. Step 5 also enters each register''s starting reading;
+  the import pack in Step 4 builds on those. The MVRS gateway carries the CHECK, SWGR and GEN routes as well as
+  the gas route: it is the MVRS upload drop, not a gas-only feed.'
+- 'Handheld gateways (Step 5): in Configuration Tool each of the three is only its name and the parameterless
+  Handheld Meter Reading Gateway type. Configuration Tool requires a type (Add Gateway assigns one and the
+  picker cannot clear it), but the Neptune and MVRS components never read it: HMR_PointNode_Get takes only the
+  gateway name and GUID from ObjectRegistry. A gateway with no nodes and no points saves and shows no problem
+  in the navigator (it flags only a missing name, a missing type, or points on no node). Massport''s live MVRS
+  gateway has no type and no nodes, a shape the 7.0 editor cannot create (PRODUCT FINDING 78). Do not give
+  these gateways another type, and do not put the register or delta points on any gateway.'
+- 'Added 2026-10-01 (Ridgeline Wind): one new gateway and one new node on each of two existing gateways, 72
+  points in all, every one attached by its Stage 2 channel key (04-points.yaml). Ridgeline SCADA File Imports
+  (gw_fig_ridgeline_scada, FIG Gateway vendor, Format FIG, folders under
+  C:\ProgramData\EEM Suite\NorthLake\Gateways\FIG-Ridgeline\) has FIG-RIDGELINE-TURBINES (60 points, six on
+  each of the ten turbines) and FIG-RIDGELINE-MET-MAST (6 points); the SCADA server writes one 10-minute CSV
+  for the turbines and one for the met mast (ridgeline-scada-turbines.fig.csv and ridgeline-met-mast.fig.csv).
+  MV90-MDEF-VED-RIDGELINE (3 points, RecorderID VEDRIDGE01) joins the VED MDEF gateway and NOAA-KSUU (3
+  points, StationID KSUU) joins the NOAA gateway; their existing tasks read them
+  (03-workflows-and-tasks.yaml), so neither needs a gateway, task or folder of its own.'
+- 'The Ridgeline SCADA clock keeps Pacific Standard Time all year (UTC-08:00, no move in March) and EEM has no
+  fixed-offset time zone, so the file is read through the FIG gateway''s UTC plus offset.
+  The 66 SCADA points keep their Pacific time zone (Stage 2''s default, TimeZoneID 33 in the installed database;
+  nothing to change) and each carries OffsetTimeMinutes 480, and the Ridgeline schedule uses TimeStampType utc.
+  FIGGatewayComponent.cs adds the offset to every stamp in the file before converting it, so 00:00 on the SCADA
+  clock becomes 08:00, and utc reads that as the UTC instant it is, in January and in July alike; EEM then
+  converts the UTC into the point''s Pacific zone for the stored local stamp, which comes out as the right
+  Pacific civil time (01:00 daylight time in July for the SCADA''s 00:00, 00:00 in January). Timestamp Type is a
+  task setting, so this task is Ridgeline''s alone (on a shared FIG task it would apply to every FIG point), and
+  the FIG component never reads the node''s TimeStampType label. The other readings are wrong: the default local
+  would read the shifted stamp as Pacific wall-clock time and store UTC 7 or 8 hours late, and leaving out the
+  offset would put UTC an hour early while Pacific is on daylight time (eight hours early with utc). Nor is the
+  GMT zone a way round: TimeZoneID 23 resolves to the Windows zone GMT Standard Time, London with summer time
+  (PRODUCT FINDING 48), and FIG offers no standard-time stamp type, which would need no offset (PRODUCT FINDING
+  49). ridgeline_scada_july_day in 04-acceptance-runs.yaml verifies the recipe on a July day, when the SCADA
+  clock and the Pacific clock are an hour apart.'
+- 'NOAA wind output units are explicit. KSUU uses Knots; KSAC uses MilesPerHour and KSMF uses KilometersPerHour.'
+- 'ODBC source setup: the ODBC node uses ProfileName=SyntheticCustomerHistorian and
+  QueryKey=SyntheticGatewayQueries:LibraryElectricInterval. Define that connection and query in source configuration:
+  select TimeStamp, Value from SyntheticIntervalReadings where PtID = |PtID| and TimeStamp > ''|LastTimeStamp|'' order by TimeStamp.
+  These are node/source settings, not ODBCGateway task parameters; the workflow owns its per-run output.'
+
+gatewayTypes:
+# Configuration Tool > Gateway Types. Enter or correct every type here before the first gateway below. Status says
+# whether the type is seeded (verify it, and add what it lacks) or new; New: true marks a parameter to add.
+- key: type_acquisuite
+  Name: AcquiSuite Gateway
+  Status: Seeded. Verify. Row Number arrives as Integer with RepairGatewayParameterMetadata.sql; set it by hand on a build
+    without it.
+  Used by: gw_acquisuite_student_electric (AcquiSuiteGateway workflow)
+  Node Parameters:
+  - {Column: 1, Label: IsEnabled, Type: Boolean, Values: {'0': Disabled, '1': Enabled}, Reads: '0 skips the node'}
+  - {Column: 2, Label: Serial Number, Type: String, Reads: 'the first token of the file name, {serial}_{device}.log; case-sensitive'}
+  Point Parameters:
+  - {Column: 1, Label: IsEnabled, Type: Boolean, Values: {'0': Disabled, '1': Enabled}, Reads: '0 skips the point'}
+  - {Column: 2, Label: DeviceID, Type: String, Reads: 'the second token of the file name; case-sensitive'}
+  - {Column: 3, Label: Row Number, Type: Integer, Reads: 'the CSV cell, plus the task Row Offset (cell 0 is the timestamp)'}
+- key: type_bacnet
+  Name: BACnet Gateway
+  Status: Seeded. Add BBMD UDP Port. RepairGatewayParameterMetadata.sql makes Object Type and Property Integer (as seeded
+    they are Booleans with six values and one, and the screen will not save the type until they are fixed) and names the
+    node IsEnabled 0 Disabled.
+  Used by: gw_bacnet_thermal_plant (BacnetGateway workflow)
+  Node Parameters:
+  - {Column: 1, Label: IsEnabled, Type: Boolean, Values: {'0': Disabled, '1': Enabled}, Reads: '0 skips the node'}
+  - {Column: 2, Label: Network Type, Type: String, Values: {BACNetIP: IP, BACNetIEtherNet: Ethernet}, Reads: 'not read by 7.0; leave blank'}
+  - {Column: 8, Label: BBMD Address, Type: String, Reads: 'the BBMD to register with as a foreign device; blank registers with none'}
+  - {Column: 9, Label: BBMD UDP Port, Type: Integer, New: true, Reads: 'the BBMD''s UDP port; set it with BBMD Address (blank reads 0)'}
+  Point Parameters:
+  - {Column: 1, Label: IsEnabled, Type: Boolean, Values: {'0': Disabled, '1': Enabled}, Reads: '0 skips the point'}
+  - {Column: 2, Label: DeviceID, Type: Integer, Reads: 'the device instance; points are read device by device'}
+  - {Column: 3, Label: ObjectID, Type: Integer, Reads: 'the object instance'}
+  - {Column: 4, Label: Object Type, Type: Integer, Values: {'0': Analog Input, '1': Analog Output, '2': Analog Variable, '3': Binary Input, '4': Binary Output, '5': Binary Variable}, Reads: '0 to 5'}
+  - {Column: 5, Label: Property, Type: Integer, Values: {'85': Present Value}, Reads: 'not read by 7.0, which always reads Present Value; leave blank'}
+  - {Column: 6, Label: Comment, Type: String, Reads: 'not read by 7.0; leave blank'}
+  - {Column: 7, Label: Array Index, Type: Integer, Values: {'-1': Typically -1}, Reads: 'array element 1 to 16; blank or any other value reads the whole value, so leave it blank'}
+- key: type_modbus
+  Name: Modbus Gateway
+  Status: Seeded. Verify. Port and Modbus Address arrive as Integer with RepairGatewayParameterMetadata.sql.
+  Used by: gw_modbus_thermal_plant (ModbusGateway workflow)
+  Node Parameters:
+  - {Column: 1, Label: IsEnabled, Type: Boolean, Values: {'0': Disable Node, '1': Enable Node}, Reads: '0 skips the node'}
+  - {Column: 2, Label: IP Address, Type: String, Values: {'*': IP Address or DNS Name}, Reads: 'the host'}
+  - {Column: 5, Label: Port, Type: Integer, Reads: 'the TCP port'}
+  - {Column: 6, Label: Modbus Address, Type: Integer, Reads: 'the unit id, 0 to 255'}
+  Point Parameters:
+  - {Column: 1, Label: IsEnabled, Type: Boolean, Values: {'0': Disable Scan, '1': Enable Scan}, Reads: '0 skips the point'}
+  - {Column: 3, Label: Register Address, Type: Integer, Values: {'[00001..49999]': Modbus Register Address}, Reads: '1xxxx a discrete input, 3xxxx an input register, anything else a holding register (4xxxx)'}
+  - {Column: 4, Label: Register Type, Type: String, Values: {Discrete Input: Binary input, Unsigned Decimal: 16 bit unsigned integer, Integer: 16 bit signed integer, Long Integer MSR First: 32 bit signed integer, Long Integer LSR First: 32 bit signed integer, Floating Point MSR First: 32 bit floating point number, Floating Point LSR First: 32 bit floating point number, Double Float MSR First: 64 bit floating point number, Double Float LSR First: 64 bit floating point number}, Reads: 'one of these, matched case for case'}
+  - {Column: 6, Label: Multiplier, Type: Decimal, Reads: 'scales the value; blank reads 0, so always set it'}
+  - {Column: 7, Label: Additive Constant, Type: Decimal, Reads: 'added after the multiplier'}
+- key: type_spinwave
+  Name: Spinwave Gateway
+  Status: Seeded. Verify. Both IsEnabled flags arrive as Boolean with RepairGatewayParameterMetadata.sql.
+  Used by: gw_spinwave_science_lab (SpinwaveGateway workflow)
+  Node Parameters:
+  - {Column: 1, Label: IsEnabled, Type: Boolean, Values: {'0': Disabled, '1': Enabled}, Reads: '0 skips the node'}
+  - {Column: 2, Label: Folder Name, Type: String, Reads: 'the sub-folder of the task Input Directory'}
+  Point Parameters:
+  - {Column: 1, Label: IsEnabled, Type: Boolean, Values: {'0': Disabled, '1': Enabled}, Reads: '0 skips the point'}
+  - {Column: 2, Label: Device Address, Type: String, Reads: 'CSV column 2, ignoring case'}
+  - {Column: 3, Label: Channel Number, Type: Integer, Reads: 'the value column is Channel Number + 2'}
+- key: type_fig
+  Name: FIG Gateway
+  Status: Seeded. Add Channel, UOM, Multiplier and OffsetTimeMinutes (PRODUCT FINDING 21). FIG reads no node parameter; the
+    task's Timestamp Type, not the node's TimeStampType, sets the clock.
+  Used by: gw_fig_multi_format, gw_fig_fixed_network_submeters, gw_fig_ridgeline_scada (FIGGateway workflow, every Format)
+  Node Parameters:
+  - {Column: 1, Label: IsEnabled, Type: Boolean, Values: {'0': Disabled, '1': Enabled}, Reads: 'not read by FIG; leave blank'}
+  - {Column: 2, Label: TimeStampType, Type: String, Values: {UTC: UTC TimeStamp, Local: Local TimeStamp}, Reads: 'not read by FIG; leave blank'}
+  Point Parameters:
+  - {Column: 1, Label: Disabled, Type: Boolean, Values: {'1': Disabled, '0': Enabled}, Reads: 'blank or 0 reads the point; anything else skips it'}
+  - {Column: 2, Label: Point Alias, Type: String, Reads: 'the point name in the file, ignoring case'}
+  - {Column: 3, Label: Channel, Type: String, New: true, Reads: 'CMEP only: the alias becomes {Point Alias}_{Channel}_{UOM}'}
+  - {Column: 4, Label: UOM, Type: String, New: true, Reads: 'CMEP only, as above'}
+  - {Column: 5, Label: Multiplier, Type: Decimal, New: true, Reads: 'scales the value; blank reads 1'}
+  - {Column: 6, Label: OffsetTimeMinutes, Type: Integer, New: true, Reads: 'minutes added to every file stamp; blank reads 0'}
+- key: type_mdef
+  Name: MDEF
+  Status: Seeded. Verify. IsEnabled and Disabled arrive as Boolean with RepairGatewayParameterMetadata.sql. One type serves
+    both MV90 formats; each schedule's Format picks the parser.
+  Used by: gw_mv90_valley_mdef, gw_mv90_helios_mv9 (MV90Gateway workflow)
+  Node Parameters:
+  - {Column: 1, Label: IsEnabled, Type: Boolean, Values: {'1': Node Enabled, '0': Node Disabled}, Reads: '0 skips the node''s points'}
+  - {Column: 2, Label: TimeStampType, Type: String, Values: {UTC: Returned Value is in UTC Time, Local: Returned Value is in LocalTimestamp, STANDARD: Returned Value is in Standard Time}, Reads: 'utc, local, standard or ticks, ignoring case; blank reads utc'}
+  Point Parameters:
+  - {Column: 1, Label: Disabled, Type: Boolean, Values: {'1': Point Disabled, '0': Point Enabled}, Reads: 'blank or 0 reads the point; anything else skips it'}
+  - {Column: 3, Label: RecorderID, Type: String, Reads: 'the file''s customer id, compared upper-cased'}
+  - {Column: 4, Label: Channel, Type: Integer, Reads: 'the channel number in the file'}
+- key: type_odbc
+  Name: ODBC Gateway
+  Status: Seeded. Verify. IsEnabled arrives as Boolean with RepairGatewayParameterMetadata.sql.
+    RetireGatewayBackfillDays.sql removes the old node and point Backfilldays fields; backfill is now a run/task parameter.
+    Every remaining label, read or not, is also a query token (|Label|).
+  Used by: gw_odbc_library_historian (ODBCGateway workflow)
+  Node Parameters:
+  - {Column: 1, Label: IsEnabled, Type: Boolean, Values: {'0': Node Disabled, '1': Node Enabled}, Reads: '0 skips the node'}
+  - {Column: 2, Label: ProfileName, Type: String, Reads: 'a connection profile that must exist; blank on an enabled node stops the run'}
+  - {Column: 3, Label: QueryKey, Type: String, Reads: 'the query template''s key; one that finds no template stops the run'}
+  - {Column: 4, Label: DaysBack, Type: Integer, Reads: 'the first window in days; also caps how old a cursor may be'}
+  - {Column: 5, Label: LastTimeStampName, Type: String, Reads: 'the timestamp column of the query result; never leave it blank'}
+  - {Column: 6, Label: TimeStampType, Type: String, Values: {UTC: Returned Value is in UTC Time, Local: Returned Value is in LocalTimestamp}, Reads: 'utc, local, standard or ticks; set it, since blank is not read as utc for the cursor'}
+  Point Parameters:
+  - {Column: 1, Label: IsEnabled, Type: Boolean, Values: {'0': Point Disabled, '1': Point Enabled}, Reads: '0 skips the point'}
+  - {Column: 5, Label: ODBC PtID, Type: String, Reads: 'not read by 7.0 except as a query token; leave blank'}
+  - {Column: 6, Label: Multiplier, Type: String, Reads: 'not read by 7.0 except as a query token; leave blank'}
+  - {Column: 7, Label: IgnoreRollovers, Type: String, Values: {'0': 'No', '1': 'Yes'}, Reads: 'not read by 7.0; leave blank'}
+  - {Column: 8, Label: RolloverValue, Type: Integer, Reads: 'not read by 7.0; leave blank'}
+- key: type_noaa
+  Name: NOAA / ECCC Weather Gateway
+  Status: Created separately as type 100094 on 2026-11-01; never convert the Aeris type in place.
+  Used by: gw_noaa_ksac_observations (noaa-gateway)
+  Node Parameters:
+  - Column: 1
+    Label: IsEnabled
+    Type: Boolean
+    Values:
+      '0': 'False'
+      '1': 'True'
+    Reads: 0 skips the node
+  - Column: 2
+    Label: WeatherKind
+    Type: String
+    Values:
+      Observation: Observation
+      Forecast: Forecast
+    Reads: Required source kind
+  - Column: 3
+    Label: StationID
+    Type: String
+    Reads: NWS station identifier
+  - Column: 4
+    Label: GhcnStationID
+    Type: String
+    Reads: GHCN identifier for observation history
+  - Column: 5
+    Label: WeatherProvider
+    Type: String
+    Values: {NWS: NWS, ECCC: ECCC}
+    Reads: Select NWS for all Northlake nodes; the collector defaults to NWS when blank
+  - Column: 6
+    Label: EcccStationID
+    Type: String
+    Reads: ECCC observation station identifier; leave blank for Northlake's NWS nodes
+  - Column: 7
+    Label: EcccForecastLocationID
+    Type: String
+    Reads: ECCC forecast location identifier; leave blank for Northlake's NWS nodes
+  Point Parameters:
+  - Column: 1
+    Label: IsEnabled
+    Type: Boolean
+    Values:
+      '0': 'False'
+      '1': 'True'
+    Reads: 0 skips the point
+  - Column: 2
+    Label: Measurement
+    Type: String
+    Values: {Temperature: Temperature, DewPoint: DewPoint, RelativeHumidity: RelativeHumidity, WindSpeed: WindSpeed, WindDirection: WindDirection, ProbabilityOfPrecipitation: ProbabilityOfPrecipitation}
+    Reads: Temperature, DewPoint, RelativeHumidity, WindSpeed, WindDirection or ProbabilityOfPrecipitation; the last two require a Forecast node
+  - Column: 3
+    Label: OutputUnit
+    Type: String
+    Values: {Celsius: Celsius, Fahrenheit: Fahrenheit, Percent: Percent, MetersPerSecond: MetersPerSecond, KilometersPerHour: KilometersPerHour, MilesPerHour: MilesPerHour, Knots: Knots, Degrees: Degrees}
+    Reads: Celsius/Fahrenheit for temperature and dew point, Percent for humidity and precipitation probability, Degrees for direction, and MetersPerSecond/KilometersPerHour/MilesPerHour/Knots for wind speed
+
+- key: type_aeris
+  Name: Aeris Weather Gateway
+  Status: Renamed from Weather Gateway as type 100092 on 2026-11-01; PointType added and obsolete history choice removed after confirmation. Verified against the live type checker.
+  Used by: Empty Northlake Aeris Weather transition profile; its three former KSMF points now use NOAA.
+  Node Parameters:
+  - {Column: 1, Label: IsEnabled, Type: Boolean, Values: {'0': Disabled, '1': Enabled}, Reads: '0 skips the node'}
+  - {Column: 2, Label: WeatherType, Type: String, Values: {observation: Aeris observations, forecast: Aeris forecast}, Reads: 'Select the Aeris observation or forecast source'}
+  - {Column: 3, Label: StationID, Type: String, Reads: 'Aeris station identifier'}
+  - {Column: 4, Label: BackFillDays, Type: Integer, Reads: 'Aeris history lookback in days; blank defaults to 0'}
+  Point Parameters:
+  - {Column: 1, Label: IsEnabled, Type: Boolean, Values: {'0': Disabled, '1': Enabled}, Reads: '0 skips the point'}
+  - {Column: 2, Label: WeatherTypeName, Type: String, Reads: 'Aeris field name such as tempC, tempF or windSpeedKPH; not a NOAA Measurement value'}
+  - {Column: 3, Label: PointType, Type: String, Reads: 'Optional interval-intake metadata; leave blank for Northlake'}
+
+- key: type_fake
+  Name: Fake Gateway
+  Status: New. Give it no parameter labeled Interval, which would collide with the point's own interval.
+  Used by: gw_fake_smoke (the custom Fake Gateway workflow, 03-workflows-and-tasks.yaml)
+  Node Parameters:
+  - {Column: 1, Label: IsEnabled, Type: Boolean, Values: {'0': Disabled, '1': Enabled}, Reads: '0 skips the node'}
+  Point Parameters:
+  - {Column: 1, Label: IsEnabled, Type: Boolean, Values: {'0': Disabled, '1': Enabled}, Reads: '0 skips the point'}
+  - {Column: 2, Label: GenerationMode, Type: String, Values: {constant: Constant, random: Random, sine: Sine wave, ramp: Ramp}, Reads: 'blank takes the task Generation Mode; any other value skips the point'}
+  - {Column: 3, Label: MinValue, Type: Decimal, Reads: 'blank takes the task Min Value'}
+  - {Column: 4, Label: MaxValue, Type: Decimal, Reads: 'blank takes the task Max Value; never below MinValue'}
+  - {Column: 5, Label: PeriodMinutes, Type: Integer, Reads: 'the sine period; blank takes the task''s'}
+  - {Column: 6, Label: Seed, Type: Integer, Reads: 'the random seed; blank takes the task''s'}
+
+- key: type_handheld
+  Name: Handheld Meter Reading Gateway
+  Status: New, with no node or point parameters. Configuration Tool requires a type on every gateway; the Neptune and
+    MVRS components read none of its labels and load every channel configured on Handheld Meter Setup.
+  Used by: gw_neptune_river_city_water, gw_neptune_cedar_row_submeters (NeptuneGateway workflow), gw_mvrs_sierra_gas
+    (MvrsGateway workflow)
+  Node Parameters: []
+  Point Parameters: []
+otherGatewayTypes:
+# Types the database holds that no Northlake gateway uses. The Neptune and MVRS gateways use the parameterless Handheld
+# Meter Reading Gateway type above; HMR Events Publish has no gateway row.
+- {Name: Aggregation Gateway, Outcome: Keep, Why: 'the product''s own aggregation gateway, which the Stage 2 aggregates use; not edited here'}
+- {Name: My Imports Gateway, Outcome: Keep, Why: 'the product''s My Excel Import gateway; not edited here'}
+- {Name: Accumulator Gateway, Outcome: Deleted, Why: 'no 7.0 component reads it; RepairGatewayParameterMetadata.sql removes it wherever no gateway uses it'}
+- {Name: FixedNetworks Gateway, Outcome: Deleted, Why: 'as above; FIXEDNETWORKS files run on FIG Gateway'}
+- {Name: Mediator Gateway, Outcome: Deleted, Why: 'as above; MEDIATOR files run on FIG Gateway'}
+- {Name: RSS Gateway, Outcome: Deleted, Why: 'as above; it has no parameters'}
+- {Name: XML Gateway, Outcome: Deleted, Why: 'as above; XML files run on FIG Gateway'}
+- {Name: Batch Gateway, Outcome: Deleted, Why: 'as above'}
+- {Name: SiE Generic Gateway2 Service, Outcome: Deleted, Why: 'as above'}
+- {Name: DataBridge, Outcome: Deleted, Why: 'as above; the ODBC component runs any DataBridge gateway an upgraded database keeps'}
+- {Name: Weather Gateway, Outcome: Renamed, Why: 'ambiguous shared name; rename its Aeris layout to Aeris Weather Gateway after assigning NOAA to its separate type'}
+transitionGateways:
+# Check this profile only while it exists. Its points are not additional assignments: they move to the NOAA
+# nodes below. Keep its own type and values intact until those moves have been verified.
+- {Description: Northlake Aeris Weather, Vendor: Aeris Weather Gateway}
+records:
+
+# ---------------------------------------------------------------- AcquiSuite --------------------------------
+- key: gw_acquisuite_student_electric
+  installed:
+    gatewayId: 3
+    nodeIds: {node_asq_ved_student: 3, node_asq_ved_lakeview: 4}
+  Gateway:
+    Description: Northlake Student Center AcquiSuite
+    Vendor: AcquiSuite Gateway
+  Schedule parameters:
+    GatewayId: 3
+    RootDirectory: C:\ProgramData\EEM Suite\NorthLake\Gateways\AcquiSuite
+    FilePatterns: '*.log.gz;*.log'
+    ZipFilePattern: '*.zip'
+    AgeThresholdSeconds: 10
+    MaxZipFiles: 0
+    MaxParallelism: 2
+    RowOffset: 0
+    AllowNoData: true
+  Nodes:
+  - key: node_asq_ved_student
+    Description: ASQ-VED-STUDENT
+    Next Batch Method: Disabled
+    Enable Late Intervals: false
+    Enable Data Gaps: false
+    Node Parameters:
+      IsEnabled: 1
+      Serial Number: ASQVED01
+    Points:
+    - channel: ch_ved_student_center_kwh_15m
+      Description: Delivered kWh 15m
+      Company: Northlake University
+      Meter: {Description: Student Center Electric Main, Meter Number: SYN-VED-M-0040004}
+      Point Parameters: {DeviceID: STUDENT, Row Number: 1}
+    - channel: ch_ved_student_center_kw_15m
+      Description: Demand kW 15m
+      Company: Northlake University
+      Meter: {Description: Student Center Electric Main, Meter Number: SYN-VED-M-0040004}
+      Point Parameters: {DeviceID: STUDENT, Row Number: 2}
+  - key: node_asq_ved_lakeview
+    Description: ASQ-VED-LAKEVIEW
+    Next Batch Method: Disabled
+    Enable Late Intervals: false
+    Enable Data Gaps: false
+    Node Parameters:
+      IsEnabled: 1
+      Serial Number: ASQVED02
+    Points:
+    - channel: ch_ved_lakeview_hall_kwh_15m
+      Description: Delivered kWh 15m
+      Company: Northlake University
+      Meter: {Description: Lakeview Hall Electric Main, Meter Number: SYN-VED-M-0040008}
+      Point Parameters: {DeviceID: LAKEVIEW, Row Number: 1}
+    - channel: ch_ved_lakeview_hall_kw_15m
+      Description: Demand kW 15m
+      Company: Northlake University
+      Meter: {Description: Lakeview Hall Electric Main, Meter Number: SYN-VED-M-0040008}
+      Point Parameters: {DeviceID: LAKEVIEW, Row Number: 2}
+
+# ---------------------------------------------------------------- MV90 MDEF ---------------------------------
+- key: gw_mv90_valley_mdef
+  installed:
+    gatewayId: 4
+    nodeIds: {node_mv90_mdef_science: 5, node_mv90_mdef_recreation: 6, node_mv90_mdef_plant: 7, node_mv90_mdef_ridgeline: 8}
+  Gateway:
+    Description: Northlake VED MDEF Interval Import
+    Vendor: MDEF
+  Schedule parameters:
+    GatewayId: 4
+    RootDirectory: C:\ProgramData\EEM Suite\NorthLake\Gateways\MV90-MDEF
+    Format: MDEF
+    FilePatterns: '*.mde'
+    AgeThresholdSeconds: 10
+    AllowNoData: true
+  Nodes:
+  - key: node_mv90_mdef_science
+    Description: MV90-MDEF-VED-SCIENCE
+    Next Batch Method: Disabled
+    Node Parameters: {IsEnabled: 1, TimeStampType: UTC}
+    Points:
+    - channel: ch_ved_science_center_kwh_15m
+      Description: Delivered kWh 15m
+      Company: Northlake University
+      Meter: {Description: Science Center Electric Main, Meter Number: SYN-VED-M-0040002}
+      Point Parameters: {RecorderID: VEDSCIENCE01, Channel: 1}
+    - channel: ch_ved_science_center_kw_15m
+      Description: Demand kW 15m
+      Company: Northlake University
+      Meter: {Description: Science Center Electric Main, Meter Number: SYN-VED-M-0040002}
+      Point Parameters: {RecorderID: VEDSCIENCE01, Channel: 2}
+  - key: node_mv90_mdef_recreation
+    Description: MV90-MDEF-VED-RECREATION
+    Next Batch Method: Disabled
+    Node Parameters: {IsEnabled: 1, TimeStampType: UTC}
+    Points:
+    - channel: ch_ved_recreation_center_kwh_15m
+      Description: Delivered kWh 15m
+      Company: Northlake University
+      Meter: {Description: Recreation Center Electric Main, Meter Number: SYN-VED-M-0040009}
+      Point Parameters: {RecorderID: VEDRECREATION01, Channel: 1}
+    - channel: ch_ved_recreation_center_kw_15m
+      Description: Demand kW 15m
+      Company: Northlake University
+      Meter: {Description: Recreation Center Electric Main, Meter Number: SYN-VED-M-0040009}
+      Point Parameters: {RecorderID: VEDRECREATION01, Channel: 2}
+  - key: node_mv90_mdef_plant
+    Description: MV90-MDEF-VED-PLANT
+    Next Batch Method: Disabled
+    Node Parameters: {IsEnabled: 1, TimeStampType: UTC}
+    Points:
+    - channel: ch_ved_central_plant_kwh_15m
+      Description: Delivered kWh 15m
+      Company: Northlake Thermal Plant
+      Meter: {Description: Central Plant Electric Service, Meter Number: SYN-VED-M-0040014}
+      Point Parameters: {RecorderID: VEDPLANT01, Channel: 1}
+    - channel: ch_ved_central_plant_kw_15m
+      Description: Demand kW 15m
+      Company: Northlake Thermal Plant
+      Meter: {Description: Central Plant Electric Service, Meter Number: SYN-VED-M-0040014}
+      Point Parameters: {RecorderID: VEDPLANT01, Channel: 2}
+  - key: node_mv90_mdef_ridgeline
+    Description: MV90-MDEF-VED-RIDGELINE
+    Next Batch Method: Disabled
+    Node Parameters: {IsEnabled: 1, TimeStampType: UTC}
+    Points:
+    - channel: ch_ved_ridgeline_received_kwh_15m   # Ridgeline Interconnection Meter > Exported kWh 15m
+      Description: Exported kWh 15m
+      Company: Northlake Thermal Plant
+      Meter: {Description: Ridgeline Interconnection Meter, Meter Number: SYN-VED-M-0040015}
+      Point Parameters: {RecorderID: VEDRIDGE01, Channel: 1}
+    - channel: ch_ved_ridgeline_delivered_kwh_15m   # Ridgeline Interconnection Meter > Station Service kWh 15m
+      Description: Station Service kWh 15m
+      Company: Northlake Thermal Plant
+      Meter: {Description: Ridgeline Interconnection Meter, Meter Number: SYN-VED-M-0040015}
+      Point Parameters: {RecorderID: VEDRIDGE01, Channel: 2}
+    - channel: ch_ved_ridgeline_kvarh_15m   # Ridgeline Interconnection Meter > Reactive kVArh 15m
+      Description: Reactive kVArh 15m
+      Company: Northlake Thermal Plant
+      Meter: {Description: Ridgeline Interconnection Meter, Meter Number: SYN-VED-M-0040015}
+      Point Parameters: {RecorderID: VEDRIDGE01, Channel: 3}
+      Notes:
+      - 'Three channels of one bidirectional recorder: 1 received (export to Valley Electric), 2 delivered (station service), 3 reactive. Local Pacific stamps like the other MDEF nodes (TimeStampType Local); the point time zone stays Pacific.'
+
+# ---------------------------------------------------------------- MV90 MV9 ----------------------------------
+- key: gw_mv90_helios_mv9
+  installed:
+    gatewayId: 5
+    nodeIds: {node_mv90_mv9_helios: 9}
+  Gateway:
+    Description: Northlake Helios MV90 Generation Import
+    Vendor: MDEF   # same legacy vendor; Format below is what selects the MV9 text parser instead of the MDEF binary one
+  Schedule parameters:
+    GatewayId: 5
+    RootDirectory: C:\ProgramData\EEM Suite\NorthLake\Gateways\MV90-MV9
+    Format: MV9
+    FilePatterns: '*.mv9'
+    AgeThresholdSeconds: 10
+    AllowNoData: true
+  Nodes:
+  - key: node_mv90_mv9_helios
+    Description: MV90-MV9-HELIOS
+    Next Batch Method: Disabled
+    Node Parameters: {TimeStampType: UTC}
+    Points:
+    - channel: ch_hos_science_center_gen_kwh_15m
+      Description: Generated kWh 15m
+      Company: Northlake University
+      Meter: {Description: Science Center PV Array, Meter Number: SYN-HOS-M-0080001}
+      Point Parameters: {RecorderID: HOSSCIENCE01, Channel: 1}
+    - channel: ch_hos_science_center_export_kwh_15m
+      Description: Exported kWh 15m
+      Company: Northlake University
+      Meter: {Description: Science Center PV Array, Meter Number: SYN-HOS-M-0080001}
+      Point Parameters: {RecorderID: HOSSCIENCE01, Channel: 2}
+    - channel: ch_hos_science_center_poa_irradiance_15m
+      Description: Plane-of-Array Irradiance 15m
+      Company: Northlake University
+      Meter: {Description: Science Center PV Array, Meter Number: SYN-HOS-M-0080001}
+      Point Parameters: {RecorderID: HOSSCIENCE01, Channel: 3}
+      Notes: [Watts per Square Meter (Stage 2 step 0); the recorder's third channel is the array pyranometer.]
+    - channel: ch_hos_student_center_gen_kwh_15m
+      Description: Generated kWh 15m
+      Company: Northlake University
+      Meter: {Description: Student Center PV Array, Meter Number: SYN-HOS-M-0080002}
+      Point Parameters: {RecorderID: HOSSTUDENT01, Channel: 1}
+    - channel: ch_hos_cedar_row_carport_gen_kwh_15m
+      Description: Generated kWh 15m
+      Company: Cedar Row Apartments
+      Meter: {Description: Cedar Row Solar Carport, Meter Number: SYN-HOS-M-0080003}
+      Point Parameters: {RecorderID: HOSCARPORT01, Channel: 1}
+
+# ---------------------------------------------------------------- BACnet ------------------------------------
+- key: gw_bacnet_thermal_plant
+  installed:
+    gatewayId: 6
+    nodeIds: {node_bacnet_science: 10, node_bacnet_recreation: 11, node_bacnet_plant: 12}
+  Gateway:
+    Description: Northlake Thermal Plant BACnet
+    Vendor: BACnet Gateway
+  Schedule parameters:
+    GatewayId: 6
+    RootDirectory: C:\ProgramData\EEM Suite\NorthLake\Gateways\BACnet
+    AllowNoData: true
+  Nodes:
+  - key: node_bacnet_science
+    Description: NTP-BACNET-SCIENCE-CHW
+    Next Batch Method: Disabled
+    Node Parameters: {"BBMD Address": '', "BBMD UDP Port": ''}
+    Points:
+    - channel: ch_ntp_science_center_chw_ton_hours_hourly
+      Description: Delivered Ton-Hours 60m
+      Company: Northlake University
+      Meter: {Description: Science Center Chilled Water, Meter Number: SYN-NTP-M-0070001}
+      Point Parameters: {DeviceID: 530101, ObjectID: 1001, "Object Type": 2}
+    - channel: ch_ntp_science_center_chw_tons_hourly
+      Description: Demand Tons 60m
+      Company: Northlake University
+      Meter: {Description: Science Center Chilled Water, Meter Number: SYN-NTP-M-0070001}
+      Point Parameters: {DeviceID: 530101, ObjectID: 1002, "Object Type": 2}
+  - key: node_bacnet_recreation
+    Description: NTP-BACNET-RECREATION-CHW
+    Next Batch Method: Disabled
+    Node Parameters: {"BBMD Address": '', "BBMD UDP Port": ''}
+    Points:
+    - channel: ch_ntp_recreation_center_chw_ton_hours_hourly
+      Description: Delivered Ton-Hours 60m
+      Company: Northlake University
+      Meter: {Description: Recreation Center Chilled Water, Meter Number: SYN-NTP-M-0070006}
+      Point Parameters: {DeviceID: 530102, ObjectID: 1001, "Object Type": 2}
+    - channel: ch_ntp_recreation_center_chw_tons_hourly
+      Description: Demand Tons 60m
+      Company: Northlake University
+      Meter: {Description: Recreation Center Chilled Water, Meter Number: SYN-NTP-M-0070006}
+      Point Parameters: {DeviceID: 530102, ObjectID: 1002, "Object Type": 2}
+  - key: node_bacnet_plant
+    Description: NTP-BACNET-PLANT-HEADERS
+    Next Batch Method: Disabled
+    Node Parameters: {"BBMD Address": '', "BBMD UDP Port": ''}
+    Points:
+    - channel: ch_ntp_plant_chw_ton_hours_hourly
+      Description: Produced Ton-Hours 60m
+      Company: Northlake Thermal Plant
+      Meter: {Description: Central Plant Chilled Water Supply, Meter Number: SYN-NTP-P-0090001}
+      Point Parameters: {DeviceID: 530103, ObjectID: 2001, "Object Type": 2}
+    - channel: ch_ntp_plant_chw_tons_hourly
+      Description: Production Rate Tons 60m
+      Company: Northlake Thermal Plant
+      Meter: {Description: Central Plant Chilled Water Supply, Meter Number: SYN-NTP-P-0090001}
+      Point Parameters: {DeviceID: 530103, ObjectID: 2002, "Object Type": 2}
+    - channel: ch_ntp_plant_steam_klb_hourly
+      Description: Produced klb 60m
+      Company: Northlake Thermal Plant
+      Meter: {Description: Central Plant Steam Production, Meter Number: SYN-NTP-P-0090002}
+      Point Parameters: {DeviceID: 530103, ObjectID: 2003, "Object Type": 2}
+    - channel: ch_ntp_plant_steam_lb_per_hour_hourly
+      Description: Production Rate lb/h 60m
+      Company: Northlake Thermal Plant
+      Meter: {Description: Central Plant Steam Production, Meter Number: SYN-NTP-P-0090002}
+      Point Parameters: {DeviceID: 530103, ObjectID: 2004, "Object Type": 2}
+    - channel: ch_ntp_plant_steam_header_psig_15m
+      Description: Steam Header Pressure 15m
+      Company: Northlake Thermal Plant
+      Meter: {Description: Central Plant Steam Production, Meter Number: SYN-NTP-P-0090002}
+      Point Parameters: {DeviceID: 530103, ObjectID: 3001, "Object Type": 0}
+      Notes: [An analog input (Object Type 0) where the plant's other points are analog values; PSIG on the Pressure measure type (Stage 2 step 0).]
+    - channel: ch_ntp_plant_condensate_kgal_hourly
+      Description: Produced kgal 60m
+      Company: Northlake Thermal Plant
+      Meter: {Description: Central Plant Condensate Return, Meter Number: SYN-NTP-P-0090003}
+      Point Parameters: {DeviceID: 530103, ObjectID: 2005, "Object Type": 2}
+
+# ---------------------------------------------------------------- NOAA --------------------------------------
+- key: gw_noaa_ksac_observations
+  installed:
+    gatewayId: 7
+    nodeIds:
+      node_noaa_ksac: 27
+      node_noaa_ksuu: 28
+      node_noaa_ksmf: 29
+      node_noaa_ksmf_forecast: 30
+      node_noaa_ksac_forecast: 31
+      node_noaa_ksuu_forecast: 32
+  Gateway:
+    Description: Northlake NOAA Weather
+    Vendor: NOAA / ECCC Weather Gateway
+  Schedule parameters:
+    GatewayId: 7
+    RootDirectory: C:\ProgramData\EEM Suite\NorthLake\Gateways\Noaa
+    Operation: Current
+    ArchiveDelayDays: 3
+    AllowNoData: true
+  Manual setup:
+  - 'In Gateway Configuration, select Northlake NOAA Weather, then the named node below. Add or select the existing point identified by Description, Company and Meter.'
+  - 'Gateway binding is the destination gateway and node for that point. Enter every Point Parameters value exactly as written, then save. Measurement and OutputUnit are the actual collector settings, not explanatory labels.'
+  - 'On NOAA-KSAC, for example, bind KSAC Dew Point to this node and enter IsEnabled=1, Measurement=DewPoint and OutputUnit=Fahrenheit. The node StationID=KSAC supplies the NOAA station.'
+  - 'The current collector selects the NWS dewpoint measurement and converts it to the requested unit. It does not use the old tempi, tempm or dewptm parameter names. Those previous values are isolated in 02-weather-binding-migration.yaml for the optional SQL migration.'
+  - 'This is the NWS setup. If the newer Weather Provider field is shown, select NWS (the collector default); ECCC identifiers are not used for these US stations.'
+  Nodes:
+  - key: node_noaa_ksac
+    Description: NOAA-KSAC
+    Next Batch Method: Disabled
+    Node Parameters:
+      IsEnabled: 1
+      WeatherKind: Observation
+      WeatherProvider: NWS
+      StationID: KSAC
+      GhcnStationID: USW00023232
+    Points:
+    - channel: ch_weather_ksac_temp_f_hourly
+      Description: KSAC Outside Air Temperature
+      Company: Northlake University
+      Meter: {Description: KSAC Sacramento Executive Airport, Meter Number: KSAC}
+      Gateway binding: {Gateway: Northlake NOAA Weather, Node: NOAA-KSAC}
+      Point Parameters:
+        IsEnabled: 1
+        Measurement: Temperature
+        OutputUnit: Fahrenheit
+    - channel: ch_weather_ksac_dewpoint_f_hourly
+      Description: KSAC Dew Point
+      Company: Northlake University
+      Meter: {Description: KSAC Sacramento Executive Airport, Meter Number: KSAC}
+      Gateway binding: {Gateway: Northlake NOAA Weather, Node: NOAA-KSAC}
+      Point Parameters:
+        IsEnabled: 1
+        Measurement: DewPoint
+        OutputUnit: Fahrenheit
+    - channel: ch_weather_ksac_rh_hourly
+      Description: KSAC Relative Humidity
+      Company: Northlake University
+      Meter: {Description: KSAC Sacramento Executive Airport, Meter Number: KSAC}
+      Gateway binding: {Gateway: Northlake NOAA Weather, Node: NOAA-KSAC}
+      Point Parameters:
+        IsEnabled: 1
+        Measurement: RelativeHumidity
+        OutputUnit: Percent
+    - channel: ch_weather_ksac_wind_mph_hourly
+      Description: KSAC Wind Speed
+      Company: Northlake University
+      Meter: {Description: KSAC Sacramento Executive Airport, Meter Number: KSAC}
+      Gateway binding: {Gateway: Northlake NOAA Weather, Node: NOAA-KSAC}
+      Point Parameters:
+        IsEnabled: 1
+        Measurement: WindSpeed
+        OutputUnit: MilesPerHour
+  - key: node_noaa_ksuu
+    Description: NOAA-KSUU
+    Next Batch Method: Disabled
+    Node Parameters:
+      IsEnabled: 1
+      WeatherKind: Observation
+      WeatherProvider: NWS
+      StationID: KSUU
+      GhcnStationID: USW00023202
+    Points:
+    - channel: ch_weather_ksuu_temp_c_hourly
+      Description: KSUU Outside Air Temperature
+      Company: Northlake University
+      Meter: {Description: KSUU Travis Air Force Base, Meter Number: KSUU}
+      Gateway binding: {Gateway: Northlake NOAA Weather, Node: NOAA-KSUU}
+      Point Parameters:
+        IsEnabled: 1
+        Measurement: Temperature
+        OutputUnit: Celsius
+    - channel: ch_weather_ksuu_rh_hourly
+      Description: KSUU Relative Humidity
+      Company: Northlake University
+      Meter: {Description: KSUU Travis Air Force Base, Meter Number: KSUU}
+      Gateway binding: {Gateway: Northlake NOAA Weather, Node: NOAA-KSUU}
+      Point Parameters:
+        IsEnabled: 1
+        Measurement: RelativeHumidity
+        OutputUnit: Percent
+    - channel: ch_weather_ksuu_wind_knots_hourly
+      Description: KSUU Wind Speed
+      Company: Northlake University
+      Meter: {Description: KSUU Travis Air Force Base, Meter Number: KSUU}
+      Gateway binding: {Gateway: Northlake NOAA Weather, Node: NOAA-KSUU}
+      Point Parameters:
+        IsEnabled: 1
+        Measurement: WindSpeed
+        OutputUnit: Knots
+    - channel: ch_weather_ksuu_dewpoint_c_hourly
+      Description: KSUU Dew Point
+      Company: Northlake University
+      Meter: {Description: KSUU Travis Air Force Base, Meter Number: KSUU}
+      Gateway binding: {Gateway: Northlake NOAA Weather, Node: NOAA-KSUU}
+      Point Parameters:
+        IsEnabled: 1
+        Measurement: DewPoint
+        OutputUnit: Celsius
+  - key: node_noaa_ksmf
+    Description: NOAA-KSMF
+    Next Batch Method: Disabled
+    Node Parameters:
+      IsEnabled: 1
+      WeatherKind: Observation
+      WeatherProvider: NWS
+      StationID: KSMF
+      GhcnStationID: USW00093225
+    Points:
+    - channel: ch_weather_ksmf_temp_c_hourly
+      Description: KSMF Outside Air Temperature
+      Company: Northlake University
+      Meter: {Description: KSMF Sacramento International Airport, Meter Number: KSMF}
+      Gateway binding: {Gateway: Northlake NOAA Weather, Node: NOAA-KSMF}
+      Point Parameters:
+        IsEnabled: 1
+        Measurement: Temperature
+        OutputUnit: Celsius
+    - channel: ch_weather_ksmf_rh_hourly
+      Description: KSMF Relative Humidity
+      Company: Northlake University
+      Meter: {Description: KSMF Sacramento International Airport, Meter Number: KSMF}
+      Gateway binding: {Gateway: Northlake NOAA Weather, Node: NOAA-KSMF}
+      Point Parameters:
+        IsEnabled: 1
+        Measurement: RelativeHumidity
+        OutputUnit: Percent
+    - channel: ch_weather_ksmf_dewpoint_c_hourly
+      Description: KSMF Dew Point
+      Company: Northlake University
+      Meter: {Description: KSMF Sacramento International Airport, Meter Number: KSMF}
+      Gateway binding: {Gateway: Northlake NOAA Weather, Node: NOAA-KSMF}
+      Point Parameters:
+        IsEnabled: 1
+        Measurement: DewPoint
+        OutputUnit: Celsius
+    - channel: ch_weather_ksmf_wind_kph_hourly
+      Description: KSMF Wind Speed
+      Company: Northlake University
+      Meter: {Description: KSMF Sacramento International Airport, Meter Number: KSMF}
+      Gateway binding: {Gateway: Northlake NOAA Weather, Node: NOAA-KSMF}
+      Point Parameters:
+        IsEnabled: 1
+        Measurement: WindSpeed
+        OutputUnit: KilometersPerHour
+  - key: node_noaa_ksmf_forecast
+    Description: NOAA-KSMF-FORECAST
+    Next Batch Method: Disabled
+    Node Parameters:
+      IsEnabled: 1
+      WeatherKind: Forecast
+      WeatherProvider: NWS
+      StationID: KSMF
+    Points:
+    - channel: ch_weather_ksmf_forecast_temp_f_hourly
+      Description: KSMF Forecast Temperature
+      Company: Northlake University
+      Meter: {Description: KSMF Sacramento International Airport, Meter Number: KSMF}
+      Gateway binding: {Gateway: Northlake NOAA Weather, Node: NOAA-KSMF-FORECAST}
+      Point Parameters:
+        IsEnabled: 1
+        Measurement: Temperature
+        OutputUnit: Fahrenheit
+    - channel: ch_weather_ksmf_forecast_dewpoint_c_hourly
+      Description: KSMF Forecast Dew Point
+      Company: Northlake University
+      Meter: {Description: KSMF Sacramento International Airport, Meter Number: KSMF}
+      Gateway binding: {Gateway: Northlake NOAA Weather, Node: NOAA-KSMF-FORECAST}
+      Point Parameters:
+        IsEnabled: 1
+        Measurement: DewPoint
+        OutputUnit: Celsius
+    - channel: ch_weather_ksmf_forecast_rh_hourly
+      Description: KSMF Forecast Relative Humidity
+      Company: Northlake University
+      Meter: {Description: KSMF Sacramento International Airport, Meter Number: KSMF}
+      Gateway binding: {Gateway: Northlake NOAA Weather, Node: NOAA-KSMF-FORECAST}
+      Point Parameters:
+        IsEnabled: 1
+        Measurement: RelativeHumidity
+        OutputUnit: Percent
+    - channel: ch_weather_ksmf_forecast_wind_kph_hourly
+      Description: KSMF Forecast Wind Speed
+      Company: Northlake University
+      Meter: {Description: KSMF Sacramento International Airport, Meter Number: KSMF}
+      Gateway binding: {Gateway: Northlake NOAA Weather, Node: NOAA-KSMF-FORECAST}
+      Point Parameters:
+        IsEnabled: 1
+        Measurement: WindSpeed
+        OutputUnit: KilometersPerHour
+    - channel: ch_weather_ksmf_forecast_wind_direction_hourly
+      Description: KSMF Forecast Wind Direction
+      Company: Northlake University
+      Meter: {Description: KSMF Sacramento International Airport, Meter Number: KSMF}
+      Gateway binding: {Gateway: Northlake NOAA Weather, Node: NOAA-KSMF-FORECAST}
+      Point Parameters:
+        IsEnabled: 1
+        Measurement: WindDirection
+        OutputUnit: Degrees
+    - channel: ch_weather_ksmf_forecast_precip_probability_hourly
+      Description: KSMF Forecast Precipitation Probability
+      Company: Northlake University
+      Meter: {Description: KSMF Sacramento International Airport, Meter Number: KSMF}
+      Gateway binding: {Gateway: Northlake NOAA Weather, Node: NOAA-KSMF-FORECAST}
+      Point Parameters:
+        IsEnabled: 1
+        Measurement: ProbabilityOfPrecipitation
+        OutputUnit: Percent
+  - key: node_noaa_ksac_forecast
+    Description: NOAA-KSAC-FORECAST
+    Next Batch Method: Disabled
+    Node Parameters:
+      IsEnabled: 1
+      WeatherKind: Forecast
+      WeatherProvider: NWS
+      StationID: KSAC
+    Points:
+    - channel: ch_weather_ksac_forecast_temp_f_hourly
+      Description: KSAC Forecast Temperature
+      Company: Northlake University
+      Meter: {Description: KSAC Sacramento Executive Airport, Meter Number: KSAC}
+      Gateway binding: {Gateway: Northlake NOAA Weather, Node: NOAA-KSAC-FORECAST}
+      Point Parameters:
+        IsEnabled: 1
+        Measurement: Temperature
+        OutputUnit: Fahrenheit
+    - channel: ch_weather_ksac_forecast_dewpoint_f_hourly
+      Description: KSAC Forecast Dew Point
+      Company: Northlake University
+      Meter: {Description: KSAC Sacramento Executive Airport, Meter Number: KSAC}
+      Gateway binding: {Gateway: Northlake NOAA Weather, Node: NOAA-KSAC-FORECAST}
+      Point Parameters:
+        IsEnabled: 1
+        Measurement: DewPoint
+        OutputUnit: Fahrenheit
+    - channel: ch_weather_ksac_forecast_rh_hourly
+      Description: KSAC Forecast Relative Humidity
+      Company: Northlake University
+      Meter: {Description: KSAC Sacramento Executive Airport, Meter Number: KSAC}
+      Gateway binding: {Gateway: Northlake NOAA Weather, Node: NOAA-KSAC-FORECAST}
+      Point Parameters:
+        IsEnabled: 1
+        Measurement: RelativeHumidity
+        OutputUnit: Percent
+    - channel: ch_weather_ksac_forecast_wind_mph_hourly
+      Description: KSAC Forecast Wind Speed
+      Company: Northlake University
+      Meter: {Description: KSAC Sacramento Executive Airport, Meter Number: KSAC}
+      Gateway binding: {Gateway: Northlake NOAA Weather, Node: NOAA-KSAC-FORECAST}
+      Point Parameters:
+        IsEnabled: 1
+        Measurement: WindSpeed
+        OutputUnit: MilesPerHour
+    - channel: ch_weather_ksac_forecast_wind_direction_hourly
+      Description: KSAC Forecast Wind Direction
+      Company: Northlake University
+      Meter: {Description: KSAC Sacramento Executive Airport, Meter Number: KSAC}
+      Gateway binding: {Gateway: Northlake NOAA Weather, Node: NOAA-KSAC-FORECAST}
+      Point Parameters:
+        IsEnabled: 1
+        Measurement: WindDirection
+        OutputUnit: Degrees
+    - channel: ch_weather_ksac_forecast_precip_probability_hourly
+      Description: KSAC Forecast Precipitation Probability
+      Company: Northlake University
+      Meter: {Description: KSAC Sacramento Executive Airport, Meter Number: KSAC}
+      Gateway binding: {Gateway: Northlake NOAA Weather, Node: NOAA-KSAC-FORECAST}
+      Point Parameters:
+        IsEnabled: 1
+        Measurement: ProbabilityOfPrecipitation
+        OutputUnit: Percent
+  - key: node_noaa_ksuu_forecast
+    Description: NOAA-KSUU-FORECAST
+    Next Batch Method: Disabled
+    Node Parameters:
+      IsEnabled: 1
+      WeatherKind: Forecast
+      WeatherProvider: NWS
+      StationID: KSUU
+    Points:
+    - channel: ch_weather_ksuu_forecast_temp_c_hourly
+      Description: KSUU Forecast Temperature
+      Company: Northlake University
+      Meter: {Description: KSUU Travis Air Force Base, Meter Number: KSUU}
+      Gateway binding: {Gateway: Northlake NOAA Weather, Node: NOAA-KSUU-FORECAST}
+      Point Parameters:
+        IsEnabled: 1
+        Measurement: Temperature
+        OutputUnit: Celsius
+    - channel: ch_weather_ksuu_forecast_dewpoint_c_hourly
+      Description: KSUU Forecast Dew Point
+      Company: Northlake University
+      Meter: {Description: KSUU Travis Air Force Base, Meter Number: KSUU}
+      Gateway binding: {Gateway: Northlake NOAA Weather, Node: NOAA-KSUU-FORECAST}
+      Point Parameters:
+        IsEnabled: 1
+        Measurement: DewPoint
+        OutputUnit: Celsius
+    - channel: ch_weather_ksuu_forecast_rh_hourly
+      Description: KSUU Forecast Relative Humidity
+      Company: Northlake University
+      Meter: {Description: KSUU Travis Air Force Base, Meter Number: KSUU}
+      Gateway binding: {Gateway: Northlake NOAA Weather, Node: NOAA-KSUU-FORECAST}
+      Point Parameters:
+        IsEnabled: 1
+        Measurement: RelativeHumidity
+        OutputUnit: Percent
+    - channel: ch_weather_ksuu_forecast_wind_knots_hourly
+      Description: KSUU Forecast Wind Speed
+      Company: Northlake University
+      Meter: {Description: KSUU Travis Air Force Base, Meter Number: KSUU}
+      Gateway binding: {Gateway: Northlake NOAA Weather, Node: NOAA-KSUU-FORECAST}
+      Point Parameters:
+        IsEnabled: 1
+        Measurement: WindSpeed
+        OutputUnit: Knots
+    - channel: ch_weather_ksuu_forecast_wind_direction_hourly
+      Description: KSUU Forecast Wind Direction
+      Company: Northlake University
+      Meter: {Description: KSUU Travis Air Force Base, Meter Number: KSUU}
+      Gateway binding: {Gateway: Northlake NOAA Weather, Node: NOAA-KSUU-FORECAST}
+      Point Parameters:
+        IsEnabled: 1
+        Measurement: WindDirection
+        OutputUnit: Degrees
+    - channel: ch_weather_ksuu_forecast_precip_probability_hourly
+      Description: KSUU Forecast Precipitation Probability
+      Company: Northlake University
+      Meter: {Description: KSUU Travis Air Force Base, Meter Number: KSUU}
+      Gateway binding: {Gateway: Northlake NOAA Weather, Node: NOAA-KSUU-FORECAST}
+      Point Parameters:
+        IsEnabled: 1
+        Measurement: ProbabilityOfPrecipitation
+        OutputUnit: Percent
+
+- key: gw_spinwave_science_lab
+  installed:
+    gatewayId: 9
+    nodeIds: {node_spinwave_science_lab: 17}
+  Gateway:
+    Description: Northlake Science Center Spinwave
+    Vendor: Spinwave Gateway
+  Schedule parameters:
+    GatewayId: 9
+    RootDirectory: C:\ProgramData\EEM Suite\NorthLake\Gateways\Spinwave
+    FilePatterns: '*.csv'
+    AgeThresholdSeconds: 10
+    AllowNoData: true
+  Nodes:
+  - key: node_spinwave_science_lab
+    Description: SPINWAVE-SCIENCE-LAB
+    Next Batch Method: Disabled
+    Node Parameters: {"Folder Name": SCIENCE}
+    Points:
+    - channel: ch_spinwave_science_lab_temp_f_10m
+      Description: Lab Air Temperature
+      Company: Northlake University
+      Meter: {Description: Science Center Lab Environment, Meter Number: SCIENCE-CENTER-ENVIRONMENTAL-SENSORS}
+      Point Parameters: {"Device Address": SW-SCI-LAB-01, "Channel Number": 1}
+    - channel: ch_spinwave_science_lab_rh_10m
+      Description: Lab Relative Humidity
+      Company: Northlake University
+      Meter: {Description: Science Center Lab Environment, Meter Number: SCIENCE-CENTER-ENVIRONMENTAL-SENSORS}
+      Point Parameters: {"Device Address": SW-SCI-LAB-01, "Channel Number": 2}
+
+# ---------------------------------------------------------------- FIG (7 formats, one gateway) ---------------
+- key: gw_fig_multi_format
+  installed:
+    gatewayId: 10
+    nodeIds: {node_fig_cedar_row: 18}
+  Gateway:
+    Description: Northlake FIG File Imports
+    Vendor: FIG Gateway
+  Schedule parameters:
+    GatewayId: 10
+    RootDirectory: C:\ProgramData\EEM Suite\NorthLake\Gateways\FIG
+    Format: FIG
+    AgeThresholdSeconds: 10
+    AllowNoData: true
+    TimeStampType: utc
+    FilePatterns: '*.csv;*.xml'
+  Nodes:
+  - key: node_fig_cedar_row
+    Description: FIG-CEDAR-ROW
+    Next Batch Method: Disabled
+    Points:
+    - channel: ch_fig_cedar_row_a_water_kgal_60m
+      Description: Delivered kgal 60m
+      Company: Cedar Row Apartments
+      Meter: {Description: Cedar Row A Water Master, Meter Number: SYN-RCU-M-0060003}
+      Point Parameters: {"Point Alias": FIG_CEDAR_ROW_A_WATER, Channel: "01", UOM: kgal, Multiplier: 1, OffsetTimeMinutes: 0}
+
+# ---------------------------------------------------------------- Modbus ------------------------------------
+- key: gw_modbus_thermal_plant
+  installed:
+    gatewayId: 11
+    nodeIds: {node_modbus_chiller: 19}
+  Gateway:
+    Description: Northlake Thermal Plant Modbus
+    Vendor: Modbus Gateway
+  Schedule parameters:
+    GatewayId: 11
+    RootDirectory: C:\ProgramData\EEM Suite\NorthLake\Gateways\Modbus
+    AllowNoData: true
+  Nodes:
+  - key: node_modbus_chiller
+    Description: NTP-MODBUS-CHILLER
+    Next Batch Method: Disabled
+    Node Parameters: {"IP Address": 10.57.0.20, Port: 502, "Modbus Address": 1}
+    Points:
+    - channel: ch_modbus_ntp_chiller_kw_1m
+      Description: Chiller Demand kW 1m
+      Company: Northlake Thermal Plant
+      Meter: {Description: Central Plant Chiller Controller, Meter Number: NTP-MODBUS-CHILLER-CONTROLLER}
+      Point Parameters: {"Register Type": "Floating Point MSR First", "Register Address": 40001, Multiplier: 1, "Additive Constant": 0}
+
+# ---------------------------------------------------------------- ODBC --------------------------------------
+- key: gw_odbc_library_historian
+  installed:
+    gatewayId: 12
+    nodeIds: {node_odbc_library: 20}
+  Gateway:
+    Description: Northlake ODBC Historian
+    Vendor: ODBC Gateway
+  Schedule parameters:
+    GatewayId: 12
+    RootDirectory: C:\ProgramData\EEM Suite\NorthLake\Gateways\ODBC
+    AllowNoData: true
+  Nodes:
+  - key: node_odbc_library
+    Description: ODBC-LIBRARY-HISTORIAN
+    Next Batch Method: Disabled
+    Node Parameters: {ProfileName: SyntheticCustomerHistorian, QueryKey: "SyntheticGatewayQueries:LibraryElectricInterval", TimeStampType: Local, LastTimeStampName: TimeStamp, DaysBack: 7}
+    Points:
+    - channel: ch_odbc_library_electric_kwh_30m
+      Description: Historian Delivered kWh 30m
+      Company: Northlake University
+      Meter: {Description: Library Electric Historian, Meter Number: LIBRARY-HISTORIAN-ELECTRIC-INTERVAL}
+      Notes: [ODBCGatewayComponent.cs binds this point by PtID inside the query result, not by a GwPtParam label; SourceTable in the scenario file is descriptive only.]
+
+# ---------------------------------------------------------------- Fake --------------------------------------
+- key: gw_fake_smoke
+  installed:
+    gatewayId: 15
+    nodeIds: {node_fake_smoke: 26}
+  Gateway:
+    Description: Northlake Fake Gateway Smoke
+    Vendor: Fake Gateway
+  Schedule parameters:
+    GatewayId: 15
+    RootDirectory: C:\ProgramData\EEM Suite\NorthLake\Gateways\Fake
+    StateFilePath: C:\ProgramData\EEM Suite\NorthLake\Gateways\Fake\fake-state.json
+    StartTimestamp: '2024-01-01T08:00:00Z'
+    EndTimestamp: '2024-01-02T07:45:00Z'
+    GenerationMode: sine
+    AllowSyntheticData: true
+    AllowNoData: true
+  Nodes:
+  - key: node_fake_smoke
+    Description: FAKE-SMOKE
+    Next Batch Method: Disabled
+    Points:
+    - channel: ch_fake_gateway_smoke_kwh_15m
+      Description: Fake Gateway Smoke kWh 15m
+      Company: Northlake University
+      Meter: {Description: Student Center Fake Gateway Smoke, Meter Number: FAKE-GATEWAY-SMOKE-METER}
+      Point Parameters: {GenerationMode: sine, MinValue: 12, MaxValue: 36, PeriodMinutes: 1440, Seed: 104729}
+      Notes: [Excluded from every customer consumption total; it exists only to exercise the Fake Gateway component and its custom workflow.]
+
+# ---------------------------------------------------------------- Neptune (River City water) -----------------
+- key: gw_neptune_river_city_water
+  installed:
+    gatewayId: 16
+  Gateway:
+    Description: Northlake Neptune Water Upload
+    Vendor: Handheld Meter Reading Gateway
+  Schedule parameters:
+    GatewayId: 16
+    RootDirectory: C:\ProgramData\EEM Suite\NorthLake\Gateways\Neptune
+    FilePatterns: '*.*'
+    AgeThresholdSeconds: 10
+    AllowNoData: true
+  # Configuration Tool: only the name and type above. No nodes, no points. Its meters (Cedar Row B Water Master
+  # on route CRBMW, the four sewer-credit deduct meters on route DEDUCT) are set up on Handheld Meter Setup:
+  # 05-handheld-routes.yaml.
+
+# ---------------------------------------------------------------- MVRS (Sierra Gas) ---------------------------
+- key: gw_mvrs_sierra_gas
+  installed:
+    gatewayId: 17
+  Gateway:
+    Description: Northlake MVRS Gas Upload
+    Vendor: Handheld Meter Reading Gateway
+  Schedule parameters:
+    GatewayId: 17
+    RootDirectory: C:\ProgramData\EEM Suite\NorthLake\Gateways\MVRS
+    FilePatterns: '*.*'
+    AgeThresholdSeconds: 10
+    AllowNoData: true
+  # Configuration Tool: only the name and type above. No nodes, no points. Its meter (Student Center Kitchen Gas,
+  # route SCGAS) is set up on Handheld Meter Setup: 05-handheld-routes.yaml.
+
+# ---------------------------------------------------------------- FIG fixed-network submeters -----------------
+- key: gw_fig_fixed_network_submeters
+  installed:
+    gatewayId: 13
+    nodeIds: {node_fig_fn_cedar_a: 21, node_fig_fn_cedar_b: 22, node_fig_fn_campus: 23}
+  Gateway:
+    Description: Northlake Fixed Network Submeters
+    Vendor: FIG Gateway
+  Schedule parameters:
+    GatewayId: 13
+    RootDirectory: C:\ProgramData\EEM Suite\NorthLake\Gateways\FIG-FixedNetworks
+    Format: FIXEDNETWORKS
+    AgeThresholdSeconds: 10
+    AllowNoData: true
+    TimeStampType: utc
+    FilePatterns: '*.xml'
+  Nodes:
+  - key: node_fig_fn_cedar_a
+    Description: FIG-CEDAR-ROW-A-UNITS
+    Next Batch Method: Disabled
+    Points:
+    - channel: ch_cedar_row_a_house_kwh_60m
+      Description: Submeter kWh 60m
+      Company: Cedar Row Apartments
+      Meter: {Description: Cedar Row A Electric House, Meter Number: SYN-SUB-E-AH}
+      Point Parameters: {"Point Alias": FN_CRA_HOUSE_E, Channel: "01", UOM: kWh, Multiplier: 1, OffsetTimeMinutes: 0}
+    - pointTemplate: true
+      channelPattern: ch_cedar_row_a_unit_{unit}_kwh_60m for unit in 101..120,201..220,301..320
+      Description: Submeter kWh 60m
+      Company: Cedar Row Apartments
+      Meter pattern: {Description: "Cedar Row A Unit {unit} Electric", Meter Number: "SYN-SUB-E-A{unit}"}
+      Point Parameters pattern: 'Point Alias: FN_CRA_{unit}_E, Channel: 01, UOM: kWh, Multiplier: 1, OffsetTimeMinutes: 0'
+      count: 60
+      Notes: [Bulk-select the 60 rows on this node, set Channel/UOM/Multiplier/OffsetTimeMinutes once, then type each row's Point Alias.]
+  - key: node_fig_fn_cedar_b
+    Description: FIG-CEDAR-ROW-B-UNITS
+    Next Batch Method: Disabled
+    Points:
+    - channel: ch_cedar_row_b_house_kwh_60m
+      Description: Submeter kWh 60m
+      Company: Cedar Row Apartments
+      Meter: {Description: Cedar Row B Electric House, Meter Number: SYN-SUB-E-BH}
+      Point Parameters: {"Point Alias": FN_CRB_HOUSE_E, Channel: "01", UOM: kWh, Multiplier: 1, OffsetTimeMinutes: 0}
+    - pointTemplate: true
+      channelPattern: ch_cedar_row_b_unit_{unit}_kwh_60m for unit in 101..116,201..216,301..316,401..416
+      Description: Submeter kWh 60m
+      Company: Cedar Row Apartments
+      Meter pattern: {Description: "Cedar Row B Unit {unit} Electric", Meter Number: "SYN-SUB-E-B{unit}"}
+      Point Parameters pattern: 'Point Alias: FN_CRB_{unit}_E, Channel: 01, UOM: kWh, Multiplier: 1, OffsetTimeMinutes: 0'
+      count: 64
+  - key: node_fig_fn_campus
+    Description: FIG-CAMPUS-SUBMETERS
+    Next Batch Method: Disabled
+    Points:
+    - channel: ch_lakeview_hall_laundry_kwh_60m
+      Description: Submeter kWh 60m
+      Company: Northlake University
+      Meter: {Description: Lakeview Hall Laundry Electric, Meter Number: SYN-SUB-E-LV01}
+      Point Parameters: {"Point Alias": FN_LAKEVIEW_LAUNDRY_E, Channel: "01", UOM: kWh, Multiplier: 1, OffsetTimeMinutes: 0}
+    - channel: ch_parking_structure_ev_kwh_60m
+      Description: Submeter kWh 60m
+      Company: Northlake University
+      Meter: {Description: Parking Structure EV Chargers, Meter Number: SYN-SUB-E-PS01}
+      Point Parameters: {"Point Alias": FN_PARKING_EV_E, Channel: "01", UOM: kWh, Multiplier: 1, OffsetTimeMinutes: 0}
+
+# ---------------------------------------------------------------- Neptune cedar row submeters -----------------
+- key: gw_neptune_cedar_row_submeters
+  installed:
+    gatewayId: 18
+  Gateway:
+    Description: Cedar Row Submeter Water Route
+    Vendor: Handheld Meter Reading Gateway
+  Schedule parameters:
+    GatewayId: 18
+    RootDirectory: C:\ProgramData\EEM Suite\NorthLake\Gateways\Neptune-CedarRow
+    FilePatterns: '*.*'
+    AgeThresholdSeconds: 10
+    AllowNoData: true
+  # Configuration Tool: only the name and type above. No nodes, no points. Its 126 meters (the Cedar Row A and B
+  # house and apartment water submeters, routes CRAWTR and CRBWTR) are set up on Handheld Meter Setup:
+  # 05-handheld-routes.yaml.
+
+# ---------------------------------------------------------------- FIG Ridgeline SCADA (standard-time clock) ---
+- key: gw_fig_ridgeline_scada
+  installed:
+    gatewayId: 14
+    nodeIds: {node_fig_ridgeline_turbines: 24, node_fig_ridgeline_met_mast: 25}
+  Gateway:
+    Description: Ridgeline SCADA File Imports
+    Vendor: FIG Gateway
+  Schedule parameters:
+    GatewayId: 14
+    RootDirectory: C:\ProgramData\EEM Suite\NorthLake\Gateways\FIG-Ridgeline
+    Format: FIG
+    AgeThresholdSeconds: 10
+    TimeStampType: utc
+    AllowNoData: true
+    FilePatterns: '*.csv'
+  Nodes:
+  - key: node_fig_ridgeline_turbines
+    Description: FIG-RIDGELINE-TURBINES
+    Next Batch Method: Disabled
+    Notes:
+    - 'The SCADA clock is Pacific Standard Time all year: every point on this node and the next keeps its Pacific time zone and carries OffsetTimeMinutes 480, and the task reads the shifted stamp as UTC, so a file stamp of 00:00 is stored as 08:00 UTC. See the standard-time note above.'
+    Points:
+    - pointTemplate: true
+      channelPattern: ch_rwl_wtg{NN}_kwh_10m for NN in 01..10   # Ridgeline WTG-{NN} > Generated kWh 10m
+      Description: Generated kWh 10m
+      Company: Northlake Thermal Plant
+      Meter pattern: {Description: "Ridgeline WTG-{NN}", Meter Number: "SYN-RWL-M-01100{NN}"}
+      Point Parameters pattern: 'Point Alias: RWL_WTG{NN}_KWH, Channel: 01, UOM: kWh, Multiplier: 1, OffsetTimeMinutes: 480'
+      count: 10
+      Notes:
+      - 'Bulk-select the 60 rows on this node and set Multiplier and OffsetTimeMinutes once; then set Channel and UOM for each of the six signals (ten rows apiece) and type each row''s Point Alias. Alias, Multiplier and OffsetTimeMinutes are what the component reads; Channel and UOM are descriptive on a plain FIG file.'
+    - pointTemplate: true
+      channelPattern: ch_rwl_wtg{NN}_kw_10m for NN in 01..10   # Ridgeline WTG-{NN} > Active Power kW 10m
+      Description: Active Power kW 10m
+      Company: Northlake Thermal Plant
+      Meter pattern: {Description: "Ridgeline WTG-{NN}", Meter Number: "SYN-RWL-M-01100{NN}"}
+      Point Parameters pattern: 'Point Alias: RWL_WTG{NN}_KW, Channel: 02, UOM: kW, Multiplier: 1, OffsetTimeMinutes: 480'
+      count: 10
+    - pointTemplate: true
+      channelPattern: ch_rwl_wtg{NN}_possible_kw_10m for NN in 01..10   # Ridgeline WTG-{NN} > Possible kW 10m
+      Description: Possible kW 10m
+      Company: Northlake Thermal Plant
+      Meter pattern: {Description: "Ridgeline WTG-{NN}", Meter Number: "SYN-RWL-M-01100{NN}"}
+      Point Parameters pattern: 'Point Alias: RWL_WTG{NN}_PKW, Channel: 03, UOM: kW, Multiplier: 1, OffsetTimeMinutes: 480'
+      count: 10
+      Notes:
+      - 'The turbine controller''s own expected output at the measured wind. It keeps reporting while a turbine is faulted, which is what separates lost production from missing data (WTG-07 outage case in 04-acceptance-runs.yaml).'
+    - pointTemplate: true
+      channelPattern: ch_rwl_wtg{NN}_nacelle_wind_ms_10m for NN in 01..10   # Ridgeline WTG-{NN} > Nacelle Wind Speed 10m
+      Description: Nacelle Wind Speed 10m
+      Company: Northlake Thermal Plant
+      Meter pattern: {Description: "Ridgeline WTG-{NN}", Meter Number: "SYN-RWL-M-01100{NN}"}
+      Point Parameters pattern: 'Point Alias: RWL_WTG{NN}_WS, Channel: 04, UOM: m/s, Multiplier: 1, OffsetTimeMinutes: 480'
+      count: 10
+    - pointTemplate: true
+      channelPattern: ch_rwl_wtg{NN}_rotor_rpm_10m for NN in 01..10   # Ridgeline WTG-{NN} > Rotor Speed 10m
+      Description: Rotor Speed 10m
+      Company: Northlake Thermal Plant
+      Meter pattern: {Description: "Ridgeline WTG-{NN}", Meter Number: "SYN-RWL-M-01100{NN}"}
+      Point Parameters pattern: 'Point Alias: RWL_WTG{NN}_RPM, Channel: 05, UOM: RPM, Multiplier: 1, OffsetTimeMinutes: 480'
+      count: 10
+    - pointTemplate: true
+      channelPattern: ch_rwl_wtg{NN}_state_10m for NN in 01..10   # Ridgeline WTG-{NN} > Turbine State
+      Description: Turbine State
+      Company: Northlake Thermal Plant
+      Meter pattern: {Description: "Ridgeline WTG-{NN}", Meter Number: "SYN-RWL-M-01100{NN}"}
+      Point Parameters pattern: 'Point Alias: RWL_WTG{NN}_STATE, Channel: 06, UOM: State, Multiplier: 1, OffsetTimeMinutes: 480'
+      count: 10
+      Notes:
+      - 'A Digital point (Stage 2): 0 Stopped, 1 Running, 2 Fault, 3 Curtailed. Its readings are stored in DigitalArchive_TBL, not AnalogArchive_TBL.'
+  - key: node_fig_ridgeline_met_mast
+    Description: FIG-RIDGELINE-MET-MAST
+    Next Batch Method: Disabled
+    Notes:
+    - 'The met mast stands upwind of WTG-01 and writes its own file on the same clock, so it takes the same offset as the turbines and is read under the same task setting. It is an owned Weather-type meter, not a weather station (Stage 2); KSUU is the station.'
+    Points:
+    - channel: ch_rwl_met_wind_ms_10m   # Ridgeline Met Mast > Hub-Height Wind Speed 10m
+      Description: Hub-Height Wind Speed 10m
+      Company: Northlake Thermal Plant
+      Meter: {Description: Ridgeline Met Mast, Meter Number: RIDGELINE-MET-MAST}
+      Point Parameters: {"Point Alias": RWL_MET_WS50, Channel: "01", UOM: m/s, Multiplier: 1, OffsetTimeMinutes: 480}
+    - channel: ch_rwl_met_wind_direction_10m   # Ridgeline Met Mast > Wind Direction 10m
+      Description: Wind Direction 10m
+      Company: Northlake Thermal Plant
+      Meter: {Description: Ridgeline Met Mast, Meter Number: RIDGELINE-MET-MAST}
+      Point Parameters: {"Point Alias": RWL_MET_WD, Channel: "02", UOM: deg, Multiplier: 1, OffsetTimeMinutes: 480}
+    - channel: ch_rwl_met_air_temp_c_10m   # Ridgeline Met Mast > Air Temperature 10m
+      Description: Air Temperature 10m
+      Company: Northlake Thermal Plant
+      Meter: {Description: Ridgeline Met Mast, Meter Number: RIDGELINE-MET-MAST}
+      Point Parameters: {"Point Alias": RWL_MET_TA, Channel: "03", UOM: degC, Multiplier: 1, OffsetTimeMinutes: 480}
+    - channel: ch_rwl_met_pressure_kpa_10m   # Ridgeline Met Mast > Barometric Pressure 10m
+      Description: Barometric Pressure 10m
+      Company: Northlake Thermal Plant
+      Meter: {Description: Ridgeline Met Mast, Meter Number: RIDGELINE-MET-MAST}
+      Point Parameters: {"Point Alias": RWL_MET_BP, Channel: "04", UOM: kPa, Multiplier: 1, OffsetTimeMinutes: 480}
+    - channel: ch_rwl_met_air_density_10m   # Ridgeline Met Mast > Air Density 10m
+      Description: Air Density 10m
+      Company: Northlake Thermal Plant
+      Meter: {Description: Ridgeline Met Mast, Meter Number: RIDGELINE-MET-MAST}
+      Point Parameters: {"Point Alias": RWL_MET_RHO, Channel: "05", UOM: kg/m3, Multiplier: 1, OffsetTimeMinutes: 480}
+    - channel: ch_rwl_met_rh_10m   # Ridgeline Met Mast > Relative Humidity 10m
+      Description: Relative Humidity 10m
+      Company: Northlake Thermal Plant
+      Meter: {Description: Ridgeline Met Mast, Meter Number: RIDGELINE-MET-MAST}
+      Point Parameters: {"Point Alias": RWL_MET_RH, Channel: "06", UOM: pct, Multiplier: 1, OffsetTimeMinutes: 480}
+
+# ---------------------------------------------------------------- HMR Events Publish ---------------------------
