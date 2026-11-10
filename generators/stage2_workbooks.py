@@ -83,8 +83,10 @@ def account_rows(accounts):
         notes = record.get("Notes") or []
         if len(notes) > 1:
             raise ValueError(f"{record['key']}: the workbook carries one account note; the recipe has {len(notes)}")
-        if [entry["Status"] for entry in record["Status"]] != ["Active Billing Account"]:
-            raise ValueError(f"{record['key']}: the workbook carries one Active status row; the recipe has {record['Status']}")
+        # The workbook carries the account's opening row. A later row (an account that closes) is added by hand
+        # on the account's Status page after the import.
+        if record["Status"][0]["Status"] != "Active Billing Account":
+            raise ValueError(f"{record['key']}: the workbook carries the opening Active status row; the recipe starts with {record['Status'][0]}")
         rows.append([record["Company"], definition["Account Number"], blank(definition.get("Previous Account Number")),
                      definition["Description"], definition["Currency Unit"], definition["Utility Provider"],
                      definition["Bill Service Type"], definition["Bill Entry Type"], definition["Bill Invoice Template"],

@@ -1,5 +1,5 @@
 # Stage 9, step 2: Point Alarm Definition (Database Administrator, Nodes > point > Definitions > Point Alarm
-# Definition tab), plus the Alarm Mail Service task that emails when one fires.
+# Definition tab). The Alarm Mail Notification task that emails when one fires is owned by the product (last record).
 stage: 9
 step: 2
 title: Alarms
@@ -9,11 +9,22 @@ source:
 - generators/documents/sources/implementation/dream-customer/phase6-operations-engagement-spec.md
 - data/scenarios/demo-university-v1.yaml
 notes:
-- 'Screen fields (PointAlarmDefinitionViewModel.cs, verified against the XAML labels): Activation, Priority
-  (PriorityLevels, verified 5 rows: 1 Informational, 2 Warning, 3 Important, 4 Critical, 5 Emergency), Notify
-  User, Notify Group, Alarm Type, Deadband, then the threshold values High Alarm / High Warning / Normal / Low
-  Warning / Low Alarm. A digital point instead gets four state colors/text (State 0-3) in place of the five
-  thresholds.'
+- 'Screen fields (PointAlarmDefinitionViewModel.cs and PointAlarmDefinitionView.xaml, re-read 2026-11-10): Activation (Normal,
+  Disabled, Suspended), Priority (PriorityLevels, verified 5 rows: 1 Informational, 2 Warning, 3 Important, 4 Critical,
+  5 Emergency), Notify User, Notify Group, Alarm Type, Deadband, then for an analog point the ladder High Alarm / High
+  Warning / Normal / Low Warning / Low Alarm. A digital point instead gets a Severity reference state picker and four
+  state colors/text (State 0-3) in place of the five thresholds. Disabled keeps the definition but records nothing;
+  Suspended still records every alarm (PointData_UpdateAlarms.sql does not read it) and stops only the mail
+  (AlarmNotification.sql filters SuspendAlarms = 0).'
+- 'An analog alarm that is enabled needs all four thresholds, strictly ordered Low Alarm < Low Warning < High Warning <
+  High Alarm (PointAlarmRules.ValidateThresholds; the screen refuses the save otherwise). Normal is the band between
+  them: it has a colour and no value. The earlier records that left Low Warning and Low Alarm blank could not have been
+  saved; every enabled analog alarm below now carries all four. Only a Disabled alarm is exempt.'
+- 'Not on the screen, so not entered: Log State Change (the view model carries LogStateChangeOptions and writes
+  DisableDigitalLogging, but PointAlarmDefinitionView.xaml binds no control to it, grep 2026-11-10) and any accumulator
+  alarm (the view model sets IsAccumulator, but the view has a threshold section for analog points and a state section for
+  digital points only). Both are product finding candidates. The Alarm Testing command named in last night''s review does
+  not exist in the Database Administrator source.'
 - 'CORRECTION: AlarmType is a 1-row system lookup (verified: only "default", ResourceSet db_alarming_default).
   There is no per-scenario Alarm Type choice ("high-demand", "chiller-fault", "data-gap", "high-usage" are this
   chapter''s names for what each alarm is watching, not a field value); every record below uses Alarm Type
@@ -37,12 +48,20 @@ notes:
   leaves it blank.'
 - 'What a digital alarm does (read from PointData_UpdateAlarms.sql, PointData_DigitalSave.sql, AlarmNotification.sql and
   the screen''s XAML, not yet run on Ridgeline data): every change of state is recorded as an AlarmData row whose
-  Severity is Priority x the distance of the new state from the point''s Normal State. No screen sets Normal State (the
-  view model carries it, the XAML binds neither it nor Log State Change), so it stays at its stored value, which
-  PointData_DigitalSave reads as 0, while the notification job, when SysConstants ResolveNormalAlarms is on, treats state
-  1 as the return to normal. For Turbine State that gives Stopped no severity, Running 1 x Priority (cleared as the
-  state returns to 1), Fault 2 x Priority and Curtailed 3 x Priority: Fault is recorded, coloured red and mailed, but
-  state 2 cannot be singled out, and Curtailed ranks above Fault. Proposed finding.'
+  Severity is Priority x the distance between the new state and the point''s Severity reference state (line 131 of
+  PointData_UpdateAlarms.sql: Priority x ABS(new state - reference)). The Point Alarm Definition screen has had a
+  Severity reference state picker since 2026-10-05 (PointAlarmDefinitionViewModel.NormalStateOptions /
+  SelectedSeverityReferenceState; label "Severity reference state", cleared = State 0). The earlier note that no screen
+  sets it was true on 2026-10-01 and is stale. With the picker left clear (reference State 0) Turbine State gives Stopped
+  no severity, Running 1 x Priority, Fault 2 x Priority and Curtailed 3 x Priority. Set to Running (State 1), as on all
+  ten turbines below, Running is the quiet state (0) and Stopped and Fault both score 1 x Priority, Curtailed 2 x Priority.
+  The picker therefore moves the zero point; it still cannot single out Fault, because severity is a distance and Stopped is
+  as far from Running as Fault is. Proposed finding, reworded from 55.'
+- 'Coverage across the 15 alarms (so each alarm-editor option is entered at least once): Activation Disabled on the
+  data-gap alarm; Activation Suspended on WTG-07; Severity reference state Running on all ten turbines (left clear on the
+  chiller); Priority 1 Informational (data gap) and 5 Emergency (met mast); Low Warning and Low Alarm on all three enabled
+  analog alarms; every alarm keeps a Notify User and a Notify Group (both pickers have CanClear off, so a blank one is not
+  offered). All invented values carry # assumed.'
 records:
 - key: student_center_demand_alarm
   installed:
@@ -57,8 +76,8 @@ records:
   High Alarm: 850     # kW; assumed threshold above the summer-event peak
   High Warning: 750    # assumed
   Normal: 500           # assumed baseline midday demand
-  Low Warning:          # not used; demand has no low-side alarm
-  Low Alarm:
+  Low Warning: 60       # kW; assumed: the overnight base load sits above it, a dead meter or a tripped feeder falls below
+  Low Alarm: 20         # kW; assumed
 - key: chiller_enable_fault_alarm
   installed:
     pointAlarmId:
@@ -68,6 +87,7 @@ records:
   Notify User: jordan.hale
   Notify Group: nlu_facilities_setup
   Alarm Type: default
+  Severity reference state:   # left clear on purpose: the default, State 0 (Chiller Off), is the quiet state
   State Colors:
   - {State: 0, Text: Chiller Off, Color: '#008040'}
   - {State: 1, Text: Chiller Enabled, Color: '#008040'}
@@ -77,29 +97,33 @@ records:
   installed:
     pointAlarmId:
   Point: ch_ved_student_center_kwh_15m (Student Center Electric Main, interval kWh; the missing_interval_backfill target)
-  Activation: Normal
-  Priority: 2 Warning
+  Activation: Disabled   # assumed. A threshold alarm cannot see missing rows (see Note), and an enabled analog alarm would need four thresholds
+  Priority: 1 Informational   # assumed
   Notify User: jordan.hale
   Notify Group: eem_gateway_reports # Northlake University copy (CompanyID 6); Avery's membership is pending cross-company support.
   Alarm Type: default
   Deadband: 0
-  Note: Data-gap alarms fire from missing interval rows, not a threshold on the value; Deadband/thresholds are
-    left at product defaults and the alarm is exercised by the missing_interval_backfill window itself.
+  Note: Data gaps are not found by a point alarm. They are found by the Data gap monitoring maintenance entry
+    (DATA_GAPS, hmDataGap_Exec, step 4) and read in the data gap reports; PointData_UpdateAlarms.sql raises an AlarmData row
+    only from a value crossing a threshold or a digital state changing. This record keeps the point's notify user and group
+    and exercises Activation Disabled; its thresholds stay blank because a disabled alarm is exempt from the four-threshold
+    rule. The missing_interval_backfill window is exercised by the monitor, not by this record.
 - key: cedar_row_water_alarm
   installed:
     pointAlarmId:
-  Point: ch_rcu_cedar_row_a_water_kgal_monthly (Cedar Row A water, kgal)
+  Point: ch_fig_cedar_row_a_water_kgal_60m (Cedar Row A Water Master, Delivered kgal 60m, hourly analog; the point
+    stage-2-hierarchy/04-points.yaml creates for this meter)
   Activation: Normal
   Priority: 2 Warning
   Notify User: valerie.kim
   Notify Group: cra_housing_ops
   Alarm Type: default
-  Deadband: 2
-  High Alarm: 950      # assumed: kgal/month, above a full-occupancy month
-  High Warning: 850     # assumed
-  Normal: 650            # assumed typical occupied month
-  Low Warning:
-  Low Alarm:
+  Deadband: 0.2         # kgal per hour; assumed
+  High Alarm: 3.0       # kgal per hour; assumed: about 3 times the average hour of a typical occupied month (650 kgal / 720 h = 0.9)
+  High Warning: 2.0     # assumed
+  Normal: 0.9           # assumed typical occupied-month average hour; reference only, the screen takes no Normal value
+  Low Warning: 0.1      # assumed: almost no flow for an hour on the master meter of an occupied building
+  Low Alarm: 0.02       # assumed
 # ---- Ridgeline Wind ----
 # One alarm per Turbine State point. Priority 3 Important is assumed for all ten, as for the chiller fault.
 - key: wtg01_turbine_state_alarm
@@ -111,6 +135,7 @@ records:
   Notify User: mateo.alvarez
   Notify Group: ntp_wind_ops
   Alarm Type: default
+  Severity reference state: 1 Running   # assumed: Running is the quiet state, so its severity is 0
   State Colors:
   - {State: 0, Text: Stopped, Color: '#000000'}
   - {State: 1, Text: Running, Color: '#008000'}
@@ -125,6 +150,7 @@ records:
   Notify User: mateo.alvarez
   Notify Group: ntp_wind_ops
   Alarm Type: default
+  Severity reference state: 1 Running   # assumed: Running is the quiet state, so its severity is 0
   State Colors:
   - {State: 0, Text: Stopped, Color: '#000000'}
   - {State: 1, Text: Running, Color: '#008000'}
@@ -139,6 +165,7 @@ records:
   Notify User: mateo.alvarez
   Notify Group: ntp_wind_ops
   Alarm Type: default
+  Severity reference state: 1 Running   # assumed: Running is the quiet state, so its severity is 0
   State Colors:
   - {State: 0, Text: Stopped, Color: '#000000'}
   - {State: 1, Text: Running, Color: '#008000'}
@@ -153,6 +180,7 @@ records:
   Notify User: mateo.alvarez
   Notify Group: ntp_wind_ops
   Alarm Type: default
+  Severity reference state: 1 Running   # assumed: Running is the quiet state, so its severity is 0
   State Colors:
   - {State: 0, Text: Stopped, Color: '#000000'}
   - {State: 1, Text: Running, Color: '#008000'}
@@ -167,6 +195,7 @@ records:
   Notify User: mateo.alvarez
   Notify Group: ntp_wind_ops
   Alarm Type: default
+  Severity reference state: 1 Running   # assumed: Running is the quiet state, so its severity is 0
   State Colors:
   - {State: 0, Text: Stopped, Color: '#000000'}
   - {State: 1, Text: Running, Color: '#008000'}
@@ -181,6 +210,7 @@ records:
   Notify User: mateo.alvarez
   Notify Group: ntp_wind_ops
   Alarm Type: default
+  Severity reference state: 1 Running   # assumed: Running is the quiet state, so its severity is 0
   State Colors:
   - {State: 0, Text: Stopped, Color: '#000000'}
   - {State: 1, Text: Running, Color: '#008000'}
@@ -190,11 +220,12 @@ records:
   installed:
     pointAlarmId:
   Point: ch_rwl_wtg07_state_10m (Ridgeline WTG-07 Turbine State, digital; the gearbox outage 2025-02-11 to 2025-04-22 is its Fault)
-  Activation: Normal
+  Activation: Suspended   # assumed: alarm mail paused while the gearbox work is under way; AlarmData still records the Fault
   Priority: 3 Important
   Notify User: mateo.alvarez
   Notify Group: ntp_wind_ops
   Alarm Type: default
+  Severity reference state: 1 Running   # assumed: Running is the quiet state, so its severity is 0
   State Colors:
   - {State: 0, Text: Stopped, Color: '#000000'}
   - {State: 1, Text: Running, Color: '#008000'}
@@ -209,6 +240,7 @@ records:
   Notify User: mateo.alvarez
   Notify Group: ntp_wind_ops
   Alarm Type: default
+  Severity reference state: 1 Running   # assumed: Running is the quiet state, so its severity is 0
   State Colors:
   - {State: 0, Text: Stopped, Color: '#000000'}
   - {State: 1, Text: Running, Color: '#008000'}
@@ -223,6 +255,7 @@ records:
   Notify User: mateo.alvarez
   Notify Group: ntp_wind_ops
   Alarm Type: default
+  Severity reference state: 1 Running   # assumed: Running is the quiet state, so its severity is 0
   State Colors:
   - {State: 0, Text: Stopped, Color: '#000000'}
   - {State: 1, Text: Running, Color: '#008000'}
@@ -237,6 +270,7 @@ records:
   Notify User: mateo.alvarez
   Notify Group: ntp_wind_ops
   Alarm Type: default
+  Severity reference state: 1 Running   # assumed: Running is the quiet state, so its severity is 0
   State Colors:
   - {State: 0, Text: Stopped, Color: '#000000'}
   - {State: 1, Text: Running, Color: '#008000'}
@@ -247,7 +281,7 @@ records:
     pointAlarmId:
   Point: ch_rwl_met_wind_ms_10m (Ridgeline Met Mast Hub-Height Wind Speed 10m, m/s)
   Activation: Normal
-  Priority: 2 Warning
+  Priority: 5 Emergency   # assumed: a gust past cut-out is when the plant wants the page
   Notify User: mateo.alvarez
   Notify Group: ntp_wind_ops
   Alarm Type: default
@@ -255,8 +289,8 @@ records:
   High Alarm: 25        # m/s; assumed: the usual cut-out speed of a 660 kW class turbine, where it stops itself
   High Warning: 20      # assumed
   Normal:               # a band between the thresholds, no value on the screen
-  Low Warning:          # not used; winter calms are ordinary (the generator bill for 2025-01-05 to 2025-02-04 exported 418,836 kWh) and a low reading cannot tell still air from a stuck sensor
-  Low Alarm:
+  Low Warning: 0.5      # m/s; assumed. The screen requires a Low Warning and a Low Alarm. Winter calms are ordinary (the generator bill for 2025-01-05 to 2025-02-04 exported 418,836 kWh), so both sit near zero and fire only in dead calm
+  Low Alarm: 0.1        # assumed; a stuck or iced anemometer is goal 41 and still cannot be told from still air
 - key: goal_turbine_performance_ratio_alarm
   kind: goal
   goal: 41
@@ -272,9 +306,10 @@ records:
   Wanted: "An alarm when the met mast's Hub-Height Wind Speed 10m holds one value for hours (a stuck or iced anemometer), which a threshold cannot see: still air and a stuck sensor read alike."
   Needs: "A derived point such as the wind speed's rolling range over the last few hours, which is the same mechanism as the performance ratio (calculated points, goal 41). The data-gap alarm cannot do it: the rows keep arriving."
 - key: alarm_mail_task
-  installed:
-    taskItemId:
-  app: Web
-  screen: tasks/manager
-  Task Manager: {Task: "Alarm Mail Service (Task 4, verified in Task_Tbl, EEMSuite.Tasks.EngineWorker, workflow \"Alarm Mail Notification\")", Schedule: "every 300 seconds (its MinIntervalSeconds)"}
-  note: "scheduled here so the 15 alarms above can actually mail; also listed among Stage 9 step 4's standard task schedules"
+  kind: system_task
+  installed: {}
+  Task: Alarm Mail Notification (BuiltInTaskCatalog ALARM_MAIL_NOTIFICATION; formerly "Alarm Mail Service")
+  note: "Nothing to enter. The task is SystemOnly and CanSchedule is the catalog default: the Task Library lists it read-only
+    and a customer cannot give it a schedule, so the recipe's earlier 'every 300 seconds' record cannot be entered.
+    The product runs it and mails the 15 alarms above (except the Disabled data-gap alarm and the Suspended WTG-07).
+    Stage 9 step 4 records it as a product-owned task."

@@ -19,6 +19,9 @@ notes:
   2026-11-07) bring 73 of them: Cedar Row C''s 50 water registers, the 4 irrigation registers, the generators'' 9
   (each a fuel register, and an Analog run-hours register with its own Analog usage point) and the switchgear''s 10
   (6 registers and 4 demand points), so 63 more Deltas.'
+- 'Added 2026-11-10: one register, on the removed Lakeshore Boathouse gas meter, carries a Delta Multiplier of 1.037 (every
+  other register keeps 1). The Delta box shows only for an Accumulator and is read by Point_Save for the usage point it
+  generates.'
 - 'A new Accumulator must be in an Energy or Volume unit or one with a rate unit (Point_Save; the point editor lists
   only those for a new register). A register in any other unit, like the generators'' run hours in Hour, is an
   Analog register with a separate Analog usage point instead.'
@@ -2983,3 +2986,16 @@ records:
   Meter: {Description: Central Plant Main Switchgear, Meter Number: SYN-SUB-E-CPSWGR}
   Point Definition: {Description: Power Factor at Max Demand, Reading Type: Analog, Measure Type: Electricity, Unit: Power Factor - (PF),
     Archive Interval: 1440, Index: ''}
+# Added 2026-11-10 (variety; enter this, nothing above changes): the one register with a Delta Multiplier other than 1.
+# The dial reads hundreds of cubic feet and the register's usage is therms, so the Delta Multiplier is the heating-value
+# factor (1,037 Btu per cubic foot is 1.037 therms per ccf). Delta Multiplier is the register's own field (the Delta box
+# on the Point Definitions page, visible for an Accumulator); it sits beside Point Definition because the Stage 2 workbook
+# and checks do not carry it, so type it by hand after the import.
+- key: ch_sgu_lakeshore_boathouse_gas_register
+  installed:
+    pointId:
+    deltaPointId:
+  Meter: {Description: Lakeshore Boathouse Gas, Meter Number: SYN-SGU-M-0050011}
+  Point Definition: {Description: Register Reading, Reading Type: Accumulator, Measure Type: Natural Gas, Unit: Therm - (Therm),
+    Archive Interval: 1440, Index: ''}
+  Delta Multiplier: 1.037  # assumed

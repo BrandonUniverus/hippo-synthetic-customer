@@ -41,18 +41,18 @@ records:
 - key: open_accrual_fixture
   installed: {}
   Fixture: open_accrual
-  Account: SYN-VED-A-0010001 (Admin Hall)
-  Action: enter a manual bill in Bill Entry for the current, not-yet-billed period, with one Bill Item on the
-    Accruals commodity and no linked reversal.
+  Account: SYN-SGU-A-0020001 (Admin Hall gas, Sierra Gas Utility, a Bill Entry account; the earlier choice, Admin Hall's Valley Electric account SYN-VED-A-0010001, is a Bill Importer account that Bill Entry cannot open)
+  Action: enter a manual bill in Bill Entry for the first period after the series, 2026-01-15 to 2026-02-14 (fiscal 2026-02), Bill Type Accrual, with one Bill Item on the Accruals commodity and no linked reversal.
+  Header: {Bill Type: Accrual, Issue Date: 2026-02-16, Due Date: 2026-03-18, Invoice Number: SYN-SGU-sgu_admin_hall-202602-ACR}  # Invoice Number # assumed
   Bill Items:
-  - {Description: accrual_estimate, Commodity: Accruals, Amount: 3400.00}  # assumed - estimated cost of the
-      # period's usage before the real Valley Electric bill arrives
-  Expected: this bill appears in rp_OpenAccruals with @Reverse=0; it has no Accrual_Bill row.
+  - {Description: accrual_estimate, Commodity: Accruals, Amount: 3400.00}  # assumed - estimated cost of the period's gas before the real Sierra Gas bill arrives
+  Expected: 'this bill appears in rp_OpenAccruals with @Reverse=0 (the proc finds accruals by the Accruals commodity); validation test 99 (Company NLU, 01-bill-validation-rules.yaml) reports it, because it is a Bill Type 2 bill with no BillAccrualMap row, and so reports on the other bills of that account too; the AP and GL approval builders leave it out (Bill Type is not 0); it has no Accrual_Bill row.'
+  Note: 'Bill Type Accrual is the engine''s marker of an accrual (BillValidation_CalcUnmappedAccruals.sql reads BillType = 2; BillAccrualMap pairs an accrual bill with its reversal). The Accruals commodity is what rp_OpenAccruals reads. The older text set only the commodity, so the validation test never saw an accrual.'
 - key: trued_up_reversal_status
   installed: {}
   Status: BLOCKED, two ways (product-gap-backlog.md item 4) - no UI or API calls rp_OpenAccruals with
     @Reverse=1, and the proc itself cannot run against this instance regardless (it deletes from dbo.Accrual_Bill
     unconditionally, and that table does not exist in EEMSuite_Northlake - see the note above). Once the real
-    Valley Electric bill for Admin Hall's period arrives, the open accrual above cannot be paired with an
+    Sierra Gas bill for Admin Hall's gas period arrives, the open accrual above cannot be paired with an
     automatically-created reversal through any screen; the Accrual_Bill/BillAccrualMap pair and the Reversals
     commodity line stay unentered until both the missing table and the missing caller are addressed.

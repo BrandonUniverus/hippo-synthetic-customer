@@ -67,6 +67,9 @@ notes:
   Open row folds it in, as saving any status removes a later row of the same status. Without the backdated row,
   tests 41 and 42 would flag the meter''s 2024-2025 bills. Enter a sample on the Status page; the Stage 2 import
   sets every meter''s rows.'
+- 'Added 2026-11-10 (variety): SYN-SGU-M-0050011, the Lakeshore Boathouse gas meter, with a Status history of Open then
+  Removed (Removed is in the SM list above). It has one register point in 04-points.yaml with a Delta other than 1. It is
+  the account''s only meter; Stage 4 owns rate assignments and this file gives it none.'
 records:
 - key: ved_admin_hall_main
   installed:
@@ -3597,3 +3600,18 @@ records:
   Status:
   - {Status: Open, As of Date: 2024-01-01}
   Notes: Reference weather station for the Ridgeline Wind Site; wind is reported in knots.
+# Added 2026-11-10 (variety; enter this, nothing above changes): the one meter that was taken out of service. Its status
+# history is Open then Removed; the Lakeshore Boathouse closed on 2025-06-30 (02-sites-and-buildings.yaml).
+- key: sgu_lakeshore_boathouse_gas
+  installed:
+    meterId:
+  Building: Lakeshore Boathouse
+  Meter Definition: {Description: Lakeshore Boathouse Gas, Measure Type: Natural Gas, Meter Number: SYN-SGU-M-0050011,
+    Provider Meter Number: SGU-SET-0050011, Meter Multiplier: '', Billing Account: SYN-SGU-A-0020011,
+    Utility Provider: Sierra Gas Utility, Bill Cycle: 1}
+  Keywords:
+  - {Type: Meter Type, Attribute: Utility Meter}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+  - {Status: Removed, As of Date: 2025-07-15}
+  Notes: Space-heating gas for the boathouse. Sierra Gas removed the meter on 2025-07-15 after the building closed.

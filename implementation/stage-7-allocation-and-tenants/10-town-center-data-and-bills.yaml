@@ -1,0 +1,537 @@
+# Stage 7, step 10: the smallest data set that gives every Town Center allocation, generation, WUI and reconciliation
+# case a known value. Everything is constant, so every number is a product of two others and was checked by a
+# script (every sum below adds to its parent). Read this file with 04 (the configs), 05 (WUI), 06 (rates and
+# generation) and 07 (runs). Nothing in it is a screen to type into except the master bills (Bill Entry Web); the
+# interval values come from Stage 3 (see tc_interval_data).
+stage: 7
+step: 10
+title: Town Center data, master bills and expected values
+app: Web SPA (Bill Entry); Stage 3 (interval data)
+screen: '#/BillEntry; Stage 3 gateway'
+source:
+- 04-bill-allocation-configs.yaml
+- 05-wui-point-families.yaml
+- 06-tenant-bill-generation.yaml
+- 09-town-center-tenant-rates.yaml
+notes:
+- 'Why this file exists. Town Center had no interval data, no bills and no source file, so no allocation, generation, WUI or reconciliation
+  case had a value to compare with. This file is that source: the loads of the points, the master bills to key, and the allocated amounts
+  each case must produce. The tables are scripted: each tenant row is the engine''s own arithmetic (read in BillAlloc_ProcessAllocatedItems
+  and BillAlloc_ProcessOverhead), every column adds to the master and the overhead to 2% of it.'
+- 'Order: file 01 and 02 (company, hierarchy), 09 (rates), Stage 3 supplies the interval data, then the master bills here, then 03 to
+  08.'
+records:
+- key: tc_interval_data
+  What: 'Hourly values for 22 of file 02''s points. Each point holds one constant value for every hour from 2024-01-01 00:00 to 2026-02-01
+    00:00 (interval-end stamps, as Stage 3 stores them: a month is the stamps after 00:00 on the 1st up to and including 00:00 on the
+    next 1st, the engine''s cut, UtilityRates_LoadData). The three proof months are the Januaries of 2024, 2025 and 2026, 744 hours
+    each, so every monthly total is the hourly value times 744. A kW point holds the demand in kW for each hour; a kWh point the energy
+    of that hour.'
+  Points:
+  - Point: Mall-Main kWh 60m
+    Meter: Mall-Main
+    Hourly value: 250
+    Unit: kWh
+    January total (kWh) / maximum (kW): 186000
+    Used for: WUI master (file 05); master for method 1 and 4 bills
+  - Point: Anchor Store kWh 60m
+    Meter: Anchor Store
+    Hourly value: 120
+    Unit: kWh
+    January total (kWh) / maximum (kW): 89280
+    Used for: priced by TC-STEP-DEMAND (reconciliation, file 07)
+  - Point: Anchor Store kW 60m
+    Meter: Anchor Store
+    Hourly value: 120
+    Unit: kW
+    January total (kWh) / maximum (kW): 120
+    Used for: the demand TC-STEP-DEMAND reads
+  - Point: Food Court kWh 60m
+    Meter: Food Court
+    Hourly value: 60
+    Unit: kWh
+    January total (kWh) / maximum (kW): 44640
+    Used for: priced by TC-FLAT-GS, Manual
+  - Point: In-line Shop 1 kWh 60m
+    Meter: In-line Shop 1
+    Hourly value: 8
+    Unit: kWh
+    January total (kWh) / maximum (kW): 5952
+    Used for: priced by TC-FLAT-GS, Auto
+  - Point: In-line Shop 2 kWh 60m
+    Meter: In-line Shop 2
+    Hourly value: 6
+    Unit: kWh
+    January total (kWh) / maximum (kW): 4464
+    Used for: priced by TC-FLAT-GS, Auto w/ Auto Regen
+  - Point: Tower-Main kWh 60m
+    Meter: Tower-Main
+    Hourly value: 400
+    Unit: kWh
+    January total (kWh) / maximum (kW): 297600
+    Used for: WUI master (file 05); master for methods 2 and 3
+  - Point: Floor 1 Submeter kWh 60m
+    Meter: Floor 1
+    Hourly value: 90
+    Unit: kWh
+    January total (kWh) / maximum (kW): 66960
+    Used for: Measured Use child (file 05); method 2 and 3 driver
+  - Point: Floor 2 Submeter kWh 60m
+    Meter: Floor 2
+    Hourly value: 80
+    Unit: kWh
+    January total (kWh) / maximum (kW): 59520
+    Used for: method 2 and 3 driver
+  - Point: Floor 3 Submeter kWh 60m
+    Meter: Floor 3
+    Hourly value: 70
+    Unit: kWh
+    January total (kWh) / maximum (kW): 52080
+    Used for: method 2 and 3 driver
+  - Point: Floor 4 Submeter kWh 60m
+    Meter: Floor 4
+    Hourly value: 60
+    Unit: kWh
+    January total (kWh) / maximum (kW): 44640
+    Used for: method 2 driver; values end 2024-12-31 (the submeter is pulled)
+  - Point: Annex-Main kWh 60m
+    Meter: Annex-Main
+    Hourly value: 300
+    Unit: kWh
+    January total (kWh) / maximum (kW): 223200
+    Used for: method 5 master
+  - Point: Annex-Main kW 60m
+    Meter: Annex-Main
+    Hourly value: 260
+    Unit: kW
+    January total (kWh) / maximum (kW): 260
+    Used for: method 5 master demand
+  - Point: Bldg A Submeter kWh 60m
+    Meter: Bldg A
+    Hourly value: 100
+    Unit: kWh
+    January total (kWh) / maximum (kW): 74400
+    Used for: method 5 driver
+  - Point: Bldg A Submeter kW 60m
+    Meter: Bldg A
+    Hourly value: 100
+    Unit: kW
+    January total (kWh) / maximum (kW): 100
+    Used for: method 5 driver
+  - Point: Bldg B Submeter kWh 60m
+    Meter: Bldg B
+    Hourly value: 80
+    Unit: kWh
+    January total (kWh) / maximum (kW): 59520
+    Used for: method 5 driver
+  - Point: Bldg B Submeter kW 60m
+    Meter: Bldg B
+    Hourly value: 80
+    Unit: kW
+    January total (kWh) / maximum (kW): 80
+    Used for: method 5 driver
+  - Point: Bldg C Submeter kWh 60m
+    Meter: Bldg C
+    Hourly value: 70
+    Unit: kWh
+    January total (kWh) / maximum (kW): 52080
+    Used for: method 5 driver
+  - Point: Bldg C Submeter kW 60m
+    Meter: Bldg C
+    Hourly value: 70
+    Unit: kW
+    January total (kWh) / maximum (kW): 70
+    Used for: method 5 driver
+  - Point: Substation-Master kWh 60m
+    Meter: Substation-Master
+    Hourly value: 500
+    Unit: kWh
+    January total (kWh) / maximum (kW): 372000
+    Used for: method 7 master
+  - Point: Substation 1 Submeter kWh 60m
+    Meter: Substation 1
+    Hourly value: 300
+    Unit: kWh
+    January total (kWh) / maximum (kW): 223200
+    Used for: method 7 driver
+  - Point: Substation 2 Submeter kWh 60m
+    Meter: Substation 2
+    Hourly value: 190
+    Unit: kWh
+    January total (kWh) / maximum (kW): 141360
+    Used for: method 7 driver
+  Exception: 'Floor 4 Submeter kWh 60m: no values after 2024-12-31 24:00 (the 2025-01 proof month has none; method 3 reads three floors
+    and a remainder).'
+  Needed from Stage 3 (outside this stage): 'Stage 3 has no Town Center node: a FIG file gateway node (as gw_fig_fixed_network_submeters
+    carries the Cedar Row submeters) with these 22 points, or any other Stage 3 path that loads hourly values, plus a task schedule,
+    and the 22 constants above. The file is 22 points x 18,000 hours (2024-01-01 to 2026-02-01). Without it no tenant bill generates,
+    the WUI run has nothing to allocate and the reconciliation has nothing to calculate; the master-bill allocation of method 1 and
+    6 does not need it.'
+  Not loaded: The four Estimated kWh points (Shop 3, Shop 4, Common Area, Landlord/House) get no imported data; Weighted Use Index writes
+    them (file 05).
+- key: tc_master_bills
+  Where: 'Web SPA #/BillEntry > Add Bill > Editor/Details, as Stage 5 step 3 does for manual accounts; the four master accounts are
+    Bill Entry accounts (file 02). Entered by a TC Bill Entry user (tc_bill_entry), before Run Now on Process Bill Allocation (file
+    07).'
+  Bills:
+  - key: bill_mall_main_2024_01
+    installed:
+      billId: null
+    Account: SYN-VED-A-3005001 (Mall-Main)
+    Invoice Number: TC-MM-2024-01
+    Invoice Date: 2024-02-05
+    Due Date: 2024-02-26
+    Period:
+      From: 2024-01-01
+      To: 2024-01-31
+    Posts To: 2024-01
+    Bill Items:
+    - Meter: Mall-Main
+      Commodity: Non-TOU kWh
+      Quantity: 186000
+      Unit: kWh
+      Amount: 24000.0
+    - Meter: Mall-Main
+      Commodity: Non-TOU kW Billed
+      Quantity: 450
+      Unit: kW
+      Amount: 6000.0
+    Total: 30000.0
+  - key: bill_mall_main_2025_01
+    installed:
+      billId: null
+    Account: SYN-VED-A-3005001 (Mall-Main)
+    Invoice Number: TC-MM-2025-01
+    Invoice Date: 2025-02-05
+    Due Date: 2025-02-26
+    Period:
+      From: 2025-01-01
+      To: 2025-01-31
+    Posts To: 2025-01
+    Bill Items:
+    - Meter: Mall-Main
+      Commodity: Non-TOU kWh
+      Quantity: 186000
+      Unit: kWh
+      Amount: 24000.0
+    - Meter: Mall-Main
+      Commodity: Non-TOU kW Billed
+      Quantity: 450
+      Unit: kW
+      Amount: 6000.0
+    Total: 30000.0
+  - key: bill_mall_main_2026_01
+    installed:
+      billId: null
+    Account: SYN-VED-A-3005001 (Mall-Main)
+    Invoice Number: TC-MM-2026-01
+    Invoice Date: 2026-02-05
+    Due Date: 2026-02-26
+    Period:
+      From: 2026-01-01
+      To: 2026-01-31
+    Posts To: 2026-01
+    Bill Items:
+    - Meter: Mall-Main
+      Commodity: Non-TOU kWh
+      Quantity: 186000
+      Unit: kWh
+      Amount: 24000.0
+    - Meter: Mall-Main
+      Commodity: Non-TOU kW Billed
+      Quantity: 450
+      Unit: kW
+      Amount: 6000.0
+    Total: 30000.0
+  - key: bill_tower_main_2024_01
+    installed:
+      billId: null
+    Account: SYN-VED-A-3006001 (Tower-Main)
+    Invoice Number: TC-TM-2024-01
+    Invoice Date: 2024-02-05
+    Due Date: 2024-02-26
+    Period:
+      From: 2024-01-01
+      To: 2024-01-31
+    Posts To: 2024-01
+    Bill Items:
+    - Meter: Tower-Main
+      Commodity: Non-TOU kWh
+      Quantity: 297600
+      Unit: kWh
+      Amount: 35712.0
+    Total: 35712.0
+  - key: bill_tower_main_2025_01
+    installed:
+      billId: null
+    Account: SYN-VED-A-3006001 (Tower-Main)
+    Invoice Number: TC-TM-2025-01
+    Invoice Date: 2025-02-05
+    Due Date: 2025-02-26
+    Period:
+      From: 2025-01-01
+      To: 2025-01-31
+    Posts To: 2025-01
+    Bill Items:
+    - Meter: Tower-Main
+      Commodity: Non-TOU kWh
+      Quantity: 297600
+      Unit: kWh
+      Amount: 35712.0
+    Total: 35712.0
+  - key: bill_annex_main_2024_01
+    installed:
+      billId: null
+    Account: SYN-VED-A-3007001 (Annex-Main)
+    Invoice Number: TC-AM-2024-01
+    Invoice Date: 2024-02-05
+    Due Date: 2024-02-26
+    Period:
+      From: 2024-01-01
+      To: 2024-01-31
+    Posts To: 2024-01
+    Bill Items:
+    - Meter: Annex-Main
+      Commodity: Non-TOU kWh
+      Quantity: 223200
+      Unit: kWh
+      Amount: 26784.0
+    Total: 26784.0
+  - key: bill_substation_master_2024_01
+    installed:
+      billId: null
+    Account: SYN-VED-A-3008001 (Substation-Master)
+    Invoice Number: TC-SM-2024-01
+    Invoice Date: 2024-02-05
+    Due Date: 2024-02-26
+    Period:
+      From: 2024-01-01
+      To: 2024-01-31
+    Posts To: 2024-01
+    Bill Items:
+    - Meter: Substation-Master
+      Commodity: Non-TOU kWh
+      Quantity: 372000
+      Unit: kWh
+      Amount: 44640.0
+    Total: 44640.0
+  notes: 'Seven bills, one line per commodity, each line carrying its meter (Bill Items have a Meter column; the allocation reads the
+    line''s meter, BillAlloc_ProcessBills requires a bill item whose meter is the config''s master). The amounts are round figures (#
+    assumed): kWh x 0.12 for the Tower, Annex and Substation lines, and 24,000.00 + 6,000.00 for Mall-Main (the unit prices are not
+    tied to a tariff because nothing rates these meters). Bill Entry takes the period dates as typed; the months are calendar months,
+    which is the Town Center fiscal period (file 01). 2026-01 is the month of file 06''s generation and carries the same Mall-Main bill
+    so Building Areas (method 4, FY2026 periods 1 to 6) has a bill to refuse.'
+- key: expected_method_1
+  Master bill: bill_mall_main_2024_01 and bill_mall_main_2025_01, 30,000.00 each (24,000.00 energy + 6,000.00 demand)
+  ? '2024-01 (config tc_market_main_method1_separate, Combine Overhead off: the overhead is its own line, commodity Electricity Overhead)'
+  : - Tenant: Anchor Store
+      Energy line: 1600.0
+      Demand line: 400.0
+      Allocated (no overhead): 2000.0
+      Overhead 2%: 40.0
+      Tenant bill: 2040.0
+    - Tenant: Food Court
+      Energy line: 3360.0
+      Demand line: 840.0
+      Allocated (no overhead): 4200.0
+      Overhead 2%: 84.0
+      Tenant bill: 4284.0
+    - Tenant: In-line Shop 1
+      Energy line: 1792.0
+      Demand line: 448.0
+      Allocated (no overhead): 2240.0
+      Overhead 2%: 44.8
+      Tenant bill: 2284.8
+    - Tenant: In-line Shop 2
+      Energy line: 1792.0
+      Demand line: 448.0
+      Allocated (no overhead): 2240.0
+      Overhead 2%: 44.8
+      Tenant bill: 2284.8
+    - Tenant: In-line Shop 3
+      Energy line: 1792.0
+      Demand line: 448.0
+      Allocated (no overhead): 2240.0
+      Overhead 2%: 44.8
+      Tenant bill: 2284.8
+    - Tenant: In-line Shop 4
+      Energy line: 1792.0
+      Demand line: 448.0
+      Allocated (no overhead): 2240.0
+      Overhead 2%: 44.8
+      Tenant bill: 2284.8
+    - Tenant: Common Area
+      Energy line: 11872.0
+      Demand line: 2968.0
+      Allocated (no overhead): 14840.0
+      Overhead 2%: 296.8
+      Tenant bill: 15136.8
+  ? '2025-01 (config tc_market_main_method1_combined, Combine Overhead on: the overhead is inside the energy and demand lines; the tenant
+    bill totals are the same)'
+  : - Tenant: Anchor Store
+      Energy line: 1600.0
+      Demand line: 400.0
+      Allocated (no overhead): 2000.0
+      Overhead 2%: 40.0
+      Tenant bill: 2040.0
+    - Tenant: Food Court
+      Energy line: 3360.0
+      Demand line: 840.0
+      Allocated (no overhead): 4200.0
+      Overhead 2%: 84.0
+      Tenant bill: 4284.0
+    - Tenant: In-line Shop 1
+      Energy line: 1792.0
+      Demand line: 448.0
+      Allocated (no overhead): 2240.0
+      Overhead 2%: 44.8
+      Tenant bill: 2284.8
+    - Tenant: In-line Shop 2
+      Energy line: 1792.0
+      Demand line: 448.0
+      Allocated (no overhead): 2240.0
+      Overhead 2%: 44.8
+      Tenant bill: 2284.8
+    - Tenant: In-line Shop 3
+      Energy line: 1792.0
+      Demand line: 448.0
+      Allocated (no overhead): 2240.0
+      Overhead 2%: 44.8
+      Tenant bill: 2284.8
+    - Tenant: In-line Shop 4
+      Energy line: 1792.0
+      Demand line: 448.0
+      Allocated (no overhead): 2240.0
+      Overhead 2%: 44.8
+      Tenant bill: 2284.8
+    - Tenant: Common Area
+      Energy line: 11872.0
+      Demand line: 2968.0
+      Allocated (no overhead): 14840.0
+      Overhead 2%: 296.8
+      Tenant bill: 15136.8
+  Totals each period:
+    Allocated (no overhead): 30000.0
+    Overhead: 600.0
+    Tenant bills: 30600.0
+    Energy kWh allocated: 186000
+    Energy kWh by tenant:
+      Anchor Store: 12400
+      Food Court: 26040
+      In-line Shop 1..4 each: 13888
+      Common Area: 92008
+  How it splits: 'BillAlloc_ProcessAllocatedItems, per master line: the fixed row first, Anchor Store 2,000.00 spread over the lines
+    in proportion to each (1,600.00 of the energy line, 400.00 of the demand line); then each percent row takes its percent of what
+    is left after the fixed amount (28,000.00: 22,400.00 energy and 5,600.00 demand), so Food Court 15% is 3,360.00 + 840.00. Overhead
+    is 2% of each tenant line, rounded to the cent, added on top (BillAlloc_ProcessOverhead). Each of the seven tenants gets one allocated
+    bill on its own account.'
+- key: expected_method_6
+  Property Total bills:
+    2024-01: 30600.0
+    2025-01: 30600.0
+    2026-01: 1548.24
+  Why: 'BillAgg_ProcessBills adds, at Allocation % 100, every bill item on the 17 feeder meters in the period. For 2024-01 and 2025-01
+    only the seven Mall-Main tenants have bills (method 1), and their tenant bills total 30,600.00. For 2026-01 the feeders'' bills
+    are the generated ones (file 06): In-line Shop 1 878.28 and In-line Shop 2 669.96 (Auto and Auto w/ Auto Regen; Food Court is Manual,
+    Anchor Store Off), 1,548.24 in all. The method 6 config is open-ended, so the aggregate is written for every period that has a feeder
+    bill.'
+- key: expected_wui
+  Run: Process Meter Allocations for 2024-01 (file 07). Allocated use = (master use - measured children) x child estimate / sum of estimates,
+    estimate = index x floor area x days in the period (WUIPtAllocationTest.sql, WUIPtAllocMasterFamilyProcess.sql). 31 days in January.
+  Mall-Main family (master Mall-Main kWh 60m, 186,000 kWh in 2024-01; no measured child):
+  - Child: In-line Shop 3 Estimated kWh
+    Index (kWh per SqFt per day): 0.4
+    Area SqFt: 2600
+    Estimate kWh: 32240.0
+    Allocated kWh: 26318.37
+  - Child: In-line Shop 4 Estimated kWh
+    Index (kWh per SqFt per day): 0.5
+    Area SqFt: 2000
+    Estimate kWh: 31000.0
+    Allocated kWh: 25306.12
+  - Child: Common Area Estimated kWh
+    Index (kWh per SqFt per day): 0.15
+    Area SqFt: 35400
+    Estimate kWh: 164610.0
+    Allocated kWh: 134375.51
+  Mall-Main family total:
+    Sum of estimates: 227850.0
+    Sum of allocated kWh: 186000.0
+    Note: 'the three children take all of the master''s use: Anchor Store, Food Court and Shops 1 and 2 are not children of this family
+      (they carry measured data)'
+  Tower-Main family (master Tower-Main kWh 60m, 297,600 kWh; measured child Floor 1 66,960 kWh):
+    Child: Landlord/House Estimated kWh
+    Index: 0.9
+    Area SqFt: 8000
+    Allocated kWh: 230640
+    Note: the only Weighted Use Index child takes the whole remainder, 297,600 - 66,960 = 230,640 kWh, whatever its index (# assumed
+      0.90)
+- key: reference_methods_not_computed_today
+  Status: NOT EXPECTED TODAY. Methods 2, 3, 4, 5 and 7 have no calculator in the product (file 04 notes; ADR-015), so these master bills
+    get no allocated bill and checks.sql asserts exactly that. The amounts below are what a plain reading of each method would allocate,
+    kept so the day a calculator ships there is an expectation to compare it with. Method 5 has no formula to apply.
+  Method 2 (Tower-Main 2024-01, 35,712.00, four floors by their own kWh):
+    Floor 1: 10713.6
+    Floor 2: 9523.2
+    Floor 3: 8332.8
+    Floor 4: 7142.4
+  Method 3 (Tower-Main 2025-01, 35,712.00, three floors by kWh of the master's 297,600; Landlord/House the remainder):
+    Floor 1: 8035.2
+    Floor 2: 7142.4
+    Floor 3: 6249.6
+    Landlord/House: 14284.8
+  ? Method 4 (Mall-Main 2026-01, 30,000.00, four shops by floor area 2200/1800/2600/2000 of 8600; last shop takes the cent remainder)
+  : In-line Shop 1: 7674.42
+    In-line Shop 2: 6279.07
+    In-line Shop 3: 9069.77
+    In-line Shop 4: 6976.74
+  Method 5 (Annex-Main 2024-01, 26,784.00):
+    drivers: kWh 100/80/70 an hour and kW 100/80/70 for Bldg A/B/C, master 300 kWh and 260 kW an hour
+    amounts: 'none: the coincident-demand weighting is not defined'
+  ? Method 7 (Substation-Master 2024-01, 44,640.00, two substations by usage share 300/490 and 190/490; 10 kWh an hour of loss left
+    out)
+  : Substation 1: 27330.61
+    Substation 2: 17309.39
+- key: expected_reconciliation
+  Meter: Anchor Store, rate TC-STEP-DEMAND with Bill checked (file 06), schedule BL on the Bill Meter Reconciliation scenario (created
+    by the checkbox, file 07)
+  Report: Web Bill Reconciliation (rp_BillReconciliation), Fiscal Year 2024 / Fiscal Period 1, then 2025 / 1; Billed is the allocated
+    bill on Anchor Store's account, Calculated is TC-STEP-DEMAND priced on Anchor Store's interval points for the bill's dates
+  Rows:
+  - Period: 2024-01
+    Billed: 2040.0
+    Calculated: 15000.0
+    Variance (Billed - Calculated): -12960.0
+  - Period: 2025-01
+    Billed: 2040.0
+    Calculated: 15000.0
+    Variance (Billed - Calculated): -12960.0
+  Why this fixture: The report compares a real bill with a calculation of the same meter's interval data under a rate. Anchor Store
+    is billed a negotiated 2,000.00 fixed amount plus 2% overhead, while its own metered load priced at the stepped tariff is 15,000.00
+    (capped), so the variance is a known -12,960.00 in both months. The calculation is the Anchor rate under both scenarios because
+    the desktop copies the rate when Bill is checked; the variance comes from the actual bill, not from a second rate.
+- key: expected_generation_2026_01
+  Run: Run Bill Gen (Task_Tbl 42) Run Now after file 06 is saved and Stage 3's January 2026 data is in; Generated Bills (#/reporting/GeneratedBills),
+    Northlake Town Center, Actual, 2026-01
+  Rows:
+  - Tenant: Anchor Store
+    Generation: 'Off'
+    Expected: no bill
+    Would be: 15000.0
+  - Tenant: Food Court
+    Generation: Manual
+    Expected: no bill until Create is pressed on Generated Bills; then
+    Bill: 6294.6
+    kWh: 44640
+  - Tenant: In-line Shop 1
+    Generation: Auto
+    Expected: one bill
+    Bill: 878.28
+    kWh: 5952
+  - Tenant: In-line Shop 2
+    Generation: Auto w/ Auto Regen
+    Expected: one bill
+    Bill: 669.96
+    kWh: 4464
+  Each generated bill: 'two lines: the customer charge 45.00 (Elec Misc Chgs/Credits, quantity 0) and the energy line (Non-TOU kWh)
+    with the kWh and the amount.'

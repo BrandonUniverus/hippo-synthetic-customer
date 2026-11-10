@@ -40,9 +40,9 @@ IF NOT EXISTS(SELECT 1 FROM #Profiles)
     THROW 51000, 'No direct-binding profile matches @ProfileKey. Handheld routes use Step 5.', 1;
 INSERT #Issues SELECT Name, N'Gateway name/type must resolve exactly once.' FROM #Profiles WHERE Matches<>1;
 
-SELECT j.Profile, j.[Key], j.Name, j.Params, p.GatewayID, ids.Matches, ids.GwNodeID
+SELECT j.Profile, j.[Key], j.Name, j.Params, j.LateIntervals, j.DataGaps, p.GatewayID, ids.Matches, ids.GwNodeID
 INTO #Nodes
-FROM OPENJSON(@Expected, '$.Nodes') WITH (Profile nvarchar(128), [Key] nvarchar(128), Name nvarchar(255), Params nvarchar(max) AS JSON) j
+FROM OPENJSON(@Expected, '$.Nodes') WITH (Profile nvarchar(128), [Key] nvarchar(128), Name nvarchar(255), Params nvarchar(max) AS JSON, LateIntervals bit, DataGaps bit) j
 JOIN #Profiles p ON p.[Key]=j.Profile
 OUTER APPLY (SELECT COUNT(*) Matches, MIN(n.GwNodeID) GwNodeID FROM dbo.GwNodes n
              WHERE n.PtGatewayID=p.GatewayID AND n.Description=j.Name) ids;
@@ -58,7 +58,8 @@ AND (SELECT COUNT(*) FROM dbo.GWVendor v JOIN dbo.GWVendorParam p ON p.GwVendorI
        AND p.GWParamType=CASE j.[Type] WHEN N'Integer' THEN 3 WHEN N'Decimal' THEN 5 WHEN N'Boolean' THEN 11 WHEN N'String' THEN 30 END)<>1;
 
 -- Only explicitly required node values are checked. FIG's unread editor defaults
--- are immaterial; scheduling flags must still remain disabled for every node.
+-- are immaterial. The late-interval and data-gap flags must match the recipe, and a node has a Next Batch
+-- Method only when its late-interval scan is on (the scan needs one).
 INSERT #Issues
 SELECT CONCAT(n.Name,N' / Node Parameter ',CONVERT(int,e.[key])+1), N'Required node value differs from the recipe.'
 FROM #Nodes n JOIN dbo.GwNodes live ON live.GwNodeID=n.GwNodeID
@@ -69,9 +70,13 @@ CROSS APPLY (VALUES (0,live.GwNodeParam1),(1,live.GwNodeParam2),(2,live.GwNodePa
 WHERE a.Pos=CONVERT(int,e.[key]) AND e.[type]<>0
   AND (ISNULL(a.Value,N'') COLLATE Latin1_General_100_BIN2<>e.Value COLLATE Latin1_General_100_BIN2 OR DATALENGTH(ISNULL(a.Value,N''))<>DATALENGTH(e.Value));
 INSERT #Issues
-SELECT n.Name,N'Node scheduling must remain Disabled, with late intervals and data gaps off.'
+SELECT n.Name,N'Enable Late Intervals or Enable Data Gaps differs from the recipe.'
 FROM #Nodes n JOIN dbo.GwNodes live ON live.GwNodeID=n.GwNodeID
-WHERE ISNULL(live.NextBatchMethodID,0)<>0 OR ISNULL(live.EnableLateIntervals,0)<>0 OR ISNULL(live.EnableDataGaps,0)<>0;
+WHERE ISNULL(live.EnableLateIntervals,0)<>ISNULL(n.LateIntervals,0) OR ISNULL(live.EnableDataGaps,0)<>ISNULL(n.DataGaps,0);
+INSERT #Issues
+SELECT n.Name,N'Next Batch Method must be Disabled unless Enable Late Intervals is on, and set when it is.'
+FROM #Nodes n JOIN dbo.GwNodes live ON live.GwNodeID=n.GwNodeID
+WHERE (ISNULL(n.LateIntervals,0)=0 AND ISNULL(live.NextBatchMethodID,0)<>0) OR (n.LateIntervals=1 AND ISNULL(live.NextBatchMethodID,0)=0);
 
 SELECT j.* INTO #Bindings
 FROM OPENJSON(@Expected, '$.Points') WITH (

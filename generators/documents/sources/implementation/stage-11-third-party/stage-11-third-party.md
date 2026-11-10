@@ -1,10 +1,16 @@
 ---
 title: Stage 11. Third-party integrations
 subtitle: Identity, provisioning, message broker, mail, ENERGY STAR, EnergyAI, the public API
-status: Research only; no editor files yet
+status: Research only; no recipe files, no checks and nothing to enter yet
 ---
 
 # Stage 11. Third-party integrations
+
+> **Status: research only. Nothing in this stage can be entered yet.** There are no YAML files, no `checks.sql` and
+> no build to follow: the folder holds this chapter and ADR-002c (the Stage 3 source-bundle research). The eight files
+> the proposal at the end names (`01-services-bundle.yaml` to `08-acceptance.yaml`) do not exist, and no integration
+> is built, configured or checked. Stages 1 to 10 and Stage 12 do not depend on it; the Stage 10 backup is complete
+> without it, and what it cannot carry is exactly what this chapter lists. Read it to decide the stage, not to enter it.
 
 Stage 10 ends with a database that is complete in itself: restore it anywhere
 and every report, rate, bill and allocation is there. Stage 11 is everything

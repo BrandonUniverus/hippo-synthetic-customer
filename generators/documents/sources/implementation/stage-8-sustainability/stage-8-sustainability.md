@@ -63,20 +63,40 @@ which is reported as avoided emissions, gets none either.
 **Where:** Web, Meter Emission Factor Assignment (`#/MeterEmissionFactorAssignment`).
 
 **Enter:** [02-meter-emission-assignments.yaml](02-meter-emission-assignments.yaml),
-34 meters across the three companies to assign, and the 10 Ridgeline turbine
-meters to exclude.
+34 meters across the three companies to assign, and 14 meters to exclude: the 10
+Ridgeline turbine meters, the three Helios PV arrays and the Ridgeline Farm
+Transfer Meter.
 
 **Order inside the screen:** pick a company node on the hierarchy tree and Show
 meters, choose the Emission Factor Source, Emission Factor Member and Emission
 Source Category once under Assignment defaults, then Assign each meter listed and
 Save. The Unassigned status shows what is left on that node. On the Thermal Plant
-node, Exclude Ridgeline WTG-01 to WTG-10 first and do not use Assign all
-(Ridgeline Wind, below).
+node, Exclude Ridgeline WTG-01 to WTG-10 and the Ridgeline Farm Transfer Meter first
+and do not use Assign all (Ridgeline Wind, below); Exclude the Science Center PV
+Array, the Student Center PV Array and the Cedar Row Solar Carport on their nodes.
+Exclude is one click per row; the screen has no bulk Exclude.
+
+**Auto-assignment, confirmed in the product.** Enabling a source in step 3 lets the
+warehouse job (`CreateDefaultEmissionMeterMap`) map every Meter of the company whose
+measure type and region match, at the company's default category, unless it is
+Excluded: no bill, billing account or submeter check. GHG History then adds only what is
+billed to a mapped meter. So the exclusions are the meters that carry billed kWh and
+must not count: generation (the Helios arrays' PPA bills, the Ridgeline statement).
+The 132 owned electric meters left to map themselves (124 Cedar Row apartments, 2 house
+meters, 6 others) have no billing account, so no bill and no quantity, and add nothing;
+they are not excluded (132 clicks for no change).
+
+**Expected totals once the warehouse job has run:** 166 meters mapped in the three
+companies (34 by hand and 132 automatic), 14 excluded and unmapped, no GHG row for an
+excluded meter, Central Plant Electric Service 2024-09 620,084.00 lb CO2 (1,512,400 kWh x
+410 lbs/MWh), Ridgeline Interconnection Meter 1,815.48 lb for 2024-08 and 18,533.40 lb
+for 2025-02.
 
 **Record:** nothing new; the assignment itself is the record.
 
-**Check:** `meter_emission_assignments`; for Ridgeline,
-`ridgeline_turbines_excluded` and `ridgeline_interconnection_assignment`.
+**Check:** `meter_emission_assignments`, `meter_exclusions`, `auto_assignment_totals` and
+`ghg_known_values`; for Ridgeline, `ridgeline_turbines_excluded` and
+`ridgeline_interconnection_assignment`.
 
 ## Step 3. GHG company configuration
 
@@ -94,7 +114,7 @@ a source matches.
 
 **Record:** nothing new.
 
-**Check:** `ghg_company_config`.
+**Check:** `ghg_company_config` (baseline years, default category and two enabled sources per company).
 
 ## Step 4. ENERGY STAR property setup, rating requests, Portfolio Manager connection
 
@@ -107,10 +127,24 @@ Task Manager (`#/tasks/manager`) for the sync task.
 [ENERGY STAR integration](energystar-integration.pdf) for the full property
 mapping this step is entering.
 
-**Order inside the screens:** confirm the 13 properties on Property Setup
-(Stage 2 already created the nodes; this maps each one to its ENERGY STAR
-primary use), then queue rating requests on New Rating Request for 2024-2025.
-Both screens are fully local and save without a Portfolio Manager account.
+**Order inside the screens:** open each of the 13 properties with Edit Property on
+Property Setup (Stage 2 already created the nodes) and fill the editor: Details
+(address, year built, occupancy percentage, Auto Update off), Property Uses (type,
+description, Primary, gross floor area and its effective date, then Edit Details for
+the use's own values: operating hours, workers, computers, enrollment, unit counts
+and so on) and Energy Data Sources (Include each building's utility bill meters, never
+the interval points beside them; the two PV arrays as Renewable, Electric on Site
+Solar). Save, then queue rating requests on New Rating Request for 2024-2025. Both
+screens are fully local and save without a Portfolio Manager account.
+
+**What the earlier step entered, and what this one adds.** Only Primary Use and Auto
+Update were entered; the year built, occupancy, floor areas, secondary uses, use
+details and meters were in the scenario file and were not carried, so Admin Hall's
+29% classroom wing could not evaluate and every request failed alike. The file now
+carries all of it for the 13 properties (31 meters included; the campus and the Cedar
+Row property are parents and carry none, and the Central Plant carries none on purpose
+so its 2025 request fails the meter check). The effective dates (2023-01-01) are
+assumed.
 
 **Scores are external:** ENERGY STAR 1-100 scores only arrive from the
 Portfolio Manager API, never by hand entry. Obtaining a sandbox account and
@@ -122,26 +156,42 @@ other property, including Admin Hall, gets metrics only.
 
 **Record:** nothing new.
 
-**Check:** `es_properties`, `es_rating_requests`, `es_scores_pending_external`.
+**Check:** `es_properties` (year built, occupancy, use, number of uses and meters per property), `es_requests` (20 requests, 0 scores).
 
 ## Step 5. Weather regression
 
-**Where:** Web, Custom views (WeatherNormalization_SetPeriod, then _Run, then
-_MeterDetails).
+**Where:** Web, the Weather Regression report (`rp_WeatherRegression`), with its
+popups WeatherNormalization_SetPeriod, _Run and _MeterDetails.
 
 **Enter:** [05-weather-regression.yaml](05-weather-regression.yaml), four
-points.
+meters.
 
-**Order inside the screens:** this is UI-then-run. Set the period and pick the
-point and its weather inputs (HDD, CDD, or both) on _SetPeriod, run it on
-_Run — this calls the same `FF_wn*` procs the Weather Normalization Sync task
-(Task 48) uses — and read the fitted coefficients and R²/CV-RMSE on
-_MeterDetails. Nothing is hand-entered; the numbers in the file are the
-expected shape of the result, not values to type.
+**What the screens are.** The report lists the company's meters with their weather
+station and latest fit (Adjusted R2, Data Count, Balance_CDD, Balance_HDD, the
+factors, the T tests and CVRMSE). A button in its notes band sets the baseline END
+(a popup with two inputs, Fiscal Year and Fiscal Period); each meter row has
+Normalize or Re-Normalize and Meter Details. There is no step that picks a point
+and no choice of weather inputs: the engine fits the heating and cooling balance
+points itself. The earlier text of this step described both and did not match.
+
+**What it regresses.** The meter's billed energy or volume (bill items of unit
+classes 3 and 7) per bill period, over the 12 fiscal periods ending at the baseline
+end, against the station's degree days. It does not read interval points, so the
+Student Center demand and the plant's hourly ton-hours cannot be inputs; the file
+uses three electric mains and one gas meter instead.
+
+**Order:** set the baseline end to Fiscal Year 2025, Fiscal Period 12; Normalize
+Science Center Electric Main, Student Center Electric Main, Lakeview Hall Electric Main
+and Admin Hall Gas; read each row. Expected: Year Ending 2025/12, Data Count 12, a
+cooling factor above 0 on the electric meters and a heating factor above 0 on the gas
+meter, Adjusted R2 at or above 0.5 (the ranges in the file are assumed: the
+synthetic bills were not generated from a known coefficient). Normalized bills need a
+bill scenario named Weather Normalized, which no Northlake company has, so none are
+produced.
 
 **Record:** nothing; the result is computed.
 
-**Check:** `weather_regression_results`.
+**Check:** `weather_regression`.
 
 ## Step 6. Benchmarks
 
@@ -152,7 +202,7 @@ per area — exactly the EUI, cost-intensity and GHG-intensity benchmarks this
 stage needs. Run those three reports over the campus and Cedar Row buildings
 once steps 1-5 are in; nothing is created here.
 
-**Check:** `benchmark_definitions_builtin`.
+**Check:** `benchmark_definitions_builtin` (9 system rows).
 
 ## Ridgeline Wind
 
@@ -202,8 +252,7 @@ and reports it beside the GHG screens:
   (step 5 records output against wind speed as a goal, finding 42).
 
 **Check:** `ridgeline_turbines_excluded`, `ridgeline_interconnection_assignment`,
-`ridgeline_generation_not_in_ghg_history`,
-`ridgeline_interconnection_energy_quantity`, `ridgeline_bct_credit_is_money`,
+`ghg_known_values`, `ridgeline_energy_quantities`,
 `ridgeline_avoided_emissions_basis`, `ridgeline_not_benchmarked_or_regressed`.
 
 ## Stage 8 is done when
@@ -211,20 +260,25 @@ and reports it beside the GHG screens:
 - eGRID's CAMX member and Non-electric commodities' gas factor each carry a
   2024 and a different 2025 value.
 - All 34 electric, gas and water meters across the three companies carry an
-  emission factor assignment, the 10 Ridgeline turbine meters are Excluded, and
-  each company's GHG configuration covers 2024-2025.
+  emission factor assignment, the 14 generation meters (ten turbines, three Helios
+  arrays, the Ridgeline Farm Transfer Meter) are Excluded, and each company's GHG
+  configuration covers 2024-2025. After the warehouse job 166 meters are mapped
+  and the CO2 rows of Central Plant Electric Service 2024-09 (620,084.00 lb) and the
+  Ridgeline Interconnection Meter (1,815.48 lb for 2024-08, 18,533.40 lb for 2025-02) are
+  as expected.
 - GHG History, GHG Variance and GHG Audit render computed emissions from that
   assignment, with Ridgeline in them as station service only, and Variance is
   non-zero between 2024 and 2025.
 - Ridgeline's avoided emissions are computed from the turbine meters' generated
   kWh at the grid factor of the year (420.11 t CO2e for July 2024), and Ridgeline
   is in no ENERGY STAR, benchmark or weather-regression result.
-- All 13 ENERGY STAR properties are mapped and their rating requests queued;
+- All 13 ENERGY STAR properties carry their year built, occupancy, uses with floor
+  areas and details and their energy meters, and their rating requests are queued;
   once a sandbox Portfolio Manager account is connected, Lakeview Residence
   Hall and Cedar Row Apartments show a quarterly 1-100 score and the rest show
   metrics only.
-- All four weather regressions have plausible R²/CV-RMSE, and the three
-  baseline shells from Stages 0/1 now show computed values.
+- The baseline end is 2025/12 and the four weather regressions show Data Count 12 and an
+  Adjusted R2 of at least 0.5 on the Weather Regression report.
 - BenchmarkRanking, MonthlyEUI and PerformanceSnapshot render a ranking across
   the campus and Cedar Row buildings using the built-in benchmarks.
 
@@ -232,6 +286,20 @@ Run `checks.sql` beside this chapter against the instance database to see each
 of these as a result set.
 
 ## Findings
+
+- **GHG auto-assignment maps every unexcluded California Electricity meter of a configured
+  company**, whatever it is (generation, submeter, tenant), at the company's default
+  category (`CreateDefaultEmissionMeterMap`). Only billed quantities reach GHG History, so
+  a generation meter with a bill must be Excluded; a meter with no bill is harmless. The
+  Exclude action is one click per row, with no bulk form.
+- **The weather regression reads billed quantities over 12 fiscal periods, not interval
+  points.** A demand or an hourly point cannot be regressed. The report's lower date
+  bound is `(FY-1)+FP`, a typo for `(FY-1)*100+FP`, so its Normalize gate counts every
+  bill up to the baseline.
+- **The ENERGY STAR editor needs far more than a primary use:** address, year built,
+  occupancy, uses with floor areas and details, and the included meters. Without them every
+  request is refused alike. Some use-detail labels (total units, bedrooms, the chilled-water
+  attribute) were not found in the seed and are marked in the file.
 
 - **ENERGY STAR scores are external.** `ESResponseFacility` only ever
   populates from the Portfolio Manager API via the EnergyStar sync task

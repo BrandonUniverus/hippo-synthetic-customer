@@ -4,89 +4,162 @@
 # "masterPointConfiguration.open") where children are added. This is point-level allocation (splitting a
 # MASTER POINT's use across child points, dbo.PtAllocationConfig), a different feature from Bill Allocation
 # (file 04, which splits a bill's dollar cost across meters) even though both live under Tenant Rebilling.
+# Unlike methods 2 to 7 of Bill Allocation, this one has a working engine: the expected values are in file 10.
 stage: 7
 step: 5
 title: WUI point families and fail-reason fixtures
 app: Web
-screen: "#/reporting/PointFamilyConfiguration -> Master Point Configuration modal"
+screen: '#/reporting/PointFamilyConfiguration -> Master Point Configuration modal'
 source:
 - generators/documents/sources/implementation/dream-customer/phase4-tenant-rebilling-spec.md
 - data/eem/northlake-town-center-v1.yaml
 notes:
-- 'Grid columns on the modal are Child Point Name, Start Date, End Date and Allocation Method (confirmed in
-  src/Web/EEMSuite.Web/frontend/src/scripts/hippo/views/viewMasterPointConfiguration.ts); dropdown options
-  come from api/TenantRebilling/GetPointAllocationMethods, i.e. dbo.PtAllocationMethod.'
-- 'PRODUCT FINDING: dbo.PtAllocationMethod on EEMSuite_Northlake has only 2 rows today (1 Weighted Use Index,
-  2 Measured Use); the reference EEMSuite database also carries a 3rd, Percentage Based, added 2019-08-14.
-  Install that row before this step or the method-3 fixture below (percentageBasedIgnored) cannot even be
-  selected to demonstrate that it is silently ignored.'
-- 'Neither the modal nor its GetPointAllocationConfigurations/ApplyPointAllocationConfigurationChanges API
-  calls carry an index value or a floor area field, and no C# source anywhere in the repo references
-  dbo.PtAllocationIndex (grep across src/Domain and src/Application returned nothing) even though
-  Database/EEMSuite/Procs/WUIPtAllocationIndex_Save.sql exists and is callable. If no current screen calls
-  that proc, index values have no UI entry path — a second PRODUCT FINDING, missed-screen not needs-feature
-  since the proc is present. Floor area is unaffected: it is the node''s own Area tab (file 02), independent
-  of WUI. Confirm this before entering; if a screen does set the index, use it and correct this note.'
-- 'Fixture points are new, dedicated to this exercise, added under a new WUI Fixture Meter under Market Hall
-  (file 02''s tree) rather than retrofitted onto real tenant spaces, so the deliberate failures cannot be
-  mistaken for a real data problem on a real tenant''s meter.'
-- 'InsufficientIntervalData (reason 1) needs an actual gap in imported interval data, which is Stage 3''s
-  concern (gateways and data), not this screen; this file only configures the allocation, and notes the gap
-  it depends on so Stage 3 or the person running Stage 7 can leave one on fixtureNoInterval''s point for one
-  billing period.'
+- Grid columns on the modal are Child Point Name, Start Date, End Date and Allocation Method (src/Web/EEMSuite.Web/frontend/src/scripts/hippo/views/viewMasterPointConfiguration.ts);
+  dropdown options come from api/TenantRebilling/GetPointAllocationMethods, i.e. dbo.PtAllocationMethod.
+- 'PRODUCT FINDING: dbo.PtAllocationMethod on EEMSuite_Northlake has only 2 rows today (1 Weighted Use Index, 2 Measured Use); the reference
+  EEMSuite database also carries a 3rd, Percentage Based, added 2019-08-14. Install that row before this step or the method-3 fixture
+  below (percentageBasedIgnored) cannot be selected.'
+- INDEX VALUES HAVE A SCREEN (this corrects the earlier version of this note, which said none exists). The Web report WUI Point Use
+  History (rp_WUIPointUseHistory) lists every Weighted Use Index child point with its Allocation_Name, Allocation_Unit, Allocation_Value,
+  Allocation_Fiscal Start and Allocation_Fiscal End, and its create and edit actions open the custom view CustomWUIAdd (src/Web/EEMSuite.Web/Views/Custom/CustomWUIAdd.cshtml)
+  with three inputs, Unit, Fiscal Start and Index Value, which post to WUIPtAllocationIndex_Save. The units on offer are the ones whose
+  class is EnergyUseIndex or VolumeUseIndex (WUIAllocationUnits_Get). The index is stored from the first day of the Fiscal Start period
+  and a later period reads the latest earlier index (WUIPtAllocUseIndex_Get), so one entry at 2024-01 serves the 2024-01 to 2024-03
+  runs of file 07. Floor area is the node's own Area tab (file 02).
+- A child with no index fails NoUseIndex. The Estimated kWh children below each get an index from the table in their record; their values
+  and the allocated results are in file 10.
+- 'The Estimated kWh children of the Mall-Main family are under Shop 3, Shop 4 and Common Area (file 02), not under Anchor Store and
+  Food Court as an earlier version had it: Anchor Store and Food Court now carry measured data and a rate (file 06), and a meter''s
+  generation prices every energy point under it, so an estimated point beside a measured one would be billed twice.'
+- 'Fixture points are new, dedicated to this exercise, under a new WUI Fixture Meter under Market Hall rather than retrofitted onto
+  real tenant spaces, so the deliberate failures cannot be mistaken for a real data problem. KNOWN PROBLEM, not fixed here: the fixture
+  nodes (WUI Fixture Meter, its six points, the master point, Fixture Chain Mid and Fixture Chain Leaf) are in no hierarchy file, and
+  ''No Area'' needs the node''s Area empty while ''No Rate'' and ''Chain Leaf'' need a valid index and area on the same meter, which
+  one Area value cannot be. Each fixture needs its own meter.'
+- InsufficientIntervalData (reason 1) needs a real gap in a Measured Use child's imported interval data, Stage 3's concern. Stage 3
+  has no Town Center node (file 10 lists what it must supply), so that gap does not exist yet either.
 records:
 - key: wui_market_electric
   Family: Weighted Use Index (method 1)
-  Master Point: Mall-Main kWh 60m                              # from file 02, tc_market_main
+  Master Point: Mall-Main kWh 60m
   Add Child Points:
-  - {order: 1, child: Anchor Store Estimated kWh, Allocation Method: Weighted Use Index, Start Date: 2024-01-01,
-    End Date:}
-  - {order: 2, child: Food Court Estimated kWh, Allocation Method: Weighted Use Index, Start Date: 2024-01-01,
-    End Date:}
-  - {order: 3, child: Common Area Estimated kWh, Allocation Method: Weighted Use Index, Start Date: 2024-01-01,
-    End Date:}
-  notes: The 3 children are new Analog points added under Anchor Store, Food Court and Common Area (file 02
-    meters, currently allocation-only with no points); each needs an index in kWh/sqft-day and uses that
-    meter's Area tab value. Indices are # assumed until the missing-screen finding above is resolved.
+  - order: 1
+    child: In-line Shop 3 Estimated kWh
+    Allocation Method: Weighted Use Index
+    Start Date: 2024-01-01
+    End Date: null
+    Index (WUI Point Use History > create):
+      Unit: kWh per SqFt per day (the EnergyUseIndex unit the list offers)
+      Fiscal Start: 2024-01
+      Index Value: 0.4
+  - order: 2
+    child: In-line Shop 4 Estimated kWh
+    Allocation Method: Weighted Use Index
+    Start Date: 2024-01-01
+    End Date: null
+    Index (WUI Point Use History > create):
+      Unit: kWh per SqFt per day (the EnergyUseIndex unit the list offers)
+      Fiscal Start: 2024-01
+      Index Value: 0.5
+  - order: 3
+    child: Common Area Estimated kWh
+    Allocation Method: Weighted Use Index
+    Start Date: 2024-01-01
+    End Date: null
+    Index (WUI Point Use History > create):
+      Unit: kWh per SqFt per day (the EnergyUseIndex unit the list offers)
+      Fiscal Start: 2024-01
+      Index Value: 0.15
+  notes: 'Three new Analog Estimated kWh points under Shop 3, Shop 4 and Common Area (file 02). Index values are # assumed. Expected
+    allocated use for 2024-01, with the master at 186,000 kWh: Shop 3 26,318.37, Shop 4 25,306.12, Common Area 134,375.51 kWh (file
+    10).'
 - key: wui_tower_electric
   Family: Measured Use + residual (method 2)
-  Master Point: Tower-Main kWh 60m                             # from file 02, tc_tower_main
+  Master Point: Tower-Main kWh 60m
   Add Child Points:
-  - {order: 1, child: Floor 1 Submeter kWh 60m, Allocation Method: Measured Use, Start Date: 2024-01-01, End Date:}
-  - {order: 2, child: Landlord/House Estimated kWh, Allocation Method: Weighted Use Index, Start Date: 2024-01-01,
-    End Date:}
-  notes: Floor 1's own submeter (file 02) is subtracted from Tower-Main's use directly (Measured Use, nothing
-    to allocate); Landlord/House is a new WUI child that receives whatever use is left over.
+  - order: 1
+    child: Floor 1 Submeter kWh 60m
+    Allocation Method: Measured Use
+    Start Date: 2024-01-01
+    End Date: null
+  - order: 2
+    child: Landlord/House Estimated kWh
+    Allocation Method: Weighted Use Index
+    Start Date: 2024-01-01
+    End Date: null
+    Index (WUI Point Use History > create):
+      Unit: kWh per SqFt per day (the EnergyUseIndex unit the list offers)
+      Fiscal Start: 2024-01
+      Index Value: 0.9
+  notes: 'Floor 1''s own submeter is subtracted from Tower-Main''s use (Measured Use); Landlord/House is the one Weighted Use Index
+    child and receives what is left: 297,600 - 66,960 = 230,640 kWh for 2024-01 (file 10).'
 - key: wui_fixtures
   Family: Deliberate fail-reason and gap fixtures
   New meter: WUI Fixture Meter (under Market Hall, Level 3, added alongside file 02's Market Hall meters)
   Master Point: WUI Fixture Master kWh 60m
   Add Child Points:
-  - {order: 1, child: Fixture No Index, Allocation Method: Weighted Use Index, Start Date: 2024-01-01, End Date:,
-    fixture: noUseIndex, expect: "PtAllocFailReason 2 NoUseIndex", how: "leave this child with no index value saved"}
-  - {order: 2, child: Fixture No Area, Allocation Method: Weighted Use Index, Start Date: 2024-01-01, End Date:,
-    fixture: noFloorArea, expect: "PtAllocFailReason 3 NoFloorArea (No area found on Premise!)",
-    how: "save an index for this child but leave its node's Area tab empty"}
-  - {order: 3, child: Fixture Partial Interval, Allocation Method: Measured Use, Start Date: 2024-01-01, End Date:,
-    fixture: insufficientIntervalData, expect: "PtAllocFailReason 1 InsufficientIntervalData",
-    how: "this child's own point is missing interval data for part of one fiscal period (Stage 3 dependency, see notes above)"}
-  - {order: 4, child: Fixture Chain Mid, Allocation Method: Weighted Use Index, Start Date: 2024-01-01, End Date:,
-    fixture: chainMidFails, expect: "this point fails with NoUseIndex like Fixture No Index",
-    how: "same as fixture 1, no index saved, but this point is ALSO configured as a second master below"}
-  - {order: 5, child: Fixture No Rate, Allocation Method: Weighted Use Index, Start Date: 2024-01-01, End Date:,
-    fixture: missingRateSetup, expect: "PtAllocFailReason 5 MissingRateSetup (Missing Rate Configuration!)",
-    how: "save a valid index and area for this child, but do not add a Bill Generation rate for its meter on the Tenant Rebill tab (file 06)"}
-  - {order: 6, child: Fixture Percentage Based, Allocation Method: Percentage Based, Start Date: 2024-01-01,
-    End Date:, fixture: percentageBasedIgnored,
-    expect: "no PtAllocFailReason row at all; the engine silently ignores method-3 children (documented product gap, see the chapter's Findings)",
-    how: "requires the PtAllocationMethod catalog finding above to be resolved first, or this row cannot be entered"}
+  - order: 1
+    child: Fixture No Index
+    Allocation Method: Weighted Use Index
+    Start Date: 2024-01-01
+    End Date: null
+    fixture: noUseIndex
+    expect: PtAllocFailReason 2 NoUseIndex
+    how: leave this child with no index value saved
+  - order: 2
+    child: Fixture No Area
+    Allocation Method: Weighted Use Index
+    Start Date: 2024-01-01
+    End Date: null
+    fixture: noFloorArea
+    expect: PtAllocFailReason 3 NoFloorArea (No area found on Premise!)
+    how: save an index for this child but leave its node's Area tab empty
+  - order: 3
+    child: Fixture Partial Interval
+    Allocation Method: Measured Use
+    Start Date: 2024-01-01
+    End Date: null
+    fixture: insufficientIntervalData
+    expect: PtAllocFailReason 1 InsufficientIntervalData
+    how: this child's own point is missing interval data for part of one fiscal period (Stage 3 dependency, see notes above)
+  - order: 4
+    child: Fixture Chain Mid
+    Allocation Method: Weighted Use Index
+    Start Date: 2024-01-01
+    End Date: null
+    fixture: chainMidFails
+    expect: this point fails with NoUseIndex like Fixture No Index
+    how: same as fixture 1, no index saved, but this point is ALSO configured as a second master below
+  - order: 5
+    child: Fixture No Rate
+    Allocation Method: Weighted Use Index
+    Start Date: 2024-01-01
+    End Date: null
+    fixture: missingRateSetup
+    expect: PtAllocFailReason 5 MissingRateSetup (Missing Rate Configuration!)
+    how: save a valid index and area for this child, but do not add a Bill Generation rate for its meter on the Tenant Rebill tab (file
+      06)
+  - order: 6
+    child: Fixture Percentage Based
+    Allocation Method: Percentage Based
+    Start Date: 2024-01-01
+    End Date: null
+    fixture: percentageBasedIgnored
+    expect: no PtAllocFailReason row at all; the engine silently ignores method-3 children (documented product gap, see the chapter's
+      Findings)
+    how: requires the PtAllocationMethod catalog finding above to be resolved first, or this row cannot be entered
 - key: wui_fixture_chain_leaf
   Family: Deliberate fail-reason chain (continued)
-  Master Point: Fixture Chain Mid                              # the wui_fixtures child above, used as a master here
+  Master Point: Fixture Chain Mid
   Add Child Points:
-  - {order: 1, child: Fixture Chain Leaf, Allocation Method: Weighted Use Index, Start Date: 2024-01-01,
-    End Date:, fixture: useNotAllocatedToMaster, expect: "PtAllocFailReason 4 UseNotAllocatedToMasterPoint",
-    how: "this child is otherwise valid (its own index and area are fine); it inherits the failure because its master, Fixture Chain Mid, itself fails to allocate"}
-  notes: A 3-level chain (WUI Fixture Master -> Fixture Chain Mid -> Fixture Chain Leaf) needs two Master
-    Point Configuration entries, one for each master in the chain; this record is the second one, opened from
-    Fixture Chain Mid's own row on #/reporting/PointFamilyConfiguration once it has at least one child.
+  - order: 1
+    child: Fixture Chain Leaf
+    Allocation Method: Weighted Use Index
+    Start Date: 2024-01-01
+    End Date: null
+    fixture: useNotAllocatedToMaster
+    expect: PtAllocFailReason 4 UseNotAllocatedToMasterPoint
+    how: this child is otherwise valid (its own index and area are fine); it inherits the failure because its master, Fixture Chain
+      Mid, itself fails to allocate
+  notes: A 3-level chain (WUI Fixture Master -> Fixture Chain Mid -> Fixture Chain Leaf) needs two Master Point Configuration entries,
+    one for each master in the chain; this record is the second one, opened from Fixture Chain Mid's own row on

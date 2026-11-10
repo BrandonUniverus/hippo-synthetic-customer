@@ -1,7 +1,9 @@
 # Stage 5, step 2: Bill Importer sources (WPF Bill Importer app, then Web SPA #/BillImporter).
 # Valley Electric District and River City Utilities are the two providers northlake-bill-entry-v1.yaml routes
-# through import (user nora.chen); Sierra Gas, Helios Solar and the Thermal Plant are manual Bill Entry and are
-# not here (see 03-bills.yaml), nor is Ridgeline Wind (EEM generates its statements, Stage 7). The WPF app only
+# through import (user nora.chen), in every company, Cedar Row Apartments and the Thermal Plant included: all 31
+# of their accounts are Bill Importer accounts (Stage 2). Sierra Gas and Helios Solar are Bill Entry accounts and are
+# not here (see 03-bills.yaml); the six Thermal Plant cost centers are Bill Allocation accounts whose bills come with
+# Stage 7; nor is Ridgeline Wind here (EEM generates its statements, Stage 7). The WPF app only
 # converts a provider's own file into the flat BIF the Web SPA reads - it has no "add a provider" screen; a
 # provider is a Schemas/<code>.xml file plus a code in appsettings.json's BillImporter:Utilities list, both
 # installed alongside the app. The bad-data and fiscal-period fixtures are hand-authored flat BIF files (the
@@ -47,6 +49,12 @@ notes:
   two imported Valley Electric accounts (the Central Plant and the generator), and the import covers 31 accounts
   in all: 14 Valley Electric and 17 River City. Ridgeline Wind itself has no source: nobody sends it a bill, EEM
   generates its statement from the ten turbine meters (Stage 7).'
+- 'Added 2026-11-10: an imported bill is never validated by Bill Entry (it is never saved in the editor). Its Bill Validation
+  results come from the validation job on the Batch Test tab (01-bill-validation-rules.yaml), which needs the built-in task
+  BILL_VALIDATION and SysConstants IsValidateBillsJob = 1; Stage 6 reads them from BillValidation_Tbl. The flat BIF carries no item
+  periods or readings, so the fixtures that need them (meter exchange, rate step, the Ridgeline pair, the Central Plant credit) are
+  uploaded from the source service''s native XML on the same Files tab (.xml is an accepted extension; BifBillItem carries BIStartDate,
+  BIEndDate, PreviousReading, CurrentReading and Multiplier).'
 records:
 - key: ved_import_source
   installed: {}

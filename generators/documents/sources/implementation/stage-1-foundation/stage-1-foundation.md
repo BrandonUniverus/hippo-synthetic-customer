@@ -7,7 +7,7 @@ status: Ready to enter
 # Stage 1. Foundation
 
 Stage 1 creates everything the rest of Northlake hangs from: the three companies
-with their levels and defaults, the six utility providers with real bill cycles
+with their levels and defaults, the seven utility providers with real bill cycles
 and vendor numbers, the fiscal calendars that bills post to, and the groups and
 users that decide who sees what. Nothing in this stage needs a meter, a bill or a
 file. When its checks are green, Stage 2 can build the hierarchy.
@@ -18,6 +18,15 @@ means four changes, each described in its step below: rename the plant's Level
 2 to Facilities, add the Ridgeline Wind provider, add two groups, and add four
 users. Two Points grants name the Ridgeline Wind Site node, so they are made
 once Stage 2 has created it.
+
+**Added 2026-11-10: fuller coverage.** Stage 1 was entered before this round, so
+everything below is extra work on the installed instance, and nothing already
+entered changes. Every provider's bill cycles now run to December 2026, so a 2026
+bill has a period (add the twelve 2026 periods to each installed cycle). A
+seventh provider, Georgian Shore Hydro, is Ontario's electric utility for the
+Stage 2 Toronto Research Hall: Northlake's one Canadian address and the first
+provider with a second country. Three workload accounts join the users: a Service,
+an API client and a Task principal.
 
 Every step below names the app and the screen, links the YAML file that holds
 the values for that screen, and says which IDs to write back into the file after
@@ -78,10 +87,10 @@ provider.
 
 **Order inside the editor:** Definitions first (Name, Description, Website,
 Icon) and save. Then Provider Address, Provider Contact and Remit Addresses.
-Then Bill Cycles: add one cycle grouping per Cycle number and its 24 periods,
-2024-01 through 2025-12. A period runs from one meter read to the day before
+Then Bill Cycles: add one cycle grouping per Cycle number and its 36 periods,
+2024-01 through 2026-12. A period runs from one meter read to the day before
 the next, and its Period and Year are the month the bill posts to. The page
-can import the periods from an Excel sheet if typing 24 rows per cycle is slow.
+can import the periods from an Excel sheet if typing 36 rows per cycle is slow.
 Then Associated Companies, which needs the Step 1 companies to exist: this is
 where each company's vendor number for the provider goes. Notes last.
 
@@ -96,8 +105,14 @@ addresses are campus mail stops.
 is the second internal provider: its site manager, Mateo Alvarez, is the
 contact, the remit address is a campus mail stop, and the only associated
 company is the Thermal Plant (vendor RWL-INTERNAL). Its one bill cycle starts
-with the acquisition, so it has 18 periods, July 2024 to December 2025. Nobody
+with the acquisition, so it has 30 periods, July 2024 to December 2026. Nobody
 sends its bill: EEM generates the monthly transfer statement in Stage 7.
+
+**Georgian Shore Hydro** (added 2026-11-10) is the Canadian provider: a business
+address and remit address in Toronto, Ontario (Country CANADA, Region ON), a
+commercial accounts contact, one bill cycle of 12 calendar-month periods starting
+January 2026 (the Toronto Research Hall opens that month), and Northlake University
+as its only associated company (vendor GSH-20001).
 
 **Record:** the Provider ID, and the ID of each remit address once saved.
 
@@ -181,14 +196,19 @@ group: it would hide whether the site scope works.
 
 **Where:** Database Administrator, Users & Groups, Users.
 
-**Enter:** [05-users.yaml](05-users.yaml), 23 people. The last four are the
-Ridgeline staff (Mateo Alvarez, Renee Castillo) and the wind researchers (Elena
-Vasquez, Kai Nakamura); until Stage 2 grants their groups' Points they can sign
-in but see no nodes.
+**Enter:** [05-users.yaml](05-users.yaml), 26 accounts: 23 people and, added
+2026-11-10, three workload accounts (a Service, an API client and a Task
+principal). Of the people, the last four are the Ridgeline staff (Mateo Alvarez,
+Renee Castillo) and the wind researchers (Elena Vasquez, Kai Nakamura); until
+Stage 2 grants their groups' Points they can sign in but see no nodes.
 
 **Order inside the editor:** add the user with User Name, Display Name, Email,
 Company, Principal Type Human and the default authentication policy, save,
-then assign the Groups the record lists. The three people with
+then assign the Groups the record lists. The three workload accounts differ:
+choose their Principal Type (Service, ApiClient or Task) in the Add user drawer,
+which then offers only the WorkloadOnly policy and lets the password pair stay
+empty; an API client gets its key from Assign/rotate workload credential on its
+page, and that key is not written down. The three people with
 energyhippo.example.com addresses belong to the Common (System) company. Create
 casey.holt like everyone else and then set Inactive: that user stays a member
 of NLU Bill Entry and must not be able to sign in.
@@ -204,13 +224,15 @@ of NLU Bill Entry and must not be able to sign in.
 - Each company has the same four base levels with the User Defined Field labels
   Site Code, Building Code, Meter Tag and Source Channel; the Thermal Plant's
   Level 2 reads Facilities.
-- Six providers exist with a website (except the Thermal Plant), an icon, a
-  business address, a contact, one remit address, and 24 periods for every bill
-  cycle from January 2024 to December 2025 (Ridgeline Wind: 18, from July 2024).
-- Fourteen company-to-provider vendor numbers exist.
+- Seven providers exist with a website (except the Thermal Plant), an icon, a
+  business address, a contact, one remit address, and 36 periods for every bill
+  cycle from January 2024 to December 2026 (Ridgeline Wind: 30, from July 2024;
+  Georgian Shore Hydro: 12, all 2026).
+- Fifteen company-to-provider vendor numbers exist.
 - Every company's fiscal calendar has 24 periods for 2024 and 2025 and none for
   2026.
-- 29 groups (91 rows with the shared copies) and 23 users exist, one user
+- 29 groups (91 rows with the shared copies) and 26 users exist (three of them
+  workload accounts), one user
   inactive, every active user in at least one group, Cedar Row's eem_reports is
   local with its own grants, and the two permission fixtures hold. Every All is
   a single category grant, and both Ridgeline groups scope the Ridgeline Wind

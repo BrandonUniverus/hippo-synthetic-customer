@@ -47,6 +47,13 @@ notes:
 - 'Ridgeline Wind Site (new, 2026-10-01): a second site in the Thermal Plant company with two outdoor nodes, Ridgeline
   Turbine Field and Ridgeline Substation. Once the site is saved, grant the two Ridgeline Points scopes waiting in
   Stage 1 (04-groups.yaml laterPermissions).'
+- 'Added 2026-11-10 (variety; enter these, nothing above changes): the Northlake Toronto Campus site with the Toronto
+  Research Hall (Eastern time, Canada, Ontario, area in square metres), and the Lakeshore Boathouse (a Closed status
+  and an Area history of two rows). Node Contact is the node editor''s page of that name: it takes the same fields as an
+  Account Contact (First Name, Last Name, Title, Phone, Email) and is filled on two nodes only, the Toronto Campus and the
+  Ridgeline Wind Site; every other node leaves it empty. The Toronto and Boathouse buildings get no weather
+  station (05-weather-stations.yaml is unchanged): the Toronto hall is outside the three Sacramento-area stations''
+  reach, and the Boathouse is closed.'
 records:
 # ---- Northlake University ----
 - key: northlake_main_campus
@@ -552,6 +559,12 @@ records:
     Country: UNITED STATES
     Latitude: 38.1226
     Longitude: -121.8134
+  Node Contact:
+    First Name: Mateo
+    Last Name: Alvarez
+    Title: Ridgeline Wind Site Manager
+    Phone: 707-555-0146
+    Email: mateo.alvarez@northlake.example.edu
   Area: null
   Keywords:
   - {Type: Department, Attribute: Thermal Plant Operations}
@@ -606,6 +619,99 @@ records:
   Status:
   - {Status: Open, As of Date: 2024-07-01}
   Notes: Collector substation where the turbines meet Valley Electric; outdoor, no floor area.
+# ---- Added 2026-11-10: variety records (enter these; nothing above changes) ----
+# Northlake Toronto Campus: the one Canadian site. It is the second time zone (Eastern), the second country
+# (Canada), the first area in square metres and a Node Contact. Its account is in Canadian dollars (01-billing-accounts).
+- key: northlake_toronto_campus
+  installed:
+    nodeId:
+  Company: Northlake University
+  Level: {Level: 1, Description: Site, Type: Site}
+  Definitions:
+    Description: Northlake Toronto Campus
+    Time Zone: (GMT-05:00) Eastern Time (US & Canada)
+    Site Code: NLU-TOR  # assumed
+  Node Address:
+    Address: 1180 Lakeshore Boulevard East  # assumed
+    City: Toronto
+    Region: ON
+    Postal Code: M4M 3L5  # assumed
+    Country: CANADA
+    Latitude: 43.6584  # assumed
+    Longitude: -79.3482  # assumed
+  Node Contact:
+    First Name: Hannah  # assumed
+    Last Name: Okafor
+    Title: Toronto campus facilities coordinator
+    Phone: 416-555-0190
+    Email: hannah.okafor@northlake.example.edu
+  Area: null
+  Keywords:
+  - {Type: Department, Attribute: Facilities Operations}
+  Notes: Northlake's only site outside California and the only one outside Pacific time; opened with the Toronto Research Hall on 2026-01-01.
+- key: toronto_research_hall
+  installed:
+    nodeId:
+  Company: Northlake University
+  Level: {Level: 2, Description: Buildings, Type: Location}
+  Parent: Northlake Toronto Campus
+  Definitions:
+    Description: Toronto Research Hall
+    Time Zone: (GMT-05:00) Eastern Time (US & Canada)
+    Building Code: TRH  # assumed
+  Node Address:
+    Address: 1200 Lakeshore Boulevard East  # assumed
+    City: Toronto
+    Region: ON
+    Postal Code: M4M 3L5  # assumed
+    Country: CANADA
+    Latitude: 43.6591  # assumed
+    Longitude: -79.3470  # assumed
+  Area:
+    Area Unit: SqM
+    History:
+    - {Area: 4200, Date: 2026-01-01}  # assumed
+  Keywords: []
+  Inherited Keywords:
+  - {Type: Department, Attribute: Facilities Operations, From: Northlake Toronto Campus}
+  Status:
+  - {Status: Open, As of Date: 2026-01-01}
+  Notes: null
+  Comment: >-
+    The only building measured in square metres. The Area page lists two area units (SqFt and the metric one); pick the
+    one that is not SqFt. No meter is entered under it in this stage, so its billing account (CAD) has no meter yet.
+# Lakeshore Boathouse: the closed building. It is the closed Status, the second Area history row, the Removed meter and the
+# inactive billing account (SYN-SGU-A-0020011, SYN-SGU-M-0050011, one register with a Delta other than 1).
+- key: lakeshore_boathouse
+  installed:
+    nodeId:
+  Company: Northlake University
+  Level: {Level: 2, Description: Buildings, Type: Location}
+  Parent: Northlake Main Campus
+  Definitions:
+    Description: Lakeshore Boathouse
+    Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+    Building Code: BTH  # assumed
+  Node Address:
+    Address: 4180 North Shore Drive  # assumed
+    City: Sacramento
+    Region: CA
+    Postal Code: '95822'
+    Country: UNITED STATES
+    Latitude: 38.5391  # assumed
+    Longitude: -121.4962  # assumed
+  Area:
+    Area Unit: SqFt
+    History:
+    - {Area: 3200, Date: 2024-01-01}  # assumed
+    - {Area: 2400, Date: 2025-03-01}  # assumed
+  Keywords: []
+  Inherited Keywords:
+  - {Type: Department, Attribute: Facilities Operations, From: Northlake Main Campus}
+  Status:
+  - {Status: Open, As of Date: 2024-01-01}
+  - {Status: Closed, As of Date: 2025-06-30}  # assumed
+  Notes: The rowing club's boathouse. The dock wing was demolished in March 2025 (3,200 to 2,400 sq ft) and the building closed on 2025-06-30; its gas meter was removed on 2025-07-15 and its account closed on 2025-07-31.
 # ---- Legacy airport nodes (optional; not checked) ----
 - key: sacramento_executive_airport
   installed:

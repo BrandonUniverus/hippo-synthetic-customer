@@ -1,7 +1,8 @@
 # Stage 5, step 5: Approval (status history behind every bill, and the QC Approval action in Bill Entry / Bill
 # Validation). Every bill from 03-bills.yaml already carries a Status_Code 1 (Bill Entry) StatusHistory row from
-# being saved; this step advances about a third of them to Status_Code 2 (QC Approval). Stage 1's shared
-# eem_company_setup grants Bill Validation; eem_bill_entry does not. Select the copy in the bill's company.
+# being saved or imported. Two paths then take a bill to Status_Code 2 (QC Approval): a person pressing Validate on a Bill Entry
+# account's bill, and, for imported bills, the bill validation job. Stage 1's shared eem_company_setup grants Bill Validation;
+# eem_bill_entry does not. Select the copy in the bill's company.
 stage: 5
 step: 5
 title: Approval
@@ -11,27 +12,45 @@ source:
 - generators/documents/sources/implementation/dream-customer/phase1-substrate-extras.md
 - implementation/stage-1-foundation/04-groups.yaml
 notes:
-- 'Entry lag and LastChangedBy per provider (phase1-substrate-extras.md, deterministic): Valley Electric 3 days
-  (nora.chen), Sierra Gas 5 days (iris.morales), River City 4 days (nora.chen), Northlake Thermal 6 days
-  (keiko.tan), Helios Solar 7 days (iris.morales), every Cedar Row bill 5 days (marcus.reed) regardless of
-  provider. AsOfDate = the bill''s period end plus that lag.'
-- Mark roughly one in three bills per account Status_Code 2 (QC Approval), spread across the two-year span so
-  rp_DailyProcessingSummary''s approved counts are not clustered in one month.
-- 'Verified in src/Web/EEMSuite.Web.Endpoints/Controllers/BillEditController.cs: the action that actually moves a
-  bill to Status_Code 2 is ValidateBill / ValidateBills ("Marks a bill as valid"), gated by
-  [EEMPermission(Function, "Bill Validation")]. Stage 1 grants that function at level 1 through each company''s
-  eem_company_setup copy; ordinary bill entry receives eem_bill_entry without that function.'
-- StatusHistory (Table_Code BL) needs no separate entry - Status_Code 1 is written when the bill is saved and
-  Status_Code 2 when Validate is clicked; nothing here is typed directly into a StatusHistory grid.
+- 'Entry lag and LastChangedBy per provider (data/eem/northlake-bill-entry-v1.yaml entryLagDays, reconciled 2026-11-10 with who
+  enters what): Valley Electric 3 days and River City 4 days (imported, nora.chen, in every company, Cedar Row included),
+  Sierra Gas 5 days and Helios Solar 7 days (typed, iris.morales), Cedar Row''s own Sierra Gas and Helios bills 5 days (typed,
+  marcus.reed), Northlake Thermal Plant 6 days (allocated, Stage 7, keiko.tan reviews). AsOfDate = the bill''s period end plus that
+  lag. The earlier text said marcus.reed enters every Cedar Row bill; Cedar Row''s Valley Electric and River City accounts are
+  Bill Importer accounts and nora.chen imports them.'
+- 'Verified in src/Web/EEMSuite.Web.Endpoints/Controllers/BillEditController.cs: the action that moves a bill to Status_Code 2 by
+  hand is ValidateBill / ValidateBills ("Marks a bill as valid"), gated by [EEMPermission(Function, "Bill Validation")]. Stage 1
+  grants that function at level 1 through each company''s eem_company_setup copy; ordinary bill entry receives eem_bill_entry
+  without that function.'
+- 'THE JOB APPROVES, AND UN-APPROVES (uaBillValidate_Job.sql, BillValidation-DeepDive.md). The built-in task BILL_VALIDATION
+  (SysConstants IsValidateBillsJob = 1, which the Batch Test rules of step 1 need) runs the Batch Test rules over every queued bill
+  (a bill is queued when it is saved or imported): a bill with no finding gets a StatusHistory (BL, 2) row written by
+  EEMValidate_Job and Status_Code 2; a bill with a finding has its status-2 rows deleted and is put back at Status_Code 1, and
+  BillValidation_Tbl holds the findings. So the imported accounts are not approved "a third at a time": every clean imported bill
+  reaches QC Approval by itself and only bills with findings wait. A manual Validate does not remove a bill from the queue,
+  so the job''s next pass over a manually approved bill that has findings puts it back at 1.'
+- 'ORDER. Do the manual approvals below BEFORE the job is switched on (leave IsValidateBillsJob unset until the end of this step),
+  then set it to 1 and let the task run once. That leaves the people''s approvals in StatusHistory under their own names and then
+  shows the job doing the rest. # assumed: the job refreshing an existing status-2 row may overwrite its LastChangedBy; if it does,
+  the manual approvals are told apart by the count of 104, not by name (record it as a finding).'
+- 'THE RULE FOR A THIRD (the Bill Entry accounts: Sierra Gas and Helios). Validate the bills that post to fiscal periods 3, 6, 9 and
+  12 of each year: 8 of an account''s 24 bills, exactly one third, spread across both years so rp_DailyProcessingSummary''s approved
+  counts are not clustered in one month. For the 13 accounts: 12 accounts x 8 = 96, SGU Library 7 (23 bills, no Dec-25), and the
+  exception below = 104.'
+- 'THE EXCEPTION. Also Validate the SGU Student Center ESTIMATED bill (2024-10-15 to 2024-11-14, fiscal 2024-11). It carries open
+  findings (tests 3 and 15), so when the job runs it takes the bill back to Status_Code 1: the approved bill held back by an open
+  alert, seen from the status side. Stage 6 reads the same findings from the AP side.'
+- StatusHistory (Table_Code BL) needs no separate entry - Status_Code 1 is written when the bill is saved or imported and
+  Status_Code 2 when Validate is clicked or the job runs; nothing here is typed directly into a StatusHistory grid.
 records:
 - key: approval_pass
   installed: {}
-  Action: For roughly one in three bills per account (spread across 2024-2025), open the bill in Bill Entry and
-    click Validate.
+  Action: For the 13 Bill Entry accounts, open each bill that posts to fiscal period 3, 6, 9 or 12 in Bill Entry and click Validate; do the SGU Student Center estimated bill as well. Imported accounts need no action (the job).
   Signed in as: a member of eem_company_setup in that bill's company, with the local Points scope listed in
     05-users.yaml. Confirm the effective Bill Validation function grant; the group name alone is not approval authority.
   Result: Status_Code advances from 1 (Bill Entry) to 2 (QC Approval); the bill's status chip and its status
     history both show the change.
+  Expect: 'Before the job runs, the Bill Entry accounts hold 104 Status_Code 2 bills (96 + 7 + 1). After its first pass every bill without a finding is at Status_Code 2 (imported accounts by EEMValidate_Job), no bill with a BillValidation_Tbl finding is at Status_Code 2, and the SGU Student Center estimate is back at Status_Code 1.'
 - key: approval_fixture_rejection
   installed: {}
   Purpose: prove that a bill-entry-only user cannot approve.
@@ -39,4 +58,5 @@ records:
     Bill Validation or click Validate on a bill she entered.
   Expected: the screen or the action is unavailable to her; record what actually happens (refused screen,
     disabled button, or a successful validate that should not have been) as a Finding if it differs from
-    "refused."
+    "refused." The bill she tried stays at Status_Code 1 (checks.sql approvals_by_role names it).
+  Bill: SGU Admin Hall 2025-02 bill (fiscal 2025-02, not a month in the rule, so it must still be at Status_Code 1 afterwards)  # assumed choice of bill

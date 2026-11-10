@@ -22,26 +22,25 @@ notes:
 - 'The Effective Date on each record below is the in-service date for the reader only: the screen has no date and every
   assignment is saved from 1970-01-01 (EmissionMeterMap_Save.sql:17-26; the in-product help says the same).'
 - 'Electric meters take source eGRID, member CAMX (WECC California) (existing, id 67), category Indirect (Scope 2
-  in customer language, step 1''s note explains the category catalog has no literal Scope 1/2/3).'
+  in customer language, the category catalog has no literal Scope 1/2/3: Indirect is the closest to Scope 2 and Stationary to Scope 1).'
 - 'Gas meters take source Non-electric commodities, member "Non-electric commodities" (existing, id 3), commodity
   Natural Gas, category Stationary (Scope 1).'
 - 'Water meters take source Non-electric commodities, same member, commodity Potable Water (step 1''s assumed
   extension), category Indirect (the product has no Scope 3; this is the closest existing category, see Findings).'
 - Sewer channels are derived from the water channel on the same meter (Stage 2/3) and are not separately metered,
   so they are not separately assigned here.
-- 'Deliberately left unassigned: the Central Plant''s own chilled-water and steam SUBMETERS (ntp_* ids, delivered
+- 'Deliberately left unassigned by hand: the Central Plant''s own chilled-water and steam SUBMETERS (ntp_* ids, delivered
   ton-hours/klb to each building) get no assignment -- assigning them alongside the plant''s electric and gas INPUT
   meters (ved_central_plant_main, sgu_central_plant_boiler_gas, both assigned below) would count the same fuel
   twice, since the plant''s Scope 1/2 already lands on those two input meters. Helios Onsite Solar generation
-  meters (ved-paired, net-metered) get no assignment either; GHG History treats whatever energy a mapped meter is
+  meters (ved-paired, net-metered) get no assignment either and are Excluded (records at the end); GHG History treats whatever energy a mapped meter is
   billed as consumption, and the module has no avoided-emissions input (see step 1''s note and Findings).
   rcu_campus_irrigation_* (north
   quad, south fields, athletics) is out of the campus building GHG boundary for this stage; add later if a
   stakeholder asks for Scope 3 irrigation. Unassigned is not the same as kept out of GHG History (the Ridgeline note
   below says why). That applies equally to the three Helios arrays (their PPA bills carry the generated kWh) and to
   the owned Electricity submeters (131 in Stage 2; they add emissions once bills exist for them, as Stage 7''s tenant
-  bills would give the Cedar Row apartments), which this file still leaves unassigned. Open: Exclude them in the same
-  pass.'
+  bills would give the Cedar Row apartments), which this file still leaves unassigned. Decided: see the auto-assignment notes below.'
 - 'Added 2026-10-01 (Ridgeline Wind): the ten turbine pad meters are Excluded and the Ridgeline Interconnection Meter
   is assigned (records at the end). Generation has to stay out of GHG History. It multiplies the energy billed to a
   mapped meter by the factor and nothing marks a meter as generation (wh_GHGTableSync.sql:55-61,110; PRODUCT FINDING
@@ -67,6 +66,10 @@ notes:
   Sep-24 bill (2024-08-05 to 2024-09-04): money, no kWh (check
   ridgeline_bct_credit_is_money). The avoided emissions of the turbines are not in this file or in any GHG screen
   (01-emission-factors.yaml, record ridgeline_avoided_emissions).'
+- 'AUTO-ASSIGNMENT, CONFIRMED in CreateDefaultEmissionMeterMap.sql (wh_GHGTableSync runs it whenever any company has an enabled source). For every company with a GHG configuration it maps EVERY Meter row whose measure type has a factor on an enabled source and whose provider, country or region matches that source''s link rule (eGRID: state and region, read from the address up the tree), at the company''s default category, unless the meter is in EmissionDisabledMeters or already mapped. It does not look at bills, billing accounts, submeters or generation. GHG History then adds only what is BILLED to a mapped meter (wh_GHGTableSync reads WH_BillProration_Tbl, energy-class quantities, per bill item meter). So a mapped meter with no bill adds nothing, and a mapped meter with a bill adds its kWh. The exclusions are therefore the meters that carry billed kWh that must not be counted.'
+- 'EXCLUDED (14 in all, records at the end): the ten turbine pad meters; the three Helios arrays (Science Center PV Array and Student Center PV Array in Northlake University, Cedar Row Solar Carport in Cedar Row: their PPA bills carry the generated kWh, which a mapping would count as consumption); and the Ridgeline Farm Transfer Meter (Thermal Plant: its generated statement carries 2,251,384 kWh for July 2024, about 420 t CO2e of Scope 2 if mapped). Exclude them BEFORE step 3 saves the company''s configuration, one click per row (the screen has no bulk Exclude).'
+- 'LEFT TO BE MAPPED AUTOMATICALLY, with no effect (132 owned Electricity meters in the three companies that have no billing account and therefore no bill and no quantity): the 124 Cedar Row apartment submeters and the two Cedar Row house submeters, Library Electric Historian, Student Center Fake Gateway Smoke, Lakeview Hall Laundry Electric, Parking Structure EV Chargers, Central Plant Main Switchgear and Central Plant Chiller Controller. They show as Assigned after the warehouse job runs and add 0 to GHG History. Excluding them is 132 clicks for no change in any total, so it is not asked. If Stage 2 ever gives the apartments billing accounts and Stage 7 allocates bills to them, Exclude them first, because the master''s own bill is already mapped. Town Center has no GHG configuration, so none of its meters is ever mapped (a master and its allocated tenant bills would double count).'
+- 'EXPECTED TOTALS once the warehouse job has run: 34 meters assigned by hand plus 132 mapped automatically = 166 meters with an EmissionMeterMap row in the three companies; 14 meters in EmissionDisabledMeters, none of them mapped; 0 rows in WH_GHG_Tbl for any excluded meter. Known GHG values (CO2 row, pounds, the CAMX 2024 and 2025 rows of step 1): Central Plant Electric Service 2024-09, 1,512,400 kWh x 410 lbs/MWh = 620,084.00 lb; Ridgeline Interconnection Meter 2024-08, 4,428 kWh = 1,815.48 lb and 2025-02, 46,920 kWh x 395 lbs/MWh = 18,533.40 lb. checks.sql asserts all of these.'
 records:
 - {key: ved_admin_hall_main, installed: {emissionMeterMapId: }, Assignment: {Meter: "ved_admin_hall_main (Admin Hall)", Emission Factor Source: eGRID, Emission Factor Member: "CAMX (WECC California)", Emission Source Category: Indirect, Effective Date: 2024-01-01}}
 - {key: ved_science_center_interval, installed: {emissionMeterMapId: }, Assignment: {Meter: "ved_science_center_interval (Science Center, main)", Emission Factor Source: eGRID, Emission Factor Member: "CAMX (WECC California)", Emission Source Category: Indirect, Effective Date: 2024-01-01}}
@@ -113,3 +116,8 @@ records:
 - {key: rwl_wtg_08, installed: {excludedMeterId: }, Assignment: {Meter: "rwl_wtg_08 (Ridgeline WTG-08, turbine pad meter, generation)", Action: Exclude}}
 - {key: rwl_wtg_09, installed: {excludedMeterId: }, Assignment: {Meter: "rwl_wtg_09 (Ridgeline WTG-09, turbine pad meter, generation)", Action: Exclude}}
 - {key: rwl_wtg_10, installed: {excludedMeterId: }, Assignment: {Meter: "rwl_wtg_10 (Ridgeline WTG-10, turbine pad meter, generation)", Action: Exclude}}
+# ---- Added 2026-11-10: generation is never GHG consumption. Three Helios arrays and the Ridgeline billing meter are Excluded (14 exclusions with the ten turbines) ----
+- {key: hos_science_center_array, installed: {excludedMeterId: }, Assignment: {Meter: "hos_science_center_array (Science Center PV Array, Helios PPA generation)", Action: Exclude}}
+- {key: hos_student_center_array, installed: {excludedMeterId: }, Assignment: {Meter: "hos_student_center_array (Student Center PV Array, Helios PPA generation)", Action: Exclude}}
+- {key: hos_cedar_row_carport, installed: {excludedMeterId: }, Assignment: {Meter: "hos_cedar_row_carport (Cedar Row Solar Carport, Helios PPA generation)", Action: Exclude}}
+- {key: rwl_farm_transfer, installed: {excludedMeterId: }, Assignment: {Meter: "rwl_farm_transfer (Ridgeline Farm Transfer Meter, the generated statement's billing meter)", Action: Exclude}}

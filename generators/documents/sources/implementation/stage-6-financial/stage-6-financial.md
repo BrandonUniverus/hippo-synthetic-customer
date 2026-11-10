@@ -1,7 +1,7 @@
 ---
 title: Stage 6. Financial
 subtitle: GL chart, account GL/AP defaults, export formats, approval and upload, accruals
-status: Ready to enter
+status: Ready to enter (revised 2026-11-10)
 ---
 
 # Stage 6. Financial
@@ -33,10 +33,12 @@ values; Step 6 is unchanged.
 ## Before you start
 
 - Stage 5's bills, and the GL account codes Stage 5 assumed (5100-ELEC through
-  2000-AP), are in place.
+  2000-AP), are in place. Step 1's GL accounts should be entered before any
+  Valley Electric or River City bill is imported if you want the importer's
+  Expense code stamped on the imported lines (Step 3, `per_line_coding`).
 - The three Ridgeline bills Step 5 uses are in place: the generated July 2024
-  transfer statement, the generator's first bill (July 1 to August 4, 2024) and
-  the Central Plant's September 2024 bill (August 5 to September 4).
+  transfer statement (Stage 7), the generator's first bill (July 1 to August 4,
+  2024) and the Central Plant's September 2024 bill (August 5 to September 4).
 - Read the Findings before Steps 4 and 6 - both describe exactly what is and is
   not possible to enter today, so you do not spend time looking for a screen
   that is not there.
@@ -88,36 +90,60 @@ for all 51 billing accounts.
 **Order inside the editor:** these four fields sit below the account's own
 identity fields on the same Definitions page Stage 2 already opened to create
 the account - there is no separate screen. Liability Account is 2000-AP
-everywhere, including the two negative-control accounts. Default Expense
-Account follows the provider (Valley Electric to 5100-ELEC, and so on). Bill
-Service Type is three real values (No AP Upload, AP Upload Only, Bill Payment -
-see Findings), not the four the AP/GL plan assumed; River City's Cedar Row B is
-the No AP Upload control, and the Thermal Plant's six allocations use Bill
-Payment instead of AP Upload Only, since they settle between Northlake
-companies rather than through a real vendor invoice. The two Ridgeline accounts
-join the Thermal Plant company: the Valley Electric generator account takes the
-ordinary Valley Electric defaults, and the transfer account, the one GL-only
-account, takes Bill Payment with Bill Generation as its Bill Entry Type and
-5150-WIND as its Default Expense Account.
+everywhere, including the negative-control account. Default Expense Account
+follows the provider (Valley Electric to 5100-ELEC, and so on). Bill Service
+Type is three real values (No AP Upload, AP Upload Only, Bill Payment - see
+Findings), not the four the AP/GL plan assumed, and this file now follows Stage 2
+and the plan: AP Upload Only for the external utilities and for the six Thermal
+Plant cost centers, Bill Payment for the three Helios accounts and for Ridgeline's
+transfer account, No AP Upload for River City's Cedar Row B, the control. The
+earlier version had the Thermal Plant on Bill Payment and Helios on AP Upload Only,
+the reverse of Stage 2. Bill Entry Type is Bill Importer for all 31 Valley Electric
+and River City accounts (Cedar Row's ten included - the earlier version made them
+Bill Entry), Bill Entry for the 13 Sierra Gas and Helios accounts, Bill Allocation
+for the six cost centers and Bill Generation for Ridgeline's transfer account.
+
+**Per-line coding.** `per_line_coding` sets the Expense Account of individual
+lines (BillItem.BI_EXpAcctID): in the Bill Entry grid for the Sierra Gas
+estimate and correction and the Helios Science Center February bill, and through
+the importer's Expense code on each commodity mapping for the Valley Electric and
+River City lines. The chart has one expense account per provider, so no bill can be
+mixed-coded; the column works and has nothing different to choose (a finding).
 
 **Record:** nothing generated.
 
-**Check:** `account_defaults` (51 rows).
+**Check:** `account_defaults` (51 accounts), `account_type_counts`, `per_line_coding`.
 
-## Step 4. AP/GL export formats
+## Step 4. AP and GL export formats
 
-**Where:** target only for every format - see Findings.
+**Where:** target only - nothing in the product can create a format. Read the
+Findings first.
 
-**Enter:** [04-ap-export-formats.yaml](04-ap-export-formats.yaml) states all
-seven formats the Phase 3 plan named, and why none can run today. It also
-states the one routing rule Ridgeline adds: the GL-only transfer statement
-belongs to the GL journal and to no file of vendor invoices.
+**Enter:** [04-ap-export-formats.yaml](04-ap-export-formats.yaml) now specifies one AP
+format (`nl_ap_invoice`) and one GL format (`nl_gl_journal`) end to end: the
+ExportSetup row each must hold (name, log type, builders, batch prefix, file type,
+status code), the rule for which bills each admits, the file layout (header,
+detail or balanced debit and credit lines, trailer), the file name pattern
+(`NLAP_` or `NLGL_` plus a 14-digit timestamp and `.csv`), a run for fiscal
+2024-09 with its expected row count, control total, ExportFile and ExportLog rows
+and status change, and a revert. The earlier seven target formats are replaced by
+these two (`other_formats_not_specified` says why for each of the rest).
+
+**What is on a screen and what is not.** On a screen: SysConstants UploadDirAP and
+uaExportApprovedBills, the page's filter, Approve boxes, Preview and Create. Not
+on any screen: the ExportSetup rows, the PermissionCatalog and Permissions rows
+that make the format appear in the picker, the two customer-written builder
+procedures each format names, and any revert. The only code in the product that
+writes those is the Massport upgrade scripts. So the definition is written down
+to be built, no SQL is invented here, and it is a product finding candidate
+(`finding_candidates`).
 
 **Record:** nothing; there is nothing to pick on the Preview/Create Interface
 File screen in this instance.
 
-**Check:** `export_formats_registered`, `ap_files_generated` (both expected
-empty; that emptiness is the check).
+**Check:** `export_formats_registered` (BLOCKED while ExportSetup is empty, PASS
+when both rows exist), then `ap_export_run`, `gl_export_run` and `export_revert`,
+which are PENDING until a file has been created.
 
 ## Step 5. AP approval and upload
 
@@ -126,21 +152,26 @@ empty; that emptiness is the check).
 **Enter:** [05-ap-approval-and-upload.yaml](05-ap-approval-and-upload.yaml).
 
 **Order:** filter to a company and period, and select the QC-Approved,
-AP-eligible bills - everything up to picking a format still works and is worth
-proving. The blocked-by-validation fixture (Recreation and Aquatics Center,
-December 2024) shows a bill whose cost jumped 41% staying out of the queue
-until its validation alert clears, even after Stage 5 marked it QC Approval.
-Two Ridgeline fixtures prove the routing. The generated July 2024 transfer
-statement (GL only) stays out of the queue even after QC Approval, so no AP file
-can name it. The generator's first bill (July 1 to August 4, 2024) is an
-ordinary AP bill for its own charges ($1,077.45), and the bill credit transfer
-is coded once, on the Central Plant's September 2024 bill. Stop before "Create
-Interface File" - the format list is empty (Step 4).
+AP-eligible bills - everything up to picking a format still works once a format
+exists and is worth proving. An approved bill with an open validation finding stays
+out of the queue: the fixture is Sierra Gas Student Center's November 2024 pair,
+the estimate (935.90, validation tests 3 and 15) and its correction (885.32, tests
+15 and 47), whose findings come from the job's Batch Test rules. The job also takes
+the estimate back to Status_Code 1 after Stage 5 approved it by hand, so the bill
+is held from the status side and from the queue side. (The earlier example, the
+Recreation and Aquatics Center's November and December 2024 bills at 5,800.00 and
+8,200.00, is dropped: that account is a Valley Electric import and its bills come
+from the source service.) Two Ridgeline fixtures prove the routing. The generated
+July 2024 transfer statement (GL only) stays out of the queue even after QC
+Approval, so no AP file can name it. The generator's first bill (July 1 to August 4,
+2024) is an ordinary AP bill for its own charges ($1,077.45), and the bill credit
+transfer is coded once, on the Central Plant's September 2024 bill. Stop before
+"Create Interface File" until Step 4's rows and builders exist.
 
 **Record:** nothing generated.
 
-**Check:** `blocked_by_validation`, `ridgeline_gl_only` (its first result set
-expected empty), `ridgeline_bct_coded_once`.
+**Check:** `blocked_by_validation` (a finding is IsError = 0; IsError = 1 means a check
+could not run), `ridgeline_gl_only`, `ridgeline_bct_coded_once`.
 
 ## Step 6. Accruals
 
@@ -154,8 +185,12 @@ bill itself. See Findings - the reversal half cannot be entered at all.
 University first, then point two new System Constants ("MPA Accruals", "MPA
 Reversals" - the names are inherited from the proc that reads them, not
 anything Northlake-specific) at their commodity IDs. Then enter the open
-accrual as an ordinary manual bill on the Accruals commodity, for a period
-Valley Electric has not yet billed Admin Hall.
+accrual as an ordinary manual bill on the Accruals commodity with Bill Type
+Accrual, for the first period Sierra Gas has not yet billed Admin Hall's gas
+account (2026-01-15 to 2026-02-14). The earlier fixture used Admin Hall's Valley
+Electric account, a Bill Importer account that Bill Entry cannot open. Bill Type
+Accrual is what validation test 99 reads; the Accruals commodity is what
+`rp_OpenAccruals` reads; the AP and GL builders leave Bill Type 2 out.
 
 **Record:** the two new CY_CommodityIDs, into the System Constants above.
 
@@ -164,21 +199,26 @@ check because it cannot exist).
 
 ## Stage 6 is done when
 
-- One runnable AP format file exists per format that is actually registered in
-  this instance - today that is none, and the chapter says so rather than
-  showing a file that was never produced.
+- The AP and GL formats are specified end to end and `export_formats_registered`
+  says BLOCKED, or PASS once someone has installed the rows and builders; no file
+  is shown that was never produced. When they exist, `ap_export_run` and
+  `gl_export_run` pass for fiscal 2024-09 and `export_revert` finds no orphan.
 - Validation passes and failures are both visible: clean bills reach the AP
-  approval queue, and the deliberate failure stays out of it until resolved.
+  approval queue, and the deliberate failure (the Student Center pair) stays out
+  of it until its findings clear; no check failed to run (`IsError = 1`).
 - The accrual pair is visible exactly as far as the product allows: the open
-  accrual bill exists and appears wherever an open accrual would show up; the
-  reversal does not exist, and nothing pretends otherwise.
+  accrual bill (Bill Type Accrual, 3,400.00) exists and appears wherever an open
+  accrual would show up; the reversal does not exist, and nothing pretends
+  otherwise.
 - Ridgeline's routing holds: the GL-only transfer statement appears in no AP
   queue and no AP file, the generator's bill is an ordinary AP bill, and the
   bill credit transfer is coded once, on the Central Plant bill.
+- The 51 accounts carry the Stage 2 values (31 importer, 13 Bill Entry, 6
+  allocation, 1 generation; 1 No AP Upload, 46 AP Upload Only, 4 Bill Payment).
 
 Run `checks.sql` beside this chapter against the instance database to see each
-of these as a result set - several are expected to come back empty, and that
-emptiness is what the check is proving.
+of these as a result set (the rows that cannot be produced yet say BLOCKED or
+PENDING, never PASS).
 
 ## Findings
 
@@ -205,9 +245,9 @@ emptiness is what the check is proving.
   "built-in" formats are themselves a demo customer's own customization, not
   core, always-present product objects - Northlake's install never received
   the equivalent. Recommend either loading a Northlake-specific pair of
-  `PermissionCatalog`/`ExportSetup` rows (reusing the demo's proc shapes) or
-  building the five richer formats product-gap-backlog.md item 2 already
-  scopes, and registering all seven the same way.
+  `PermissionCatalog`/`ExportSetup` rows (reusing the demo's proc shapes) for
+  the two Northlake formats `04-ap-export-formats.yaml` now defines, or the richer
+  formats product-gap-backlog.md item 2 already scopes.
 - **Accruals are blocked twice over, not once.** Product-gap-backlog.md item 4
   already says no UI or API calls `rp_OpenAccruals` with `@Reverse=1`. Reading
   the proc (`Database/EEMSuite/Procs/rp_OpenAccruals.sql`) shows it is worse
@@ -230,6 +270,19 @@ emptiness is what the check is proving.
   AP builders therefore need an exclusion of their own, and the target file
   assumes one keyed on Bill Entry Type (Bill Generation). Closing it for real
   needs GL-only and AP-and-GL values in the lookup, honored by every builder.
+
+- **Nothing in the product creates an export format, its picker row or its
+  revert.** ExportSetup, PermissionCatalog TypeKey EX, the group grant and the two
+  builder procedures are SQL only; Massport's revert is a custom page over
+  `[MPA].[MPA_RevertExports]`, which deletes the history, log and file rows but
+  does not set Bill.Status_Code back. The approval builder receives no fiscal
+  period, so the period of a run is whatever the user filters and ticks. The
+  Northlake definition is in `04-ap-export-formats.yaml`.
+- **A validation finding and a failed check are different rows.** In
+  BillValidation_Tbl, IsError = 0 is a finding and IsError = 1 means the check
+  could not run (BillValidation_Run.sql). The earlier `blocked_by_validation`
+  selected IsError = 1 as "open alerts" and so returned nothing while real alerts
+  existed.
 
 None of the above blocks entering what this stage can enter - the GL chart,
 the account defaults, and the open accrual all go in normally. They are

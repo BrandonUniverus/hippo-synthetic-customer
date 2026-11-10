@@ -11,7 +11,7 @@ source:
 - implementation/stage-2-hierarchy/03-meters.yaml (cedar_row_a_unit_214_water)
 - implementation/stage-2-hierarchy/04-points.yaml (ch_cedar_row_a_unit_214_water_register)
 - implementation/stage-3-gateways-and-data/05-handheld-routes.yaml (hmr_cedar_row_a_water_submeters)
-- implementation/stage-3-gateways-and-data/04-acceptance-runs.yaml (rollover: "does not prove meter replacement")
+- 'implementation/stage-3-gateways-and-data/04-acceptance-runs.yaml (rollover: "does not prove meter replacement")'
 requires:
 - Stage 3 Step 5 entered (route CRAWTR with unit 214 at sequence 350, starting reading 1350 kgal on 2024-01-01).
 - At least one handheld round on CRAWTR after January 2024 (Stage 3 Step 4 submeter batch or Stage 9).

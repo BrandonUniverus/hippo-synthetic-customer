@@ -1,8 +1,8 @@
 # Stage 8, step 4: ENERGY STAR property setup and rating requests (Web, #/ESPropertySetup and #/ESNewRatingRequest),
 # plus the sandbox Portfolio Manager connection (Configuration Tool, System Constants) and the EnergyStar sync task
-# (Web, #/tasks/manager). See [ENERGY STAR integration](energystar-integration.pdf) for the full property mapping
-# this step enters. Property records come first (they must exist before a rating request can reference one), then
-# rating requests, then the Portfolio Manager connection record.
+# (Web, #/tasks/manager). See [ENERGY STAR integration](energystar-integration.pdf) for the full property mapping.
+# Rewritten 2026-11-10: each of the 13 properties now carries its address, year built, occupancy, uses with floor
+# areas and details, and its energy meters, not only its primary use.
 stage: 8
 step: 4
 title: ENERGY STAR property setup, rating requests, Portfolio Manager connection
@@ -13,85 +13,911 @@ source:
 - generators/documents/sources/implementation/stage-8-sustainability/energystar-integration.pdf
 - generators/documents/sources/implementation/dream-customer/product-gap-backlog.md (item 1)
 notes:
-- 'ESPropertySetup grid columns (viewESPropertySetup.ts): Parent/Site, Property, Primary Use, Auto Update, Rating,
-  Rating Date, Year Ending, Request Year Ending, and row actions Request Rating / View / Edit / History / Clear.
-  It lists the hierarchy''s sites and buildings; Edit maps a node to its ENERGY STAR property use(s), matching the
-  13 properties already modeled in data/scenarios/demo-university-v1.yaml energyStarProperties (campus parent + 7
-  campus buildings, the Cedar Row multifamily property + its 3 buildings, the Central Plant). PMPropertyID stays 0
-  until the pm_connection record below links it.'
-- 'ESNewRatingRequest queues a request per property per year-ending date; it is fully local (ESRequestType 3
-  Building, verified row in dbo.ESRequestType) and does not need Portfolio Manager to save. Submitting it for real
-  scoring does.'
-- 'EnergyStar sync task: Task 19 "Energy Star" (Energy Star Request Processor, EEMSuite.Tasks.EnergyStar,
-  RatingSyncService) and Task 20 "Energy Star Automation Task" (approves valid facilities), both verified rows in
-  Task_Tbl. Schedule Task 19 to run every 300 seconds once pm_connection is in place; Stage 9 step 4 schedules it
-  alongside the other standard tasks. Until then leave it unscheduled -- running it against no CustomerServer just
-  logs a skip, it does not error.'
-- 'Eligibility (per energystar.gov, and the source-model note on Admin Hall): a property scores only when more than
-  50% of gross floor area is a score-eligible type and non-scoring uses stay under 25%. In the US the eligible-type
-  set here is Office, Residence Hall/Dormitory and Multifamily Housing (Library scores only in Canada). Lakeview
-  Residence Hall and Cedar Row Apartments score; Admin Hall is Office-primary but its 25,000 sq ft classroom wing is
-  29% of its 85,000 sq ft, over the 25% cap, so it gets metrics only, not a score.'
-- 'The PM account username/password are the Energy Star task''s own configuration parameters, not a System
-  Constant (LegacyEncryptedCredentialProvider reads PMUsername/PMAccountPassword keyed EEMSuite.Tasks.EnergyStar)
-  -- set them on that task''s Parameters in Task Manager, not on pm_connection below.'
-- 'Added 2026-10-01 (Ridgeline Wind): the Ridgeline Wind Site is not an ENERGY STAR property (the Sustainability
-  Office: a generating site, not a building, not benchmarked), so this file gains no property and no rating request
-  and the count stays 13. Property Setup lists every level-2 node of the company, configured or not
-  (ESGetPropertyList.sql:13-27,88), so Ridgeline Turbine Field and Ridgeline Substation appear under Northlake
-  Thermal Plant with Primary Use N/a: leave them unconfigured, like Campus Grounds and Cedar Row Carport and
-  Grounds. The one per-meter generation marker EEM has lives in this module, for the follow-on meter mapping: a meter
-  on a property can carry the Renewables class, Electric on Site Solar (attribute 5) or Electric on Site Wind (6),
-  offered on every electric meter (ESFacilityMeterClassTypeByMeter_Get.sql:93-117), and the sync then sends it to
-  Portfolio Manager as the meter type in place of Electric (ESFacilityMeter_Get.sql:62; MeterMapping.cs:17;
-  TypeOfMeter.cs:55). It describes generation on the property''s own site, and the sync reports zero energy exported
-  off site for such a meter (MeterConsumptionMapping.cs:29-32). Ridgeline is about fifty miles from the campus and
-  exports all of its output, so no Ridgeline meter is ever mapped to a property and the override is never set. Nor
-  does Ridgeline change the Central Plant property: the VED-BCT credit on the plant''s Valley Electric bill is money,
-  and the readings sent to Portfolio Manager are the meter''s billed energy quantities
-  (ESMeterReading_Create.sql:120-135).'
+- 'ESPropertySetup grid columns (viewESPropertySetup.ts): Parent/Site, Property, Property Uses, Auto Update, Rating, Rating Date, Year
+  Ending, Request Year Ending, and row actions Request Rating / View / Edit Property / History / Clear. It lists the company''s level-2
+  nodes whether configured or not; a location not yet set up shows N/A under Property Uses and its only action is Edit Property (in-product
+  help, property-list). 13 properties are configured: campus parent + 7 campus buildings, the Cedar Row multifamily property + 3 buildings,
+  the Central Plant. PMPropertyID stays 0 until the pm_connection record below links it.'
+- 'WHAT IS ENTERED PER PROPERTY (ESPropertyEditor.cshtml and the in-product help, SeedLanguageData.sql section property-details, energy-data-sources,
+  property-use-details). Edit Property opens the editor: Details (Address, City, Country, State or Region and Postal Code, Year Built,
+  Occupancy Percentage and Auto Update; the required ones are marked and the total floor area is added up from the uses), tabs Property
+  Uses (Add Property Use: type and description, Primary, Gross Floor Area with its effective date, then Edit Details for the use''s
+  own values), Energy Data Sources (Include per meter, with Energy From, Meter Type and, for some types, an attribute or a use) and
+  Rating History (filled by requests). The earlier version of this file entered only Primary Use and Auto Update; the year built, occupancy,
+  floor areas and use details were in the scenario file and were not carried. The Details come from data/scenarios/demo-university-v1.yaml
+  (energyStarProperties); addresses are the Stage 2 node addresses.'
+- 'Property Use Details: each use has its own list of values (Weekly Operating Hours, Number of Workers on Main Shift, Number of Computers,
+  Percent That Can Be Cooled / Heated, Total Enrollment, Number of FTE workers, Grant Dollars, and for the other use types Number of
+  Rooms, Computer Lab?, Dining Hall?, Months in Use, the parking sizes, the multifamily unit counts and so on; labels are the ENERGY
+  STAR attribute names seeded in SeedEnergyStarReferenceData.sql). A blank value shows DEFAULT. Every required value must apply from
+  the first day of the Year Ending month of the request or earlier, so the effective dates are 2023-01-01 for every floor area and detail
+  (# assumed, before the first request, 2024-03). The label of a few attributes was not found in the seed (marked in the record); use
+  the attribute the list offers for it.'
+- 'Energy Data Sources: each property''s own utility BILL meters (Energy From Bills) are included, never the interval points beside
+  them (counting both counts the energy twice, in-product help). The campus and the Cedar Row multifamily property are PARENTS and carry
+  no meters of their own; their children do (# assumed: ENERGY STAR rolls the children up). Water meters are not included (ENERGY STAR
+  water needs its own meter type; not asked here). The two Helios PV arrays are the property''s on-site generation: Meter Type Renewable,
+  attribute Electric on Site Solar (the attribute offered on every electric meter, ESFacilityMeterClassTypeByMeter_Get.sql); the Cedar
+  Row Solar Carport is on Carport and Grounds, which is not a property. The Library''s Old Meter closed on 2024-08-14 and carries that
+  Inactive Date. Admin Hall is the one property whose uses decide eligibility: 60,000 sq ft of Office and 25,000 of Other - Education,
+  which is 29.4% of 85,000, over the 25% cap, so it can be rated for metrics and gets no score once PM-connected.'
+- 'Every request still fails alike until Portfolio Manager is connected: the editor and Request Rating check the property first (Year
+  Built, required use details, twelve months of data on each included meter) and a request that passes is queued for the ENERGY STAR
+  task. The Central Plant request of 2025 is the deliberate error row: leave its Energy Data Sources empty (no meter included) so it
+  fails the check, as the file''s record says.'
+- 'WHAT IS ENTERED PER PROPERTY (ESPropertyEditor.cshtml and the in-product help, SeedLanguageData.sql section property-details, energy-data-sources,
+  property-use-details). Edit Property opens the editor: Details (Address, City, Country, State or Region and Postal Code, Year Built,
+  Occupancy Percentage and Auto Update; the required ones are marked and the total floor area is added up from the uses), tabs Property
+  Uses (Add Property Use: type and description, Primary, Gross Floor Area with its effective date, then Edit Details for the use''s
+  own values), Energy Data Sources (Include per meter, with Energy From, Meter Type and, for some types, an attribute or a use) and
+  Rating History (filled by requests). The earlier version of this file entered only Primary Use and Auto Update; the year built, occupancy,
+  floor areas and use details were in the scenario file and were not carried. The Details come from data/scenarios/demo-university-v1.yaml
+  (energyStarProperties); addresses are the Stage 2 node addresses.'
+- 'Property Use Details: each use has its own list of values (Weekly Operating Hours, Number of Workers on Main Shift, Number of Computers,
+  Percent That Can Be Cooled / Heated, Total Enrollment, Number of FTE workers, Grant Dollars, and for the other use types Number of
+  Rooms, Computer Lab?, Dining Hall?, Months in Use, the parking sizes, the multifamily unit counts and so on; labels are the ENERGY
+  STAR attribute names seeded in SeedEnergyStarReferenceData.sql). A blank value shows DEFAULT. Every required value must apply from
+  the first day of the Year Ending month of the request or earlier, so the effective dates are 2023-01-01 for every floor area and detail
+  (# assumed, before the first request, 2024-03). The label of a few attributes was not found in the seed (marked in the record); use
+  the attribute the list offers for it.'
+- 'Energy Data Sources: each property''s own utility BILL meters (Energy From Bills) are included, never the interval points beside
+  them (counting both counts the energy twice, in-product help). The campus and the Cedar Row multifamily property are PARENTS and carry
+  no meters of their own; their children do (# assumed: ENERGY STAR rolls the children up). Water meters are not included (ENERGY STAR
+  water needs its own meter type; not asked here). The two Helios PV arrays are the property''s on-site generation: Meter Type Renewable,
+  attribute Electric on Site Solar (the attribute offered on every electric meter, ESFacilityMeterClassTypeByMeter_Get.sql); the Cedar
+  Row Solar Carport is on Carport and Grounds, which is not a property. The Library''s Old Meter closed on 2024-08-14 and carries that
+  Inactive Date. Admin Hall is the one property whose uses decide eligibility: 60,000 sq ft of Office and 25,000 of Other - Education,
+  which is 29.4% of 85,000, over the 25% cap, so it can be rated for metrics and gets no score once PM-connected.'
+- 'Every request still fails alike until Portfolio Manager is connected: the editor and Request Rating check the property first (Year
+  Built, required use details, twelve months of data on each included meter) and a request that passes is queued for the ENERGY STAR
+  task. The Central Plant request of 2025 is the deliberate error row: leave its Energy Data Sources empty (no meter included) so it
+  fails the check, as the file''s record says.'
+- ESNewRatingRequest queues a request per property per year-ending date; it is fully local (ESRequestType 3 Building, verified row in
+  dbo.ESRequestType) and does not need Portfolio Manager to save. Submitting it for real scoring does.
+- 'EnergyStar sync task: Task 19 "Energy Star" (Energy Star Request Processor, EEMSuite.Tasks.EnergyStar, RatingSyncService) and Task
+  20 "Energy Star Automation Task" (approves valid facilities), both verified rows in Task_Tbl. Schedule Task 19 to run every 300 seconds
+  once pm_connection is in place; Stage 9 step 4 schedules it alongside the other standard tasks. Until then leave it unscheduled --
+  running it against no CustomerServer just logs a skip, it does not error.'
+- 'Eligibility (per energystar.gov, and the source-model note on Admin Hall): a property scores only when more than 50% of gross floor
+  area is a score-eligible type and non-scoring uses stay under 25%. In the US the eligible-type set here is Office, Residence Hall/Dormitory
+  and Multifamily Housing (Library scores only in Canada). Lakeview Residence Hall and Cedar Row Apartments score; Admin Hall is Office-primary
+  but its 25,000 sq ft classroom wing is 29% of its 85,000 sq ft, over the 25% cap, so it gets metrics only, not a score.'
+- The PM account username/password are the Energy Star task's own configuration parameters, not a System Constant (LegacyEncryptedCredentialProvider
+  reads PMUsername/PMAccountPassword keyed EEMSuite.Tasks.EnergyStar) -- set them on that task's Parameters in Task Manager, not on
+  pm_connection below.
+- 'Added 2026-10-01 (Ridgeline Wind): the Ridgeline Wind Site is not an ENERGY STAR property (the Sustainability Office: a generating
+  site, not a building, not benchmarked), so this file gains no property and no rating request and the count stays 13. Property Setup
+  lists every level-2 node of the company, configured or not (ESGetPropertyList.sql:13-27,88), so Ridgeline Turbine Field and Ridgeline
+  Substation appear under Northlake Thermal Plant with Primary Use N/a: leave them unconfigured, like Campus Grounds and Cedar Row Carport
+  and Grounds. The one per-meter generation marker EEM has lives in this module, for the follow-on meter mapping: a meter on a property
+  can carry the Renewables class, Electric on Site Solar (attribute 5) or Electric on Site Wind (6), offered on every electric meter
+  (ESFacilityMeterClassTypeByMeter_Get.sql:93-117), and the sync then sends it to Portfolio Manager as the meter type in place of Electric
+  (ESFacilityMeter_Get.sql:62; MeterMapping.cs:17; TypeOfMeter.cs:55). It describes generation on the property''s own site, and the
+  sync reports zero energy exported off site for such a meter (MeterConsumptionMapping.cs:29-32). Ridgeline is about fifty miles from
+  the campus and exports all of its output, so no Ridgeline meter is ever mapped to a property and the override is never set. Nor does
+  Ridgeline change the Central Plant property: the VED-BCT credit on the plant''s Valley Electric bill is money, and the readings sent
+  to Portfolio Manager are the meter''s billed energy quantities (ESMeterReading_Create.sql:120-135).'
 records:
-- {key: es_property_northlake_main_campus, installed: {esFacilityId: }, Property Setup: {Property: Northlake Main Campus, Parent/Site: (campus parent), Primary Use: College/University, Auto Update: false}, note: metrics only}
-- {key: es_property_admin_hall, installed: {esFacilityId: }, Property Setup: {Property: Admin Hall, Parent/Site: Northlake Main Campus, Primary Use: Office, Auto Update: false}, note: "metrics only; classroom wing 29% of area, over the 25% cap"}
-- {key: es_property_science_center, installed: {esFacilityId: }, Property Setup: {Property: Science Center, Parent/Site: Northlake Main Campus, Primary Use: Laboratory, Auto Update: false}, note: metrics only}
-- {key: es_property_library, installed: {esFacilityId: }, Property Setup: {Property: Library, Parent/Site: Northlake Main Campus, Primary Use: Library, Auto Update: false}, note: "metrics only in the US"}
-- {key: es_property_student_center, installed: {esFacilityId: }, Property Setup: {Property: Student Center, Parent/Site: Northlake Main Campus, Primary Use: Food Service, Auto Update: false}, note: metrics only}
-- {key: es_property_lakeview_hall, installed: {esFacilityId: }, Property Setup: {Property: Lakeview Hall, Parent/Site: Northlake Main Campus, Primary Use: Residence Hall/Dormitory, Auto Update: false}, note: "score-eligible; quarterly 1-100 score once PM-connected"}
-- {key: es_property_recreation_center, installed: {esFacilityId: }, Property Setup: {Property: Recreation Center, Parent/Site: Northlake Main Campus, Primary Use: Fitness Center/Health Club/Gym, Auto Update: false}, note: metrics only}
-- {key: es_property_parking_structure, installed: {esFacilityId: }, Property Setup: {Property: Parking Structure, Parent/Site: Northlake Main Campus, Primary Use: Parking, Auto Update: false}, note: metrics only}
-- {key: es_property_cedar_row_apartments, installed: {esFacilityId: }, Property Setup: {Property: Cedar Row Apartments, Parent/Site: (multifamily property), Primary Use: Multifamily Housing, Auto Update: false}, note: "score-eligible; quarterly 1-100 score once PM-connected"}
-- {key: es_property_cedar_row_a, installed: {esFacilityId: }, Property Setup: {Property: Cedar Row A, Parent/Site: Cedar Row Apartments, Primary Use: Multifamily Housing, Auto Update: false}, note: "rolls up to the property score, not scored on its own"}
-- {key: es_property_cedar_row_b, installed: {esFacilityId: }, Property Setup: {Property: Cedar Row B, Parent/Site: Cedar Row Apartments, Primary Use: Multifamily Housing, Auto Update: false}, note: "rolls up to the property score, not scored on its own"}
-- {key: es_property_cedar_row_common_house, installed: {esFacilityId: }, Property Setup: {Property: Cedar Row Common House, Parent/Site: Cedar Row Apartments, Primary Use: Other - Recreation, Auto Update: false}, note: metrics only}
-- {key: es_property_central_plant, installed: {esFacilityId: }, Property Setup: {Property: Central Plant, Parent/Site: (standalone property), Primary Use: Other - Utility, Auto Update: false}, note: "metrics only; excluded from the campus academic benchmarking boundary"}
-- {key: ridgeline_not_an_es_property, installed: {}, Property Setup: {Property: "Ridgeline Turbine Field; Ridgeline Substation", Parent/Site: Ridgeline Wind Site (Northlake Thermal Plant), Primary Use: "N/a (leave unconfigured)", Auto Update: false}, note: "not a property: no rating request, and no Ridgeline meter on any property, so Electric on Site Wind is never set"}
-- {key: es_request_lakeview_hall_2024q1, installed: {esRequestId: }, Rating Request: {Property: Lakeview Hall, Request Type: Building, Year Ending: 2024-03-31}, expect: "score once PM-connected"}
-- {key: es_request_lakeview_hall_2024q2, installed: {esRequestId: }, Rating Request: {Property: Lakeview Hall, Request Type: Building, Year Ending: 2024-06-30}, expect: "score once PM-connected"}
-- {key: es_request_lakeview_hall_2024q3, installed: {esRequestId: }, Rating Request: {Property: Lakeview Hall, Request Type: Building, Year Ending: 2024-09-30}, expect: "score once PM-connected"}
-- {key: es_request_lakeview_hall_2024q4, installed: {esRequestId: }, Rating Request: {Property: Lakeview Hall, Request Type: Building, Year Ending: 2024-12-31}, expect: "score ~72 once PM-connected"}
-- {key: es_request_lakeview_hall_2025q1, installed: {esRequestId: }, Rating Request: {Property: Lakeview Hall, Request Type: Building, Year Ending: 2025-03-31}, expect: "score trending up once PM-connected"}
-- {key: es_request_lakeview_hall_2025q2, installed: {esRequestId: }, Rating Request: {Property: Lakeview Hall, Request Type: Building, Year Ending: 2025-06-30}, expect: "score trending up once PM-connected"}
-- {key: es_request_lakeview_hall_2025q3, installed: {esRequestId: }, Rating Request: {Property: Lakeview Hall, Request Type: Building, Year Ending: 2025-09-30}, expect: "score trending up once PM-connected"}
-- {key: es_request_lakeview_hall_2025q4, installed: {esRequestId: }, Rating Request: {Property: Lakeview Hall, Request Type: Building, Year Ending: 2025-12-31}, expect: "score ~78 once PM-connected"}
-- {key: es_request_cedar_row_apartments_2024q1, installed: {esRequestId: }, Rating Request: {Property: Cedar Row Apartments, Request Type: Building, Year Ending: 2024-03-31}, expect: "score once PM-connected"}
-- {key: es_request_cedar_row_apartments_2024q2, installed: {esRequestId: }, Rating Request: {Property: Cedar Row Apartments, Request Type: Building, Year Ending: 2024-06-30}, expect: "score once PM-connected"}
-- {key: es_request_cedar_row_apartments_2024q3, installed: {esRequestId: }, Rating Request: {Property: Cedar Row Apartments, Request Type: Building, Year Ending: 2024-09-30}, expect: "score once PM-connected"}
-- {key: es_request_cedar_row_apartments_2024q4, installed: {esRequestId: }, Rating Request: {Property: Cedar Row Apartments, Request Type: Building, Year Ending: 2024-12-31}, expect: "score once PM-connected"}
-- {key: es_request_cedar_row_apartments_2025q1, installed: {esRequestId: }, Rating Request: {Property: Cedar Row Apartments, Request Type: Building, Year Ending: 2025-03-31}, expect: "score trending up once PM-connected"}
-- {key: es_request_cedar_row_apartments_2025q2, installed: {esRequestId: }, Rating Request: {Property: Cedar Row Apartments, Request Type: Building, Year Ending: 2025-06-30}, expect: "score trending up once PM-connected"}
-- {key: es_request_cedar_row_apartments_2025q3, installed: {esRequestId: }, Rating Request: {Property: Cedar Row Apartments, Request Type: Building, Year Ending: 2025-09-30}, expect: "score trending up once PM-connected"}
-- {key: es_request_cedar_row_apartments_2025q4, installed: {esRequestId: }, Rating Request: {Property: Cedar Row Apartments, Request Type: Building, Year Ending: 2025-12-31}, expect: "score trending up once PM-connected"}
-- {key: es_request_admin_hall_2024, installed: {esRequestId: }, Rating Request: {Property: Admin Hall, Request Type: Building, Year Ending: 2024-12-31}, expect: "metrics only, eligible=false, no score"}
-- {key: es_request_admin_hall_2025, installed: {esRequestId: }, Rating Request: {Property: Admin Hall, Request Type: Building, Year Ending: 2025-12-31}, expect: "metrics only, eligible=false, no score"}
-- {key: es_request_science_center_2025_pending, installed: {esRequestId: }, Rating Request: {Property: Science Center, Request Type: Building, Year Ending: 2025-12-31}, expect: "left pending; rp_ESRatingRequestLog shows a pending row"}
-- {key: es_request_central_plant_2025_error, installed: {esRequestId: }, Rating Request: {Property: Central Plant, Request Type: Building, Year Ending: 2025-12-31}, expect: "submitted with an incomplete meter map on purpose; rp_ESRatingRequestLog shows an error row"}
+- key: es_property_northlake_main_campus
+  installed:
+    esFacilityId: null
+  Property Setup:
+    Property: Northlake Main Campus
+    Parent/Site: (campus parent)
+    Primary Use: College/University
+    Auto Update: false
+  Details:
+    Address:
+      Address: 4100 North Shore Drive
+      City: Sacramento
+      Region: CA
+      Postal Code: '95822'
+      Country: UNITED STATES
+      Latitude: 38.5352
+      Longitude: -121.4939
+    Year Built: 1965
+    Occupancy Percentage: 90
+    Auto Update: false
+  Property Uses:
+  - Property Use Type: College/University
+    Description: College/University
+    Primary: true
+    Gross Floor Area: 545000
+    Gross Floor Area Effective Date: 2023-01-01
+    Property Use Details:
+      Effective date for new value: 2023-01-01
+      Values:
+        Weekly Operating Hours: 100
+        Total Enrollment: 9500
+        Number of FTE workers: 1200
+        Number of Computers: 4200
+        Grant Dollars: 18500000
+  Energy Data Sources: []
+  note: metrics only
+- key: es_property_admin_hall
+  installed:
+    esFacilityId: null
+  Property Setup:
+    Property: Admin Hall
+    Parent/Site: Northlake Main Campus
+    Primary Use: Office
+    Auto Update: false
+  Details:
+    Address:
+      Address: 100 Synthetic Campus Drive
+      City: Sacramento
+      Region: CA
+      Postal Code: '95822'
+      Country: UNITED STATES
+      Latitude: 38.5359
+      Longitude: -121.4945
+    Year Built: 1998
+    Occupancy Percentage: 95
+    Auto Update: false
+  Property Uses:
+  - Property Use Type: Office
+    Description: Office
+    Primary: true
+    Gross Floor Area: 60000
+    Gross Floor Area Effective Date: 2023-01-01
+    Property Use Details:
+      Effective date for new value: 2023-01-01
+      Values:
+        Weekly Operating Hours: 60
+        Number of Workers on Main Shift: 180
+        Number of Computers: 200
+        Percent That Can Be Cooled: 100
+        Percent That Can Be Heated: 100
+  - Property Use Type: Other - Education
+    Description: Other - Education
+    Primary: false
+    Gross Floor Area: 25000
+    Gross Floor Area Effective Date: 2023-01-01
+    Property Use Details:
+      Effective date for new value: 2023-01-01
+      Values:
+        Weekly Operating Hours: 50
+        Number of Workers on Main Shift: 20
+        Number of Computers: 60
+  Energy Data Sources:
+  - Meter: Admin Hall Electric Main
+    Energy From: Bills
+    Include: true
+    Meter Type: Standard
+  - Meter: Admin Hall Gas
+    Energy From: Bills
+    Include: true
+    Meter Type: Standard
+  - Meter: Admin Hall Steam
+    Energy From: Bills
+    Include: true
+    Meter Type: Standard
+  note: metrics only; classroom wing 29% of area, over the 25% cap
+- key: es_property_science_center
+  installed:
+    esFacilityId: null
+  Property Setup:
+    Property: Science Center
+    Parent/Site: Northlake Main Campus
+    Primary Use: Laboratory
+    Auto Update: false
+  Details:
+    Address:
+      Address: 120 Synthetic Campus Drive
+      City: Sacramento
+      Region: CA
+      Postal Code: '95822'
+      Country: UNITED STATES
+      Latitude: 38.53655
+      Longitude: -121.4928
+    Year Built: 2008
+    Occupancy Percentage: 90
+    Auto Update: false
+  Property Uses:
+  - Property Use Type: Laboratory
+    Description: Laboratory
+    Primary: true
+    Gross Floor Area: 80000
+    Gross Floor Area Effective Date: 2023-01-01
+    Property Use Details:
+      Effective date for new value: 2023-01-01
+      Values:
+        Weekly Operating Hours: 90
+        Number of Workers on Main Shift: 60
+        Number of Computers: 150
+  - Property Use Type: Other - Education
+    Description: Other - Education
+    Primary: false
+    Gross Floor Area: 40000
+    Gross Floor Area Effective Date: 2023-01-01
+    Property Use Details:
+      Effective date for new value: 2023-01-01
+      Values:
+        Weekly Operating Hours: 50
+        Number of Workers on Main Shift: 15
+        Number of Computers: 80
+  Energy Data Sources:
+  - Meter: Science Center Electric Main
+    Energy From: Bills
+    Include: true
+    Meter Type: Standard
+  - Meter: Science Center Electric Lab Wing
+    Energy From: Bills
+    Include: true
+    Meter Type: Standard
+  - Meter: Science Center Gas
+    Energy From: Bills
+    Include: true
+    Meter Type: Standard
+  - Meter: Science Center Chilled Water
+    Energy From: Bills
+    Include: true
+    Meter Type: Chilled Water
+    Meter Type attribute: 'the attribute the list offers  # not confirmed'
+  - Meter: Science Center Steam
+    Energy From: Bills
+    Include: true
+    Meter Type: Standard
+  - Meter: Science Center PV Array
+    Energy From: Bills
+    Include: true
+    Meter Type: Renewable
+    Meter Type attribute: Electric on Site Solar
+  note: metrics only
+- key: es_property_library
+  installed:
+    esFacilityId: null
+  Property Setup:
+    Property: Library
+    Parent/Site: Northlake Main Campus
+    Primary Use: Library
+    Auto Update: false
+  Details:
+    Address:
+      Address: 140 Synthetic Campus Drive
+      City: Sacramento
+      Region: CA
+      Postal Code: '95822'
+      Country: UNITED STATES
+      Latitude: 38.5348
+      Longitude: -121.4931
+    Year Built: 1992
+    Occupancy Percentage: 90
+    Auto Update: false
+  Property Uses:
+  - Property Use Type: Library
+    Description: Library
+    Primary: true
+    Gross Floor Area: 70000
+    Gross Floor Area Effective Date: 2023-01-01
+    Property Use Details:
+      Effective date for new value: 2023-01-01
+      Values:
+        Weekly Operating Hours: 100
+        Number of Workers on Main Shift: 25
+        Number of Computers: 120
+        Percent That Can Be Heated: 100
+        Percent That Can Be Cooled: 100
+  Energy Data Sources:
+  - Meter: Library Electric Old Meter
+    Energy From: Bills
+    Include: true
+    Meter Type: Standard
+    Inactive Date: 2024-08-14
+  - Meter: Library Electric New Meter
+    Energy From: Bills
+    Include: true
+    Meter Type: Standard
+  - Meter: Library Gas
+    Energy From: Bills
+    Include: true
+    Meter Type: Standard
+  - Meter: Library Steam
+    Energy From: Bills
+    Include: true
+    Meter Type: Standard
+  note: metrics only in the US
+- key: es_property_student_center
+  installed:
+    esFacilityId: null
+  Property Setup:
+    Property: Student Center
+    Parent/Site: Northlake Main Campus
+    Primary Use: Food Service
+    Auto Update: false
+  Details:
+    Address:
+      Address: 160 Synthetic Campus Drive
+      City: Sacramento
+      Region: CA
+      Postal Code: '95822'
+      Country: UNITED STATES
+      Latitude: 38.5342
+      Longitude: -121.4953
+    Year Built: 2003
+    Occupancy Percentage: 85
+    Auto Update: false
+  Property Uses:
+  - Property Use Type: Food Service
+    Description: Food Service
+    Primary: true
+    Gross Floor Area: 45000
+    Gross Floor Area Effective Date: 2023-01-01
+    Property Use Details:
+      Effective date for new value: 2023-01-01
+      Values:
+        Weekly Operating Hours: 98
+        Number of Workers on Main Shift: 40
+        Number of Computers: 30
+  - Property Use Type: Other - Entertainment/Public Assembly
+    Description: Other - Entertainment/Public Assembly
+    Primary: false
+    Gross Floor Area: 50000
+    Gross Floor Area Effective Date: 2023-01-01
+    Property Use Details:
+      Effective date for new value: 2023-01-01
+      Values:
+        Weekly Operating Hours: 70
+        Number of Workers on Main Shift: 20
+        Number of Computers: 25
+  Energy Data Sources:
+  - Meter: Student Center Electric Main
+    Energy From: Bills
+    Include: true
+    Meter Type: Standard
+  - Meter: Student Center Kitchen Gas
+    Energy From: Bills
+    Include: true
+    Meter Type: Standard
+  - Meter: Student Center Steam
+    Energy From: Bills
+    Include: true
+    Meter Type: Standard
+  - Meter: Student Center PV Array
+    Energy From: Bills
+    Include: true
+    Meter Type: Renewable
+    Meter Type attribute: Electric on Site Solar
+  note: metrics only
+- key: es_property_lakeview_hall
+  installed:
+    esFacilityId: null
+  Property Setup:
+    Property: Lakeview Residence Hall
+    Parent/Site: Northlake Main Campus
+    Primary Use: Residence Hall/Dormitory
+    Auto Update: false
+  Details:
+    Address:
+      Address: 180 Synthetic Campus Drive
+      City: Sacramento
+      Region: CA
+      Postal Code: '95822'
+      Country: UNITED STATES
+      Latitude: 38.5338
+      Longitude: -121.4922
+    Year Built: 2010
+    Occupancy Percentage: 95
+    Auto Update: false
+  Property Uses:
+  - Property Use Type: Residence Hall/Dormitory
+    Description: Residence Hall/Dormitory
+    Primary: true
+    Gross Floor Area: 110000
+    Gross Floor Area Effective Date: 2023-01-01
+    Property Use Details:
+      Effective date for new value: 2023-01-01
+      Values:
+        Number of Rooms: 150
+        Computer Lab?: 'Yes'
+        Dining Hall?: 'No'
+        Percent That Can Be Cooled: 100
+        Percent That Can Be Heated: 100
+  Energy Data Sources:
+  - Meter: Lakeview Hall Electric Main
+    Energy From: Bills
+    Include: true
+    Meter Type: Standard
+  - Meter: Lakeview Hall Gas
+    Energy From: Bills
+    Include: true
+    Meter Type: Standard
+  - Meter: Lakeview Hall Steam
+    Energy From: Bills
+    Include: true
+    Meter Type: Standard
+  note: score-eligible; quarterly 1-100 score once PM-connected
+- key: es_property_recreation_center
+  installed:
+    esFacilityId: null
+  Property Setup:
+    Property: Recreation and Aquatics Center
+    Parent/Site: Northlake Main Campus
+    Primary Use: Fitness Center/Health Club/Gym
+    Auto Update: false
+  Details:
+    Address:
+      Address: 200 Synthetic Campus Drive
+      City: Sacramento
+      Region: CA
+      Postal Code: '95822'
+      Country: UNITED STATES
+      Latitude: 38.5333
+      Longitude: -121.4944
+    Year Built: 2015
+    Occupancy Percentage: 90
+    Auto Update: false
+  Property Uses:
+  - Property Use Type: Fitness Center/Health Club/Gym
+    Description: Fitness Center/Health Club/Gym
+    Primary: true
+    Gross Floor Area: 55000
+    Gross Floor Area Effective Date: 2023-01-01
+    Property Use Details:
+      Effective date for new value: 2023-01-01
+      Values:
+        Weekly Operating Hours: 105
+        Number of Workers on Main Shift: 12
+        Number of Computers: 10
+        Percent That Can Be Cooled: 100
+        Percent That Can Be Heated: 100
+  - Property Use Type: Swimming Pool
+    Description: Swimming Pool
+    Primary: false
+    Gross Floor Area: 10000
+    Gross Floor Area Effective Date: 2023-01-01
+    Property Use Details:
+      Effective date for new value: 2023-01-01
+      Values:
+        Approximate Pool Size: Short Course (25 yards x 20 yards)
+        Months in Use: 12
+        Location of Pool?: Indoor
+  Energy Data Sources:
+  - Meter: Recreation Center Electric Main
+    Energy From: Bills
+    Include: true
+    Meter Type: Standard
+  - Meter: Recreation Center Pool Gas
+    Energy From: Bills
+    Include: true
+    Meter Type: Standard
+  - Meter: Recreation Center Chilled Water
+    Energy From: Bills
+    Include: true
+    Meter Type: Chilled Water
+    Meter Type attribute: 'the attribute the list offers  # not confirmed'
+  - Meter: Recreation Center Steam
+    Energy From: Bills
+    Include: true
+    Meter Type: Standard
+  note: metrics only
+- key: es_property_parking_structure
+  installed:
+    esFacilityId: null
+  Property Setup:
+    Property: Parking Structure
+    Parent/Site: Northlake Main Campus
+    Primary Use: Parking
+    Auto Update: false
+  Details:
+    Address:
+      Address: 220 Synthetic Campus Drive
+      City: Sacramento
+      Region: CA
+      Postal Code: '95822'
+      Country: UNITED STATES
+      Latitude: 38.5346
+      Longitude: -121.496
+    Year Built: 2019
+    Occupancy Percentage: 100
+    Auto Update: false
+  Property Uses:
+  - Property Use Type: Parking
+    Description: Parking
+    Primary: true
+    Gross Floor Area: 180000
+    Gross Floor Area Effective Date: 2023-01-01
+    Property Use Details:
+      Effective date for new value: 2023-01-01
+      Values:
+        Completely Enclosed Parking Garage Size: 0
+        Partially Enclosed Parking Garage Size: 180000
+        Open Parking Lot Size: 0
+        Supplemental heating?: 'No'
+  Energy Data Sources:
+  - Meter: Parking Structure Electric Main
+    Energy From: Bills
+    Include: true
+    Meter Type: Standard
+  note: metrics only
+- key: es_property_cedar_row_apartments
+  installed:
+    esFacilityId: null
+  Property Setup:
+    Property: Cedar Row Apartments
+    Parent/Site: (multifamily property)
+    Primary Use: Multifamily Housing
+    Auto Update: false
+  Details:
+    Address:
+      Address: 1280 Cedar Row Lane
+      City: Sacramento
+      Region: CA
+      Postal Code: '95822'
+      Country: UNITED STATES
+      Latitude: 38.5472
+      Longitude: -121.4706
+    Year Built: 2012
+    Occupancy Percentage: 95
+    Auto Update: false
+  Property Uses:
+  - Property Use Type: Multifamily Housing
+    Description: Multifamily Housing
+    Primary: true
+    Gross Floor Area: 120000
+    Gross Floor Area Effective Date: 2023-01-01
+    Property Use Details:
+      Effective date for new value: 2023-01-01
+      Values:
+        'Total number of residential living units  # label not confirmed': 124
+        Number Of Residential Living Units Low-Rise: 124
+        Number Of Residential Living Units Mid-Rise: 0
+        Number Of Residential Living Units High-Rise: 0
+        'Number of Bedrooms  # label not confirmed': 200
+        Resident Population Type: Dedicated Student
+        Government Subsidized Housing?: 'No'
+        Number Of Laundry Hookups in units: 0
+        Number Of Common Laundry Hookups: 8
+        Percent That Can Be Heated: 100
+        Percent That Can Be Cooled: 100
+  - Property Use Type: Other - Recreation
+    Description: Other - Recreation
+    Primary: false
+    Gross Floor Area: 18400
+    Gross Floor Area Effective Date: 2023-01-01
+    Property Use Details:
+      Effective date for new value: 2023-01-01
+      Values:
+        Weekly Operating Hours: 84
+        Number of Workers on Main Shift: 4
+  Energy Data Sources: []
+  note: score-eligible; quarterly 1-100 score once PM-connected
+- key: es_property_cedar_row_a
+  installed:
+    esFacilityId: null
+  Property Setup:
+    Property: Cedar Row A
+    Parent/Site: Cedar Row Apartments
+    Primary Use: Multifamily Housing
+    Auto Update: false
+  Details:
+    Address:
+      Address: 400 Synthetic Grove Avenue
+      City: Sacramento
+      Region: CA
+      Postal Code: '95822'
+      Country: UNITED STATES
+      Latitude: 38.54765
+      Longitude: -121.4702
+    Year Built: 2012
+    Occupancy Percentage: 95
+    Auto Update: false
+  Property Uses:
+  - Property Use Type: Multifamily Housing
+    Description: Multifamily Housing
+    Primary: true
+    Gross Floor Area: 58000
+    Gross Floor Area Effective Date: 2023-01-01
+    Property Use Details:
+      Effective date for new value: 2023-01-01
+      Values:
+        'Total number of residential living units  # label not confirmed': 60
+        Number Of Residential Living Units Low-Rise: 60
+        'Number of Bedrooms  # label not confirmed': 96
+        Resident Population Type: Dedicated Student
+  Energy Data Sources:
+  - Meter: Cedar Row A Electric Master
+    Energy From: Bills
+    Include: true
+    Meter Type: Standard
+  - Meter: Cedar Row A Gas House
+    Energy From: Bills
+    Include: true
+    Meter Type: Standard
+  note: rolls up to the property score, not scored on its own
+- key: es_property_cedar_row_b
+  installed:
+    esFacilityId: null
+  Property Setup:
+    Property: Cedar Row B
+    Parent/Site: Cedar Row Apartments
+    Primary Use: Multifamily Housing
+    Auto Update: false
+  Details:
+    Address:
+      Address: 420 Synthetic Grove Avenue
+      City: Sacramento
+      Region: CA
+      Postal Code: '95822'
+      Country: UNITED STATES
+      Latitude: 38.54685
+      Longitude: -121.46955
+    Year Built: 2014
+    Occupancy Percentage: 95
+    Auto Update: false
+  Property Uses:
+  - Property Use Type: Multifamily Housing
+    Description: Multifamily Housing
+    Primary: true
+    Gross Floor Area: 62000
+    Gross Floor Area Effective Date: 2023-01-01
+    Property Use Details:
+      Effective date for new value: 2023-01-01
+      Values:
+        'Total number of residential living units  # label not confirmed': 64
+        Number Of Residential Living Units Low-Rise: 64
+        'Number of Bedrooms  # label not confirmed': 104
+        Resident Population Type: Dedicated Student
+  Energy Data Sources:
+  - Meter: Cedar Row B Electric Master
+    Energy From: Bills
+    Include: true
+    Meter Type: Standard
+  - Meter: Cedar Row B Gas House
+    Energy From: Bills
+    Include: true
+    Meter Type: Standard
+  note: rolls up to the property score, not scored on its own
+- key: es_property_cedar_row_common_house
+  installed:
+    esFacilityId: null
+  Property Setup:
+    Property: Cedar Row Common House
+    Parent/Site: Cedar Row Apartments
+    Primary Use: Other - Recreation
+    Auto Update: false
+  Details:
+    Address:
+      Address: 1304 Cedar Row Lane
+      City: Sacramento
+      Region: CA
+      Postal Code: '95822'
+      Country: UNITED STATES
+      Latitude: 38.54715
+      Longitude: -121.47085
+    Year Built: 2013
+    Occupancy Percentage: 100
+    Auto Update: false
+  Property Uses:
+  - Property Use Type: Other - Recreation
+    Description: Other - Recreation
+    Primary: true
+    Gross Floor Area: 18400
+    Gross Floor Area Effective Date: 2023-01-01
+    Property Use Details:
+      Effective date for new value: 2023-01-01
+      Values:
+        Weekly Operating Hours: 84
+        Number of Workers on Main Shift: 4
+  Energy Data Sources:
+  - Meter: Common House Electric Main
+    Energy From: Bills
+    Include: true
+    Meter Type: Standard
+  - Meter: Common House Gas
+    Energy From: Bills
+    Include: true
+    Meter Type: Standard
+  note: metrics only
+- key: es_property_central_plant
+  installed:
+    esFacilityId: null
+  Property Setup:
+    Property: Central Plant
+    Parent/Site: (standalone property)
+    Primary Use: Other - Utility
+    Auto Update: false
+  Details:
+    Address:
+      Address: 4122 Plant Service Road
+      City: Sacramento
+      Region: CA
+      Postal Code: '95822'
+      Country: UNITED STATES
+      Latitude: 38.53725
+      Longitude: -121.49685
+    Year Built: 1988
+    Occupancy Percentage: 100
+    Auto Update: false
+  Property Uses:
+  - Property Use Type: Other - Utility
+    Description: Other - Utility
+    Primary: true
+    Gross Floor Area: 58400
+    Gross Floor Area Effective Date: 2023-01-01
+    Property Use Details:
+      Effective date for new value: 2023-01-01
+      Values:
+        Weekly Operating Hours: 168
+        Number of Workers on Main Shift: 8
+  Energy Data Sources: []
+  note: 'metrics only; excluded from the campus academic benchmarking boundary Energy Data Sources left EMPTY on purpose: the 2025 request
+    below must be refused for an incomplete meter map. Energy Data Sources left EMPTY on purpose: the 2025 request below must be refused
+    for an incomplete meter map.'
+- key: ridgeline_not_an_es_property
+  installed: {}
+  Property Setup:
+    Property: Ridgeline Turbine Field; Ridgeline Substation
+    Parent/Site: Ridgeline Wind Site (Northlake Thermal Plant)
+    Primary Use: N/a (leave unconfigured)
+    Auto Update: false
+  note: 'not a property: no rating request, and no Ridgeline meter on any property, so Electric on Site Wind is never set'
+- key: es_request_lakeview_hall_2024q1
+  installed:
+    esRequestId: null
+  Rating Request:
+    Property: Lakeview Hall
+    Request Type: Building
+    Year Ending: 2024-03-31
+  expect: score once PM-connected
+- key: es_request_lakeview_hall_2024q2
+  installed:
+    esRequestId: null
+  Rating Request:
+    Property: Lakeview Hall
+    Request Type: Building
+    Year Ending: 2024-06-30
+  expect: score once PM-connected
+- key: es_request_lakeview_hall_2024q3
+  installed:
+    esRequestId: null
+  Rating Request:
+    Property: Lakeview Hall
+    Request Type: Building
+    Year Ending: 2024-09-30
+  expect: score once PM-connected
+- key: es_request_lakeview_hall_2024q4
+  installed:
+    esRequestId: null
+  Rating Request:
+    Property: Lakeview Hall
+    Request Type: Building
+    Year Ending: 2024-12-31
+  expect: score ~72 once PM-connected
+- key: es_request_lakeview_hall_2025q1
+  installed:
+    esRequestId: null
+  Rating Request:
+    Property: Lakeview Hall
+    Request Type: Building
+    Year Ending: 2025-03-31
+  expect: score trending up once PM-connected
+- key: es_request_lakeview_hall_2025q2
+  installed:
+    esRequestId: null
+  Rating Request:
+    Property: Lakeview Hall
+    Request Type: Building
+    Year Ending: 2025-06-30
+  expect: score trending up once PM-connected
+- key: es_request_lakeview_hall_2025q3
+  installed:
+    esRequestId: null
+  Rating Request:
+    Property: Lakeview Hall
+    Request Type: Building
+    Year Ending: 2025-09-30
+  expect: score trending up once PM-connected
+- key: es_request_lakeview_hall_2025q4
+  installed:
+    esRequestId: null
+  Rating Request:
+    Property: Lakeview Hall
+    Request Type: Building
+    Year Ending: 2025-12-31
+  expect: score ~78 once PM-connected
+- key: es_request_cedar_row_apartments_2024q1
+  installed:
+    esRequestId: null
+  Rating Request:
+    Property: Cedar Row Apartments
+    Request Type: Building
+    Year Ending: 2024-03-31
+  expect: score once PM-connected
+- key: es_request_cedar_row_apartments_2024q2
+  installed:
+    esRequestId: null
+  Rating Request:
+    Property: Cedar Row Apartments
+    Request Type: Building
+    Year Ending: 2024-06-30
+  expect: score once PM-connected
+- key: es_request_cedar_row_apartments_2024q3
+  installed:
+    esRequestId: null
+  Rating Request:
+    Property: Cedar Row Apartments
+    Request Type: Building
+    Year Ending: 2024-09-30
+  expect: score once PM-connected
+- key: es_request_cedar_row_apartments_2024q4
+  installed:
+    esRequestId: null
+  Rating Request:
+    Property: Cedar Row Apartments
+    Request Type: Building
+    Year Ending: 2024-12-31
+  expect: score once PM-connected
+- key: es_request_cedar_row_apartments_2025q1
+  installed:
+    esRequestId: null
+  Rating Request:
+    Property: Cedar Row Apartments
+    Request Type: Building
+    Year Ending: 2025-03-31
+  expect: score trending up once PM-connected
+- key: es_request_cedar_row_apartments_2025q2
+  installed:
+    esRequestId: null
+  Rating Request:
+    Property: Cedar Row Apartments
+    Request Type: Building
+    Year Ending: 2025-06-30
+  expect: score trending up once PM-connected
+- key: es_request_cedar_row_apartments_2025q3
+  installed:
+    esRequestId: null
+  Rating Request:
+    Property: Cedar Row Apartments
+    Request Type: Building
+    Year Ending: 2025-09-30
+  expect: score trending up once PM-connected
+- key: es_request_cedar_row_apartments_2025q4
+  installed:
+    esRequestId: null
+  Rating Request:
+    Property: Cedar Row Apartments
+    Request Type: Building
+    Year Ending: 2025-12-31
+  expect: score trending up once PM-connected
+- key: es_request_admin_hall_2024
+  installed:
+    esRequestId: null
+  Rating Request:
+    Property: Admin Hall
+    Request Type: Building
+    Year Ending: 2024-12-31
+  expect: metrics only, eligible=false, no score
+- key: es_request_admin_hall_2025
+  installed:
+    esRequestId: null
+  Rating Request:
+    Property: Admin Hall
+    Request Type: Building
+    Year Ending: 2025-12-31
+  expect: metrics only, eligible=false, no score
+- key: es_request_science_center_2025_pending
+  installed:
+    esRequestId: null
+  Rating Request:
+    Property: Science Center
+    Request Type: Building
+    Year Ending: 2025-12-31
+  expect: left pending; rp_ESRatingRequestLog shows a pending row
+- key: es_request_central_plant_2025_error
+  installed:
+    esRequestId: null
+  Rating Request:
+    Property: Central Plant
+    Request Type: Building
+    Year Ending: 2025-12-31
+  expect: submitted with an incomplete meter map on purpose; rp_ESRatingRequestLog shows an error row
 - key: pm_connection
   installed:
     systemConstantSet: false
   System Constants:
     Item: CustomerServer
     Type: String
-    Value: "(blank until a sandbox/real Portfolio Manager account is obtained -- product backlog item 1)"
-  note: "SystemConstantService.IsCustomerServerSetAsync() is what #/ESNewRatingRequest checks before it will submit
-    (EnergyStarController.IsConfiguredForRequests). Obtaining the sandbox account is Brandon's own action item;
-    the field stays blank in this pass."
+    Value: (blank until a sandbox/real Portfolio Manager account is obtained -- product backlog item 1)
+  note: 'SystemConstantService.IsCustomerServerSetAsync() is what #/ESNewRatingRequest checks before it will submit (EnergyStarController.IsConfiguredForRequests).
+    Obtaining the sandbox account is Brandon''s own action item; the field stays blank in this pass.'

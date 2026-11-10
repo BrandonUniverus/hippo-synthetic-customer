@@ -63,10 +63,10 @@ steps:
   Expected: The two registers show prompts MW and MWP; their previous prompts are KW and KWP (HMR_Reading.PreviousTextPrompt).
 - key: return_old_round
   Where: Task Manager, Northlake MVRS Gas Upload (Run now)
-  Action: Return the February round from the kept route file, read on 2025-02-28 in kW: KW 1294.60, KWP 1281.15.
+  Action: 'Return the February round from the kept route file, read on 2025-02-28 in kW: KW 1294.60, KWP 1281.15.'
   Expected: Both land on their kW points as read (1294.6 and 1281.15), matched through the previous prompts. Nothing is unmatched.
 - key: first_mw_round
-  Action: Export a new route file (prompts MW and MWP) and return the March 31, 2025 read in MW: MW 1.312, MWP 1.298.
+  Action: 'Export a new route file (prompts MW and MWP) and return the March 31, 2025 read in MW: MW 1.312, MWP 1.298.'
   Expected: Max Demand kW holds 1312 and On-Peak Max Demand kW 1298 at 2025-03-31 07:00 UTC.
 verify:
 - Max Demand kW's history reads 1294.6 (February) then 1312 (March) with no gap and no factor-of-1000 step.

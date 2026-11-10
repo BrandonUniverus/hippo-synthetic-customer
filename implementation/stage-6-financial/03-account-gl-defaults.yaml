@@ -18,11 +18,12 @@ notes:
   option; GL coding is the Liability Account and Default Expense Account fields below, present on every account
   regardless of its Bill Service Type.'
 - 'Bill Entry Type is Global_Status_Code ''BA2'': 0 Bill Entry, 1 Bill Importer, 2 Bill Generation, 3 Bill
-  Allocation, 10 Other. It follows Stage 5''s entry method per account, with the Cedar Row company scope beating
-  the provider default: Valley Electric and River City accounts import (1) except at Cedar Row, where every
-  account is manual (0); Sierra Gas and Helios Solar accounts are manual everywhere (0); the Thermal Plant''s six
-  internal allocation "bills" use Bill Allocation (3); the Ridgeline transfer statement uses Bill Generation (2),
-  the one account whose bill EEM generates.'
+  Allocation, 10 Other. RECONCILED 2026-11-10 with Stage 2 (01-billing-accounts.yaml), Stage 5 and the plan
+  (data/eem/northlake-bill-entry-v1.yaml): Valley Electric and River City accounts are Bill Importer (1) in EVERY company, Cedar
+  Row Apartments included (31 accounts: 14 + 17; the earlier version of this file made Cedar Row''s 10 manual, which is wrong:
+  the plan, Stage 2 and the importer step say nora.chen imports them); Sierra Gas and Helios Solar accounts are Bill Entry (0), 13
+  in all; the Thermal Plant''s six internal allocations are Bill Allocation (3); the Ridgeline transfer statement is Bill
+  Generation (2), the one account whose bill EEM generates. Totals 31 + 13 + 6 + 1 = 51.'
 - 'Liability Account is 2000-AP on every account in its own company''s chart, including the two negative
   controls below and Ridgeline''s GL-only transfer account - the AP/GL plan is explicit that the liability
   account is set "on every account, including the ones that never upload."'
@@ -31,12 +32,15 @@ notes:
   5130-THERMAL (charged to the receiving company, Northlake University - see 01-gl-accounts.yaml), Helios Solar
   -> 5140-SOLAR, Ridgeline Wind -> 5150-WIND (charged to the Thermal Plant company, the only company it bills).
   All seven GL codes must already exist in that account''s own company''s chart (Step 1).'
-- 'Two Bill Service Type values are deliberately exercised beyond the default: River City''s Cedar Row B account
-  is the negative control (No AP Upload - it must never appear in an export, checked by
-  `blocked_by_validation`/`export_formats_registered` in checks.sql); the Thermal Plant''s six internal
-  allocations use Bill Payment, since they settle between Northlake companies rather than through a real vendor
-  AP voucher; Ridgeline''s transfer account, which is GL only, takes Bill Payment too (Stage 2) and is the one
-  that must also stay out of every AP file, checked by `ridgeline_gl_only` in checks.sql.'
+- 'Bill Service Type, RECONCILED with Stage 2 and the plan (accountUploadFlags): AP Upload Only for every external utility
+  account (Valley Electric, Sierra Gas, River City) and for the six Thermal Plant cost centers ("internal allocations post to
+  the GL and settle between companies", the plan''s AP and GL); Bill Payment for the three Helios PPA accounts ("payment runs
+  outside AP", the plan''s GL) and for Ridgeline''s transfer account (GL only); No AP Upload for River City''s Cedar Row B, the
+  negative control that must never appear in an export (checked by `account_defaults` and `ap_export_run` in checks.sql).
+  The earlier version of this file had the Thermal Plant on Bill Payment and Helios on AP Upload Only, the reverse of Stage 2;
+  Stage 2 is what the screen holds, so this file follows it. A Helios account is Bill Payment, which is also what makes Pay
+  Amount appear on its bills (Stage 5, header_field_bills). Ridgeline''s transfer account is the one that must stay out of every
+  AP file, checked by `ridgeline_gl_only` in checks.sql.'
 - 'Added 2026-10-01 (Ridgeline Wind): two accounts join the Thermal Plant company. SYN-VED-A-0010014 (Ridgeline
   Substation / VED) is the Valley Electric generator account. It takes the Valley Electric defaults below (AP
   Upload Only, Bill Importer, 2000-AP, 5100-ELEC); in the customer''s terms it is "AP and GL", the AP/GL plan''s
@@ -55,7 +59,7 @@ records:
   Accounts (Northlake University, Bill Entry Type Bill Importer): [SYN-VED-A-0010001, SYN-VED-A-0010002, SYN-VED-A-0010003,
     SYN-VED-A-0010004, SYN-VED-A-0010007, SYN-VED-A-0010008, SYN-VED-A-0010009, SYN-VED-A-0010010]
   Accounts (Northlake Thermal Plant, Bill Entry Type Bill Importer): [SYN-VED-A-0010013, SYN-VED-A-0010014]  # 0010014 is the Ridgeline generator account, customer upload flag AP and GL
-  Accounts (Cedar Row Apartments, Bill Entry Type Bill Entry instead of Bill Importer): [SYN-VED-A-0010005,
+  Accounts (Cedar Row Apartments, Bill Entry Type Bill Importer): [SYN-VED-A-0010005,
     SYN-VED-A-0010006, SYN-VED-A-0010011, SYN-VED-A-0010012]
 - key: sgu_account_defaults
   installed: {}
@@ -73,20 +77,20 @@ records:
     SYN-RCU-A-0030002, SYN-RCU-A-0030007, SYN-RCU-A-0030008, SYN-RCU-A-0030009, SYN-RCU-A-0030010, SYN-RCU-A-0030011,
     SYN-RCU-A-0030012]
   Accounts (Northlake Thermal Plant, Bill Entry Type Bill Importer): [SYN-RCU-A-0030017]
-  Accounts (Cedar Row Apartments, Bill Entry Type Bill Entry instead of Bill Importer): [SYN-RCU-A-0030003,
+  Accounts (Cedar Row Apartments, Bill Entry Type Bill Importer): [SYN-RCU-A-0030003,
     SYN-RCU-A-0030004, SYN-RCU-A-0030013, SYN-RCU-A-0030014, SYN-RCU-A-0030015, SYN-RCU-A-0030016]
   Exception: {Account: SYN-RCU-A-0030004, Building: Cedar Row B, Bill Service Type: No AP Upload, Why: negative
     control - this account must never reach an export file}
 - key: ntp_account_defaults
   installed: {}
   Provider: Northlake Thermal Plant
-  Default: {Bill Service Type: Bill Payment, Bill Entry Type: Bill Allocation, Liability Account: 2000-AP, Default Expense Account: 5130-THERMAL}
+  Default: {Bill Service Type: AP Upload Only, Bill Entry Type: Bill Allocation, Liability Account: 2000-AP, Default Expense Account: 5130-THERMAL}
   Accounts (all Northlake University): [SYN-NTP-C-0000001, SYN-NTP-C-0000002, SYN-NTP-C-0000003, SYN-NTP-C-0000004,
     SYN-NTP-C-0000005, SYN-NTP-C-0000006]
 - key: hos_account_defaults
   installed: {}
   Provider: Helios Onsite Solar
-  Default: {Bill Service Type: AP Upload Only, Bill Entry Type: Bill Entry, Liability Account: 2000-AP, Default Expense Account: 5140-SOLAR}
+  Default: {Bill Service Type: Bill Payment, Bill Entry Type: Bill Entry, Liability Account: 2000-AP, Default Expense Account: 5140-SOLAR}
   Accounts (Northlake University): [SYN-HOS-P-0000001, SYN-HOS-P-0000002]
   Accounts (Cedar Row Apartments): [SYN-HOS-P-0000003]
 - key: rwl_account_defaults
@@ -95,3 +99,26 @@ records:
   Default: {Bill Service Type: Bill Payment, Bill Entry Type: Bill Generation, Liability Account: 2000-AP, Default Expense Account: 5150-WIND}
   Accounts (Northlake Thermal Plant): [SYN-RWL-G-0000001]
   Customer upload flag: GL only
+- key: per_line_coding
+  installed: {}
+  Purpose: >-
+    The Expense Account of individual bill lines (BillItem.BI_EXpAcctID), which no bill set before: every line fell back to the
+    account's Default Expense Account. Do this after step 1 (the GL accounts exist) and the defaults above. Where a line has an
+    Expense Account it wins over the account default (the GL builder reads COALESCE(BI_EXpAcctID, BA_DefExpAcctID)).
+  Bill Entry accounts (Bill Items grid column Expense Account, or the line item drawer's Expense Account):
+  - {Bill: SGU Student Center estimated bill (2024-10-15 to 2024-11-14), Lines: every line including the Gas therm Exclude line, Expense Account: 5110-GAS}
+  - {Bill: SGU Student Center corrected bill (same period), Lines: every line, Expense Account: 5110-GAS}
+  - {Bill: HOS Science Center Feb-25 (SYN-HOS-P-0000001), Lines: ppa_energy, net_metering_credit and rec_transfer, Expense Account: 5140-SOLAR}
+  Imported accounts (Bill Importer > Mappings > Commodity Mapping, the field labelled Expense code on each mapping row; it is stamped on the lines of bills imported AFTER it is set, so the bills imported in Stage 5 keep the account default unless the GL accounts were entered before them. Either enter step 1 before Stage 5's imports, or, for the three Ridgeline bills ved_ridgeline_generator_2024_07, ved_ridgeline_generator_2025_01 and ved_central_plant_2024_09, remove their import in the Workspace and import them again after the Expense codes are set):
+  - {Provider: Valley Electric District, Rows: every row of the VED commodity mapping (Electric, TOU; Demand; Fixed; Adjustment; Rider; Tax; Non-TOU energy; Reactive energy; Credit), Expense code: 5100-ELEC}
+  - {Provider: River City Utilities, Rows: Water, Sewer, Stormwater, Expense code: 5120-WATER}
+  Expect: >-
+    Every line of the three Bill Entry bills above, and of the three Ridgeline bills once re-imported, has BI_EXpAcctID set (checks.sql per_line_coding). Because the Bill Importer commodity mapping is per
+    commodity and the generator's generation_credit, bct_credit_transferred and the Central Plant's bct_credit_received all map to
+    the one commodity "Electric, Credit", the credit lines of the three bills carry the same account (5100-ELEC); the credit cannot
+    be coded to a different account on the generator than on the Central Plant. The credit is still coded once where it lands because
+    the generator's pair nets to 0.00 (ridgeline_bct_coded_once).
+  Finding candidate: >-
+    The chart has one expense account per provider, so no bill can be mixed-coded to two different expense accounts within a
+    provider (tax or credit lines to an account of their own, the most common real case); the Expense Account column works but
+    has nothing different to choose. Adding an account (for example 5190-TAX) to a chart is a Stage 6 step 1 change, not made here.

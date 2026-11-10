@@ -44,7 +44,7 @@ records:
       FROM DISK = N'C:\Hippo\Backups\EEMSuite_Northlake.stage10-final.<yyyyMMdd>.bak'
       WITH CHECKSUM;
   KeepBeside:
-    applicationVersion: 7.0.0.4005
+    applicationVersion: "read from the installed app at backup time (the tree builds 7.1; the earlier 7.0.0.4005 is stale)"
     instanceName: NorthLake
     repoCommit: "the energyhippo commit the installed app was built from at backup time (git rev-parse HEAD on that worktree)"
     gatewayInputDirectories: "C:\\ProgramData\\EEM Suite\\NorthLake\\Gateways (every profile's Input/Working/Backup/Error

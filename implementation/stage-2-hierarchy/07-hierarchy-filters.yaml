@@ -1,0 +1,36 @@
+# Stage 2, step 7: Hierarchy Filters (Database Administrator > Nodes, the tree's filter bar, manage filters; the
+# Hierarchy Filters page, HierarchyFilterManagerViewModel). Added 2026-11-10. One record per saved filter. Section keys are the
+# page's own parts in the order it lists them: Name, then Where, What, Who, and Matches (read only).
+# Not covered by checks.sql, which has no hierarchy-filter family: count the matches and compare.
+stage: 2
+step: 7
+title: Hierarchy filters
+app: Database Administrator
+screen: Nodes > Hierarchy Filters
+source:
+- implementation/stage-2-hierarchy/03-meters.yaml (the Meter Type keyword)
+notes:
+- 'A hierarchy filter is a saved rule that picks locations, meters or points. Open Nodes, use the tree filter bar to manage
+  filters, click New filter (or the Everything with a keyword quick start), and fill the parts in order: Name, Where (the
+  companies, then what the filter returns), What (the criteria; a node matches only when all are true), Who (who can use
+  it). Matches counts only when asked (Count matches).'
+- 'Utility Meters is the one filter: Northlake University meters whose Meter Type keyword is Utility Meter. Run after
+  Stage 2 step 3, since the keyword is assigned there. Expected count: every Northlake University meter with Meter Type =
+  Utility Meter in 03-meters.yaml. Count them from the file and compare with Count matches; nothing here is stored as an
+  expected number.'
+- 'Who can use it is Only me (the default), My group, or Everyone in my company (administrators only). Everyone in my
+  company is used so that the filter is visible to every Northlake University user.'
+records:
+- key: filter_nlu_utility_meters
+  installed:
+    filterId:
+  Name: Utility Meters  # assumed
+  Where:
+    Company: Northlake University
+    What should the filter return?: Meters
+  What:
+  - Criterion: Keyword
+    Keyword type: Meter Type
+    Relation: is one of
+    Values: [Utility Meter]
+  Who: Everyone in my company

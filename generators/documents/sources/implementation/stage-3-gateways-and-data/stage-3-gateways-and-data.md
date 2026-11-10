@@ -114,10 +114,34 @@ values (Channel, UOM, Multiplier) across every selected row at once; only the pe
 typed per row. 02-gateways.yaml gives the naming pattern and the count, not 128 individual lines.
 The Cedar Row water submeters are handheld meters: they go on no gateway and are set up in step 5.
 
+**Node flags and disabled records (added 2026-11-10).** Three things on the node and point pages
+that earlier versions of this step left at their defaults:
+
+- **Enable Data Gaps** is on for NOAA-KSAC, NOAA-KSMF and NTP-BACNET-PLANT-HEADERS, the feeds that
+  are polled live. The Stage 9 task Run DataGap Calculations (`hmDataGap_Exec`) only looks at points
+  on a node with the flag on, so before this it had nothing to do. It scans the last 100 days (the
+  `hmDaysBack` system constant) and, the first time it sees a point, flags every hourly interval
+  from the start of that window to the point's latest reading as missing. Expect thousands of gaps
+  per point on its first run after a live poll, and none for any node whose data is only from 2024:
+  that is why the AcquiSuite and MDEF nodes are not on this list.
+- **Enable Late Intervals** is on for ASQ-VED-STUDENT, MV90-MDEF-VED-SCIENCE and FIG-CEDAR-ROW-A-UNITS,
+  the feeds whose data arrives by file, and each of the three needs a **Next Batch Method** other than
+  Disabled: the late window ends at the method's next batch time, and the Late Intervals report
+  and Gateway Status report join on the method. The list is database data, not source, so pick the
+  entry that matches a daily delivery and write its name into 02-gateways.yaml. Because those three
+  feeds stopped delivering in 2024, the late scan flags the last 100 days of every point on them and
+  the report shows each node at 0 percent posting, Fail: the right answer for a feed that has gone
+  quiet, and one that clears only when a current file is delivered.
+- **One node and one point are disabled on purpose.** ASQ-VED-LAKEVIEW has IsEnabled 0 (the
+  Lakeview Hall logger was pulled in the renovation) and the Lakeview Hall laundry submeter on the
+  FIG campus node has Disabled 1 (the laundry room closed). The AcquiSuite gateway skips the node
+  and counts its two points as skipped; the FIG gateway skips the point and counts it in Skipped
+  Point Count. FIG reads no node IsEnabled, so only its points can be disabled.
+
 **Record:** the gateway id, each node id, and each point's parameter values once saved.
 
 **Check:** `gateway_types`, `gateway_types_retired`, `gateway_types_unlisted`,
-`gateway_points_bound`, `ridgeline_nodes_bound`.
+`gateway_points_bound`, `ridgeline_nodes_bound`, `node_scheduling_flags`.
 
 ## Step 3. Workflows and tasks
 
@@ -173,9 +197,14 @@ back what was actually stored.
 **Enter:** [04-acceptance-runs.yaml](04-acceptance-runs.yaml). The AcquiSuite case is four runs
 against the customer's own expected numbers, in one sequence on the live database with no restore:
 a file with a missing block, a backfill that closes it, the complete day over the filled day, and a
-replay of that same file. The remaining 26 format cases (five of them Ridgeline's, below) each name
-the sample file they need and whether the generator has produced it yet; only AcquiSuite has a
-sample today.
+replay of that same file. The remaining 31 format cases (five of them Ridgeline's, below, and one
+the Central Plant's August 2024 bill period) each carry a Status block: whether a sample exists, what
+would produce it, the expected result and the check. Only AcquiSuite has sample files in the
+repository. Most of the others are made by the `services/sources` producer, which delivers into a
+gateway's Input folder with `python -m services.sources deliver`; the BACnet, historian and
+handheld cases have their own services; Modbus has none yet; NOAA is public data with no fixed
+value. A check that reads NOT LOADED means the data is not in the database yet, not that a case
+failed.
 
 **The numbers that must match exactly:** the gap file, run first, lands 88 readings per point and
 1,780 kWh, missing 12:00 through 13:45 Pacific. The backfill file supplies exactly those eight
@@ -197,7 +226,23 @@ Interval and Summary reports for the affected points.
 
 **Record:** the workflow run id and the observed numbers for every case run.
 
-**Check:** `acquisuite_complete_day`, `replay_no_duplicates`, `gap_then_backfill`, `task_runs`.
+**The Central Plant case (added 2026-11-10).** The main meter is now rated VED-TOU-PRI, so its
+interval points need the bill period of `ved_central_plant_2024_09` behind them. The case is
+`mdef_central_plant_2024_09`: gateway Northlake VED MDEF Interval Import, node MV90-MDEF-VED-PLANT,
+points Delivered kWh 15m and Demand kW 15m (recorder VEDPLANT01, channels 1 and 2), local stamps
+after 2024-08-05 00:00 up to and including 2024-09-05 00:00, which is 2,976 readings per point. Cut
+by the Stage 4 grids, the kWh must sum to 412,800 peak (528 intervals), 368,400 part-peak (704)
+and 731,200 off-peak (1,744) kWh, 1,512,400 in all, with a 3,240 kW maximum; re-running the Stage 4
+test with Load from Point on these points must then give the bill's $303,951.62. Run
+`central_plant_tou_period_totals` to see each figure beside its expected value.
+
+**Check:** `acquisuite_complete_day`, `replay_no_duplicates`, `gap_then_backfill`, `task_runs`, and for
+the other format cases `mdef_valley_electric_month`, `central_plant_tou_period_totals`,
+`mv9_helios_rules`, `bacnet_history_tie_out`, `noaa_observation_sanity`, `noaa_history_scope`,
+`spinwave_days`, `fig_cedar_row_water_days`, `fixed_network_days`, `feed_archive_intervals` and
+`fake_smoke_day`. Each prints Expected, Actual and a Status. `replay_no_duplicates` now counts every
+archived row of the two Student Center points (it used to test the archive's primary key, which
+cannot fail).
 
 ## Step 5. Handheld meter reading routes
 
@@ -323,6 +368,11 @@ is empty until Step 2 has bound the measured points; this is why the step moved 
 the two Science Center baselines, and Average of Top 5 Days (a curtailment baseline) on the Student
 Center demand baseline, which bids into Valley Electric District demand response.
 
+**Seven seeded algorithms are not used** (Average of 3 Days in 7, Yesterday, Last 5 Days, Last 10
+Days, Other Baseline, Other Forecast and EnergyAI Baseline). A baseline needs a Stage 2 point shell
+and enough history to give a known result; the recipe has neither, since the Student Center demand
+point holds one loaded day and Average of Top 5 Days already needs five.
+
 **Record:** nothing new; these are edits to points recorded in Stage 2.
 
 **Check:** `baselines`.
@@ -403,8 +453,11 @@ July day.
   parameters, with no interval below 300 seconds.
 - The AcquiSuite complete-day, replay, gap and backfill cases show the exact expected numbers on
   the Time Interval and Summary reports.
-- Every remaining format case, Ridgeline's five included, is recorded as either run, or open work
-  waiting on its sample file or service.
+- Every remaining format case, Ridgeline's five and the Central Plant's included, is recorded as
+  either run, or open work waiting on its sample file or service, and its check reads PASS (or NOT
+  LOADED while it waits).
+- `node_scheduling_flags` reads PASS on every row: the data-gap and late-interval flags, the
+  disabled Lakeview Hall node and laundry point.
 - The July 2024 Ridgeline SCADA day shows 144 readings per point at the right UTC and stored local
   stamps that read Pacific civil time, which verifies the UTC-plus-offset workaround (finding 49).
 - The nine read types and the ten handheld routes (192 meters, 204 registers) are entered with

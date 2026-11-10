@@ -116,7 +116,10 @@ def build_data(documents):
         profiles.append({"Key": profile_key, "Name": gateway["Gateway"]["Description"], "Vendor": vendor})
         for node in gateway["Nodes"]:
             nodes.append({"Profile": profile_key, "Key": node["key"], "Name": node["Description"],
-                          "Params": parameter_values(definition.get("Node Parameters", []), node.get("Node Parameters", {}))})
+                          "Params": parameter_values(definition.get("Node Parameters", []), node.get("Node Parameters", {})),
+                          # The node's two scan flags, as the recipe sets them (off unless stated).
+                          "LateIntervals": bool(node.get("Enable Late Intervals", False)),
+                          "DataGaps": bool(node.get("Enable Data Gaps", False))})
             for binding in expand_points(node.get("Points", [])):
                 channel = binding["channel"]
                 if channel in assigned:

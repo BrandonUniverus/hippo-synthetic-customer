@@ -69,8 +69,20 @@ notes:
   03-workflows-and-tasks.yaml).'
 - 'Fake Gateway needs one custom workflow: FakeGateway followed by IntervalDataPublish. The installed MvrsGateway
   already includes HmrEventsPublish; do not create a separate HMR workflow, gateway or task. See 03-workflows-and-tasks.yaml.'
-- 'Next Batch Method on every node below is left at Disabled: it is a legacy per-node scheduling hook that
-  predates Task Manager, and nothing in Northlake''s task-based scheduling reads it.'
+- 'Node flags (added 2026-11-10). Enable Data Gaps and Enable Late Intervals are node toggles on the Gateway Configuration node page,
+  beside Next Batch Method. They feed the Stage 9 task Run DataGap Calculations (hmDataGap_Exec), which scans only points on a node
+  with a flag on. Enable Data Gaps is on for NOAA-KSAC, NOAA-KSMF and NTP-BACNET-PLANT-HEADERS, the live-polled feeds. Enable Late
+  Intervals is on for ASQ-VED-STUDENT, MV90-MDEF-VED-SCIENCE and FIG-CEDAR-ROW-A-UNITS, the feeds whose data arrives by file. Every
+  other node keeps both off. What each produces is in the chapter, Step 2, and is asserted by checks.sql node_scheduling_flags.'
+- 'Next Batch Method stays Disabled on every node except the three Late Intervals nodes. The Late Intervals page, the Gateway Status report
+  and the late scan all need a method that is not Disabled, because the late window ends at the method''s next batch time. The list
+  is database data (hmNextBatchMethod, read by the picker), not source, so its names are not fixed here: on those three nodes open the
+  picker, choose the entry that matches a daily delivery, and write its name into Next Batch Method # assumed. If the list holds
+  only Disabled, leave the three nodes as they are and record that as a finding.'
+- 'Disabled on purpose (added 2026-11-10): node ASQ-VED-LAKEVIEW (IsEnabled 0) and point Lakeview Hall Laundry Delivered kWh 60m
+  (FIG Disabled 1). The AcquiSuite gateway skips a disabled node and counts its two points as skipped; the FIG gateway skips a
+  disabled point and counts it in Skipped Point Count (AcquiSuiteGatewayComponent, FIGGatewayComponent). FIG reads no node IsEnabled, so
+  a FIG node cannot be disabled; its points carry the Disabled column.'
 - 'Parameters shown under "Schedule parameters" are not entered on this gateway screen or as fixed
   task defaults. They are the per-profile values to enter on a schedule of the reusable task in
   03-workflows-and-tasks.yaml. Leave the reusable task GatewayId and RootDirectory blank; choose the
@@ -380,8 +392,8 @@ records:
   Nodes:
   - key: node_asq_ved_student
     Description: ASQ-VED-STUDENT
-    Next Batch Method: Disabled
-    Enable Late Intervals: false
+    Next Batch Method: the picker's daily-delivery entry   # assumed: the late scan needs a method; write the name chosen here
+    Enable Late Intervals: true   # assumed (added 2026-11-10): the logger posts a file; see the Next Batch Method note at the top
     Enable Data Gaps: false
     Node Parameters:
       IsEnabled: 1
@@ -403,7 +415,7 @@ records:
     Enable Late Intervals: false
     Enable Data Gaps: false
     Node Parameters:
-      IsEnabled: 1
+      IsEnabled: 0   # assumed (added 2026-11-10): logger ASQVED02 was pulled in the Lakeview Hall renovation; the node stays so its two points keep their history, and the gateway skips it
       Serial Number: ASQVED02
     Points:
     - channel: ch_ved_lakeview_hall_kwh_15m
@@ -435,7 +447,8 @@ records:
   Nodes:
   - key: node_mv90_mdef_science
     Description: MV90-MDEF-VED-SCIENCE
-    Next Batch Method: Disabled
+    Next Batch Method: the picker's daily-delivery entry   # assumed: the late scan needs a method; write the name chosen here
+    Enable Late Intervals: true   # assumed (added 2026-11-10): the data arrives by file; see the Next Batch Method note at the top
     Node Parameters: {IsEnabled: 1, TimeStampType: UTC}
     Points:
     - channel: ch_ved_science_center_kwh_15m
@@ -595,6 +608,7 @@ records:
   - key: node_bacnet_plant
     Description: NTP-BACNET-PLANT-HEADERS
     Next Batch Method: Disabled
+    Enable Data Gaps: true   # assumed (added 2026-11-10): live-polled feed, a missed hour is a real hole
     Node Parameters: {"BBMD Address": '', "BBMD UDP Port": ''}
     Points:
     - channel: ch_ntp_plant_chw_ton_hours_hourly
@@ -659,6 +673,7 @@ records:
   - key: node_noaa_ksac
     Description: NOAA-KSAC
     Next Batch Method: Disabled
+    Enable Data Gaps: true   # assumed (added 2026-11-10): live-polled feed, a missed hour is a real hole
     Node Parameters:
       IsEnabled: 1
       WeatherKind: Observation
@@ -751,6 +766,7 @@ records:
   - key: node_noaa_ksmf
     Description: NOAA-KSMF
     Next Batch Method: Disabled
+    Enable Data Gaps: true   # assumed (added 2026-11-10): live-polled feed, a missed hour is a real hole
     Node Parameters:
       IsEnabled: 1
       WeatherKind: Observation
@@ -1170,7 +1186,8 @@ records:
   Nodes:
   - key: node_fig_fn_cedar_a
     Description: FIG-CEDAR-ROW-A-UNITS
-    Next Batch Method: Disabled
+    Next Batch Method: the picker's daily-delivery entry   # assumed: the late scan needs a method; write the name chosen here
+    Enable Late Intervals: true   # assumed (added 2026-11-10): the data arrives by file; see the Next Batch Method note at the top
     Points:
     - channel: ch_cedar_row_a_house_kwh_60m
       Description: Submeter kWh 60m
@@ -1209,7 +1226,7 @@ records:
       Description: Submeter kWh 60m
       Company: Northlake University
       Meter: {Description: Lakeview Hall Laundry Electric, Meter Number: SYN-SUB-E-LV01}
-      Point Parameters: {"Point Alias": FN_LAKEVIEW_LAUNDRY_E, Channel: "01", UOM: kWh, Multiplier: 1, OffsetTimeMinutes: 0}
+      Point Parameters: {"Point Alias": FN_LAKEVIEW_LAUNDRY_E, Channel: "01", UOM: kWh, Multiplier: 1, OffsetTimeMinutes: 0, Disabled: 1}   # assumed (added 2026-11-10): the laundry room closed and its machines were removed; the point stays on the node, set Disabled to 1 and the gateway skips it
     - channel: ch_parking_structure_ev_kwh_60m
       Description: Submeter kWh 60m
       Company: Northlake University

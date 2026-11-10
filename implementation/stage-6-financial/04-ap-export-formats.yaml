@@ -1,95 +1,183 @@
-# Stage 6, step 4: AP/GL export formats, runnable from Web SPA #/reporting/APApprovalAndUpload. NONE ARE
-# RUNNABLE TODAY in this installed instance - see Findings. This file states the target formats so the content
-# is ready the moment an ExportSetup row (and, for the five Northlake-specific formats, a builder proc) exists.
-#
-# Verified against EEMSuite_Northlake: BOTH ExportSetup (0 rows) and PermissionCatalog TypeKey='EX' (0 rows) are
-# empty. Exports_Get (Database/EEMSuite/Procs/Exports_Get.sql) inner-joins PermissionCatalog to ExportSetup_View
-# on ExportName, so with neither side seeded, the Preview/Create Interface File picker has nothing to show for
-# any format, built-in or Northlake-specific. Checked against the EEMSuite upgraded-demo database for
-# comparison: it has both PermissionCatalog rows (export_ap "Accounts Payable (AP)", export_ap2 "Accounts
-# Payable (AP) Thirvine" - Database/EEMSuite/Scripts/SeedPermissionCatalogLanguage.sql) and both ExportSetup
-# rows, the latter pointing at HIPPODemo-schema procs (HIPPODemo.EEM_AP_BillsForApproval_Get / _UploadFile_Get,
-# etc.). That confirms these "built-in" formats are themselves a per-install customization (a demo customer's
-# own catalog entries and builder procs), not core, always-present product objects - Northlake's install simply
-# never received that customization. Product-gap-backlog.md item 2 already recommends dev work for the five
-# richer formats; this finding means the same two-part gap (catalog entry + ExportSetup row + builder proc)
-# applies, for this instance, to the two the plan called built-in.
+# Stage 6, step 4: one AP export format and one GL export format, specified end to end for the page
+# #/reporting/APApprovalAndUpload (Preview Interface File, Create Interface File). WHAT THE SCREENS CAN AND CANNOT DO,
+# read from the product on 2026-11-10:
+#   - A format is one row of dbo.ExportSetup (ExportName, ExportLogType, ApprovalSQL, UploadFileSQL, FileType, StatusCode,
+#     BatchSQL, BatchPrefix, ShowJournalDate, ShowDates), a dbo.PermissionCatalog row with TypeKey 'EX' and the same key as
+#     its ExportName, a grant of that key to a group (dbo.Permissions, PermissionType 'EX'; EEMPermissionTypes.BillExportMethod),
+#     and two customer-written stored procedures that ExportSetup names: the approval builder (the list of bills) and the upload
+#     builder (the file text). Exports_Get, ExportSetup_View, rp_FinancialInterfaceApproval and rp_FinancialInterfaceUpload read
+#     all of that; NO screen, API or script in the product creates any of it (the only writers are the Massport upgrade scripts
+#     Schemas/MPA/InitialImport/Migrations/MPA.InitialConfiguration.sql and Schemas/MPA/Scripts/MPA.ProcedureBindings.sql, which
+#     UPDATE rows a legacy customer database already had). The older template path (ExportType, ExportTemplate) has tables and
+#     two lookup rows (APINV, APDIS) and no screen either.
+#   - Therefore a format cannot be "entered on screen". What follows is the definition the rows and the two builders must
+#     meet, so the day someone installs them the run is verifiable. It is a PRODUCT FINDING CANDIDATE and no SQL is invented here:
+#     the procedure bodies are not written, only what they must return.
+#   - What IS entered on screen: SysConstants (Configuration Tool > System Constants) UploadDirAP, uaExportApprovedBills; the bill
+#     statuses; the page itself (filter, Approve checkboxes, Preview, Create).
 stage: 6
 step: 4
-title: AP/GL export formats
-app: Web SPA (target - no ExportSetup row exists for any format in this instance)
-screen: '#/reporting/APApprovalAndUpload (target: Preview/Create Interface File format picker)'
+title: AP and GL export formats
+app: Web SPA (a target; nothing in the product creates the format rows or builders)
+screen: '#/reporting/APApprovalAndUpload (Preview Interface File, Create Interface File)'
 source:
 - data/eem/northlake-ap-gl-v1.yaml
 - generators/documents/sources/implementation/dream-customer/phase3-ap-gl-validation-spec.md
-- generators/documents/sources/implementation/dream-customer/product-gap-backlog.md
 - documents/guides/chart-of-accounts-and-gl-guide.pdf
+- Database/EEMSuite/Procs/rp_FinancialInterfaceApproval.sql
+- Database/EEMSuite/Procs/rp_FinancialInterfaceUpload.sql
+- Database/EEMSuite/Procs/Exports_Get.sql
+- Database/EEMSuite/Views/ExportSetup_View.sql
+- Database/EEMSuite/Schemas/MPA/Procs/MPA.MPA_FI_AP_BillsForApproval_Get.sql
+- Database/EEMSuite/Schemas/MPA/Procs/MPA.MPA_RevertExports.sql
+- src/Web/EEMSuite.Web/frontend/src/scripts/hippo/reports/apApprovalAndUpload.ts
 notes:
-- 'ExportType lookup (verified, 2 rows): APINV "AP Invoice Header", APDIS "AP Distribution Details" - both csv,
-  both already present and usable by whichever ExportSetup row references them once one exists.'
-- The five Northlake-specific formats are unchanged from the AP/GL plan; this file only corrects which two are
-  demo-only versus core product, per the Stage 5 Findings' three-value Bill Service Type correction.
-- 'Added 2026-10-01 (Ridgeline Wind): no format is added, but every builder pair now carries a routing rule for the
-  two Ridgeline accounts (ridgeline_routing below). The transfer statement (SYN-RWL-G-0000001) is GL only, "a
-  journal between the plant and its own wind company" with no payment leaving the plant (chart-of-accounts guide),
-  so no file of vendor invoices may carry it and only the GL journal does. The generator account''s bill
-  (SYN-VED-A-0010014) is an ordinary AP voucher. The bill credit transfer is coded once, on the Central Plant bill
-  where it lands: the generator''s voucher carries no net credit and the Central Plant''s carries it.'
+- 'How a run works (rp_FinancialInterfaceApproval / rp_FinancialInterfaceUpload, read not run). (1) The page lists Exports_Get rows
+  (ExportSetup joined to PermissionCatalog TypeKey EX, active, and granted to the user). (2) Picking one runs the ApprovalSQL
+  procedure with @HeaderDate and @ObjectID; it must return, in this order, BillID, AccountNo, CompanyName, FiscalYear, FiscalPeriod,
+  PeriodStart, PeriodEnd, DueDate, BillAmount, Status, CurrencyUnit, StatusCode, ErrorTags, IsError, ImageCount. A bill with a
+  non-empty ErrorTags is an exception and cannot be approved. The grid has an Approve checkbox per valid bill (Check All in the
+  header) and a totals grid with the rows Approved, Un-approved and Exceptions, each with a bill count and an amount. There is no
+  fiscal-period parameter: a period is chosen by filtering the Fiscal column and ticking those bills. (3) BatchSQL returns one
+  value, the Batch Number shown under the grid. (4) Preview Interface File calls the UploadFileSQL procedure with @SaveData = 0 and
+  shows its text in a new tab; nothing is written. (5) Create Interface File asks "You are about to create an Accounts Payable
+  (AP) upload file ... status ... changed to uploaded", then with @SaveData = 1, inside one transaction: refuses a bill that is
+  already in ExportLog for this ExportLogType or already has the format''s StatusCode in its StatusHistory (error
+  accounts-payable.bills.already-exported); inserts ONE ExportFile row (ExportDate, ExportFile = the SysConstants UploadDirAP
+  path + BatchPrefix + Batch Number + "." + FileType, ExportShortName = the file name, ExportData = the whole text); inserts one
+  ExportLog row per bill (ExportType = ExportLogType, BillID, ExportAmount = Bill.BL_Amount, ExportFileID); inserts a StatusHistory
+  row (Table_Code BL, Status_Code = ExportSetup.StatusCode) and sets Bill.Status_Code and BL_StatusDate; queues the built-in task
+  AP_EMAILER_TASK with the ExportFileID, which mails the file (needs Stage 9 mail). Running the same request again returns the
+  first file (WasAlreadyCreated).'
+- A bill becomes read-only once exported, so the bills of a period are exported after they are final (Stage 5 step 3 note).
+- 'Why two formats and not seven: the earlier version of this file listed seven target formats (export_ap, export_ap2, nl_ap_gludf,
+  nl_ap_voucher, nl_gl_journal, nl_sap_fi, nl_ar_interface), none specifiable. One AP and one GL are enough to exercise preview,
+  create, the three tables, the status change, the already-exported refusal and the revert; the others stay unspecified
+  (other_formats_not_specified).'
 records:
-- key: export_ap
+- key: export_prerequisites
   installed: {}
-  Format: export_ap
-  Structure: fixed-width .txt, one record per bill line
-  Status: >-
-    BLOCKED - neither a PermissionCatalog 'EX' row nor an ExportSetup row exists in EEMSuite_Northlake. Needs
-    both a PermissionCatalog row (TypeKey='EX', PermissionKey='export_ap') and a Northlake-specific ExportSetup
-    row (ExportName='export_ap', ApprovalSQL/UploadFileSQL pointing at Northlake builder procs following the
-    demo's HIPPODemo.EEM_AP_BillsForApproval_Get / EEM_AP_UploadFile_Get pattern) before it can run here.
-- key: export_ap2
+  On screen (Configuration Tool > System Constants):
+  - {Item: UploadDirAP, Type: Character, Value: 'C:\Hippo\NorthlakeExports\AP\'}  # assumed path: the folder must exist and be writable by the API service; the proc appends a backslash when it is missing
+  - {Item: uaExportApprovedBills, Type: Integer, Value: 1}  # the builder admits only QC-approved bills (Status_Code 2, StatusHistory BL 2), as the Massport builder does when this is 1
+  Built-in task: AP_EMAILER_TASK (Tasks, Stage 9) with a mail route, so Create Interface File can queue the mail; without it Create fails and rolls back.
+  Not on any screen (product finding candidate, see finding_candidates):
+  - dbo.ExportSetup rows nl_ap_invoice and nl_gl_journal as given below
+  - dbo.PermissionCatalog rows (TypeKey EX, PermissionKey nl_ap_invoice, DescriptionFallback 'Accounts Payable (AP) Northlake'; PermissionKey nl_gl_journal, DescriptionFallback 'General Ledger (GL) Northlake') and the Permissions grant of both keys to the company administrator group
+  - the four builder procedures, in the Northlake schema (which exists: Database/EEMSuite/Schemas/Northlake holds the Stage 2 import functions)
+- key: nl_ap_invoice
   installed: {}
-  Format: export_ap2
-  Structure: .csv, fixed-width-in-CSV at bill grain
-  Status: BLOCKED - same as export_ap; neither the PermissionCatalog row nor the ExportSetup row exists.
-- key: nl_ap_gludf
-  installed: {}
-  Format: nl_ap_gludf
-  Structure: fixed-width header+detail, GL-UD-field coded (Sacramento-County style)
-  Status: NEEDS DEV (product-gap-backlog.md item 2) - depends on 02-gl-fields.yaml, itself blocked on the
-    missing GL user-defined-fields view.
-- key: nl_ap_voucher
-  installed: {}
-  Format: nl_ap_voucher
-  Structure: fixed-width C/H/L/D records, PeopleSoft AP voucher
-  Status: NEEDS DEV (product-gap-backlog.md item 2).
+  Format: nl_ap_invoice
+  Structure: comma-delimited .csv, one header row, one detail row per bill and expense account, one trailer row
+  ExportSetup row (the values the row must hold):
+    ExportName: nl_ap_invoice
+    ExportLogType: APINV           # the ExportType lookup already holds APINV "AP Invoice Header" (csv); ExportLog.ExportType is char(10)
+    ApprovalSQL: '[Northlake].[AP_BillsForApproval_Get]'
+    UploadFileSQL: '[Northlake].[AP_UploadFile_Get] @SaveData=@SaveData,'
+    BatchSQL: '[Northlake].[AP_GetBatch]'       # returns one column, BatchName, the timestamp yyyyMMddHHmmss (the Massport AP_GetFileDate shape)
+    BatchPrefix: NLAP_
+    FileType: csv
+    StatusCode: 3                  # the status the export writes to StatusHistory; # assumed 3, the code the Massport AP rows use for the AP upload status (confirm its Global_Status_Code BL description)
+    ShowJournalDate: 0
+    ShowDates: 0
+  Approval builder admits a bill when (all of):
+  - Bill.Status_Code = 2 and a StatusHistory (BL, 2) row exists
+  - Bill.BillType = 0 (an estimate or an accrual is an exception row, tag 'Estimated Bill Flag set', as in the Massport builder; an accrual never reaches AP)
+  - BillingAccount.Type_Code in (1, 2) (AP Upload Only or Bill Payment; 0 No AP Upload is the Cedar Row B control)
+  - BillingAccount.BillType_Code <> 2 (Bill Generation: keeps Ridgeline's GL-only transfer statement out, see ridgeline_routing)
+  - the account is Active (BillingAccount.Status_Code = 1)
+  - no ExportLog row of ExportType APINV exists for the bill
+  - no BillValidation_Tbl row of any kind exists for the bill (an open alert holds an approved bill; Stage 6 step 5)
+  Exceptions (ErrorTags set, IsError 1, cannot be approved): Missing Invoice Number; Missing Vendor Number (CompanyProvider.CP_VendorNbr); Bill Item Not Assigned To Meter; Fiscal Period incorrect.
+  Rows:
+    Header: 'H,NLAP,<HeaderDate yyyyMMdd>,<Batch Number>'
+    Detail: 'D,<CompanyProvider.CP_VendorNbr>,<Bill.BL_InvoiceNumber>,<BL_BillDate yyyyMMdd>,<BL_DueDate yyyyMMdd, empty when none>,<amount, 2 decimals>,<liability account code, 2000-AP>,<expense account code>,<BA_BillingAccountNumber>'
+    Detail grain: one row per bill and expense account, the amount being the sum of the bill's lines coded to that account (BI_EXpAcctID, else the account's BA_DefExpAcctID); with one expense account per provider that is one row per bill
+    Trailer: 'T,<number of detail rows>,<sum of detail amounts, 2 decimals>'
+  File name pattern: '^NLAP_[0-9]{14}\.csv$'  # in the UploadDirAP folder; ExportFile.ExportShortName is the name alone
 - key: nl_gl_journal
   installed: {}
   Format: nl_gl_journal
-  Structure: fixed-width H/L records, PeopleSoft GL journal, balanced debit/credit pairs
-  Status: NEEDS DEV (product-gap-backlog.md item 2); the only format that carries the GL-only Ridgeline transfer
-    statement (see ridgeline_routing).
-- key: nl_sap_fi
-  installed: {}
-  Format: nl_sap_fi
-  Structure: comma-delimited, SAP FI document
-  Status: NEEDS DEV (product-gap-backlog.md item 2).
-- key: nl_ar_interface
-  installed: {}
-  Format: nl_ar_interface
-  Structure: fixed-width, AR interface (Phase 4 tenant rebilling)
-  Status: NEEDS DEV (product-gap-backlog.md item 2); out of Stage 6's scope (Phase 4/Stage 7).
+  Structure: comma-delimited .csv journal, one header row, balanced debit and credit lines, one trailer row
+  ExportSetup row (the values the row must hold):
+    ExportName: nl_gl_journal
+    ExportLogType: GLJNL           # a new value; ExportLog.ExportType has no foreign key to ExportType, so it needs no lookup row
+    ApprovalSQL: '[Northlake].[GL_BillsForApproval_Get]'
+    UploadFileSQL: '[Northlake].[GL_UploadFile_Get] @SaveData=@SaveData,'
+    BatchSQL: '[Northlake].[AP_GetBatch]'
+    BatchPrefix: NLGL_
+    FileType: csv
+    StatusCode: 7                  # # assumed 7, the code the Massport GL row uses
+    ShowJournalDate: 1             # the page then asks for the journal date, passed as @HeaderDate
+    ShowDates: 0
+  Approval builder admits a bill when: the same list as nl_ap_invoice EXCEPT that Bill Entry Type Bill Generation is admitted (Ridgeline's transfer statement is the GL-only bill and only this format carries it), the bill has no ExportLog row of type GLJNL, and Bill Type 2 (accrual) stays out (accruals have their own GL export, not specified here).
+  Rows:
+    Header: 'J,<HeaderDate yyyyMMdd>,<Batch Number>,NLU'
+    Debit line: 'L,<Batch Number>,<line number>,<expense account code>,<amount>,0.00,<BA_BillingAccountNumber> <fiscal year>-<fiscal period>'
+    Credit line: 'L,<Batch Number>,<line number>,2000-AP,0.00,<bill amount>,<BA_BillingAccountNumber> <fiscal year>-<fiscal period>'
+    Grain: per bill, one debit line per expense account the bill's lines are coded to and one credit line of the bill's total to its Liability Account; a negative expense amount (a credit line) is written as a debit of that negative figure so the pair still balances
+    Trailer: 'T,<number of L lines>,<sum of debits>,<sum of credits>'  # the two sums are equal
+  File name pattern: '^NLGL_[0-9]{14}\.csv$'
 - key: ridgeline_routing
   installed: {}
-  Format: no new format - which Ridgeline bills each existing format may carry
-  Structure: a selection rule in each format's approval builder, not a file layout
+  Format: no new format - which Ridgeline bills each format carries
+  Structure: a selection rule in each approval builder, not a file layout
   SYN-RWL-G-0000001 (transfer statement, GL only):
     Carried by: nl_gl_journal
-    Never carried by: every file of vendor invoices - export_ap, export_ap2, nl_ap_gludf, nl_ap_voucher, and nl_sap_fi
-      when it carries invoices
+    Never carried by: nl_ap_invoice (Bill Entry Type Bill Generation is excluded by the AP builder)
   SYN-VED-A-0010014 (Valley Electric generator, AP and GL):
-    Carried by: the AP formats and nl_gl_journal
+    Carried by: both formats
     Voucher: its own charges only (first bill total 1077.45); the generation credit and the transferred line net to 0.00
-  Status: TARGET - no builder exists in this instance (see the formats above), so this is the rule to build in,
-    checked by ridgeline_gl_only in checks.sql. The statement is held out of AP files by Bill Entry Type (Bill
-    Generation, BillType_Code 2), not by Bill Service Type, because EEM has no GL-only value, Bill Payment is only the
-    nearest, and the Massport AP approval builder (MPA.MPA_FI_AP_BillsForApproval_Get) admits Type_Code 2 as "both AP
-    and BI".  # assumed - the exclusion column is a design choice for the Northlake builders
+  Status: TARGET - no builder exists in this instance, so this is the rule to build in, checked by ridgeline_gl_only in checks.sql. The statement is held out of AP files by Bill Entry Type (Bill Generation, BillType_Code 2), not by Bill Service Type, because EEM has no GL-only value, Bill Payment is only the nearest (Helios accounts are Bill Payment and ARE AP-eligible in this design), and the Massport AP approval builder admits Type_Code 2 as "both AP and BI".  # assumed: the exclusion column is a design choice for the Northlake builders
+- key: ap_export_run
+  installed: {}
+  Purpose: one AP run for one named period, once the rows and builders exist.
+  Period: 'fiscal 2024-09 (Sep-24: the bills posting to September 2024, which for Valley Electric are 2024-08-05 to 2024-09-04)'
+  Steps:
+  - Open #/reporting/APApprovalAndUpload, pick Accounts Payable (AP) Northlake, filter to Northlake University (and again to Cedar Row Apartments and Northlake Thermal Plant, or leave the company filter empty to take all three)
+  - Header Date 2024-10-01  # assumed
+  - filter the Fiscal column to 2024-09 and read the totals grid (Approved / Un-approved / Exceptions)
+  - tick Approve on every valid 2024-09 bill (Check All, then clear any other period), press Preview Interface File and read the text, then Create Interface File and answer Yes
+  Expect:
+    Bills in the period at this point: 44 (14 Valley Electric including the generator, 17 River City, 10 Sierra Gas, 3 Helios; the six Thermal Plant cost centers have no bills until Stage 7)
+    Never in the file: 'SYN-RCU-A-0030004 (Cedar Row B, No AP Upload) and every bill with a BillValidation_Tbl row, among them the Library''s Sep-24 bill (validation test 41: its new meter opened after the period start)'
+    Detail rows: at most 42 (44, less the No AP Upload bill, less the held bills); the exact set is every 2024-09 bill that is approved, AP-eligible and finding-free, and checks.sql ap_export_run computes it from the tables and compares
+    File: one ExportFile row; ExportShortName matches ^NLAP_[0-9]{14}\.csv$; the file has detail rows + 2 lines (header and trailer)
+    Control total: 'the trailer''s second figure equals SUM(ExportLog.ExportAmount) for the file, equals the Approved row of the totals grid, and equals the sum of those bills'' Total Due (the expected totals of Stage 5 sample_bill_totals and expected_totals_feed: Central Plant Sep-24 151171.47 and Cedar Row A 1984.50 are in it unless held by a finding)'
+    ExportLog: one row per bill, ExportType APINV, ExportAmount = the bill's BL_Amount, one ExportFileID for all of them
+    Status: each bill has a StatusHistory (BL, 3) row and Bill.Status_Code 3
+    Task: one AP_EMAILER_TASK run queued with {ExportFileID}
+    Run it again with the same bills: refused with accounts-payable.bills.already-exported, or the first file returned when the request guid repeats; no second ExportFile row
+- key: gl_export_run
+  installed: {}
+  Purpose: one GL run for the same period.
+  Period: fiscal 2024-09, Journal Date 2024-10-01  # assumed
+  Expect:
+    Bills: the AP list plus nothing else at this point (the generated Ridgeline statement does not exist until Stage 7; re-run the GL for 2024-07 then, where it is the one bill that only the GL carries, 129330.27 against 5150-WIND and 2000-AP)
+    Lines: 2 x (the number of bills), because each bill is coded to one expense account (one debit, one credit); plus the header and trailer
+    Control total: sum of debits = sum of credits = the sum of the bills' Total Due; the trailer carries both
+    ExportLog: one row per bill, ExportType GLJNL; StatusHistory (BL, 7) per bill; the AP rows of the same bills are untouched (a bill can be in both)
+    File: ^NLGL_[0-9]{14}\.csv$
+- key: export_revert
+  installed: {}
+  Purpose: undo a run (a file found wrong), and prove the bills return to the queue.
+  How: >-
+    The core product has no revert: no screen, API or procedure. Massport has one, as a custom page
+    (Views/Custom/_Customers/Massport/MPA_reversebill.cshtml) over [MPA].[MPA_RevertExports] @Exporttype, @ExportFileID, which deletes
+    the StatusHistory rows of the format's StatusCode for the file's bills, the ExportLog rows of the file and the ExportFile row.
+    Northlake has neither, so the revert is a customer-specific procedure (and a page to call it) that no screen can create: a
+    product finding candidate. Reading the Massport procedure shows one more gap to design around: it deletes the StatusHistory row
+    but does not set Bill.Status_Code back, so a reverted bill would still show the exported status in Bill Entry.
+  Expect after a revert of the AP file: 0 ExportLog rows with that ExportFileID; 0 ExportFile rows with it; no StatusHistory (BL, 3) row for its bills; Bill.Status_Code = 2 again (the revert procedure must write it); the bills are in the approval queue again; they can be exported again under a new file.
+- key: other_formats_not_specified
+  installed: {}
+  Formats: [export_ap, export_ap2, nl_ap_gludf, nl_ap_voucher, nl_sap_fi, nl_ar_interface]
+  Why: the AP/GL plan named seven formats. export_ap and export_ap2 are a demo customer's own customization (HIPPODemo procedures) and are replaced by nl_ap_invoice. nl_ap_gludf depends on GL user-defined fields, which have no screen (02-gl-fields.yaml). nl_ap_voucher (PeopleSoft C/H/L/D records) and nl_sap_fi (SAP FI) are layouts nobody has defined for Northlake. nl_ar_interface is the AR (tenant rebilling) export of Stage 7. A GL accrual export (the Massport export_4 shape, @Accrual = 1) is the missing half of Step 6.
+- key: finding_candidates
+  installed: {}
+  Candidates:
+  - 'No screen, API or script creates an export format. ExportSetup, PermissionCatalog TypeKey EX and the group grant are SQL only, and the two builder procedures are customer SQL; a new customer cannot get a first AP or GL file without a developer. Needs an export format editor (name, type, status, batch prefix, file type, the two builders chosen from a list) or a shipped generic builder.'
+  - 'The core product has no export revert; Massport''s is a custom page and its procedure leaves Bill.Status_Code at the exported status.'
+  - 'The approval builder receives no fiscal-period parameter (only HeaderDate and ObjectID), so the period of a run is whatever the user filters and ticks; two people can export different parts of one period.'
+  - 'Bill Service Type has no GL-only value; GL-only is carried by Bill Entry Type Bill Generation in the builders (ridgeline_routing).'
+  - 'ExportType and ExportTemplate (APINV, APDIS and a field template) have tables and no screen, no reader other than a lookup procedure.'

@@ -45,11 +45,12 @@ notes:
 - 'Massport shows the pattern: since 2024, 303 of 51,786 handheld demand values on meters with an energy register
   were keyed one or more days after their energy read (183 the next day), and 2,226 of its meters bill by Meter Reads.'
 - 'Auto w/ Auto Regen, not Auto: the intake marks a bill for regeneration when a value lands inside its dates. In
-  round 6 the demand arrives after its energy read, possibly after Run Bill Gen (every 5 minutes) has made the
+  round 6 the demand arrives after its energy read, possibly after bill generation (daily at 02:00 by default) has made the
   September bill; regeneration then adds it.'
 - 'A flat tenant rate keeps every expected line exact: Customer Charge 25.00 a bill, Energy 0.152 a kWh, Demand 14.80
-  a kW. Stage 4''s VED-TOU-GS prices energy by time of use, which a monthly read cannot split, and NL-STEP-Demand
-  bills demand as a block amount.'
+  a kW. Stage 4''s VED-TOU-GS prices energy by time of use, which a monthly read cannot split. The Stage 4 rate that
+  billed demand as a block amount, NL-STEP-Demand, moved to the Rate Lab (stage-4-rates/08-rate-lab.yaml), which is not
+  ready to enter, so it is not a rate this scenario can use.'
 setup:
 - key: tc_kiosk_k1
   Where: Database Administrator > Nodes > Northlake Town Center > Market Hall > add Meter
@@ -67,7 +68,7 @@ setup:
   kind: Billing account (Utility Accountant tab, Stage 2 shape)
   meter: tc_kiosk_k1
   number: TC-MKT-KIOSK1
-  provider: null
+  provider: Valley Electric District   # Add Billing Account needs a provider; the meter takes its provider from the account, and a rate is offered only then
   typeCode: '0'
   billTypeCode: 2 Bill Generation
   notes: Bill Generation, not Allocation like the other Market Hall tenants, because its bills come from its own meter.
@@ -81,7 +82,7 @@ setup:
   Point Definition: {Description: Max Demand kW, Reading Type: Analog, Measure Type: Electricity,
     Unit: Kilowatt - (kW), Archive Interval: 1440, Index: ''}
 - key: tc_tenant_gs
-  Where: Database Administrator > RateModeler > Rate Edit, under Valley Electric District (as NL-STEP-Demand is)
+  Where: Database Administrator > RateModeler > Rate Edit, under Valley Electric District (the provider of Stage 4's commercial rates such as VED-TOU-GS)
   Rate: {Rate Name: TC-TENANT-GS, Currency: US Dollar, Measure Type: Electricity,
     Rate Categories: {Transmission: false, Distribution: true, Commodity: true}}
   Rate Classes:

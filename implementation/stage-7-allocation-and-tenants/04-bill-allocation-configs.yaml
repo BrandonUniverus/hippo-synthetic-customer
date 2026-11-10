@@ -7,161 +7,326 @@ stage: 7
 step: 4
 title: Bill Allocation Configuration, one config per method
 app: Web
-screen: "#/reporting/BillAllocationConfiguration"
+screen: '#/reporting/BillAllocationConfiguration'
 source:
 - documents/guides/tenant-and-lease-roster.pdf
 - generators/documents/sources/implementation/dream-customer/phase4-tenant-rebilling-spec.md
 - generators/documents/sources/implementation/dream-customer/product-gap-backlog.md
 notes:
-- 'PRODUCT FINDING, verify before typing: the installed EEMSuite_Northlake database''s dbo.BillAllocationMethod
-  table has only method 1 (Fixed Amount and %) seeded today; methods 2-7 exist in the reference EEMSuite demo
-  database (Fully Submetered Space, Partially Submetered Space, Building Areas, Partially Submetered w/
-  Coincident Demand, Bill Aggregation, Metered Substations From Master Bills — confirmed by querying both
-  databases directly) but are not yet loaded on this instance, so the Method dropdown on this screen will
-  show only one choice until they are. Per entry-path-and-gaps.md this catalog is product install data, not
-  customer data, from the same class of ".bak, not in git" lookups as PtAllocationMethod — install the
-  missing rows before this step, do not type around it with SQL.'
-- 'Tenant & Lease Roster (documents/guides/tenant-and-lease-roster.pdf) describes Market Hall and Office
-  Tower each with ONE table covering multiple cost-split rules; the product applies one method per master per
-  fiscal window, so this file re-maps the roster''s language onto separate, non-overlapping windows on the
-  same master meter — exactly what the roster''s own preamble asks for ("please map these to the appropriate
-  allocation method").'
-- 'Methods 2, 3, 4, 5 and 7 compute their Allocation % automatically from each candidate meter''s interval
-  consumption (2, 3, 5), floor area (4) or usage share (7) when Process Meter Allocations runs (file 07); only
-  method 1''s rows need Allocation Amount/Allocation %/Overhead typed by hand. Add each candidate through
-  Add Allocated Meters > Eligible Meters and leave its Allocation % at 0 unless noted otherwise.'
-- Order inside the editor is Master Meter, Commodity, Method and Effective From first, save, then add
-  candidates through Add Allocated Meters, then Combine Overhead, then Balance to 100% if the percentages
-  do not already sum to the method's RequiredAllocationPercentTotal (100 for method 1).
+- 'WHAT THE STOCK ENGINE DOES (read in the product, 2026-11-10). Only method 1 (Fixed Amount and %) and method 6 (Bill Aggregation)
+  compute anything. BillAlloc_ProcessBills selects every master bill whose config method uses the default procedure, but BillAlloc_ProcessBillItems
+  then goes on only if the master meter has a METHOD 1 config for the bill''s period (two guards, ''goto AllocationAbort'' otherwise),
+  and BillAlloc_ProcessAllocatedItems never branches on the method: it splits by the typed Allocation % and Allocation Amount. Methods
+  2, 3, 4, 5 and 7 have no calculator (src/Documentation/TODO/ADR-015-Versioned-Bill-Allocation-Handlers.md, ''Current core behavior'':
+  ''Distinct stock calculator: None''). So the five configs below that use them can be ENTERED, and a master bill in their window produces
+  NO allocated bill. The earlier text of this file (''the engine computes each share from interval consumption when Process Meter Allocations
+  runs'') described a feature the product does not have; Process Meter Allocations is the WUI run of file 05 and does not touch bill
+  allocation.'
+- 'What each config is for, therefore: methods 1 and 6 give known dollar values (file 10 computes them: the master bill, each tenant''s
+  allocated amount, the overhead, and the Property Total aggregate). Methods 2, 3, 4, 5 and 7 are entered to prove the configuration
+  screen takes them and to hold a place for the day the calculators exist; file 10 keeps a reference table of what a plain reading of
+  each method would allocate (use share, remainder, area share), marked NOT expected today, and checks.sql asserts today''s behaviour:
+  the master bill exists and no BillAllocationMap row exists for it. When a calculator ships, that assertion fails and file 10''s reference
+  table becomes the expectation.'
+- 'PRODUCT FINDING: dbo.BillAllocationMethod on EEMSuite_Northlake may hold only method 1 (Fixed Amount and %). Methods 2-7 exist in
+  the reference EEMSuite demo database (Fully Submetered Space, Partially Submetered Space, Building Areas, Partially Submetered w/
+  Coincident Demand, Bill Aggregation, Metered Substations From Master Bills) but there is no seed for them under Database/EEMSuite
+  (no Script or Migration inserts them), so the Method list may show one choice until the rows are installed. They are product install
+  data, not customer data: install them before this step, do not type around it with SQL. Method 6 also needs AllocationType ''Aggregation''
+  on its row (BillAgg_GetBills filters on it).'
+- 'Every candidate must pass BillAllocationEligibleMeters_Get: the master''s measure type (Electricity, file 02), a billing account,
+  the master''s currency (US Dollar) and the same company calendar; a method 1 candidate also cannot be a method 1 master or sit in
+  another method 1 config whose window overlaps (the FY2024 and FY2025 Mall-Main configs do not overlap).'
+- Order inside the editor is Master Meter, Commodity, Method and Effective From first, save, then add candidates through Add Allocated
+  Meters, then Combine Overhead, then Balance to 100% if the percentages do not already sum to the method's RequiredAllocationPercentTotal
+  (100 for method 1).
+- 'Overhead % is ADDED on top of the allocated amount, not carved out of it (BillAlloc_ProcessOverhead: a tenant''s overhead is Overhead
+  % of its allocated item, rounded to the cent, written as an extra line in the commodity named ''Electricity Overhead'', or folded
+  into the tenant''s own items when Combine Overhead is on). So a tenant''s bill is its share plus 2%, the shares add up to the master
+  bill, and the overhead adds 2% of the master bill to what the tenants owe in all. The earlier ''every allocated child sums to its
+  parent'' reading was wrong whenever Overhead % is above 0 (file 10 and checks.sql separate the two).'
+- 'Method 6 is the other way round. BillAgg_GetBills multiplies each feeder item by the row''s Allocation % divided by 100, so a method
+  6 row left at 0 aggregates nothing: every row below is typed 100. An aggregate is written for a period when at least one feeder has
+  a bill item in it (missing feeders do not block it, because the proc defaults to ForceCalc ''y'').'
 records:
 - key: tc_market_main_method1_separate
-  installed: {billAllocationConfigId:}
+  installed:
+    billAllocationConfigId: null
   Master Meter: Mall-Main
   Commodity: Electric
   Method: Fixed Amount and %
-  Effective From: {Fiscal Year Start: 2024, Fiscal Period Start: 1, Fiscal Year End: 2024, Fiscal Period End: 12}
+  Effective From:
+    Fiscal Year Start: 2024
+    Fiscal Period Start: 1
+    Fiscal Year End: 2024
+    Fiscal Period End: 12
   Combine Overhead: false
   Add Allocated Meters:
-  - {order: 1, meter: Anchor Store, Allocation Amount: 2000, Fixed: true, Overhead %: 2}
-  - {order: 2, meter: Food Court, Allocation %: 15, Overhead %: 2}
-  - {order: 3, meter: In-line Shop 1, Allocation %: 8, Overhead %: 2}
-  - {order: 4, meter: In-line Shop 2, Allocation %: 8, Overhead %: 2}
-  - {order: 5, meter: In-line Shop 3, Allocation %: 8, Overhead %: 2}
-  - {order: 6, meter: In-line Shop 4, Allocation %: 8, Overhead %: 2}
-  - {order: 7, meter: Common Area, Allocation %: 53, Overhead %: 2}
-  notes: Percent rows (excluding Anchor's fixed amount) total 15+8+8+8+8+53 = 100, satisfying
-    RequiredAllocationPercentTotal. Overhead shown as its own line per tenant (Combine Overhead off).
+  - order: 1
+    meter: Anchor Store
+    Allocation Amount: 2000
+    Fixed: true
+    Overhead %: 2
+  - order: 2
+    meter: Food Court
+    Allocation %: 15
+    Overhead %: 2
+  - order: 3
+    meter: In-line Shop 1
+    Allocation %: 8
+    Overhead %: 2
+  - order: 4
+    meter: In-line Shop 2
+    Allocation %: 8
+    Overhead %: 2
+  - order: 5
+    meter: In-line Shop 3
+    Allocation %: 8
+    Overhead %: 2
+  - order: 6
+    meter: In-line Shop 4
+    Allocation %: 8
+    Overhead %: 2
+  - order: 7
+    meter: Common Area
+    Allocation %: 53
+    Overhead %: 2
+  notes: 'Percent rows (excluding Anchor''s fixed amount) total 15+8+8+8+8+53 = 100, satisfying RequiredAllocationPercentTotal. Overhead
+    is its own line per tenant (Combine Overhead off). With the 2024-01 master bill of file 10 (30,000.00) each tenant is billed its
+    share plus 2%: Anchor Store 2,040.00, Food Court 4,284.00, Shops 1 to 4 2,284.80 each, Common Area 15,136.80, 30,600.00 in all.'
+  expect:
+    allocated base (no overhead): 30000.0
+    overhead: 600.0
+    tenant bills: 30600.0
 - key: tc_market_main_method1_combined
-  installed: {billAllocationConfigId:}
+  installed:
+    billAllocationConfigId: null
   Master Meter: Mall-Main
   Commodity: Electric
   Method: Fixed Amount and %
-  Effective From: {Fiscal Year Start: 2025, Fiscal Period Start: 1, Fiscal Year End: 2025, Fiscal Period End: 12}
+  Effective From:
+    Fiscal Year Start: 2025
+    Fiscal Period Start: 1
+    Fiscal Year End: 2025
+    Fiscal Period End: 12
   Combine Overhead: true
   Add Allocated Meters:
-  - {order: 1, meter: Anchor Store, Allocation Amount: 2000, Fixed: true, Overhead %: 2}
-  - {order: 2, meter: Food Court, Allocation %: 15, Overhead %: 2}
-  - {order: 3, meter: In-line Shop 1, Allocation %: 8, Overhead %: 2}
-  - {order: 4, meter: In-line Shop 2, Allocation %: 8, Overhead %: 2}
-  - {order: 5, meter: In-line Shop 3, Allocation %: 8, Overhead %: 2}
-  - {order: 6, meter: In-line Shop 4, Allocation %: 8, Overhead %: 2}
-  - {order: 7, meter: Common Area, Allocation %: 53, Overhead %: 2}
-  notes: Same tenants and percentages as the FY2024 config, one fiscal year later, Combine Overhead on so
-    the 2% shows folded into each tenant's one allocated line instead of a separate overhead line.
+  - order: 1
+    meter: Anchor Store
+    Allocation Amount: 2000
+    Fixed: true
+    Overhead %: 2
+  - order: 2
+    meter: Food Court
+    Allocation %: 15
+    Overhead %: 2
+  - order: 3
+    meter: In-line Shop 1
+    Allocation %: 8
+    Overhead %: 2
+  - order: 4
+    meter: In-line Shop 2
+    Allocation %: 8
+    Overhead %: 2
+  - order: 5
+    meter: In-line Shop 3
+    Allocation %: 8
+    Overhead %: 2
+  - order: 6
+    meter: In-line Shop 4
+    Allocation %: 8
+    Overhead %: 2
+  - order: 7
+    meter: Common Area
+    Allocation %: 53
+    Overhead %: 2
+  notes: Same tenants and percentages as the FY2024 config, one fiscal year later, Combine Overhead on, so the 2% is folded into each
+    tenant's own lines instead of a separate overhead line. The 2025-01 master bill of file 10 is the same 30,000.00, so every tenant's
+    bill total is the same as in 2024-01 and only the line layout differs.
+  expect:
+    allocated base (no overhead): 30000.0
+    tenant bills: 30600.0
 - key: tc_tower_main_method2
-  installed: {billAllocationConfigId:}
+  installed:
+    billAllocationConfigId: null
   Master Meter: Tower-Main
   Commodity: Electric
   Method: Fully Submetered Space
-  Effective From: {Fiscal Year Start: 2024, Fiscal Period Start: 1, Fiscal Year End: 2024, Fiscal Period End: 12}
+  Effective From:
+    Fiscal Year Start: 2024
+    Fiscal Period Start: 1
+    Fiscal Year End: 2024
+    Fiscal Period End: 12
   Combine Overhead: false
   Add Allocated Meters:
-  - {order: 1, meter: Floor 1}
-  - {order: 2, meter: Floor 2}
-  - {order: 3, meter: Floor 3}
-  - {order: 4, meter: Floor 4}
-  notes: No Landlord/House candidate this year; all four floors are submetered and the engine computes each
-    floor's share from its own interval consumption.
+  - order: 1
+    meter: Floor 1
+  - order: 2
+    meter: Floor 2
+  - order: 3
+    meter: Floor 3
+  - order: 4
+    meter: Floor 4
+  notes: 'All four floors submetered. NOT COMPUTED TODAY (method 2 has no calculator): the 2024-01 Tower-Main bill (file 10) gets no
+    allocated bill. Reference when it does: each floor''s share of the four floors'' kWh (file 10).'
 - key: tc_tower_main_method3
-  installed: {billAllocationConfigId:}
+  installed:
+    billAllocationConfigId: null
   Master Meter: Tower-Main
   Commodity: Electric
   Method: Partially Submetered Space
-  Effective From: {Fiscal Year Start: 2025, Fiscal Period Start: 1, Fiscal Year End: 9999, Fiscal Period End: 12}
+  Effective From:
+    Fiscal Year Start: 2025
+    Fiscal Period Start: 1
+    Fiscal Year End: 9999
+    Fiscal Period End: 12
   Combine Overhead: false
   Add Allocated Meters:
-  - {order: 1, meter: Floor 1}
-  - {order: 2, meter: Floor 2}
-  - {order: 3, meter: Floor 3}
-  - {order: 4, meter: Landlord/House}
-  notes: Floor 4's submeter was pulled after a 2024 tenant buildout (file 02); from FY2025 its load is folded
-    into Landlord/House, which the engine gives whatever the three submetered floors do not account for.
+  - order: 1
+    meter: Floor 1
+  - order: 2
+    meter: Floor 2
+  - order: 3
+    meter: Floor 3
+  - order: 4
+    meter: Landlord/House
+  notes: 'Floor 4''s submeter was pulled after a 2024 tenant buildout; from FY2025 its load is folded into Landlord/House, the remainder
+    meter. NOT COMPUTED TODAY (method 3 has no calculator). Reference when it does: floors by their kWh, Landlord/House the remainder
+    (file 10).'
 - key: tc_market_main_method4
-  installed: {billAllocationConfigId:}
+  installed:
+    billAllocationConfigId: null
   Master Meter: Mall-Main
   Commodity: Electric
   Method: Building Areas
-  Effective From: {Fiscal Year Start: 2026, Fiscal Period Start: 1, Fiscal Year End: 2026, Fiscal Period End: 6}
+  Effective From:
+    Fiscal Year Start: 2026
+    Fiscal Period Start: 1
+    Fiscal Year End: 2026
+    Fiscal Period End: 6
   Combine Overhead: false
   Add Allocated Meters:
-  - {order: 1, meter: In-line Shop 1}
-  - {order: 2, meter: In-line Shop 2}
-  - {order: 3, meter: In-line Shop 3}
-  - {order: 4, meter: In-line Shop 4}
-  notes: A later, narrower re-scope of Mall-Main used only to exercise Building Areas; Anchor Store, Food
-    Court and Common Area are not candidates in this window. Requires each shop's Area tab value from file 02.
+  - order: 1
+    meter: In-line Shop 1
+  - order: 2
+    meter: In-line Shop 2
+  - order: 3
+    meter: In-line Shop 3
+  - order: 4
+    meter: In-line Shop 4
+  notes: 'A later, narrower re-scope of Mall-Main used only to exercise Building Areas (each shop''s Area tab value, file 02). NOT COMPUTED
+    TODAY (method 4 has no calculator; the window also holds no method 1 config for Mall-Main, so the guard in BillAlloc_ProcessBillItems
+    stops it). Reference when it does: area share (file 10).'
 - key: tc_annex_main_method5
-  installed: {billAllocationConfigId:}
+  installed:
+    billAllocationConfigId: null
   Master Meter: Annex-Main
   Commodity: Electric
   Method: Partially Submetered w/ Coincident Demand
-  Effective From: {Fiscal Year Start: 2024, Fiscal Period Start: 1, Fiscal Year End: 9999, Fiscal Period End: 12}
+  Effective From:
+    Fiscal Year Start: 2024
+    Fiscal Period Start: 1
+    Fiscal Year End: 9999
+    Fiscal Period End: 12
   Combine Overhead: false
   Add Allocated Meters:
-  - {order: 1, meter: Bldg A}
-  - {order: 2, meter: Bldg B}
-  - {order: 3, meter: Bldg C}
-  notes: Optional column format for this method is "Percent,,Required,," (confirmed in the reference
-    BillAllocationMethod catalog); the engine weighs each building's usage and its coincident peak kW point
-    from file 02.
+  - order: 1
+    meter: Bldg A
+  - order: 2
+    meter: Bldg B
+  - order: 3
+    meter: Bldg C
+  notes: 'Optional column format for this method is ''Percent,,Required,,'' (reference BillAllocationMethod catalog). NOT COMPUTED TODAY
+    (method 5 has no calculator) and no formula is specified anywhere (ADR-015 open question 5: where the master coincident peak comes
+    from), so file 10 carries the drivers (kWh and kW per building) and no reference amounts.'
 - key: tc_property_total_method6
-  installed: {billAllocationConfigId:}
+  installed:
+    billAllocationConfigId: null
   Master Meter: Property Total
   Commodity: n/a (cost center)
   Method: Bill Aggregation
-  Effective From: {Fiscal Year Start: 2024, Fiscal Period Start: 1, Fiscal Year End: 9999, Fiscal Period End: 12}
+  Effective From:
+    Fiscal Year Start: 2024
+    Fiscal Period Start: 1
+    Fiscal Year End: 9999
+    Fiscal Period End: 12
   Combine Overhead: false
-  Add Allocated Meters:                 # direction reverses for this method: every row FEEDS the master
-  - {order: 1, meter: Anchor Store}
-  - {order: 2, meter: Food Court}
-  - {order: 3, meter: In-line Shop 1}
-  - {order: 4, meter: In-line Shop 2}
-  - {order: 5, meter: In-line Shop 3}
-  - {order: 6, meter: In-line Shop 4}
-  - {order: 7, meter: Common Area}
-  - {order: 8, meter: Floor 1}
-  - {order: 9, meter: Floor 2}
-  - {order: 10, meter: Floor 3}
-  - {order: 11, meter: Floor 4}
-  - {order: 12, meter: Landlord/House}
-  - {order: 13, meter: Bldg A}
-  - {order: 14, meter: Bldg B}
-  - {order: 15, meter: Bldg C}
-  - {order: 16, meter: Substation 1}
-  - {order: 17, meter: Substation 2}
-  notes: Method 6's AllocationProc is BillAgg_ProcessBills and its AllocatedBillTable is
-    BillAllocationConfigDetail (both confirmed in the reference catalog), unlike every other method's
-    default/BillAllocationConfig; the web hub renders it as "COST CENTER" with an inbound total instead of
-    an outbound one (tenantMapDiagram.ts, methodId === 6). Every already-allocated Town Center tenant feeds
-    Property Total; this is the only config where the master is a receiver, not a source.
+  Add Allocated Meters:
+  - order: 1
+    meter: Anchor Store
+    Allocation %: 100
+  - order: 2
+    meter: Food Court
+    Allocation %: 100
+  - order: 3
+    meter: In-line Shop 1
+    Allocation %: 100
+  - order: 4
+    meter: In-line Shop 2
+    Allocation %: 100
+  - order: 5
+    meter: In-line Shop 3
+    Allocation %: 100
+  - order: 6
+    meter: In-line Shop 4
+    Allocation %: 100
+  - order: 7
+    meter: Common Area
+    Allocation %: 100
+  - order: 8
+    meter: Floor 1
+    Allocation %: 100
+  - order: 9
+    meter: Floor 2
+    Allocation %: 100
+  - order: 10
+    meter: Floor 3
+    Allocation %: 100
+  - order: 11
+    meter: Floor 4
+    Allocation %: 100
+  - order: 12
+    meter: Landlord/House
+    Allocation %: 100
+  - order: 13
+    meter: Bldg A
+    Allocation %: 100
+  - order: 14
+    meter: Bldg B
+    Allocation %: 100
+  - order: 15
+    meter: Bldg C
+    Allocation %: 100
+  - order: 16
+    meter: Substation 1
+    Allocation %: 100
+  - order: 17
+    meter: Substation 2
+    Allocation %: 100
+  notes: Method 6's AllocationProc is BillAgg_ProcessBills (run by Job_BillAllocation after BillAlloc_ProcessBills) and the web hub
+    renders it as COST CENTER with an inbound total (tenantMapDiagram.ts, methodId === 6). Every row FEEDS the master and is typed Allocation
+    % 100 (BillAgg_GetBills multiplies by it). Only Mall-Main's seven tenants have bills in 2024-01 and 2025-01 (method 1 allocates
+    them), so the Property Total bill for those two periods is the sum of their allocated bills, 30,600.00 (file 10). Floors, buildings
+    and substations have no allocated bill because methods 2, 3, 5 and 7 produce none.
+  expect:
+    Property Total bill 2024-01: 30600.0
+    Property Total bill 2025-01: 30600.0
 - key: tc_substation_master_method7
-  installed: {billAllocationConfigId:}
+  installed:
+    billAllocationConfigId: null
   Master Meter: Substation-Master
   Commodity: Electric
   Method: Metered Substations From Master Bills
-  Effective From: {Fiscal Year Start: 2024, Fiscal Period Start: 1, Fiscal Year End: 9999, Fiscal Period End: 12}
+  Effective From:
+    Fiscal Year Start: 2024
+    Fiscal Period Start: 1
+    Fiscal Year End: 9999
+    Fiscal Period End: 12
   Combine Overhead: false
   Add Allocated Meters:
-  - {order: 1, meter: Substation 1}
-  - {order: 2, meter: Substation 2}
-  notes: Engine computes each substation's percentage of the master bill from its own metered usage.
+  - order: 1
+    meter: Substation 1
+  - order: 2
+    meter: Substation 2
+  notes: 'NOT COMPUTED TODAY (method 7 has no calculator; ADR-015 open question 6 leaves the loss treatment undecided). Reference when
+    it does, on the plain reading (usage share of the two substations): file 10.'

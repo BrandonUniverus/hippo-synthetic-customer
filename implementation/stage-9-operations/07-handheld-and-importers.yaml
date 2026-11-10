@@ -3,7 +3,7 @@ stage: 9
 step: 7
 title: Handheld reading operations and importers
 app: Web and the Northlake handheld simulator
-screen: Handheld Meter Setup; Handheld Meter Reading Export; Task Manager; MyImports
+screen: Handheld Meter Setup; Handheld Meter Reading Export; Task Dashboard; MyImports
 source:
 - implementation/stage-3-gateways-and-data/05-handheld-routes.yaml
 - implementation/stage-3-gateways-and-data/handheld-test-environment.md
@@ -44,6 +44,22 @@ notes:
   that the Neptune/MVRS export, collector or HMR event path works.'
 - 'GreenButton (ESPI XML) and EnergyAI enrollment retain their existing product findings; no new upload
   or enrollment workflow is implied by the handheld simulator.'
+- 'My Imports, re-read 2026-11-10. The permission catalog names nine import methods (Scripts/SeedLanguageData.sql, type MI):
+  Boulder City, CRC, Create Hierarchy, Loss Factor Import, Meter Reading Import, Meter Swap, SWG, Hospitality Import and
+  Interval Data Import, plus the exports Facility Detail and Facility Area. A method is a definition (MyImportExport_Tbl: Name,
+  ObjectName, ImportProcedureName) with its worksheet setups (MyImportExcelSetup), made in HippoTools > My Imports Config. One handler
+  ships whole in the product database: MyImportToLossFactors_Save (Loss Factor Import, added by the 7.0 upgrade).
+  MyImportToFIG_Save (point values: PtAlias, Value, TimeStamp) and MyImportToBIP_Save (bills) are shared handlers that call a
+  per-sheet procedure, which the definition''s worksheet setup names (the Interval Data Import definition is of this kind).
+  Meter Swap, Create Hierarchy, Hospitality, SWG, CRC and Boulder City have a permission
+  entry and no definition, handler or template anywhere in the product source, and Northlake has none of them (ADR-002c:
+  Northlake holds Interval Data Import, Loss Factor Import and Northlake Stage 2). They cannot be entered here and are recorded
+  as a finding candidate (permission entries for methods nothing implements). The Meter Reading Import template named below is
+  not installed in Northlake either; it must be added in My Imports Config before it can be used.'
+- 'Meter Swap and Stage 12 scenario 1: no evidence found that Meter Swap exists as a working import in this product (no
+  handler, no sheet layout, no documentation), so scenario 1 is not changed. If a Meter Swap definition is supplied, the place
+  for it is scenario 1''s add_new_meter, close_old_meter and swap_on_the_route steps, which it would replace with one upload of
+  old meter number, new meter number and swap date; the scenario''s starting reading and first-read checks would stay.'
 records:
 - key: hmr_configuration_reused
   kind: handheld_preflight
@@ -98,3 +114,17 @@ records:
   installed:
     myImportExportId:
   MyImports: {Template: myimport_MeterReadings, Action: "download XLSX, fill a month of readings for one RCU water meter, upload"}
+- key: myimport_lossfactor_template
+  kind: myimport_template
+  installed:
+    myImportExportId:
+  MyImports: {Template: myimport_LossFactorImport (Loss Factor Import, installed by the 7.0 upgrade), Action: "download XLSX, fill Account Number | Loss Factor | Notes for one Library account, upload"}
+  Rows:
+  - {Account Number: SYN-VED-A-0010003, Loss Factor: 1.036, Notes: Library service transformer loss}   # assumed: 1.036 is the handler's own documented example
+  Expected: "the Loss Factor keyword type and one keyword value (1.036) exist, and each meter of account SYN-VED-A-0010003 is mapped to it; a row of n/a would remove the mapping"
+  sideEffect: adds a keyword type and value to the Stage 2 keyword inventory; nothing on a bill changes (only the Hydro One upload reads the factor)
+- key: myimport_methods_not_enterable
+  kind: myimport_finding
+  installed: {}
+  Methods: [Meter Swap, Create Hierarchy, Hospitality Import, SWG, CRC, Boulder City]
+  Status: "permission entries only; no definition or handler in the product (see the note); nothing entered"

@@ -1,0 +1,200 @@
+# Stage 7, step 9: Town Center's own tenant rates (Database Administrator > RateModeler > Rate Edit), filed under
+# Valley Electric District. Same record shape as stage-4-rates/05-rates.yaml. Enter these two rates BEFORE step 6:
+# step 6's Tenant Rebill rows pick them from the meter's provider's rate list.
+stage: 7
+step: 9
+title: Town Center tenant rates
+app: Database Administrator
+screen: RateModeler > Rate Edit
+source:
+- implementation/stage-4-rates/05-rates.yaml (record shape)
+- implementation/stage-4-rates/08-rate-lab.yaml (NL-STEP-Demand, the rate this one stands in for)
+- src UtilityRates_Run_210.sql, UtilityRates_Run_600.sql (how the two charge types price)
+notes:
+- 'Why Stage 7 owns these. The nine NL- feature rates left Stage 4''s enterable file on 2026-11-09 (08-rate-lab.yaml is not enterable),
+  and NL-MULTI-Commodity never existed. Stage 7 needs two rates for the Town Center tenants it bills from interval data, and nothing
+  in Stage 4 is a tenant rate. They are modest on purpose: one flat general-service rate and one stepped-demand anchor rate.'
+- 'Order inside the editor is Stage 4 step 5''s: toggle Show all providers, pick Valley Electric District, Add Rate (Rate Name only
+  at first save), set Currency and Measure Type before the first charge (both lock once a rate has a charge), then each charge under
+  the class All that Add Rate creates, one Effective Date per price, and Block rows for the stepped charge. Rate Categories as Stage
+  4 (# assumed): Distribution and Commodity on.'
+- Entering these adds two rates to Valley Electric District, so Stage 4's rates_by_provider count (VED 5) reads 7 once this step is
+  done; Stage 4's own check should be run before this step, or read with that in mind.
+records:
+- key: tc_flat_gs
+  installed:
+    providerId: 1
+    rateId: null
+  provider: valley_electric_district
+  Rate:
+    Rate Name: TC-FLAT-GS
+    Currency: US Dollar
+    Measure Type: Electricity
+    Rate Categories:
+      Transmission: false
+      Distribution: true
+      Commodity: true
+  Rate Classes:
+  - Rate Class Name: All
+  Determinants:
+  - Charge Name: Customer Charge
+    Charge Type: 400 Fixed By Period
+    Units: US Dollar
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Elec Misc Chgs/Credits
+        Commodity: Elec Misc Chgs/Credits
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 45.0
+  - Charge Name: Energy
+    Charge Type: 200 Charge Period
+    Units: KilowattHours
+    Aggregation Rule: Summing
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Elec Energy (Non-TOU)
+        Commodity: Non-TOU kWh
+      Commodity (Usage):
+        Category: Elec Energy (Non-TOU)
+        Commodity: Non-TOU kWh
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 0.14
+  Expected bill (Jan 2026, 744 hours, constant hourly load of file 10):
+  - Tenant: Food Court
+    Hourly kWh: 60
+    kWh: 44640
+    Customer Charge: 45.0
+    Energy: 6249.6
+    Total: 6294.6
+  - Tenant: In-line Shop 1
+    Hourly kWh: 8
+    kWh: 5952
+    Customer Charge: 45.0
+    Energy: 833.28
+    Total: 878.28
+  - Tenant: In-line Shop 2
+    Hourly kWh: 6
+    kWh: 4464
+    Customer Charge: 45.0
+    Energy: 624.96
+    Total: 669.96
+  notes:
+  - 'The flat general-service rate for the Market Hall tenants that are billed from their own meter: Food Court, In-line Shop 1 and
+    In-line Shop 2 (file 06). A customer charge per bill period and one energy price, both effective 2024-01-01 (# assumed figures).
+    Nothing else: the varied charge types are in the stepped rate below.'
+  - Commodity Mapping on both charges, because a charge becomes a bill line only through its mapping (Stage 4 05-rates.yaml notes).
+    The customer charge is a money line (Elec Misc Chgs/Credits); the energy charge maps quantity and amount to Non-TOU kWh, so its
+    one line carries the kWh and the dollars. Both commodities are in the installed catalog (Stage 4 uses the same ones on RWL-XFER-2024).
+  - Filed under Valley Electric District because the tenant meters carry that provider through their billing accounts (file 02), and
+    the Tenant Rebill rate list is the meter provider's rates of the meter's measure type. The rate does not collide with Stage 12 scenario
+    4's TC-TENANT-GS, which is a different rate with a demand charge for a hand-read meter.
+  - Both prices are exact to the cent for any whole kWh (x 0.14), so the generated bill and this table agree line for line. The engine
+    rounds each line to the cent and keeps the bill total to four decimals (Stage 7 file 08 notes), which cannot differ here.
+- key: tc_step_demand
+  installed:
+    providerId: 1
+    rateId: null
+  provider: valley_electric_district
+  Rate:
+    Rate Name: TC-STEP-DEMAND
+    Currency: US Dollar
+    Measure Type: Electricity
+    Rate Categories:
+      Transmission: false
+      Distribution: true
+      Commodity: true
+  Rate Classes:
+  - Rate Class Name: All
+  Determinants:
+  - Charge Name: Stepped Demand
+    Charge Type: 210 Charge Period Fixed Value
+    IsDemand: true
+    Units: Kilowatt
+    Aggregation Rule: Maximum
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Elec Demand (Non-TOU)
+        Commodity: Non-TOU kW Billed
+      Commodity (Usage):
+        Category: Elec Demand (Non-TOU)
+        Commodity: Non-TOU kW Billed
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Blocks:
+      - Block Number: 1
+        Block Size: 100
+        Block Value: 1500.0
+      - Block Number: 2
+        Block Size: 150
+        Block Value: 3200.0
+      - Block Number: 3
+        Block Size: null
+        Block Value: 6800.0
+  - Charge Name: Energy
+    Charge Type: 200 Charge Period
+    Units: KilowattHours
+    Aggregation Rule: Summing
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Elec Energy (Non-TOU)
+        Commodity: Non-TOU kWh
+      Commodity (Usage):
+        Category: Elec Energy (Non-TOU)
+        Commodity: Non-TOU kWh
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 0.142
+  - Charge Name: Maximum Bill
+    Charge Type: 600 Max Value
+    Units: US Dollar
+    Schedule: Annual All Hrs
+    Significance: All Hour
+    Apply Charges:
+    - Stepped Demand
+    - Energy
+    Commodity Mapping:
+      Commodity (Charge):
+        Category: Elec Misc Chgs/Credits
+        Commodity: Elec Misc Chgs/Credits
+    Effective Dates:
+    - Effective Date: 2024-01-01
+      Value: 15000.0
+  Expected bill (Anchor Store, Jan 2024 and Jan 2025 and Jan 2026, 744 hours, constant 120 kW and 120 kWh an hour):
+    Demand kW (maximum): 120
+    kWh: 89280
+    Stepped Demand: 3200.0
+    Energy: 12677.76
+    Charges before the cap: 15877.76
+    Maximum Bill: -877.76
+    Total: 15000.0
+  Expected bill (a 28-day month, 672 hours, same load; below the cap):
+    kWh: 80640
+    Stepped Demand: 3200.0
+    Energy: 11450.88
+    Maximum Bill: no line
+    Total: 14650.88
+  notes:
+  - 'The stepped-demand anchor rate: the only charge types 210 (Charge Period Fixed Value) and 600 (Max Value) at Town Center, with
+    an energy charge between them. It replaces NL-STEP-Demand (stage-4-rates/08-rate-lab.yaml), which Stage 4 keeps in the Rate Lab
+    and cannot be assigned. Same blocks and energy price; the cap is 15,000.00 here (# assumed) instead of 25,000.00 so that the Anchor
+    Store load of file 10 crosses it.'
+  - 'How the charges price (UtilityRates_Run_210, UtilityRates_Run_600): the demand is the month''s highest hourly kW, 120. Charge Period
+    Fixed Value picks the ONE block the demand falls in (block 1 is 0 to 100 kW, block 2 over 100 to 250, block 3 over 250) and bills
+    that block''s value as a flat amount, 3,200.00 for 120 kW, not the three blocks added. Maximum Bill sums the charges named in Apply
+    Charges and, when the sum is above its value, writes the difference as a negative line, so the bill total lands on the cap. The
+    block boundaries are cumulative sums of the Block Size column (100, 250); that is read from UtilityRates_EffectiveDates''s use in
+    Run_210 and is not seen on a run yet.'
+  - 'Commodity Mapping on all three: demand maps quantity and amount to Non-TOU kW Billed, energy to Non-TOU kWh, and the cap is a money
+    line in Elec Misc Chgs/Credits (an unmapped charge would move the total and write no line).'
+  - The 12,677.76 energy line is 89,280 kWh x 0.142; with the 3,200.00 demand block the charges are 15,877.76, 877.76 over the cap,
+    so the Maximum Bill line is -877.76 and the total 15,000.00.

@@ -23,8 +23,12 @@ notes:
   administrator for a customer-company user. Ordinary groups, including eem_company_setup, do not grant that protected role.
   IsAdmin specifies the User Editor setting; it is not an instruction to add a database column.
 - User Name is the sign-in name and the key EEM stores; Display Name is what screens show.
-- Authentication Policy LocalAndFederated is the product default for a human user; WorkloadOnly is for service principals
-  only.
+- Authentication Policy LocalAndFederated is the product default for a human user; WorkloadOnly is the only policy the
+  Add user drawer offers a Service, ApiClient or Task principal (NewUserRules, UserFormRules.PolicyChoices), and the
+  password pair may be left empty for them.
+- 'Added 2026-11-10: three workload principals (Service, ApiClient, Task) so the Principal Type and Authentication Policy
+  fields take more than one value. The Add user drawer lists all four principal types; a workload id has no spaces and
+  is at most 64 characters. They are not people: none is an administrator, none is a Stage 9 recipient.'
 - The three energyhippo.example.com people belong to Common (System); they are the implementation and support accounts.
 - Do not delete the built-in Admin, SiE_Setup, reportemail, dbo or Worker principals.
 records:
@@ -426,6 +430,56 @@ records:
   Groups:
     Northlake University:
     - eem_ridgeline_research
+- key: svc.report-delivery
+  installed:
+    userId: null
+  User Name: svc.report-delivery
+  Display Name: Northlake Report Delivery Service
+  Email: svc.report-delivery@northlake.example.edu  # assumed
+  Company: Northlake University
+  IsAdmin: false
+  Principal Type: Service
+  Authentication Policy: WorkloadOnly
+  Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+  Inactive: false
+  Groups:
+    Northlake University:
+    - eem_nlu_points_read
+    - eem_reports
+  Notes: 'The one Service principal: a background service that renders and delivers reports. No password is typed; leave the credential unassigned (nothing signs in as it in Northlake).'
+- key: api.energy-dashboard
+  installed:
+    userId: null
+  User Name: api.energy-dashboard
+  Display Name: Campus Energy Dashboard API Client
+  Email: api.energy-dashboard@northlake.example.edu  # assumed
+  Company: Northlake University
+  IsAdmin: false
+  Principal Type: ApiClient
+  Authentication Policy: WorkloadOnly
+  Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+  Inactive: false
+  Groups:
+    Northlake University:
+    - eem_nlu_points_read
+  Notes: 'The one API client: the campus dashboard reading Northlake data through the public API. Read-only Points. Assign its API key on the user page (Assign/rotate workload credential) and do not copy the key anywhere.'
+- key: task.gateway-poll
+  installed:
+    userId: null
+  User Name: task.gateway-poll
+  Display Name: Gateway Poll Task Account
+  Email: task.gateway-poll@northlake.example.edu  # assumed
+  Company: Northlake University
+  IsAdmin: false
+  Principal Type: Task
+  Authentication Policy: WorkloadOnly
+  Time Zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+  Inactive: false
+  Groups:
+    Northlake University:
+    - eem_gateway_reports
+    - eem_nlu_points_read
+  Notes: 'The one Task principal: the identity a scheduled gateway task runs as. Gateway reports and read-only Points; no task-execution grants are added here.'
 companyIds:
   Common (System, CompanyID -1): -1
   Northlake University: 6
@@ -434,7 +488,7 @@ companyIds:
 
 # Group membership entry: select the company, open Groups and assign the listed user names.
 # These lists mirror records[].Groups above; keep both views in sync when assignments change.
-# Unlisted groups have no expected members from this 23-user roster.
+# Unlisted groups have no expected members from this 26-user roster.
 # Include casey.holt in the listed groups and keep that user Inactive=true.
 # Administrator roles still use each user's IsAdmin field above.
 # The rates group uses its installed ID eem_rate_allocations (singular rate).
@@ -466,17 +520,21 @@ groupMemberships:
     - quinn.roberts
     eem_gateway_reports:
     - jordan.hale
+    - task.gateway-poll
     eem_nlu_points_admin:
     - emerson.fox
     - jordan.hale
     - priya.nandakumar
     - samantha.ireland
     eem_nlu_points_read:
+    - api.energy-dashboard
     - casey.holt
     - iris.morales
     - leo.martinez
     - nora.chen
     - quinn.roberts
+    - svc.report-delivery
+    - task.gateway-poll
     eem_ntp_points_modify:
     - priya.nandakumar
     eem_ntp_points_read:
@@ -489,6 +547,7 @@ groupMemberships:
     - leo.martinez
     - quinn.roberts
     - samantha.ireland
+    - svc.report-delivery
     eem_ridgeline_research:
     - elena.vasquez
     - kai.nakamura

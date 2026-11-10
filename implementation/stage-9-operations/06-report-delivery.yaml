@@ -10,6 +10,14 @@ source:
 - generators/documents/sources/implementation/dream-customer/phase6-operations-engagement-spec.md
 - generators/documents/sources/implementation/dream-customer/product-gap-backlog.md (item 8)
 notes:
+- 'MFR delivery editor (MFRDelivery.cshtml, viewMFRDelivery.ts, re-read 2026-11-10). Fields: Delivery description (required),
+  Email subject (required), Delivery status (On / Off; Off is saved but does not run on schedule), then the Output card:
+  Attach as PDF and/or Excel, PDF orientation (Portrait / Landscape, default Landscape), Impersonate reports (shown to
+  administrators only: render each report once as the delivery owner and send the same output to every recipient; the
+  review''s note that it is not on the editor is stale). Tabs: My Favorite Reports, Recipients, Groups, Schedule. Schedule has a
+  Schedule / Run immediately toggle ("This delivery will run once when it is saved"), and under Schedule the shared schedule
+  editor: Time zone, How often (Once at... / Every N / At specific times / Custom cron), Start date, Run forever or an end date,
+  Next run. The records below set every one of these at least once; the Ridgeline delivery keeps Impersonate reports off.'
 - 'Verified two levels deep: the persisted table MFRDeliveryRecipient_TBL DOES have an Email column (alongside
   RecipientKind/UserID/GroupID), so the data model can hold an email-only recipient -- but the picker DTO the web
   view binds (MFRDeliveryRecipientsDTO, viewMFRDelivery.ts) only offers UserID/DisplayName/CompanyID rows sourced
@@ -58,22 +66,34 @@ records:
   installed:
     mfrDeliveryId:
   MFRDelivery:
+    Delivery description: Monthly Building Energy to building representatives
+    Email subject: Monthly Building Energy Report
+    Delivery status: On
     Reports: Monthly Building Energy
     Recipients: (none individual)
     Groups: "the 12 Bldg Rep groups above (120 users)"
     Schedule: "cron 0 7 1 * *"
+    Time zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+    Run forever: true
     Format: PDF
+    PDF orientation: Landscape
   check: "delivery task log shows >=100 resolved recipients"
 - key: weekly_cost_rollup_delivery
   kind: delivery
   installed:
     mfrDeliveryId:
   MFRDelivery:
+    Delivery description: Weekly Cost Rollup to Finance
+    Email subject: Weekly Cost Rollup
+    Delivery status: On
     Reports: Weekly Cost Rollup
     Recipients: "samantha.ireland, morgan.patel (individual)"
     Groups: NLU Finance Distribution
     Schedule: "cron 0 6 * * 1"
+    Time zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+    Run forever: true
     Format: PDF+Excel
+    PDF orientation: Portrait   # assumed: a long cost table prints better tall
   externalRecipientsWanted: ["ap-review@northlake.example.edu", "budget-office@northlake.example.edu"]
   externalRecipientsStatus: "BLOCKED -- no email-recipient field exists (backlog item 8); not entered"
 - key: daily_operations_delivery
@@ -81,20 +101,51 @@ records:
   installed:
     mfrDeliveryId:
   MFRDelivery:
+    Delivery description: Daily Operations to Facilities
+    Email subject: Daily Operations Summary
+    Delivery status: Off   # assumed: saved but not running; Jordan reads the same tiles on Facility Operations (step 5)
     Reports: Daily Operations
     Recipients: "jordan.hale, emerson.fox (individual)"
     Groups: (none)
     Schedule: "interval, every 24h at 06:00"
+    Time zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+    Start date: '2025-01-02 06:00'   # assumed: the day after the first full day of Northlake's data
+    Run forever: false
+    End date: '2025-12-31 23:59'   # assumed: the scenario's data ends 2025-12-31
     Format: PDF
+    PDF orientation: Landscape
 # ---- Ridgeline Wind ----
 - key: ridgeline_monthly_performance_delivery
   kind: delivery
   installed:
     mfrDeliveryId:
   MFRDelivery:
+    Delivery description: Ridgeline monthly performance to the plant and the research lab
+    Email subject: Ridgeline Monthly Performance
+    Delivery status: On
     Reports: Ridgeline Monthly Performance
     Recipients: "mateo.alvarez, elena.vasquez (individual)"
     Groups: (none)
+    Time zone: (GMT-08:00) Pacific Time (US & Canada); Tijuana
+    Run forever: true
+    PDF orientation: Landscape
+    Impersonate reports: false   # the default; each recipient runs the report as themselves
     Schedule: "cron 0 7 2 * *"   # assumed: the 2nd, so the last month's final SCADA files are in and it does not queue with Monthly Building Energy (the 1st, 07:00)
     Format: PDF+Excel   # assumed: Excel for the lab's own analysis
   check: "delivery task log shows 2 resolved recipients, each sent a PDF and an Excel attachment"
+# ---- A one-shot ----
+- key: executive_summary_one_shot_delivery
+  kind: delivery
+  installed:
+    mfrDeliveryId:
+  MFRDelivery:
+    Delivery description: Executive Sustainability Summary, one send to Samantha
+    Email subject: Executive Sustainability Summary
+    Delivery status: On
+    Reports: Executive Sustainability Summary
+    Recipients: "samantha.ireland (individual)"
+    Groups: (none)
+    Schedule: Run immediately   # the toggle: runs once when it is saved, no recurring schedule is created
+    Format: PDF
+    PDF orientation: Landscape
+  check: "ScheduleKind 0 (once); one delivery run on save"

@@ -40,7 +40,7 @@ from Stage 3's entry backup in the instance's own default backup path.
 Run `RESTORE VERIFYONLY` against it immediately.
 
 **Keep beside it, since none of it is in the database:** the application
-version (7.0.0.4005) and the repo commit the install was built from; the
+version (read it from the installed app; the tree builds 7.1, and 7.0.0.4005 in earlier drafts is stale) and the repo commit the install was built from; the
 gateway input/working/backup/error folders and
 `GatewayOutput` state files under
 `C:\ProgramData\EEM Suite\NorthLake`; and any externally-held settings —
@@ -72,17 +72,21 @@ database, the file every future restore starts from. Drop
 `EEMSuite_NorthlakeVerify` and its scratch folders; the real instance was
 never touched.
 
-**Check:** `row_counts_major_tables`, `report_matrix_nonempty`.
+**Check:** `baseline_counts`, `ridgeline_bill_values` and `activity_and_audit_survive_restore`. Each returns an expected value, the
+actual value and PASS or FAIL, and the same values must come back from the restored copy as from the original.
+`checklist_not_scripted` lists the checklist lines that can only be read by eye.
 
 ## Stage 10 is done when
 
 - The Step 1 backup exists in `msdb` backup history as a full backup at
   `C:\Hippo\Backups\`, and `RESTORE VERIFYONLY` passed.
-- Every table in `row_counts_major_tables` that a prior stage populates shows
-  a non-zero count.
-- Every report bucket in `report_matrix_nonempty` is non-zero, standing in
-  for the full [report coverage matrix](../report-coverage-matrix.pdf)'s 115
-  reports all having rendered at least once.
+- Every row of `baseline_counts` is PASS: the three named companies, six providers, 13 ENERGY STAR
+  properties, 4 regressions, 3 GHG configurations, 5 projects, 15 alarm points, 23 saved-report rows, 3 dashboards,
+  5 deliveries with 20 recipient rows and no EnergyAI loads.
+- `ridgeline_bill_values` is PASS: the July 2024 statement at 129,330.27, the generator's first bill at 1,077.45 and
+  the -152,792.65 credit on the one Central Plant bill and no other.
+- The full [report coverage matrix](../report-coverage-matrix.pdf)'s 119 reports have each rendered at least once; the
+  matrix records the value a stage expects for each, where one is known.
 - The restore-verification checklist opened cleanly in a disposable database
   and every value matched.
 - The backup is promoted as Northlake's reference database.

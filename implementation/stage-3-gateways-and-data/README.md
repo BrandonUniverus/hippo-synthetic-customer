@@ -103,7 +103,7 @@ Gateway 7 is now **Northlake NOAA Weather**. These are the saved nodes:
 | NOAA-KSAC-FORECAST | 31 | Forecast | KSAC | blank | 6 |
 | NOAA-KSUU-FORECAST | 32 | Forecast | KSUU | blank | 6 |
 
-Set **IsEnabled = 1** explicitly on these nodes. Keep **Next Batch Method = Disabled**, late intervals off and data gaps off. These flags configure the nodes; the workflow tasks must remain disabled until Step 4. The binding script requires the gateway type, node names and required node values to match before it can apply.
+Set **IsEnabled = 1** explicitly on these nodes. Keep **Next Batch Method = Disabled** and late intervals off. Data gaps are on for NOAA-KSAC and NOAA-KSMF (added 2026-11-10, see the node flag notes in 02-gateways.yaml) and off on the other four. These flags configure the nodes; the workflow tasks must remain disabled until Step 4. The binding script requires the gateway type, node names and required node values to match before it can apply.
 
 ## 3. Connect the weather points
 

@@ -15,17 +15,22 @@ source:
 notes:
 - Enter Definitions first (name, archive interval, time zone, country, alarm defaults) and save; Levels, Company
   Address, Company Contact and Bill Scenarios unlock after that first save, same order as Stage 1 step 1. Saving
-  creates the Actual bill scenario and a 1990-2013 fiscal calendar on its own; leave both.
+  creates the Actual bill scenario and the company calendar on its own (Company_Save calls CompanyCalendar_Generate
+  and generates periods through next year, as Stage 1 step 3 says for the other companies); leave both. Fiscal year
+  equals calendar year, so period 1 of 2024 is January 2024, which every figure in files 09 and 10 relies on.
 - Archive Interval 60 minutes and Pacific time match every other Northlake company so interval imports behave the
   same way across the portfolio.
 - 'Levels: the four base types (Site, Location, Meter, Point) are fixed by the product. Town Center''s wording follows
   Cedar Row''s pattern (a single property, not a campus of sites) rather than Northlake University''s.'
 - Company Address and Company Contact are invented for Town Center (assumed); no source names them, since neither
   tenant-and-lease-roster.pdf nor northlake-town-center-v1.yaml gives Town Center a street address or a staff contact.
-- 'Bill Scenarios > Used adds two scenarios beyond Actual: Budget, so Step 4''s multi-component rate can be assigned
-  under both Actual (-1) and a non-actual scenario per the Phase 4 spec section D; and Bill Meter Reconciliation
-  (ScenarioTypeID 20, confirmed present in dbo.ScenarioType), which Step 7''s reconciliation fixture needs on the
-  Anchor Store meter.'
+- 'Bill Scenarios > Used adds two scenarios beyond Actual. Budget: file 06 assigns Anchor Store''s rate under both
+  Actual and a non-actual scenario. Bill Meter Reconciliation (ScenarioTypeID 20, in dbo.ScenarioType): the Bill
+  checkbox on Anchor Store''s Actual rate row copies the rate onto this scenario and creates its Bill Generation row
+  (UtilityRateMeterAssignment_Save.sql looks the scenario up by company and ScenarioTypeId 20), so without it the Bill
+  checkbox fails (UtilityMeterRates.BillScenarioID is NOT NULL). The Tenant Rebill scenario picker never lists this
+  scenario (UtilityBillScenario_Get, type 6 is all except Bill Recon), which is why the checkbox is the only way in
+  (file 07).'
 - 'Town Center needs a vendor number with Valley Electric District once this company exists: go back to Database
   Administrator > Utility Providers > Valley Electric District > Associated Companies (Stage 1 step 2''s screen)
   and add Northlake Town Center with a new vendor number, e.g. VED-3005-TC # assumed. Not repeated here because
@@ -127,7 +132,7 @@ records:
       Bill Validation: Admin
     Functions:
       Bill Administration: Admin
-      Bill Entry Web and bill images: Edit
+      Bill Entry Web and bill images: Admin   # level 3: Generated Bills > Create (beBill_Sav) needs it, file 06's Manual tenant
     Points:
       Node Scope: Northlake Town Center (root)
       Level: Admin

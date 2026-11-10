@@ -30,6 +30,7 @@ notes:
   assigns on its own), not a meter count. Starting Year 2024 and Ending Year 2025 stay: Ridgeline has data from July
   2024, and a multi-year baseline averages each fiscal month over the years that have results, without filling
   January to June 2024 with zeros (SeedHelpGuides.sql:987-992).'
+- 'Auto-assignment and what to exclude is confirmed in step 2''s notes (CreateDefaultEmissionMeterMap.sql): saving a company here with a source enabled lets the warehouse job map every unexcluded California Electricity meter of that company. The Exclude records of step 2 (14 meters) must be saved first. Expected after the job: 166 mapped meters, 14 excluded, 0 GHG rows for an excluded meter (checks.sql).'
 records:
 - key: nlu_ghg_config
   installed:
@@ -39,7 +40,7 @@ records:
   Ending Year: 2025
   Default Emission Source Category: Indirect
   Enabled Sources:
-  - {source: eGRID, meterAssignment: "10 electric meters (step 2)", commodities: Electric, emissionTypes: "CO2, CH4, N2O"}
+  - {source: eGRID, meterAssignment: "10 electric meters (step 2); the Science Center and Student Center PV arrays Excluded; the owned electric submeters map by themselves and carry no bill", commodities: Electric, emissionTypes: "CO2, CH4, N2O"}
   - {source: Non-electric commodities, meterAssignment: "6 gas meters + 6 water meters (step 2, excludes the Thermal Plant company)", commodities: "Natural Gas, Potable Water", emissionTypes: CO2}
 - key: cra_ghg_config
   installed:
@@ -49,7 +50,7 @@ records:
   Ending Year: 2025
   Default Emission Source Category: Indirect
   Enabled Sources:
-  - {source: eGRID, meterAssignment: "4 electric meters (Cedar Row A, B, Common House, area lighting)", commodities: Electric, emissionTypes: "CO2, CH4, N2O"}
+  - {source: eGRID, meterAssignment: "4 electric meters (Cedar Row A, B, Common House, area lighting); the Solar Carport array Excluded; the 126 apartment and house submeters map by themselves and carry no bill", commodities: Electric, emissionTypes: "CO2, CH4, N2O"}
   - {source: Non-electric commodities, meterAssignment: "3 gas meters + 2 water meters (Cedar Row A, B, Common House)", commodities: "Natural Gas, Potable Water", emissionTypes: CO2}
 - key: ntp_ghg_config
   installed:
@@ -59,5 +60,5 @@ records:
   Ending Year: 2025
   Default Emission Source Category: Stationary
   Enabled Sources:
-  - {source: eGRID, meterAssignment: "2 electric meters (plant chiller input; Ridgeline Interconnection Meter, station service only); the 10 Ridgeline turbine meters are Excluded in step 2", commodities: Electric, emissionTypes: "CO2, CH4, N2O"}
+  - {source: eGRID, meterAssignment: "2 electric meters (the plant electric service; Ridgeline Interconnection Meter, station service only); the 10 Ridgeline turbine meters and the Ridgeline Farm Transfer Meter are Excluded in step 2", commodities: Electric, emissionTypes: "CO2, CH4, N2O"}
   - {source: Non-electric commodities, meterAssignment: "1 gas meter (plant boiler input)", commodities: Natural Gas, emissionTypes: CO2}

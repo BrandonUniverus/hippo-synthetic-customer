@@ -94,8 +94,10 @@ class Stage2HierarchyFilesTests(unittest.TestCase):
                 self.assertEqual(render_data(number), text[text.index(BEGIN):text.index(END) + len(END)])
 
     # ---------------------------------------------------------------- counts
-    def test_51_billing_accounts(self):
-        self.assertEqual(51, len(self.accounts))
+    def test_53_billing_accounts(self):
+        # 51 until 2026-11-10, when the coverage fixes added a Canadian-dollar account (Georgian Shore Hydro) and an
+        # account that closes (the Lakeshore Boathouse gas account).
+        self.assertEqual(53, len(self.accounts))
         by_kind = {"externalUtilityAccounts": 0, "internalCostCenters": 0, "ppaAgreements": 0, "generationTransfers": 0}
         for r in self.accounts:
             provider = r["Definitions"]["Utility Provider"]
@@ -107,12 +109,13 @@ class Stage2HierarchyFilesTests(unittest.TestCase):
                 by_kind["generationTransfers"] += 1
             else:
                 by_kind["externalUtilityAccounts"] += 1
-        self.assertEqual({"externalUtilityAccounts": 41, "internalCostCenters": 6, "ppaAgreements": 3, "generationTransfers": 1}, by_kind)
+        self.assertEqual({"externalUtilityAccounts": 43, "internalCostCenters": 6, "ppaAgreements": 3, "generationTransfers": 1}, by_kind)
 
-    def test_390_meters(self):
-        self.assertEqual(390, len(self.meters))
+    def test_391_meters(self):
+        # 390 until 2026-11-10: plus the boathouse gas meter, the one meter with a Removed status.
+        self.assertEqual(391, len(self.meters))
         with_account = sum(1 for r in self.meters if r["Meter Definition"]["Billing Account"])
-        self.assertEqual(67, with_account)                     # ten turbines, the farm transfer meter and the interconnection meter included
+        self.assertEqual(68, with_account)                     # ten turbines, the farm transfer meter and the interconnection meter included
         self.assertEqual(323, len(self.meters) - with_account)  # 320 owned (the met mast and the 54 handheld-route meters included) + 3 weather stations
 
     def test_the_transfer_statement_is_priced_on_one_billing_meter(self):
@@ -125,17 +128,18 @@ class Stage2HierarchyFilesTests(unittest.TestCase):
         self.assertEqual({f"ch_rwl_wtg{n:02d}_kwh_10m" for n in range(1, 11)},
                          {self.point_by_meter[(m["Meter Number"], m["Point"])]["key"] for m in farm["Members"]})
 
-    def test_points_to_enter_plus_generated_is_677(self):
+    def test_points_to_enter_plus_generated_is_679(self):
         entered = len(self.points)
-        self.assertEqual(474, entered)  # includes 18 hourly forecast points, 12 observations, three baseline shells and 73 handheld-route points
+        self.assertEqual(475, entered)  # 474 until 2026-11-10: plus the boathouse gas register
+        #  # includes 18 hourly forecast points, 12 observations, three baseline shells and 73 handheld-route points
 
         generated_deltas = sum(1 for r in self.points if r["Point Definition"]["Reading Type"] == "Accumulator")
-        self.assertEqual(197, generated_deltas)  # one AccumulatorDelta per register, real Point_Save behaviour
+        self.assertEqual(198, generated_deltas)  # one AccumulatorDelta per register, real Point_Save behaviour
 
         generated_hdd_cdd = sum(1 for r in self.points if r["Point Definition"].get("Index") == "Degree Days") * 2
         self.assertEqual(6, generated_hdd_cdd)  # HDD + CDD behind each of the 3 station temperature points
 
-        self.assertEqual(677, entered + generated_deltas + generated_hdd_cdd)
+        self.assertEqual(679, entered + generated_deltas + generated_hdd_cdd)
 
     def test_every_meter_multiplier_has_a_point_to_act_on(self):
         with_points = {r["Meter"]["Meter Number"] for r in self.points if "Meter" in r}
@@ -223,13 +227,14 @@ class Stage2HierarchyFilesTests(unittest.TestCase):
         self.assertEqual({"Bill Importer", "Bill Entry", "Bill Allocation", "Bill Generation"}, {d["Bill Entry Type"] for d in definitions})
         self.assertEqual({"AP Upload Only", "No AP Upload", "Bill Payment"}, {d["Bill Service Type"] for d in definitions})
         self.assertEqual({"Bill Table Invoice Default", "Billing Charges Report"}, {d["Bill Invoice Template"] for d in definitions})
-        self.assertEqual({"US Dollar"}, {d["Currency Unit"] for d in definitions})
+        self.assertEqual({"US Dollar", "Canadian Dollar"}, {d["Currency Unit"] for d in definitions})  # one Canadian account since 2026-11-10
         self.assertEqual(2, sum(1 for d in definitions if d.get("Previous Account Number")))  # a renewal and an acquisition
         self.assertEqual(1, sum(1 for r in self.accounts if "Account Contact" not in r))
         acquired = {"ved_ridgeline_generator", "rwl_ridgeline_transfer"}   # opened with the 2024-07-01 acquisition
         for r in self.accounts:
             with self.subTest(account=r["key"]):
-                start = date(2024, 7, 1) if r["key"] in acquired else date(2024, 1, 1)
+                # The Toronto account opens with its provider's first bill cycle, 2026 (added 2026-11-10).
+                start = date(2024, 7, 1) if r["key"] in acquired else date(2026, 1, 1) if r["key"] == "gsh_toronto_research_hall" else date(2024, 1, 1)
                 self.assertIn({"Status": "Active Billing Account", "As of Date": start}, r["Status"])
                 self.assertIsNotNone(r["Service Address"].get("Latitude"))
 
@@ -281,6 +286,7 @@ class Stage2HierarchyFilesTests(unittest.TestCase):
             "northlake_central_plant": 31, "central_plant": 32,
             "ridgeline_wind_site": None, "ridgeline_turbine_field": None, "ridgeline_substation": None,  # new, to enter
             "cedar_row_c": None,  # new 2026-11-07, to enter
+            "northlake_toronto_campus": None, "toronto_research_hall": None, "lakeshore_boathouse": None,  # new 2026-11-10, to enter
         }
         self.assertEqual(expected, installed)
 

@@ -1,5 +1,7 @@
 # Stage 9, step 3: Audit and activity trail (system-generated). Nothing is configured; this file lists the actions
-# to perform, through the normal apps, so rp_Audit and rp_ActivityTracker have rows once they are run.
+# to perform, through the normal apps, so Audit Explorer (rp_AuditExplorer, over dbo.AuditEntry) and rp_ActivityTracker
+# have rows once they are run. Rewritten 2026-11-10: the classic Audit report (rp_Audit) and its AuditLog/AuditConfig
+# tables were retired by Scripts/RetireAuditReport.sql and the audit replacement (AuditEntry).
 stage: 9
 step: 3
 title: Audit and activity trail
@@ -8,13 +10,20 @@ screen: (system-generated; no dedicated setup screen)
 source:
 - generators/documents/sources/implementation/dream-customer/phase6-operations-engagement-spec.md
 notes:
-- 'Verified: AuditConfig already has 12 Active=1 rows tracking Bill.BL_Amount/FiscalYear/Period/PeriodStart/
-  PeriodEnd, BillItem.BI_Amount/BI_Quantity, BillingAccount_Tbl.BA_BillingAccountNumber/Description/ProviderID, and
-  Meter.SM_Code/BA_BillingAccountID. Nothing to enable; AuditLog fills the moment one of those columns changes
-  (LogID, AuditID, KeyID, TableRowID, UserID, AsOfDate, PreviousValue, CurrentValue).'
-- 'Verified: rp_ActivityTracker (stored procedure) counts, per user or per company, Logins from UserLogin_Tbl and
-  Activity from GuiReportActivityLog (joined to GuiReports/GuiReportTypes, i.e. report views) between two dates.
-  There is nothing to configure; sign in and open reports as several users and the counts populate.'
+- 'Verified 2026-11-10 against the product: the application audit trail is dbo.AuditEntry (Tables/AuditEntry.sql: Id,
+  EntryUid, OperationId, OccurredUtc, ActorKind, ActorId, SourceApplication, CompanyId, EntityType, EntityKey, Action,
+  DetailLevel, PayloadJson). AuditLog and AuditConfig no longer exist, and there are no 12 tracked-column rows to enable:
+  capture is service-owned and selected by the ApplicationAudit configuration (Enabled, Preset Custom / Regular / All,
+  Entities), which defaults to enabled with All when nothing is configured, so Bill, BillItem, BillingAccount and Meter
+  (AuditEntityTypes in AuditContracts.cs) are captured as soon as the product edits them. Direct SQL does not write entries,
+  so the edits below must go through the screens. Entries are read in Audit Explorer (System Health > Audit, report
+  audit_explorer, route #/AuditExplorer, procedure rp_AuditExplorer), a report for system administrators with Report
+  Settings for date range, users, record types, actions, companies and sources. A changed field is a row in
+  PayloadJson ("changes": field: {old, new}); Action is "Update" for an edit. AUDIT_RETENTION (step 4) purges expired
+  entries when ApplicationAudit:RetentionDays is configured; nothing in this recipe sets it, so nothing is purged.'
+- 'Verified 2026-11-10: rp_ActivityTracker returns one row per report run (GuiReportActivityLog), per page open
+  (GuiPageActivityLog, stored in UTC) and per sign-in (UserLogin_Tbl) between two dates, with a Kinds facet (run, open,
+  signin). There is nothing to configure; sign in, open pages and run reports as several users and the rows populate.'
 - 'CORRECTION: UserLogin_Tbl records a session once sign-in succeeds; it has no failure flag. casey.holt is
   Inactive (Stage 1), so the "disabled-user failed-auth" case proves itself by ABSENCE -- no UserLogin_Tbl row, no
   session -- not by a special failed-attempt row inside rp_ActivityTracker. If a separate identity/security audit
@@ -34,8 +43,9 @@ notes:
 records:
 - key: bill_field_edits
   action: "Open an existing Sierra Gas or Valley Electric bill in Bill Entry and change its amount by a cent, then
-    change a billing account's description by a word, then rename a meter's code and back. Three edits, three
-    AuditLog rows, spanning Bill/BillItem/BillingAccount/Meter."
+    change a billing account's description by a word, then rename a meter's code and back. Four saves, so four
+    AuditEntry rows with Action Update: one of EntityType Bill (or Bill and BillItem if the amount cascades), one
+    BillingAccount and two Meter (the rename and the rename back), each with its old and new value in the Changes column."
   performedBy: jordan.hale (Northlake University eem_company_setup, nlu_facilities_setup and nlu_points_admin)
 - key: normal_logins
   action: "Sign in as 5-6 of the Stage 1 users spanning all three companies over a few different days in the
@@ -58,3 +68,15 @@ records:
     run for the Northlake Thermal Plant counts neither of them."
   performedBy: "elena.vasquez and kai.nakamura (Northlake University, eem_ridgeline_research, Points granted in Stage 2);
     quinn.roberts reads the result with his Northlake University eem_audit_readonly copy"
+- key: read_audit_explorer
+  action: "Sign in as a system administrator (Audit Explorer is a system-administrator report), open System Health > Audit >
+    Audit Explorer for the days of the four edits and narrow the Report Settings by Record types (Bill, BillingAccount,
+    Meter) and by Users (jordan.hale). Open a Meter entry's record history and its same-save operation."
+  performedBy: a system administrator (the one who authors the cross-company deliveries in step 6)
+  expect: "4 entries by jordan.hale (Bill or Bill+BillItem, BillingAccount 1, Meter 2) with the changed field, old value and
+    new value in Changes; none for casey.holt."
+- key: page_opens
+  action: "As samantha.ireland and jordan.hale open a report page, then a configuration page, from the main menu (not by
+    pasting a link), so rp_ActivityTracker has page-open rows beside the report runs and sign-ins. Filter its Kinds facet to
+    page opens."
+  performedBy: samantha.ireland, jordan.hale

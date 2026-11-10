@@ -15,6 +15,14 @@ tenants) and WUI point allocation (splitting a master point's measured use acros
 this stage uses both, on top of Bill Generation (rate times meter use), which the earlier rate and
 meter stages already stood up.
 
+**What the product actually does (read in its source, 2026-11-10).** Only two of the seven Bill
+Allocation methods compute anything: method 1 (Fixed Amount and %) and method 6 (Bill Aggregation).
+Methods 2, 3, 4, 5 and 7 can be configured but have no calculator, so a master bill under them produces
+no allocated bill (Step 4). Bill Allocation, Bill Generation and WUI each need their meters to have a
+Measure Type and a billing account with a provider, which the earlier hierarchy did not give them (Steps 2
+and 6). Town Center now has its own rates (Step 9) and a small scripted data set with every expected
+value (Step 10).
+
 **Added 2026-10-01: Ridgeline Wind.** The Thermal Plant bought a ten-turbine wind company on July 1,
 2024, and Stage 7 gains Step 8 and one more Run Now in Step 7. Ridgeline is Bill Generation the other
 way round from the tenants: no tenant and no allocation, one account (SYN-RWL-G-0000001) whose
@@ -29,9 +37,12 @@ one to the cent, $129,330.27. Steps 1 through 6 take nothing from Ridgeline.
 - Stages 1 through 6 are green. This stage adds a new company and hierarchy of its own (Town Center)
   and adds records to Northlake University and Cedar Row Apartments, both of which must already exist
   (companies 6 and 3).
+- **Order of work.** Steps 1 and 2, then Step 9 (the two tenant rates, which Step 6 picks from), then
+  Stage 3's Town Center data (Step 10 lists the 22 points and their constants), then the master bills of
+  Step 10 on Bill Entry Web, then Steps 3 to 8.
 - Two catalog gaps must be closed before typing this stage, and neither is customer data: `dbo.
-  BillAllocationMethod` has only method 1 seeded on this instance today (methods 2-7 are confirmed
-  present in the reference EEMSuite database) and `dbo.PtAllocationMethod` has only 2 of its 3 rows
+  BillAllocationMethod` may have only method 1 on this instance (methods 2-7 are present in the reference
+  EEMSuite database; the product has no seed for them) and `dbo.PtAllocationMethod` has only 2 of its 3 rows
   (Percentage Based is missing). Install both, the same way earlier stages treated other ".bak, not
   in git" catalogs as product install data. Step 4 and Step 5 name the exact rows.
 - Enter everything through the applications. If a screen cannot take a value this stage needs, stop
@@ -52,11 +63,11 @@ one to the cent, $129,330.27. Steps 1 through 6 take nothing from Ridgeline.
 Address, Company Contact and Bill Scenarios. Then create the two groups and the one user under Users
 & Groups.
 
-**EEM creates for you:** the Actual bill scenario and a 1990-2013 fiscal calendar.
+**EEM creates for you:** the Actual bill scenario and the company calendar through next year (fiscal year equals calendar year, so period 1 of 2024 is January 2024).
 
-**Bill Scenarios:** add Budget and Bill Meter Reconciliation to Used, alongside Actual — Step 4's
-anchor tenant rate and Step 7's reconciliation fixture both need a scenario beyond Actual to assign
-to.
+**Bill Scenarios:** add Budget and Bill Meter Reconciliation to Used, alongside Actual. Budget holds
+Anchor Store's second rate row (Step 6); Bill Meter Reconciliation is what the Bill checkbox on that
+row copies the rate to (Step 7). The Tenant Rebill scenario picker never lists it.
 
 **A loose end for Stage 1's screen, not this one:** once Town Center is saved, go back to Utility
 Providers > Valley Electric District > Associated Companies and give Town Center a vendor number.
@@ -75,15 +86,26 @@ Add Billing Account dialog, opened from a meter.
 **Order inside the tree:** the Property node, save; the five Buildings (Market Hall, Office Tower,
 Campus Annex, Substation Feed, Property Total), save each; then every Meter under its building —
 save a Billing Account first through Add Billing Account so the meter has one to attach to. Points
-last, only on meters that carry real interval data.
+last.
 
-**Two things every tenant space needs even with no physical device:** a Meter-level node (Bill
-Allocation Configuration details point at a node with a billing account, not a bare name) and, for
-every tenant Step 4's Building Areas method touches, an Area tab value.
+**What every meter needs, and why.** Each of the 22 meters has Measure Type Electricity and a billing
+account whose Utility Provider is Valley Electric District (US Dollar). The Add Billing Account dialog
+will not save an account without a provider, and the meter's provider is copied from its account.
+Without them the Tenant Rebill rate list is empty (it lists the meter provider's rates of the meter's
+measure type), a rate of another measure type is refused, and the Add Allocated Meters picker rejects the
+meter (different measure type, no account or a different currency). The four masters are Bill Entry
+accounts (their bills are keyed in Step 10); the four tenants that Step 6 generates for are Bill
+Generation accounts; the rest are Bill Allocation accounts.
+
+**Points (26 in all):** the measured kWh and kW points that Stage 3 loads (Step 10 lists them) and four
+Estimated kWh points under Shop 3, Shop 4, Common Area and Landlord/House that Weighted Use Index writes
+into. Floor area (Area tab, SqFt) goes on every tenant space the Building Areas method and the WUI
+families read.
 
 **Record:** the MetaWorldID, MeterID and BillingAccountID for every row.
 
-**Check:** `town_center_hierarchy`.
+**Check:** `town_center_hierarchy` (level counts, account types, provider and measure type on every
+meter, and each floor area against its expected value).
 
 ## Step 3. Thermal Plant chilled water and steam cost recovery
 
@@ -102,7 +124,7 @@ treating this step as final.
 
 **Record:** the BillAllocationConfigID for both configs.
 
-**Check:** `allocation_configs_by_method` (this step's two rows are included in that check).
+**Check:** `allocation_configs` (this step's two rows are included in that check: 2 and 6 detail rows).
 
 ## Step 4. Bill Allocation Configuration, one config per method
 
@@ -115,17 +137,28 @@ methods 1 through 7.
 Add Allocated Meters through the Eligible Meters picker; then Combine Overhead; then Balance to
 100% if a method 1 config's percentages do not already total 100.
 
-**What you type versus what the engine computes:** only method 1's rows need Allocation Amount /
-Allocation % / Overhead typed by hand. Methods 2, 3, 4, 5 and 7 compute their own split — from
-submeter consumption, floor area or usage share — the first time Process Meter Allocations runs
-(Step 7); add the candidates and leave their percentages at 0.
+**Which methods compute.** Only method 1 and method 6. The bill-allocation procedures go on only when
+the master meter has a method 1 config for the bill's period and then split by the typed Allocation %
+and Allocation Amount; they never branch on the method. Methods 2, 3, 4, 5 and 7 have no calculator
+(ADR-015), so those five configs can be entered and a master bill under them gets no allocated bill.
+The earlier text of this step said the engine would compute the shares from consumption, area or usage
+when Process Meter Allocations runs. It does not: Process Meter Allocations is the WUI run of Step 5.
 
-**Method 6, Bill Aggregation, runs backwards:** its master, Property Total, is the receiver, not the
-source, and every other Town Center tenant meter is a candidate feeding it.
+**What you type.** Method 1: Allocation %, Allocation Amount with Fixed, and Overhead % on every row.
+Overhead is added on top of each tenant's share, not carved out of it. Method 6 runs backwards: its
+master, Property Total, is the receiver and every row feeds it, and each row is typed Allocation % 100
+(a method 6 row left at 0 aggregates nothing). Methods 2, 3, 4, 5 and 7: add the candidates and leave
+their percentages at 0.
+
+**Known values.** With the master bills of Step 10 (Mall-Main 30,000.00 in 2024-01 and 2025-01): Anchor
+Store 2,040.00, Food Court 4,284.00, each of Shops 1 to 4 2,284.80, Common Area 15,136.80, which is
+30,000.00 of shares plus 600.00 of overhead; Property Total 30,600.00 in both periods. For the other
+five masters the check asserts the opposite: the bill exists and nothing was allocated.
 
 **Record:** the BillAllocationConfigID for every config.
 
-**Check:** `allocation_configs_by_method`.
+**Check:** `allocation_configs`, then after Step 7 `method_1_allocation`, `tenant_bills_sum_to_parent`,
+`methods_2_3_4_5_7_not_computed_today` and `method_6_property_total`.
 
 ## Step 5. WUI point families and fail-reason fixtures
 
@@ -134,66 +167,88 @@ opens the Master Point Configuration modal.
 
 **Enter:** [05-wui-point-families.yaml](05-wui-point-families.yaml): two real point families
 (wui_market_electric, wui_tower_electric) and a set of deliberately broken fixtures covering all 5
-`PtAllocFailReason` values plus the unimplemented Percentage Based method.
+`PtAllocFailReason` values plus the unimplemented Percentage Based method. The fixture nodes are in no
+hierarchy file yet, and No Area and No Rate need separate meters (a known problem in the file's notes).
 
 **Order inside the modal:** pick or confirm the master point, then Add Child Points with each
 child's Allocation Method and Start Date.
 
 **Before this step:** install the missing `PtAllocationMethod` row (3, Percentage Based) — without
-it the last fixture cannot even be selected. Read this file's note on `PtAllocationIndex` before
-entering the two real families: no screen in the current build appears to write that table, which
-would leave every index value without an entry path; confirm this in the running application and
-correct the file if a screen does exist.
+it the last fixture cannot even be selected.
+
+**Index values have a screen.** The Web report WUI Point Use History lists every Weighted Use Index
+child; its create action opens a small view with three inputs (Unit, Fiscal Start, Index Value), which
+calls `WUIPtAllocationIndex_Save`. Enter 0.40, 0.50, 0.15 and 0.90 kWh per SqFt per day for the four
+Estimated kWh children, fiscal start 2024-01 (the file has them). The expected allocated use for
+2024-01 is in Step 10: Shop 3 26,318.37, Shop 4 25,306.12, Common Area 134,375.51 and Landlord/House
+230,640 kWh.
 
 **Record:** nothing new; the modal has no separate ID beyond the point IDs already recorded when the
 points were created.
 
-**Check:** `wui_families_and_fail_reasons`.
+**Check:** `wui_families`, `wui_index_values` and, after Step 7, `wui_allocated_use_2024_01`.
 
 ## Step 6. Tenant bill generation types and Cedar Row residential allocation
 
 **Where:** Database Administrator, Nodes (a meter node's Tenant Rebill tab); Web, Bill Allocation
 Configuration.
 
-**Enter:** [06-tenant-bill-generation.yaml](06-tenant-bill-generation.yaml): 8 Tenant Rebill tab
-entries (the 4 generation types plus the 4 Cedar Row master meters' reconciliation flag) and 4 Bill
-Allocation Configuration configs covering Cedar Row's 248 apartment submeters.
+**Enter:** [06-tenant-bill-generation.yaml](06-tenant-bill-generation.yaml): 4 Tenant Rebill entries
+(the 4 generation types, on Anchor Store, Food Court, In-line Shop 1 and In-line Shop 2) and 4 Bill
+Allocation Configuration configs for Cedar Row.
 
 **Order inside the Tenant Rebill tab:** pick the Bill Scenario at the top, add a Rate Configuration
 row and save, then switch to Bill Generation and add its row (Assigned Rates, Fiscal Start/End,
-Schedule, Status, Available %, Offset).
+Schedule, Status, Available %, Offset). A company administrator enters the Bill Generation row.
 
-**Cedar Row is the same screen and method as Step 4's Tower-Main config, at real scale:** method 2,
-Fully Submetered, one config per building per commodity (4 total), each apartment's own submeter a
-candidate, no percentage typed anywhere — the engine computes 248 shares when Step 7 runs. House
-submeters are not candidates; type Overhead % = 2 into every apartment row so their cost is
-recovered instead of dropped.
+**Rates.** The tab offers the meter provider's rates of the meter's measure type, so the rates of
+Step 9 appear because Step 2 gave the tenants a provider and a measure type. Anchor Store takes
+TC-STEP-DEMAND (Actual and Budget, from 2024-01-01); Food Court, Shop 1 and Shop 2 take TC-FLAT-GS from
+2026-01-01. The earlier NL-STEP-Demand, NL-RES-Tiered and NL-MULTI-Commodity are gone (the first two
+moved to Stage 4's Rate Lab, the last never existed).
+
+**The four generation types**, each over the single period 2026-01 so generated bills never double the
+allocated bills of 2024 and 2025: Anchor Store Off (Bill ticked, which creates the reconciliation of
+Step 7), Food Court Manual, Shop 1 Auto, Shop 2 Auto w/ Auto Regen. A generation row needs the meter to
+have child points; Step 10 gives them their data.
+
+**Cedar Row.** The four masters keep the real tariffs Stage 4 assigns and take no rate here. The four
+configs (method 2, one per building per commodity, 248 apartment rows) are not enterable as written
+and compute nothing: the apartment submeters have no billing account (Stage 2), which the eligible-meter
+picker requires, and method 2 has no calculator. They are kept for the day both are fixed.
 
 **Record:** nothing new on the Tenant Rebill tab; the 4 Cedar Row BillAllocationConfigIDs.
 
-**Check:** `generation_configs`, `allocation_configs_by_method` (Cedar Row's 4 configs), and — once
-Step 7 has run — `tenant_bills_sum_to_parent`.
+**Check:** `generation_configs`, `rate_assignments`, `allocation_configs`, and after Step 7
+`generated_tenant_bills_2026_01`.
 
 ## Step 7. Allocation runs, scheduled tasks and reconciliation
 
 **Where:** Web, Process Meter Allocations (`#/reporting/ProcessMeterAllocations`); Web, Task Manager
-(`#/tasks/manager`); Database Administrator, a meter's Tenant Rebill tab for the reconciliation
-fixture.
+(`#/tasks/manager`); the Bill Reconciliation report.
 
 **Enter:** [07-allocation-runs-and-reconciliation.yaml](07-allocation-runs-and-reconciliation.yaml).
 
 **Order:** run Process Meter Allocations for 2024-01 through 2024-03 first (it needs Step 5's
-families saved). Then schedule and Run Now Task_Tbl 24 (Process Bill Allocation) and 42 (Run Bill
-Gen) from Task Manager — Task_Tbl 47 (Run WUI Process) is system-only and needs no schedule of its
-own. Then enter the Anchor Store reconciliation fixture on its Tenant Rebill tab. Run Now on Run Bill
-Gen once more after Step 8, once Ridgeline's data is in.
+families and indices and Stage 3's data). Key the master bills of Step 10, then schedule and Run Now
+Task_Tbl 24 (Process Bill Allocation, which also aggregates Property Total), and only then 42 (Run Bill
+Gen) from Task Manager. Task_Tbl 47 (Run WUI Process) is system-only. Run Now on Run Bill Gen once more
+after Step 8, once Ridgeline's data is in.
 
-**Tenant accruals have no entry path at all** — no UI, no API, no scheduled task writes
+**Reconciliation is the Bill checkbox, nothing else.** The Tenant Rebill scenario picker leaves out
+Bill Meter Reconciliation, and a mismatched rate under it cannot be typed. Ticking Bill on Anchor
+Store's Actual rate row copies the same rate to that scenario and creates its Bill Generation row
+(schedule BL, Auto w/ Auto Regen, Interval). Schedule BL is the only one that records the real bill the
+report compares with. So the variance comes from the actual bill, not a second rate: Anchor Store's
+allocated bills are 2,040.00; its own interval data priced at TC-STEP-DEMAND is 15,000.00 (capped);
+variance -12,960.00 in 2024-01 and 2025-01.
+
+**Tenant accruals have no entry path at all** — no UI, API or scheduled task writes
 `BillAccrualMap`. This step does not attempt one; see Findings.
 
 **Record:** nothing generated; this step produces data, not IDs.
 
-**Check:** `allocation_runs`, `tenant_bills_sum_to_parent`, `reconciliation_variance`.
+**Check:** `allocation_runs`, `tenant_bills_sum_to_parent`, `reconciliation_anchor_store`.
 
 ## Step 8. Ridgeline Wind transfer statement
 
@@ -243,32 +298,78 @@ four informational rows of the hand-made one; its two lines and total must match
 
 **Record:** nothing new; the billing meter's IDs are Stage 2's.
 
-**Check:** `ridgeline_billing_meter`, `ridgeline_commodity_mapping`, `ridgeline_generation_config`,
+**Check:** `ridgeline_setup` (asserts the billing meter, mapping, generation row, 18 log rows and statements, July 2024), `ridgeline_billing_meter`, `ridgeline_commodity_mapping`, `ridgeline_generation_config`,
 `ridgeline_generation_log`, `ridgeline_generated_statements`, `ridgeline_acceptance_2024_07`,
 `ridgeline_outage_months`.
 
+## Step 9. Town Center tenant rates
+
+**Where:** Database Administrator, RateModeler > Rate Edit, under Valley Electric District. Enter this
+step before Step 6.
+
+**Enter:** [09-town-center-tenant-rates.yaml](09-town-center-tenant-rates.yaml): TC-FLAT-GS (customer
+charge 45.00 and energy 0.14 a kWh) and TC-STEP-DEMAND (a stepped demand charge of Charge Type 210 with
+blocks 100/150/rest at 1,500.00, 3,200.00 and 6,800.00, energy 0.142 a kWh and a Maximum Bill of type
+600 at 15,000.00). Every charge has a commodity mapping, because an unmapped charge adds to the bill
+total and writes no line.
+
+**Expected bills** (constant loads, 744-hour January): Food Court 6,294.60, Shop 1 878.28, Shop 2 669.96
+on TC-FLAT-GS; Anchor Store 15,000.00 on TC-STEP-DEMAND (demand 3,200.00 from the 100 to 250 kW block,
+energy 12,677.76, Maximum Bill line -877.76). A 28-day month stays under the cap (14,650.88).
+
+**Record:** the rate IDs.
+
+**Check:** `tenant_rates`. Stage 4's `rates_by_provider` reads two more Valley Electric rates once this
+step is done.
+
+## Step 10. Town Center data, master bills and expected values
+
+**Where:** Web, Bill Entry (the master bills); Stage 3 (the interval data).
+
+**Enter:** [10-town-center-data-and-bills.yaml](10-town-center-data-and-bills.yaml).
+
+**Why it exists.** Town Center had no interval data, no bills and no source file, so no case had a value
+to compare with. This file is the smallest set that gives each one: 22 points with a constant hourly
+value from 2024-01-01 to 2026-02-01 (so every January is value times 744), seven master bills (Mall-Main
+2024-01, 2025-01 and 2026-01 at 30,000.00; Tower-Main 2024-01 and 2025-01 at 35,712.00; Annex-Main
+26,784.00; Substation-Master 44,640.00), and a table of what each case must produce, scripted so every
+column adds to its master.
+
+**Outside this stage:** Stage 3 must load the 22 points (a file gateway node as for the Cedar Row
+submeters). Until it does, no tenant bill generates, the WUI run has nothing to allocate and the
+reconciliation has nothing to calculate; method 1 and method 6 allocation does not need it.
+
+**Reference only:** for methods 2, 3, 4, 5 and 7 the file keeps what a plain reading of each method would
+allocate, marked not expected today.
+
+**Check:** `master_bills`, `method_1_allocation`, `method_6_property_total`, `wui_allocated_use_2024_01`.
+
 ## Stage 7 is done when
 
-- Northlake Town Center exists with its levels, address, contact, two groups and one user, and its
-  five buildings, 22 meters and billing accounts, and area values on every tenant space Method 4 and
-  the WUI fixtures need.
-- Every Bill Allocation method 1 through 7 has at least one config that produces tenant bills, plus
-  the Thermal Plant's chilled-water and steam recovery and Cedar Row's 4 residential configs.
-- Every allocated child's amount, including overhead, sums to its parent bill to the penny —
-  `tenant_bills_sum_to_parent` shows Diff = 0 on every row and Property Total equal to the sum of the
-  bills it aggregates.
-- Both WUI point families produce allocated use proportional to index, area and days, and each of
-  `PtAllocFailReason` 1 through 5 has been produced by its fixture at least once; the Percentage
-  Based fixture produces neither a success nor a failure row.
-- All 4 bill generation types behave as configured, and the 3 Task_Tbl tasks this stage depends on
-  are confirmed present and, for 24 and 42, scheduled.
-- `rp_BillReconciliation` shows a nonzero variance for Anchor Store in 2024-01, and every other
-  Tenant Rebilling report this instance's catalog carries renders without error.
+- Northlake Town Center exists with its levels, address, contact, two groups and one user, five
+  buildings, 22 Electricity meters with Valley Electric District accounts, 26 points and the area values
+  the Building Areas method and the WUI families need.
+- TC-FLAT-GS and TC-STEP-DEMAND exist with a commodity mapping on every charge.
+- Method 1 allocates Mall-Main's two bills to the seven tenants to the cent (30,000.00 of shares plus
+  600.00 of overhead each period), Property Total holds 30,600.00 for 2024-01 and 2025-01, and
+  the five masters on methods 2, 3, 4, 5 and 7 have a bill and no allocated bill (a product gap).
+- The Weighted Use Index and Measured Use families allocate the use of file 10 (Shop 3 26,318.37, Shop 4
+  25,306.12, Common Area 134,375.51, Landlord/House 230,640 kWh for 2024-01), and each of `PtAllocFailReason`
+  1 through 5 has been produced by its fixture at least once; the Percentage Based fixture produces
+  neither a success nor a failure row.
+- All 4 bill generation types behave as configured for 2026-01 (Shop 1 878.28, Shop 2 669.96, nothing
+  for Off and Manual), and the 3 Task_Tbl tasks this stage depends on are present and, for 24 and 42,
+  scheduled.
+- The Bill Reconciliation report shows Anchor Store billed 2,040.00 against calculated 15,000.00 in
+  2024-01 and 2025-01 (variance -12,960.00), and every other Tenant Rebilling report this instance's
+  catalog carries renders without error.
 - Ridgeline's account SYN-RWL-G-0000001 holds 18 generated statements, one a month from July 2024 to
   December 2025, each with the transfer-energy line and the research credit once. July 2024 reads
   $129,330.27 and its per-turbine sums match the hand-made statement
   (`ridgeline_acceptance_2024_07`, Diff 0), and February to April 2025 are lower with no adjustment
   line.
+- Cedar Row's four configs are entered only once Stage 2 gives the apartment submeters billing accounts
+  (`allocation_configs` shows them as FAIL until then, which is correct).
 
 Run `checks.sql` beside this chapter against the instance database to see each of these as a result
 set.
@@ -284,11 +385,27 @@ already logged in [product findings](../product-findings.pdf):
   database, and both fit the precedent already established for other install-time catalogs: standing
   them up is finishing the install, not seeding this customer's data. Neither can be typed around
   from a screen.
+- **Not fixed here:** the WUI fixture nodes are in no hierarchy file and `No Area` / `No Rate` need
+  separate meters; the Thermal Plant masters of Step 3 and the node names it uses are not in Stage 2.
 - **Three Tenant Rebilling reports are not registered on this instance.** `dbo.GuiReports_Tbl` has 11
   of the 14 rows the reference database carries for this feature; missing are `rp_accruals`,
   `rp_mpaaccruals` and `rp_OpenAccruals`, all three accrual reports. They will not appear on the
   Reporting menu, with data or without, until their catalog rows are installed — consistent with the
   gap below.
+- **Bill Allocation methods 2, 3, 4, 5 and 7 have no calculator.** `BillAlloc_ProcessBillItems` goes on
+  only when the master meter has a method 1 config for the period, and `BillAlloc_ProcessAllocatedItems`
+  splits by the typed percent and amount whatever the method. The configs save and nothing is allocated
+  (ADR-015 records the same). Only methods 1 and 6 produce values.
+- **Overhead % is added to the allocation, not carved out of it**, so a config with Overhead % above 0
+  bills the tenants 2% more than the master in all. The earlier sum-to-parent check could not reach zero.
+- **The Add Billing Account dialog requires a provider**, so an allocation-only or tenant account cannot
+  be provider-less, and a meter's provider is copied from its account. The Tenant Rebill rate list and
+  the allocation candidate picker both depend on a measure type and an account the original tenant meters
+  lacked.
+- **The reconciliation scenario is reachable only through the Bill checkbox** (the picker excludes it),
+  which copies the same rate. A reconciliation between two rates cannot be entered on the desktop.
+- **Cedar Row's apartment submeters cannot be allocation candidates** (no billing account), and method 2
+  would compute nothing if they could.
 - **Tenant accruals (product-gap-backlog #4, "Accruals create/reverse feature") have no entry path.**
   No screen, API or scheduled task writes `dbo.BillAccrualMap`; `rp_OpenAccruals @Reverse` exists as
   a proc but nothing calls it from the UI. This blocks Phase 4's tenant accrual case entirely, not
@@ -297,12 +414,9 @@ already logged in [product findings](../product-findings.pdf):
   Once its catalog row is installed it can be selected on the Master Point Configuration modal, but a
   child configured with it produces no allocated use and no `PtAllocFailReason` row — it is silently
   ignored. This matches the Phase 4 spec's documented expectation exactly.
-- **`PtAllocationIndex` appears to have no entry screen.** The modal that configures WUI child
-  points (Master Point Configuration) has no index field, and no C# source under `src/Domain` or
-  `src/Application` references `dbo.PtAllocationIndex` by name, even though
-  `Database/EEMSuite/Procs/WUIPtAllocationIndex_Save.sql` exists and is callable. If that is
-  confirmed by running the application rather than reading its source, it is a missed-screen finding:
-  the backend and the proc exist, but nothing in the current build calls it.
+- **Index values have a screen, though not the modal.** WUI Point Use History (`rp_WUIPointUseHistory`)
+  opens `CustomWUIAdd`, which calls `WUIPtAllocationIndex_Save`. The earlier finding that no screen
+  writes `PtAllocationIndex` was wrong; the screen is a custom view, outside the C# search.
 - **Per-meter rate-class/option binding (product-gap-backlog #5, "Per-meter rate-class / option
   binding") still has no field on the Tenant Rebill tab's Rate Configuration grid.** Not exercised by
   this stage directly, but every tenant meter here is exactly the kind of assignment that gap

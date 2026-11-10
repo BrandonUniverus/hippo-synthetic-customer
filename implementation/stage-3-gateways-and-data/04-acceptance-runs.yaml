@@ -48,6 +48,7 @@ notes:
   is read again in full; the archive table''s primary key (PtID, UTCTimeStamp) is why the replay cannot add rows.'
 - 'A success in the task log is not acceptance. Acceptance is the stored intervals rendering on a screen with the expected
   value: the Time Interval report for the counts and timestamps, the Summary report for the kWh sum and kW maximum.'
+- 'Status (added 2026-11-10): every record that has no sample file carries a Status block saying whether a sample exists, what would produce it, the expected result and the check. Most samples are produced by the services/sources producer, which is not generators/northlake_packet.py; its README lists 215 file-backed inputs across seven profiles. A check that says NOT LOADED means the data is not in the database yet, not that the case failed; PASS and FAIL compare the recipe value with the database.'
 - 'Records whose Sample file exists is false are open work for the generator (generators/northlake_packet.py writes only the
   AcquiSuite deliveries today). Run them when the file or service exists, each from the then-current database; they add data
   for other points and need no restore.'
@@ -106,6 +107,7 @@ records:
     Missing intervals (local PST): 2024-01-15 12:00 through 13:45 (eight intervals; UTC 20:00 through 21:45)
     Otherwise: Everything else identical to the complete day
   Check: gap_then_backfill, task_runs
+  Status: 'The sample exists (documents/intake-package/sample-data/acquisuite/gap/ASQVED01_STUDENT.log, sha256 above). Expected: 88 readings per point, 1780 kWh, 120 kW, the 12:00 to 13:45 gap. Check: gap_then_backfill.'   # added 2026-11-10
 - key: acquisuite_backfill
   installed:
     runOn:
@@ -128,6 +130,7 @@ records:
     Peak kW after the run: 120
     Gap closed: 12:00 through 13:45 PST now present
   Check: gap_then_backfill, task_runs
+  Status: 'The sample exists (backfill/ASQVED01_STUDENT.log, sha256 above). Expected: 96 readings per point, 2020 kWh, 120 kW. Check: gap_then_backfill.'   # added 2026-11-10
 - key: acquisuite_complete_day
   installed:
     runOn:
@@ -157,6 +160,7 @@ records:
     File after the run: gone from Input, inside Archive/yyyy_MM_dd/RunGuid.zip, nothing in Error
     Rows added by this run: none; every interval already exists. Record how the product reports the overlap under installed.observed.replayTreatment
   Check: acquisuite_complete_day, replay_no_duplicates, task_runs
+  Status: 'The sample exists (complete/ASQVED01_STUDENT.log, sha256 above). Expected: 96 on the file''s day and 95 / 2010 on EEM''s day. Check: acquisuite_complete_day.'   # added 2026-11-10
 - key: acquisuite_replay
   installed:
     runOn:
@@ -179,6 +183,7 @@ records:
     Rows in the archive per point: 96 (the replay updates, it does not insert)
     Record: how the product reported the replay (rows updated, rows duplicated, or file skipped) under installed.observed.replayTreatment
   Check: replay_no_duplicates, task_runs
+  Status: 'The sample exists (the complete file again). Expected: still 96 rows and 2020 kWh per the whole archive, not only the day. Check: replay_no_duplicates, rewritten 2026-11-10 to count every archived row of the two points.'   # added 2026-11-10
 # ---- Remaining format cases: one record each. None has a generated sample yet; run when it exists. ----
 - key: mdef_valley_electric
   installed: {runOn: , workflowRunId: }
@@ -188,8 +193,37 @@ records:
   Format: MV90 MDEF (binary .mde)
   Sample file needed: artifacts/demo-university-v1/mv90/SCIENCE_VED_202401.mde (one file per recorder month for VEDSCIENCE01, VEDRECREATION01, VEDPLANT01)
   Sample file exists: false
+  Status:   # added 2026-11-10: what exists, what would produce it, the expected result, the check
+    Sample: 'No file in this repository. The source service makes MDEF files for recorders VEDSCIENCE01, VEDRECREATION01, VEDPLANT01 and VEDRIDGE01 in per-window files named <recorder>_<window>.mde, not the SCIENCE_VED_202401.mde name above (that name was an assumption).'
+    Produced by: 'services/sources producer (python -m services.sources deliver --url http://localhost:18081 --source gw_mv90_valley_mdef --destination <the gateway Input folder>; see services/sources/README.md), --month 2024-01.'
+    Expected result: 'A known count, not known sums: 96 readings per point per day, 2976 per point for January 2024 (no daylight-saving day in it). The kWh sums depend on the producer''s model and are recorded, not asserted.'
+    Check: 'mdef_valley_electric_month (added 2026-11-10): expected 2976 readings and 0 days not at 96, for the six points; NOT LOADED until the file is delivered.'
   Points: ch_ved_science_center_kwh_15m, ch_ved_science_center_kw_15m, ch_ved_recreation_center_kwh_15m, ch_ved_recreation_center_kw_15m, ch_ved_central_plant_kwh_15m, ch_ved_central_plant_kw_15m
   Expected: 96 intervals per point per day; local timestamps, so the DST days 2024-03-10 and 2024-11-03 need 92 and 100 intervals; sum kWh, max kW.
+- key: mdef_central_plant_2024_09
+  installed: {runOn: , workflowRunId: }
+  Gateway: gw_mv90_valley_mdef
+  Task: task_mv90
+  Schedule: schedule_mv90_valley_mdef
+  Format: MV90 MDEF (binary .mde), recorder VEDPLANT01, node MV90-MDEF-VED-PLANT   # added 2026-11-10
+  Sample file needed: the MDEF files for recorder VEDPLANT01 covering the Central Plant bill period 2024-08-05 to 2024-09-04 (the stamps after local 2024-08-05 00:00 up to and including local 2024-09-05 00:00, which is UTC 07:00 to UTC 07:00 on the UTC node), files named <recorder>_<window>.mde by the source service
+  Sample file exists: false
+  Status:   # added 2026-11-10
+    Sample: 'No file in this repository. The source service already carries this case: its model (services/sources/model.py, _build_constraints) takes the Central Plant energy of ved_central_plant_2024_09 per period (energy_peak, energy_part_peak, energy_off_peak) and the 3240 kW demand as a cap on every interval, using the same windows as Stage 4 (weekday peak 12 to 18, part-peak 8 to 12 and 18 to 22, weekends and holidays off-peak, Labor Day 2024-09-02 included).'
+    Produced by: 'services/sources producer (python -m services.sources deliver --url http://localhost:18081 --source gw_mv90_valley_mdef --month 2024-08, then --month 2024-09 --destination <the MDEF Input folder>). Both months deliver every recorder, so the other three recorders load too, which is wanted. Nothing here has been run; the check below is what shows whether the producer reaches the totals. If the maximum is under 3240 kW, the producer needs to pin one interval at its cap (an interval ending 2024-08-14 15:00 local, UTC 22:00), a change in services/sources, outside this recipe.'
+    Expected result: 'See Expected. Rate engine tie-out afterwards: the Stage 4 test test_ved_tou_pri_central_plant_2024_09 re-run with Load from Point on ch_ved_central_plant_kwh_15m and ch_ved_central_plant_kw_15m for 2024-08-05 to 2024-09-04 must give the same lines and the $303,951.62 total.'
+    Check: central_plant_tou_period_totals (added 2026-11-10), task_runs
+  Points: ch_ved_central_plant_kwh_15m (channel 1, Central Plant Electric Service, SYN-VED-M-0040014, Delivered kWh 15m), ch_ved_central_plant_kw_15m (channel 2, Demand kW 15m)
+  Expected:
+    Readings per point: 2976 (31 days x 96; no daylight-saving day in the period)
+    Peak energy: 412800 kWh in 528 intervals (weekdays 12:00 to 18:00 local, the 22 weekdays of the period less Labor Day, each interval counted in the hour it ends in, so the stamps 12:15 through 18:00)
+    Part-peak energy: 368400 kWh in 704 intervals (weekdays 08:00 to 12:00 and 18:00 to 22:00, stamps 08:15 through 12:00 and 18:15 through 22:00)
+    Off-peak energy: 731200 kWh in 1744 intervals (every other stamp, meaning nights, weekends and 2024-09-02)
+    Total energy: 1512400 kWh (the sum of the three, the bill's Delivered quantity)
+    Maximum 15-minute demand: 3240 kW, the demand-point maximum over the period (a 15-minute kW is its kWh x 4)
+    Spread: every interval above zero; no interval above 3240 kW; the peak intervals average 782 kWh and the part-peak 523, so any exact per-interval split that sums to the figures above and stays under the cap will do (the 3240 kW interval holds 810 kWh)   # assumed shape
+    Node setting: the node's TimeStampType is UTC (02-gateways.yaml), so the file stamps are UTC interval ends and the stored local stamps are Pacific daylight time, UTC-07:00
+  Check: central_plant_tou_period_totals, task_runs
 - key: mv9_helios_generation
   installed: {runOn: , workflowRunId: }
   Gateway: gw_mv90_helios_mv9
@@ -198,6 +232,11 @@ records:
   Format: MV90 MV9 (text .mv9)
   Sample file needed: artifacts/demo-university-v1/mv90/HELIOS_202401.mv9
   Sample file exists: false
+  Status:   # added 2026-11-10: what exists, what would produce it, the expected result, the check
+    Sample: 'No file in this repository. The source service makes the MV9 file for recorders HOSSCIENCE01, HOSSTUDENT01 and HOSCARPORT01.'
+    Produced by: 'services/sources producer (python -m services.sources deliver --url http://localhost:18081 --source gw_mv90_helios_mv9 --destination <the gateway Input folder>; see services/sources/README.md), --month 2024-01.'
+    Expected result: 'Rules, not sums: generation never negative and zero overnight (local 22:00 to 04:00), export never above generation in the same interval, irradiance never negative and zero overnight.'
+    Check: 'mv9_helios_rules (added 2026-11-10): each rule is a violation count that must be 0; NOT LOADED until the file is delivered. The Science Center array has a deliberate gap in 2025-03 (comparison rows need both values).'
   Points: ch_hos_science_center_gen_kwh_15m, ch_hos_science_center_export_kwh_15m, ch_hos_science_center_poa_irradiance_15m, ch_hos_student_center_gen_kwh_15m, ch_hos_cedar_row_carport_gen_kwh_15m
   Expected: generation positive, zero overnight, midday curve; export never exceeds generation in the same interval;
     irradiance in W/m2 (a Northlake unit) peaks at midday and is zero overnight.
@@ -209,6 +248,11 @@ records:
   Format: BACnet/IP device polling (live)
   Sample file needed: none; services/bacnet supplies three live devices on BVirtualPC Ethernet 3 (172.21.29.4), discovered over UDP 47808 with device IDs 530101, 530102 and 530103
   Sample file exists: false
+  Status:   # added 2026-11-10: what exists, what would produce it, the expected result, the check
+    Sample: 'None needed for the poll: the services/bacnet container supplies the three live devices. The 2024-2025 history the Thermal Plant bills tie to has no sample and no path in: no gateway, format, task or case loads a history file.'
+    Produced by: 'services/bacnet for the poll. For the history, a new loader would be needed (a file format a gateway here reads, or the Fake gateway replaying the values); nothing in the repository produces it today.'
+    Expected result: 'Poll: one reading per point per poll, stamped at poll time. History: Science Center chilled water Delivered Ton-Hours 60m sums to 180860 over July 2024 and 58640 over March 2025, the Demand Tons 60m peaks being 542 (2024-07-18 15:00) and 214.'
+    Check: 'bacnet_history_tie_out (added 2026-11-10): expected against actual for the two sums and the July peak; NOT LOADED until a history path exists. feed_archive_intervals asserts the archive interval of the polled points.'
   Points: ch_ntp_science_center_chw_ton_hours_hourly, ch_ntp_science_center_chw_tons_hourly, ch_ntp_recreation_center_chw_ton_hours_hourly, ch_ntp_recreation_center_chw_tons_hourly, ch_ntp_plant_chw_ton_hours_hourly, ch_ntp_plant_chw_tons_hourly, ch_ntp_plant_steam_klb_hourly, ch_ntp_plant_steam_lb_per_hour_hourly, ch_ntp_plant_steam_header_psig_15m, ch_ntp_plant_condensate_kgal_hourly
   Expected: one reading per point per poll, stamped at poll time; history for 2024-2025 comes through a file path, not the poll.
   History must match the bills: 'the Thermal Plant allocates from these meters, so the 2024-2025 history must reproduce its itemized statements (data/bills/northlake-thermal-plant-v1.yaml). Science Center chilled water sums to 180,860 ton-hours with a 542-ton hourly peak (2024-07-18 15:00) over July 2024 and to 58,640 ton-hours with a 214-ton peak over March 2025, each month cut the way EEM cuts it (the stamps after its first midnight up to and including the last).'   # assumed until the history file exists
@@ -220,6 +264,11 @@ records:
   Format: NWS observation collections and hourly forecasts (HTTPS)
   Sample file needed: none; NWS public station observations and hourly forecast services
   Sample file exists: false
+  Status:   # added 2026-11-10: what exists, what would produce it, the expected result, the check
+    Sample: 'None, by design: NWS public station observations and hourly forecasts cannot have a fixed file.'
+    Produced by: 'The NWS public service, through Run now on schedule_noaa_ksac. A recorded fixture would be needed for a repeatable value; none exists.'
+    Expected result: 'No fixed value. The checkable facts: humidity within 0 to 100, wind not negative, dew point not above temperature at the same stamp, no observation stamped in the future.'
+    Check: 'noaa_observation_sanity (added 2026-11-10): violation counts that must be 0 per station; NOT LOADED until the first Run now.'
   Points: ch_weather_ksac_temp_f_hourly, ch_weather_ksac_dewpoint_f_hourly, ch_weather_ksac_rh_hourly, ch_weather_ksac_wind_mph_hourly, ch_weather_ksac_forecast_temp_f_hourly, ch_weather_ksac_forecast_dewpoint_f_hourly, ch_weather_ksac_forecast_rh_hourly, ch_weather_ksac_forecast_wind_mph_hourly, ch_weather_ksac_forecast_wind_direction_hourly, ch_weather_ksac_forecast_precip_probability_hourly
   Expected: latest valid observation independently per metric and hourly interval, with source time rounded up to the UTC interval end. Forecast periods write only to the separate forecast points using period end times; current collection runs every 15 minutes and forecasts refresh hourly.
   Forecast units: Temperature = Fahrenheit, Dew Point = Fahrenheit, Relative Humidity = Percent, Wind Speed = MilesPerHour, Wind Direction = Degrees, Precipitation Probability = Percent
@@ -236,6 +285,11 @@ records:
   Format: NCEI GHCN-hourly history (HTTPS)
   Sample file needed: none; public archives for USW00023232, USW00093225 and USW00023202
   Sample file exists: false
+  Status:   # added 2026-11-10: what exists, what would produce it, the expected result, the check
+    Sample: 'None, by design: public NCEI GHCN-hourly archives.'
+    Produced by: 'The NCEI archive, through schedule_noaa_history (Operation History, HistoryStartUtc 2024-01-01T08:00:00Z).'
+    Expected result: 'Twelve observation points hold history from the start of the window and the eighteen forecast points hold none of it. Values are the archive''s, not fixed here.'
+    Check: 'noaa_history_scope (added 2026-11-10): expected 12 observation points with a row before 2026-11-01 and 0 forecast points with one (the date is assumed to be the day the history run happens); NOT LOADED until the history run.'
   Parameters: {Operation: History, HistoryStartUtc: '2024-01-01T08:00:00Z', ArchiveDelayDays: 3}
   Expected: twelve observation points receive their available quality-accepted historical measurements in the requested UTC window; missing source values remain missing. History does not write the eighteen forecast points.
   Notes:
@@ -250,6 +304,11 @@ records:
   Format: NWS observation collections and hourly forecasts (HTTPS)
   Sample file needed: none; NWS public station observations and hourly forecast services
   Sample file exists: false
+  Status:   # added 2026-11-10: what exists, what would produce it, the expected result, the check
+    Sample: 'None, by design: NWS public station observations and hourly forecasts cannot have a fixed file.'
+    Produced by: 'The NWS public service, through Run now on schedule_noaa_ksac. A recorded fixture would be needed for a repeatable value; none exists.'
+    Expected result: 'No fixed value. The checkable facts: humidity within 0 to 100, wind not negative, dew point not above temperature at the same stamp, no observation stamped in the future.'
+    Check: 'noaa_observation_sanity (added 2026-11-10): violation counts that must be 0 per station; NOT LOADED until the first Run now.'
   Points: ch_weather_ksmf_temp_c_hourly, ch_weather_ksmf_dewpoint_c_hourly, ch_weather_ksmf_rh_hourly, ch_weather_ksmf_wind_kph_hourly, ch_weather_ksmf_forecast_temp_f_hourly, ch_weather_ksmf_forecast_dewpoint_c_hourly, ch_weather_ksmf_forecast_rh_hourly, ch_weather_ksmf_forecast_wind_kph_hourly, ch_weather_ksmf_forecast_wind_direction_hourly, ch_weather_ksmf_forecast_precip_probability_hourly
   Expected: observation valid times and forecast valid times stay on their own points; the observation arrives in degrees
     Celsius and its daily HDD/CDD children in HDD(C)/CDD(C), wind in km/h. Preserve the temperature forecast in
@@ -268,6 +327,11 @@ records:
   Format: Spinwave CSV
   Sample file needed: artifacts/demo-university-v1/spinwave/SCIENCE/science-lab-env.csv
   Sample file exists: false
+  Status:   # added 2026-11-10: what exists, what would produce it, the expected result, the check
+    Sample: 'No file in this repository. The source service makes the Spinwave CSV for device SW-SCI-LAB-01.'
+    Produced by: 'services/sources producer (python -m services.sources deliver --url http://localhost:18081 --source gw_spinwave_science_lab --destination <the gateway Input folder>; see services/sources/README.md), --month 2024-01.'
+    Expected result: 'A known count: 144 readings per point per day, except a daylight-saving day if the producer stamps local time (138 on 2024-03-10, 150 on 2024-11-03). The value ranges are the producer''s.'
+    Check: 'spinwave_days (added 2026-11-10): days not at 144, expected 0, with the four daylight-saving days left out; NOT LOADED until the file is delivered.'
   Points: ch_spinwave_science_lab_temp_f_10m, ch_spinwave_science_lab_rh_10m
   Expected: 144 readings per point per day (10-minute); the value ranges come with the generated file (the scenario defines no shape yet).
 - key: fig_cedar_row_water_fig
@@ -279,6 +343,11 @@ records:
   Parameters: {Format: FIG}
   Sample file needed: artifacts/demo-university-v1/fig/cedar-row-water.fig.csv
   Sample file exists: false
+  Status:   # added 2026-11-10: what exists, what would produce it, the expected result, the check
+    Sample: 'No file in this repository. The source service lists the seven FIG encodings of the Cedar Row day as explicit compatibility fixtures, not as ordinary deliveries.'
+    Produced by: 'services/sources producer (python -m services.sources deliver --url http://localhost:18081 --source gw_fig_multi_format --destination <the gateway Input folder>; see services/sources/README.md), with --include-acceptance and the case name /catalog.json lists for FIG.'
+    Expected result: '24 hourly kgal readings on the day, the same 24 values as the other six encodings. The values are the producer''s; sameness across the seven days is what is asserted.'
+    Check: 'fig_cedar_row_water_days (added 2026-11-10): one row per day loaded, 24 readings each, and 0 hours that differ from the first day loaded; the expected day count is 7 once all seven cases have run. NOT LOADED until the first one runs.'
   Points: ch_fig_cedar_row_a_water_kgal_60m
   Expected: 24 hourly kgal readings per day. The seven FIG formats carry the same day, so each must land the same 24 values; run them on separate days.
 - key: fig_cedar_row_water_siemens
@@ -290,6 +359,11 @@ records:
   Parameters: {Format: SIEMANSREPORT}
   Sample file needed: artifacts/demo-university-v1/fig/cedar-row-water.siemens.csv
   Sample file exists: false
+  Status:   # added 2026-11-10: what exists, what would produce it, the expected result, the check
+    Sample: 'No file in this repository. The source service lists the seven FIG encodings of the Cedar Row day as explicit compatibility fixtures, not as ordinary deliveries.'
+    Produced by: 'services/sources producer (python -m services.sources deliver --url http://localhost:18081 --source gw_fig_multi_format --destination <the gateway Input folder>; see services/sources/README.md), with --include-acceptance and the case name /catalog.json lists for SIEMANSREPORT.'
+    Expected result: '24 hourly kgal readings on the day, the same 24 values as the other six encodings. The values are the producer''s; sameness across the seven days is what is asserted.'
+    Check: 'fig_cedar_row_water_days (added 2026-11-10): one row per day loaded, 24 readings each, and 0 hours that differ from the first day loaded; the expected day count is 7 once all seven cases have run. NOT LOADED until the first one runs.'
   Points: ch_fig_cedar_row_a_water_kgal_60m
   Expected: same 24 values as fig_cedar_row_water_fig.
 - key: fig_cedar_row_water_mediator
@@ -301,6 +375,11 @@ records:
   Parameters: {Format: MEDIATOR}
   Sample file needed: artifacts/demo-university-v1/fig/cedar-row-water.mediator.csv
   Sample file exists: false
+  Status:   # added 2026-11-10: what exists, what would produce it, the expected result, the check
+    Sample: 'No file in this repository. The source service lists the seven FIG encodings of the Cedar Row day as explicit compatibility fixtures, not as ordinary deliveries.'
+    Produced by: 'services/sources producer (python -m services.sources deliver --url http://localhost:18081 --source gw_fig_multi_format --destination <the gateway Input folder>; see services/sources/README.md), with --include-acceptance and the case name /catalog.json lists for MEDIATOR.'
+    Expected result: '24 hourly kgal readings on the day, the same 24 values as the other six encodings. The values are the producer''s; sameness across the seven days is what is asserted.'
+    Check: 'fig_cedar_row_water_days (added 2026-11-10): one row per day loaded, 24 readings each, and 0 hours that differ from the first day loaded; the expected day count is 7 once all seven cases have run. NOT LOADED until the first one runs.'
   Points: ch_fig_cedar_row_a_water_kgal_60m
   Expected: same 24 values as fig_cedar_row_water_fig.
 - key: fig_cedar_row_water_eaton
@@ -312,6 +391,11 @@ records:
   Parameters: {Format: EATON}
   Sample file needed: artifacts/demo-university-v1/fig/cedar-row-water.eaton.csv
   Sample file exists: false
+  Status:   # added 2026-11-10: what exists, what would produce it, the expected result, the check
+    Sample: 'No file in this repository. The source service lists the seven FIG encodings of the Cedar Row day as explicit compatibility fixtures, not as ordinary deliveries.'
+    Produced by: 'services/sources producer (python -m services.sources deliver --url http://localhost:18081 --source gw_fig_multi_format --destination <the gateway Input folder>; see services/sources/README.md), with --include-acceptance and the case name /catalog.json lists for EATON.'
+    Expected result: '24 hourly kgal readings on the day, the same 24 values as the other six encodings. The values are the producer''s; sameness across the seven days is what is asserted.'
+    Check: 'fig_cedar_row_water_days (added 2026-11-10): one row per day loaded, 24 readings each, and 0 hours that differ from the first day loaded; the expected day count is 7 once all seven cases have run. NOT LOADED until the first one runs.'
   Points: ch_fig_cedar_row_a_water_kgal_60m
   Expected: same 24 values as fig_cedar_row_water_fig.
 - key: fig_cedar_row_water_xml
@@ -323,6 +407,11 @@ records:
   Parameters: {Format: XML}
   Sample file needed: artifacts/demo-university-v1/fig/cedar-row-water.xml
   Sample file exists: false
+  Status:   # added 2026-11-10: what exists, what would produce it, the expected result, the check
+    Sample: 'No file in this repository. The source service lists the seven FIG encodings of the Cedar Row day as explicit compatibility fixtures, not as ordinary deliveries.'
+    Produced by: 'services/sources producer (python -m services.sources deliver --url http://localhost:18081 --source gw_fig_multi_format --destination <the gateway Input folder>; see services/sources/README.md), with --include-acceptance and the case name /catalog.json lists for XML.'
+    Expected result: '24 hourly kgal readings on the day, the same 24 values as the other six encodings. The values are the producer''s; sameness across the seven days is what is asserted.'
+    Check: 'fig_cedar_row_water_days (added 2026-11-10): one row per day loaded, 24 readings each, and 0 hours that differ from the first day loaded; the expected day count is 7 once all seven cases have run. NOT LOADED until the first one runs.'
   Points: ch_fig_cedar_row_a_water_kgal_60m
   Expected: same 24 values as fig_cedar_row_water_fig.
 - key: fig_cedar_row_water_fixednetworks
@@ -334,6 +423,11 @@ records:
   Parameters: {Format: FIXEDNETWORKS}
   Sample file needed: artifacts/demo-university-v1/fig/cedar-row-water.fixednetworks.xml
   Sample file exists: false
+  Status:   # added 2026-11-10: what exists, what would produce it, the expected result, the check
+    Sample: 'No file in this repository. The source service lists the seven FIG encodings of the Cedar Row day as explicit compatibility fixtures, not as ordinary deliveries.'
+    Produced by: 'services/sources producer (python -m services.sources deliver --url http://localhost:18081 --source gw_fig_multi_format --destination <the gateway Input folder>; see services/sources/README.md), with --include-acceptance and the case name /catalog.json lists for FIXEDNETWORKS.'
+    Expected result: '24 hourly kgal readings on the day, the same 24 values as the other six encodings. The values are the producer''s; sameness across the seven days is what is asserted.'
+    Check: 'fig_cedar_row_water_days (added 2026-11-10): one row per day loaded, 24 readings each, and 0 hours that differ from the first day loaded; the expected day count is 7 once all seven cases have run. NOT LOADED until the first one runs.'
   Points: ch_fig_cedar_row_a_water_kgal_60m
   Expected: same 24 values as fig_cedar_row_water_fig.
 - key: fig_cedar_row_water_cmep
@@ -345,6 +439,11 @@ records:
   Parameters: {Format: CMEP}
   Sample file needed: artifacts/demo-university-v1/fig/cedar-row-water.cmep.csv
   Sample file exists: false
+  Status:   # added 2026-11-10: what exists, what would produce it, the expected result, the check
+    Sample: 'No file in this repository. The source service lists the seven FIG encodings of the Cedar Row day as explicit compatibility fixtures, not as ordinary deliveries.'
+    Produced by: 'services/sources producer (python -m services.sources deliver --url http://localhost:18081 --source gw_fig_multi_format --destination <the gateway Input folder>; see services/sources/README.md), with --include-acceptance and the case name /catalog.json lists for CMEP.'
+    Expected result: '24 hourly kgal readings on the day, the same 24 values as the other six encodings. The values are the producer''s; sameness across the seven days is what is asserted.'
+    Check: 'fig_cedar_row_water_days (added 2026-11-10): one row per day loaded, 24 readings each, and 0 hours that differ from the first day loaded; the expected day count is 7 once all seven cases have run. NOT LOADED until the first one runs.'
   Points: ch_fig_cedar_row_a_water_kgal_60m
   Expected: same 24 values as fig_cedar_row_water_fig.
 - key: modbus_chiller
@@ -355,6 +454,11 @@ records:
   Format: Modbus TCP register polling (live)
   Sample file needed: none; needs a Modbus TCP server at 10.57.0.20:502 serving a float32 at register 40001
   Sample file exists: false
+  Status:   # added 2026-11-10: what exists, what would produce it, the expected result, the check
+    Sample: 'None, and nothing in the repository produces one: the case needs a Modbus TCP server at 10.57.0.20:502 serving a float32 at register 40001.'
+    Produced by: 'A Modbus TCP simulator that does not exist yet (a small service beside services/bacnet, answering holding register 40001, Floating Point MSR First). It needs a new service, outside this recipe.'
+    Expected result: 'One kW reading per poll at poll time, archived on the 1-minute interval. The value is whatever the simulator serves; Multiplier 1 and Additive Constant 0 mean it is stored as served.'
+    Check: 'feed_archive_intervals (added 2026-11-10): archive interval 1 expected; NOT LOADED until a poll lands.'
   Points: ch_modbus_ntp_chiller_kw_1m
   Expected: one kW reading per poll at poll time, archived on the 1-minute interval.
 - key: odbc_library_historian
@@ -365,6 +469,11 @@ records:
   Format: ODBC query against a separate historian database
   Sample file needed: none; needs the SyntheticIntervalReadings table in a historian database reachable through the SyntheticCustomerHistorian profile
   Sample file exists: false
+  Status:   # added 2026-11-10: what exists, what would produce it, the expected result, the check
+    Sample: 'None: the source is the Access historian database, not a file.'
+    Produced by: 'services/historian (the container keeps northlake-historian.accdb current every half hour; its README says the ODBC profile fix must be built first).'
+    Expected result: 'Rows newer than the saved cursor only; a second Run now adds nothing when the source has not moved. The 30-minute archive interval is checkable; the second-run count is a before-and-after you record.'
+    Check: 'feed_archive_intervals (added 2026-11-10): archive interval 30 expected; NOT LOADED until the first run.'
   Points: ch_odbc_library_electric_kwh_30m
   Expected: rows newer than the saved cursor only; a second run adds nothing when the source has not moved.
 - key: fake_smoke
@@ -375,6 +484,11 @@ records:
   Format: EEM Fake gateway (generates its own data)
   Sample file needed: none
   Sample file exists: not applicable
+  Status:   # added 2026-11-10: what exists, what would produce it, the expected result, the check
+    Sample: 'Not applicable: the Fake gateway generates its own data.'
+    Produced by: 'FakeGatewayComponent, from the schedule parameters (StartTimestamp, EndTimestamp, GenerationMode sine).'
+    Expected result: '96 readings between 12 and 36 for 2024-01-01 (UTC 08:00 through 2024-01-02 07:45).'
+    Check: 'fake_smoke_day (added 2026-11-10): expected 96 readings with minimum at or above 12 and maximum at or below 36; NOT LOADED until the run.'
   Points: ch_fake_gateway_smoke_kwh_15m
   Expected: 96 sinusoidal readings between 12 and 36 for 2024-01-01; excluded from every customer consumption total.
 - key: neptune_cedar_row_b_water
@@ -385,6 +499,11 @@ records:
   Format: Neptune handheld upload file
   Sample file needed: artifacts/demo-university-v1/neptune/cedar-row-b-upload.txt (produced by reading the route exported in 05-handheld-routes.yaml)
   Sample file exists: false
+  Status:   # added 2026-11-10: what exists, what would produce it, the expected result, the check
+    Sample: 'None yet. The upload file is made by reading the route exported in 05-handheld-routes.yaml; the services/handheld service has the native Neptune and MVRS return-file codecs and a browser round workflow. The services/sources producer makes none.'
+    Produced by: 'services/handheld, from the exported route (Step 5 must be entered first).'
+    Expected result: 'Known values are in handheldAcceptance (opening, normal, replay, zero-usage and database-previous), with expected usage per case.'
+    Check: 'None added here: configuration is asserted by the generated handheld block of checks.sql (handheld_configuration), and the results are recorded against the handheldAcceptance cases.'
   Points: ch_rcu_cedar_row_b_water_register (reading), ch_rcu_cedar_row_b_water_kgal_route (usage)
   Expected: Run handheldAcceptance opening, normal, replay, zero-usage and database-previous cases. Verify both register and generated delta history, not only task success.
 - key: mvrs_student_center_gas
@@ -395,6 +514,11 @@ records:
   Format: MVRS handheld upload file
   Sample file needed: artifacts/demo-university-v1/mvrs/student-center-gas-upload.txt
   Sample file exists: false
+  Status:   # added 2026-11-10: what exists, what would produce it, the expected result, the check
+    Sample: 'None yet. The upload file is made by reading the route exported in 05-handheld-routes.yaml; the services/handheld service has the native Neptune and MVRS return-file codecs and a browser round workflow. The services/sources producer makes none.'
+    Produced by: 'services/handheld, from the exported route (Step 5 must be entered first).'
+    Expected result: 'Known values are in handheldAcceptance (opening, normal, skipped, late-actual, replay and direct-demand), with expected usage per case.'
+    Check: 'None added here: configuration is asserted by the generated handheld block of checks.sql (handheld_configuration), and the results are recorded against the handheldAcceptance cases.'
   Points: ch_sgu_student_center_gas_register (reading), ch_sgu_student_center_therms_route (usage)
   Expected: Run handheldAcceptance opening, normal, skipped, late-actual, replay and direct-demand cases. The built-in workflow publishes the resulting HMR log events.
 - key: fixed_network_submeters
@@ -405,6 +529,11 @@ records:
   Format: FIXEDNETWORKS (fixed-network submeter export)
   Sample file needed: artifacts/demo-university-v1/fig/cedar-row-submeters.fixednetworks.xml and artifacts/demo-university-v1/fig/campus-submeters.fixednetworks.xml
   Sample file exists: false
+  Status:   # added 2026-11-10: what exists, what would produce it, the expected result, the check
+    Sample: 'No file in this repository. The source service makes FIXEDNETWORKS files for the Cedar Row A, Cedar Row B and campus submeter nodes.'
+    Produced by: 'services/sources producer (python -m services.sources deliver --url http://localhost:18081 --source gw_fig_fixed_network_submeters --destination <the gateway Input folder>; see services/sources/README.md), --month 2024-01.'
+    Expected result: '24 hourly kWh readings per point per day. The Lakeview Hall laundry point is Disabled (added 2026-11-10), so the file carries its alias and the gateway skips it: 127 points load, not 128. The apartment submeters summing below the building master is the producer''s conservation rule.'
+    Check: 'fixed_network_days (added 2026-11-10): points with data per node (61, 65 and 1 expected), points with any day not at 24, and 0 rows for the disabled laundry point; NOT LOADED until the files are delivered.'
   Points: 124 apartment electric submeters (60 in Cedar Row A, 64 in Cedar Row B), the two house submeters, ch_lakeview_hall_laundry_kwh_60m, ch_parking_structure_ev_kwh_60m
   Expected: 24 hourly kWh readings per point per day; the apartment submeters sum to less than the building's utility master meter.
 - key: neptune_cedar_row_submeters
@@ -415,6 +544,11 @@ records:
   Format: Neptune handheld upload file (apartment water route)
   Sample file needed: artifacts/demo-university-v1/neptune/cedar-row-submeter-route.txt
   Sample file exists: false
+  Status:   # added 2026-11-10: what exists, what would produce it, the expected result, the check
+    Sample: 'None yet. The upload file is made by reading the route exported in 05-handheld-routes.yaml; the services/handheld service has the native Neptune and MVRS return-file codecs and a browser round workflow. The services/sources producer makes none.'
+    Produced by: 'services/handheld, from the exported route (Step 5 must be entered first).'
+    Expected result: 'Known values are in handheldAcceptance (submeter_batch), with expected usage per case.'
+    Check: 'None added here: configuration is asserted by the generated handheld block of checks.sql (handheld_configuration), and the results are recorded against the handheldAcceptance cases.'
   Points: 124 apartment water register and usage pairs plus the two house pairs (05-handheld-routes.yaml)
   Expected: every register on the route receives one read; usage equals the read difference.
 # ---- The handheld routes added 2026-11-07 (05-handheld-routes.yaml); their cases are in handheldAcceptance ----
@@ -426,6 +560,11 @@ records:
   Format: Neptune handheld upload file (Cedar Row C, as its installer built the route)
   Sample file needed: artifacts/demo-university-v1/neptune/cedar-row-c-route.txt
   Sample file exists: false
+  Status:   # added 2026-11-10: what exists, what would produce it, the expected result, the check
+    Sample: 'None yet. The upload file is made by reading the route exported in 05-handheld-routes.yaml; the services/handheld service has the native Neptune and MVRS return-file codecs and a browser round workflow. The services/sources producer makes none.'
+    Produced by: 'services/handheld, from the exported route (Step 5 must be entered first).'
+    Expected result: 'Known values are in handheldAcceptance (cedar_row_c_round), with expected usage per case.'
+    Check: 'None added here: configuration is asserted by the generated handheld block of checks.sql (handheld_configuration), and the results are recorded against the handheldAcceptance cases.'
   Points: Cedar Row C's 50 water registers and their Deltas, ccf upstairs and gallons downstairs (05-handheld-routes.yaml)
   Expected: Run handheldAcceptance cedar_row_c_round. The 48 meters on cycle 02's route file are read; unit 412 (cycle 20) and the disabled laundry meter are not.
 - key: neptune_irrigation
@@ -436,6 +575,11 @@ records:
   Format: Neptune handheld upload file (irrigation route, ccf)
   Sample file needed: artifacts/demo-university-v1/neptune/irrigation-route.txt
   Sample file exists: false
+  Status:   # added 2026-11-10: what exists, what would produce it, the expected result, the check
+    Sample: 'None yet. The upload file is made by reading the route exported in 05-handheld-routes.yaml; the services/handheld service has the native Neptune and MVRS return-file codecs and a browser round workflow. The services/sources producer makes none.'
+    Produced by: 'services/handheld, from the exported route (Step 5 must be entered first).'
+    Expected result: 'Known values are in handheldAcceptance (irrigation_season_read), with expected usage per case.'
+    Check: 'None added here: configuration is asserted by the generated handheld block of checks.sql (handheld_configuration), and the results are recorded against the handheldAcceptance cases.'
   Points: the four irrigation registers and their Deltas, in ccf
   Expected: Run handheldAcceptance irrigation_season_read.
 - key: mvrs_facilities_rounds
@@ -446,6 +590,11 @@ records:
   Format: MVRS handheld upload file (routes CHECK, SWGR and GEN, one file per case)
   Sample file needed: artifacts/demo-university-v1/mvrs/check-route.txt, switchgear-route.txt and generator-route.txt
   Sample file exists: false
+  Status:   # added 2026-11-10: what exists, what would produce it, the expected result, the check
+    Sample: 'None yet. The upload file is made by reading the route exported in 05-handheld-routes.yaml; the services/handheld service has the native Neptune and MVRS return-file codecs and a browser round workflow. The services/sources producer makes none.'
+    Produced by: 'services/handheld, from the exported route (Step 5 must be entered first).'
+    Expected result: 'Known values are in handheldAcceptance (utility_check_constants, switchgear_round and generator_round), with expected usage per case.'
+    Check: 'None added here: configuration is asserted by the generated handheld block of checks.sql (handheld_configuration), and the results are recorded against the handheldAcceptance cases.'
   Points: the two check registers, the switchgear's six registers and four demand points, the generators' six registers
   Expected: Run handheldAcceptance utility_check_constants, switchgear_round and generator_round. The built-in workflow publishes their HMR log events too.
 - key: hmr_events_publish
@@ -456,6 +605,11 @@ records:
   Format: HMR reading events (JSON lines to the message broker)
   Sample file needed: the MVRS gas upload used by mvrs_student_center_gas; the workflow produces and publishes the companion events file
   Sample file exists: false
+  Status:   # added 2026-11-10: what exists, what would produce it, the expected result, the check
+    Sample: 'None: the companion events file is produced by the MVRS workflow from the gas upload.'
+    Produced by: 'The built-in MVRS workflow (HmrEventsPublish), once mvrs_student_center_gas has run.'
+    Expected result: 'Delivery may repeat on replay; no duplicate persisted HMR log or interval row for the same payload. No fixed value.'
+    Check: 'None added: the HMR log tables belong to the handheld section, which the Step 5 entry owns.'
   Points: no additional point bindings; the events describe the MVRS gas reads
   Expected: The publisher may deliver again on replay. Verify no duplicate persisted HMR logs or interval rows for the same payload, rather than claiming the broker delivered exactly once.
 # ---- Ridgeline Wind cases (see the notes above): run each from the then-current database when its sample file or service exists. ----
@@ -470,6 +624,11 @@ records:
   Format: FIG sentinel CSV, two files cut to one SCADA day
   Sample file needed: artifacts/demo-university-v1/fig/ridgeline-scada-turbines.fig.csv (60 aliases) and artifacts/demo-university-v1/fig/ridgeline-met-mast.fig.csv (6 aliases), each holding the rows of 2024-07-15 on the SCADA clock   # assumed day; any July 2024 day does, change the dates in checks.sql to match
   Sample file exists: false
+  Status:   # added 2026-11-10: what exists, what would produce it, the expected result, the check
+    Sample: 'No file in this repository. The source service makes the Ridgeline SCADA files.'
+    Produced by: 'services/sources producer (python -m services.sources deliver --url http://localhost:18081 --source gw_fig_ridgeline_scada --destination <the gateway Input folder>; see services/sources/README.md), --day 2024-07-15.'
+    Expected result: 'Known values: 144 readings per point, 9504 stored, first and last UTC stamps, stored local stamps (the Expected block).'
+    Check: 'Already asserted: ridgeline_scada_day and ridgeline_scada_day_short_points.'
   Delivered to: C:\ProgramData\EEM Suite\NorthLake\Gateways\FIG-Ridgeline\Input\
   Points: the 60 turbine points (kwh, kw, possible_kw, nacelle_wind_ms, rotor_rpm and state, each _10m, on ch_rwl_wtg01 through ch_rwl_wtg10) and the 6 met mast points (ch_rwl_met_wind_ms_10m, ch_rwl_met_wind_direction_10m, ch_rwl_met_air_temp_c_10m, ch_rwl_met_pressure_kpa_10m, ch_rwl_met_air_density_10m, ch_rwl_met_rh_10m)
   Before the run: 'vendor_setup shows Channel, UOM, Multiplier and OffsetTimeMinutes on the FIG Gateway vendor; ridgeline_nodes_bound shows the 60 and 6 points still on Pacific, TimeZoneID 33, as Stage 2 left them; the task parameter Timestamp Type is utc and each point carries OffsetTimeMinutes 480.'
@@ -497,6 +656,11 @@ records:
   Format: FIG sentinel CSV, the turbine file over the outage
   Sample file needed: artifacts/demo-university-v1/fig/ridgeline-scada-turbines.fig.csv holding 2025-02-11 through 2025-04-22 on the SCADA clock (the file carries all ten turbines, so WTG-06 is the control; deliver it in as many files as the generator cuts)
   Sample file exists: false
+  Status:   # added 2026-11-10: what exists, what would produce it, the expected result, the check
+    Sample: 'No file in this repository. The source service makes the turbine file for the outage; its model sets the WTG-07 outage window.'
+    Produced by: 'services/sources producer (python -m services.sources deliver --url http://localhost:18081 --source gw_fig_ridgeline_scada --destination <the gateway Input folder>; see services/sources/README.md), --month 2025-02, 2025-03 and 2025-04.'
+    Expected result: 'Known values: 10224 readings per point, state 2, zero kWh (the Expected block).'
+    Check: 'Already asserted: ridgeline_wtg07_outage.'
   Delivered to: C:\ProgramData\EEM Suite\NorthLake\Gateways\FIG-Ridgeline\Input\
   Points: ch_rwl_wtg07_kwh_10m, ch_rwl_wtg07_kw_10m, ch_rwl_wtg07_possible_kw_10m and ch_rwl_wtg07_state_10m, with the same four on ch_rwl_wtg06 as the control; WTG-07's nacelle wind and rotor speed load too, and the scenario does not constrain them
   Expected:
@@ -519,6 +683,11 @@ records:
   Format: NWS observations and hourly forecasts, separate Observation and Forecast nodes for KSUU
   Sample file needed: none; NWS public KSUU station observations. Compare with the met mast only where both have data for the same hour.
   Sample file exists: false
+  Status:   # added 2026-11-10: what exists, what would produce it, the expected result, the check
+    Sample: 'None, by design: NWS public KSUU observations.'
+    Produced by: 'The NWS public service, through Run now on schedule_noaa_ksac.'
+    Expected result: 'Order of magnitude against the met mast only; no fixed value.'
+    Check: 'Already listed for comparison: ksuu_wind_knots (a person reads the ratio); noaa_observation_sanity asserts the physical limits.'
   Points: ch_weather_ksuu_temp_c_hourly, ch_weather_ksuu_rh_hourly, ch_weather_ksuu_wind_knots_hourly, ch_weather_ksuu_dewpoint_c_hourly, ch_weather_ksuu_forecast_temp_c_hourly, ch_weather_ksuu_forecast_dewpoint_c_hourly, ch_weather_ksuu_forecast_rh_hourly, ch_weather_ksuu_forecast_wind_knots_hourly, ch_weather_ksuu_forecast_wind_direction_hourly, ch_weather_ksuu_forecast_precip_probability_hourly
   Expected:
     Per run: latest valid observation independently per metric and hourly interval, like noaa_ksac; each forecast measurement uses its own separate hourly point
@@ -541,6 +710,11 @@ records:
   Format: MV90 MDEF (binary .mde), recorder VEDRIDGE01
   Sample file needed: artifacts/demo-university-v1/mv90/RIDGELINE_VED_202407.mde and RIDGELINE_VED_202408.mde, then RIDGELINE_VED_202501.mde and RIDGELINE_VED_202502.mde (one file per recorder month for VEDRIDGE01; the first bill period runs into August and the winter one into February)   # assumed names, following SCIENCE_VED_202401.mde
   Sample file exists: false
+  Status:   # added 2026-11-10: what exists, what would produce it, the expected result, the check
+    Sample: 'No file in this repository. The source service makes the VEDRIDGE01 MDEF files; its model ties the export to the bills.'
+    Produced by: 'services/sources producer (python -m services.sources deliver --url http://localhost:18081 --source gw_mv90_valley_mdef --destination <the gateway Input folder>; see services/sources/README.md), --month 2024-07, 2024-08, 2025-01 and 2025-02.'
+    Expected result: 'Known values: 2496612 / 4428 / 858948 over the first bill and 418836 / 46920 / 131664 over the winter bill (the Expected block).'
+    Check: 'Already listed: ridgeline_mdef_channels (the sums sit beside the PRINT; a person compares).'
   Points: ch_ved_ridgeline_received_kwh_15m (channel 1), ch_ved_ridgeline_delivered_kwh_15m (channel 2), ch_ved_ridgeline_kvarh_15m (channel 3)
   Expected:
     Per day: 96 intervals per point, with local timestamps like the other MDEF recorders (node TimeStampType local, point zone Pacific), the first stamped 2024-07-01 00:15, the day the meter opens; the MDEF gateway stamps each reading at the end of its fifteen minutes (MdefFileParser takes the record's start minute, 01, adds the interval and subtracts one), so a day is 00:15 through the next day's 00:00
@@ -560,6 +734,11 @@ records:
   Task: none in 03-workflows-and-tasks.yaml; Recalculate on the Aggregates workspace (Database Administrator) over the loaded range
   Sample file needed: none of its own; it reads what ridgeline_scada_july_day, ridgeline_wtg07_outage and mdef_ridgeline_interconnection stored
   Sample file exists: not applicable
+  Status:   # added 2026-11-10: what exists, what would produce it, the expected result, the check
+    Sample: 'Not applicable: it reads what ridgeline_scada_july_day, ridgeline_wtg07_outage and mdef_ridgeline_interconnection stored.'
+    Produced by: 'Recalculate on the Aggregates workspace (Database Administrator) over the loaded range.'
+    Expected result: 'Known values: 144 and 96 readings for the SCADA and MDEF days and the July tie-out of 2251384 (the Expected block).'
+    Check: 'Already listed: ridgeline_aggregates (counts beside the PRINT; a person compares).'
   Points: agg_ntp_ridgeline_generated_kwh_10m (Ridgeline Farm Generated kWh 10m), agg_ntp_ridgeline_active_kw_10m (Ridgeline Farm Active Power kW 10m), agg_ntp_ridgeline_possible_kw_10m (Ridgeline Farm Possible Power kW 10m) and agg_ntp_ridgeline_net_export_kwh_15m (Ridgeline Net Export kWh 15m); members as in implementation/stage-2-hierarchy/06-aggregates.yaml
   Expected:
     Registered: 'each of the four has its PointAggregates_TBL row (checks.sql ridgeline_aggregates shows Registered 1). PRODUCT FINDING 14 blocks this first: Database Administrator writes the members but not that row, so Recalculate fails with error 51081 until the product writes it. Record the case as blocked, not worked around.'

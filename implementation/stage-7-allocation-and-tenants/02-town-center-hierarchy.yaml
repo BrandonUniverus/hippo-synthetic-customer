@@ -1,41 +1,54 @@
 # Stage 7, step 2: Northlake Town Center hierarchy (Database Administrator > Nodes tree). One record per
 # node, in tree order: Property > Buildings > Meters > Points, then Billing Accounts (the Add Billing Account
 # dialog opened from a meter). Shape follows Stage 2's node conventions (Definitions/Address/Area/Meter
-# Definitions/Point Definitions pages) — Stage 2 is being written in parallel; its own YAML is not committed
-# yet, so meters and points here are new Town Center nodes only and do not depend on Stage 2's IDs. Every
-# tenant space is a real Meter-level node even where it has no physical device, because Bill Allocation
-# details point at a Metaworld ID with a Billing Account, not at a bare tenant name.
+# Definitions/Point Definitions pages). Every tenant space is a real Meter-level node even where it has no
+# physical device, because Bill Allocation details point at a node with a billing account, not at a bare tenant
+# name; the notes below say what each kind of meter needs to take part in allocation, rates and generation.
 stage: 7
 step: 2
 title: Town Center site, buildings, meters, points and billing accounts
 app: Database Administrator
-screen: Nodes > (Property / Location / Meter / Point) node > Definitions, Address, Area, Meter Definitions, Point
-  Definitions; Add Billing Account dialog from a Meter node
+screen: Nodes > (Property / Location / Meter / Point) node > Definitions, Address, Area, Meter Definitions, Point Definitions; Add Billing
+  Account dialog from a Meter node
 source:
 - data/eem/northlake-town-center-v1.yaml
 - documents/guides/tenant-and-lease-roster.pdf
 - generators/documents/sources/implementation/dream-customer/phase4-tenant-rebilling-spec.md
 notes:
-- 'Order inside the tree: add the Property node under Northlake Town Center (Stage 7 step 1), save, then each Building
-  (Location), save, then each Meter under its building, save, then each Meter''s Point. A Billing Account must exist
-  before a meter can be attached to one, so run the Add Billing Account dialog first for each row in billingAccounts
-  below, then set BA_BillingAccountID on the matching meter.'
-- 'Two meter kinds appear here: a master meter (real utility interval + monthly bill from Valley Electric District,
-  Type Code 1 AP Upload Only, Bill Type Importer) and an allocation meter (a tenant space with no physical device
-  — no Point Definitions page needed — that exists only to hold a Billing Account, Bill Type Allocation, so it can
-  appear as a row in a Bill Allocation Configuration Detail grid). Floor 1-4, Bldg A/B/C and Substation 1/2 are
-  a third kind: an owned submeter with a real interval point but no utility bill of its own (Bill Type Allocation,
-  no provider), matching Cedar Row''s owned-submeter pattern from Stage 2.'
-- Vendor numbers for Town Center's four Valley Electric District accounts are assigned on the Utility Providers
-  > Associated Companies page (Stage 1 step 2), e.g. VED-3005-TC through VED-3008-TC.
-- Floor area values (Area tab) are entered in SqFt on every tenant-space node used by the Building Areas method
-  (file 04) so that method has something to divide by; other tenant spaces get an area value too so the WUI fail-reason
-  fixture (file 05) has a real "has area" baseline to contrast against.
-- All synthetic meter numbers are new and assumed, in Valley Electric District's existing format (SYN-VED-M-#######,
-  see data/providers/valley-electric-district.yaml) since Town Center buys its electricity from the same provider
-  as the rest of the portfolio.
-- Records marked kind 'Billing account (Utility Accountant tab, Stage 2 shape)' were entered on that other editor;
-  they sit in this file because they belong to this step.
+- 'Order inside the tree: add the Property node under Northlake Town Center (Stage 7 step 1), save, then each Building (Location), save,
+  then each Meter under its building, save, then each Meter''s Point. A Billing Account must exist before a meter can be attached to
+  one, so run the Add Billing Account dialog first for each row in billingAccounts below, then set BA_BillingAccountID on the matching
+  meter.'
+- 'Every Town Center meter needs a Measure Type (Electricity) and a billing account that has a Utility Provider, and the reason is in
+  the product. The Add Billing Account dialog refuses an account with no provider (AddBillingAccountViewModel.ConfirmCommand: select
+  a utility), and Meter_Save copies the account''s ProviderID onto the node (MetaWorld_TBL.ProviderID), so a meter''s Utility Provider
+  is whatever its account carries (MeterDefinitionViewModel: the account brings its provider). Both matter. (1) The Tenant Rebill rate
+  list is the meter''s provider''s rates filtered by the meter''s measure type (TenantRebillViewModel.ChangeHierarchyIDAsync and UpdateAvailableRates),
+  and UtilityRateMeterAssignment_Save refuses a rate whose measure type is not the meter''s. (2) The Add Allocated Meters picker rejects
+  a candidate with another measure type than the master (error 2), no billing account (3) or another currency (5) (BillAllocationEligibleMeters_Get.sql).
+  The earlier version of this file left the 18 tenant, floor, building and aggregate meters with neither, which made each of them unusable
+  for rates, generation and allocation.'
+- 'All 22 accounts are therefore Valley Electric District accounts in US Dollar (# assumed: the landlord resells Valley Electric power,
+  which is also what Stage 12 scenario 4 does with its tenant rate). The four masters are Bill Entry accounts (Town Center has no Bill
+  Importer source, and the master bills of file 10 are keyed on Bill Entry Web); the four tenants that file 06 generates bills for are
+  Bill Generation accounts; the rest receive allocated bills (Bill Allocation). Neither engine reads the account''s Bill Entry Type
+  (UtilityGenBill_Create and BillAlloc_CreateBill do not), it is classification only, so a Bill Generation tenant can also receive an
+  allocated bill.'
+- Meter Number is optional (Meter.SM_Code is NULL-able), so the allocation-only tenant meters carry none. Masters and submeters keep
+  their SYN-VED-M-30xxxxx numbers, in Valley Electric District's existing format.
+- 'Points are Analog interval points in the shape of Stage 2 (Reading Type Analog, Unit KilowattHours - (kWh) or Kilowatt - (kW), Archive
+  Interval 60). Two kinds exist: the measured kWh and kW points that Stage 3 loads (file 10 lists the values) and the four Estimated
+  kWh points that Weighted Use Index writes into (file 05; they get no imported data). The Estimated points sit under Shop 3, Shop 4,
+  Common Area and Landlord/House, none of which generates a bill, so a rate never prices an estimated and a measured kWh point on one
+  meter twice (generation prices every energy point under the meter). 26 points in all.'
+- Floor area (Area tab, SqFt) is on every tenant space that Building Areas (file 04) and Weighted Use Index (file 05) read.
+- 'Vendor numbers for Town Center''s Valley Electric District accounts are assigned on the Utility Providers > Associated Companies
+  page (Stage 1 step 2), e.g. VED-3005-TC (# assumed): one vendor number for the company covers all 22 accounts, since they are one
+  company''s accounts with one provider.'
+- Records marked kind 'Billing account (Utility Accountant tab, Stage 2 shape)' were entered on that other editor; they sit in this
+  file because they belong to this step. Account Number, Description, Currency Unit, Utility Provider, Bill Service Type, Bill Entry
+  Type and Bill Invoice Template are the Definitions fields of Stage 2's accounts; the Service Address, Account Address and Account
+  Contact pages are left blank (nothing reads them here).
 records:
 - key: tc_property
   installed:
@@ -121,8 +134,8 @@ records:
     Type: Location
     Building Code: TOTAL
     Parent: tc_property
-  notes: Holds only the Property Total cost-center meter (method 6's aggregation target); no address, no meters
-    of its own besides that one.
+  notes: Holds only the Property Total cost-center meter (method 6's aggregation target); no address, no meters of its own besides that
+    one.
 - key: tc_market_main
   installed:
     metaWorldId: null
@@ -134,17 +147,18 @@ records:
     Parent: tc_market_hall
     Meter Tag: MKT-MAIN
   Meter Definitions:
-    Measure Type: Electric
-    Synthetic Meter Number: SYN-VED-M-3005001
-    Provider: Valley Electric District
+    Measure Type: Electricity
+    Meter Number: SYN-VED-M-3005001
     Billing Account: tc_market_main_ba
+    Utility Provider: Valley Electric District
     Bill Cycle: 1
   Point Definitions:
   - Description: Mall-Main kWh 60m
-    Point Type: Accumulator
-    Measure Type: Electric
-    Unit: kWh
-    Interval: 60
+    Reading Type: Analog
+    Measure Type: Electricity
+    Unit: KilowattHours - (kWh)
+    Archive Interval: 60
+    Index: ''
 - key: tc_anchor_store
   installed:
     metaWorldId: null
@@ -156,11 +170,26 @@ records:
     Parent: tc_market_hall
     Meter Tag: MKT-ANCHOR
   Meter Definitions:
+    Measure Type: Electricity
     Billing Account: tc_anchor_store_ba
-    notes: allocation-only meter, no provider, no synthetic meter number
+    Utility Provider: Valley Electric District
   Area:
     Value: 28000
     Unit: SqFt
+  notes: tenant space; no physical device of its own here beyond its listed points. Takes allocated bills and, for the four generation tenants, interval points (file 06)
+  Point Definitions:
+  - Description: Anchor Store kWh 60m
+    Reading Type: Analog
+    Measure Type: Electricity
+    Unit: KilowattHours - (kWh)
+    Archive Interval: 60
+    Index: ''
+  - Description: Anchor Store kW 60m
+    Reading Type: Analog
+    Measure Type: Electricity
+    Unit: Kilowatt - (kW)
+    Archive Interval: 60
+    Index: ''
 - key: tc_food_court
   installed:
     metaWorldId: null
@@ -172,11 +201,20 @@ records:
     Parent: tc_market_hall
     Meter Tag: MKT-FOODCOURT
   Meter Definitions:
+    Measure Type: Electricity
     Billing Account: tc_food_court_ba
-    notes: allocation-only meter
+    Utility Provider: Valley Electric District
   Area:
     Value: 12000
     Unit: SqFt
+  notes: tenant space; takes allocated bills (file 04)
+  Point Definitions:
+  - Description: Food Court kWh 60m
+    Reading Type: Analog
+    Measure Type: Electricity
+    Unit: KilowattHours - (kWh)
+    Archive Interval: 60
+    Index: ''
 - key: tc_inline_shop_1
   installed:
     metaWorldId: null
@@ -188,11 +226,20 @@ records:
     Parent: tc_market_hall
     Meter Tag: MKT-SHOP1
   Meter Definitions:
+    Measure Type: Electricity
     Billing Account: tc_inline_shop_1_ba
-    notes: allocation-only meter
+    Utility Provider: Valley Electric District
   Area:
     Value: 2200
     Unit: SqFt
+  notes: tenant space; takes allocated bills (file 04)
+  Point Definitions:
+  - Description: In-line Shop 1 kWh 60m
+    Reading Type: Analog
+    Measure Type: Electricity
+    Unit: KilowattHours - (kWh)
+    Archive Interval: 60
+    Index: ''
 - key: tc_inline_shop_2
   installed:
     metaWorldId: null
@@ -204,11 +251,20 @@ records:
     Parent: tc_market_hall
     Meter Tag: MKT-SHOP2
   Meter Definitions:
+    Measure Type: Electricity
     Billing Account: tc_inline_shop_2_ba
-    notes: allocation-only meter
+    Utility Provider: Valley Electric District
   Area:
     Value: 1800
     Unit: SqFt
+  notes: tenant space; takes allocated bills (file 04)
+  Point Definitions:
+  - Description: In-line Shop 2 kWh 60m
+    Reading Type: Analog
+    Measure Type: Electricity
+    Unit: KilowattHours - (kWh)
+    Archive Interval: 60
+    Index: ''
 - key: tc_inline_shop_3
   installed:
     metaWorldId: null
@@ -220,11 +276,20 @@ records:
     Parent: tc_market_hall
     Meter Tag: MKT-SHOP3
   Meter Definitions:
+    Measure Type: Electricity
     Billing Account: tc_inline_shop_3_ba
-    notes: allocation-only meter
+    Utility Provider: Valley Electric District
   Area:
     Value: 2600
     Unit: SqFt
+  notes: tenant space; takes allocated bills (file 04)
+  Point Definitions:
+  - Description: In-line Shop 3 Estimated kWh
+    Reading Type: Analog
+    Measure Type: Electricity
+    Unit: KilowattHours - (kWh)
+    Archive Interval: 60
+    Index: ''
 - key: tc_inline_shop_4
   installed:
     metaWorldId: null
@@ -236,11 +301,20 @@ records:
     Parent: tc_market_hall
     Meter Tag: MKT-SHOP4
   Meter Definitions:
+    Measure Type: Electricity
     Billing Account: tc_inline_shop_4_ba
-    notes: allocation-only meter
+    Utility Provider: Valley Electric District
   Area:
     Value: 2000
     Unit: SqFt
+  notes: tenant space; takes allocated bills (file 04)
+  Point Definitions:
+  - Description: In-line Shop 4 Estimated kWh
+    Reading Type: Analog
+    Measure Type: Electricity
+    Unit: KilowattHours - (kWh)
+    Archive Interval: 60
+    Index: ''
 - key: tc_common_area
   installed:
     metaWorldId: null
@@ -252,11 +326,20 @@ records:
     Parent: tc_market_hall
     Meter Tag: MKT-COMMON
   Meter Definitions:
+    Measure Type: Electricity
     Billing Account: tc_common_area_ba
-    notes: allocation-only meter
+    Utility Provider: Valley Electric District
   Area:
     Value: 35400
     Unit: SqFt
+  notes: tenant space; takes allocated bills (file 04)
+  Point Definitions:
+  - Description: Common Area Estimated kWh
+    Reading Type: Analog
+    Measure Type: Electricity
+    Unit: KilowattHours - (kWh)
+    Archive Interval: 60
+    Index: ''
 - key: tc_tower_main
   installed:
     metaWorldId: null
@@ -268,17 +351,18 @@ records:
     Parent: tc_office_tower
     Meter Tag: TWR-MAIN
   Meter Definitions:
-    Measure Type: Electric
-    Synthetic Meter Number: SYN-VED-M-3006001
-    Provider: Valley Electric District
+    Measure Type: Electricity
+    Meter Number: SYN-VED-M-3006001
     Billing Account: tc_tower_main_ba
+    Utility Provider: Valley Electric District
     Bill Cycle: 1
   Point Definitions:
   - Description: Tower-Main kWh 60m
-    Point Type: Accumulator
-    Measure Type: Electric
-    Unit: kWh
-    Interval: 60
+    Reading Type: Analog
+    Measure Type: Electricity
+    Unit: KilowattHours - (kWh)
+    Archive Interval: 60
+    Index: ''
 - key: tc_floor_1
   installed:
     metaWorldId: null
@@ -290,19 +374,21 @@ records:
     Parent: tc_office_tower
     Meter Tag: TWR-FL1
   Meter Definitions:
-    Measure Type: Electric
-    Synthetic Meter Number: SYN-VED-M-3006002
+    Measure Type: Electricity
+    Meter Number: SYN-VED-M-3006002
     Billing Account: tc_floor_1_ba
-    notes: owned submeter, no provider bill
+    Utility Provider: Valley Electric District
   Area:
     Value: 22000
     Unit: SqFt
   Point Definitions:
   - Description: Floor 1 Submeter kWh 60m
-    Point Type: Accumulator
-    Measure Type: Electric
-    Unit: kWh
-    Interval: 60
+    Reading Type: Analog
+    Measure Type: Electricity
+    Unit: KilowattHours - (kWh)
+    Archive Interval: 60
+    Index: ''
+  notes: owned submeter; takes allocated bills
 - key: tc_floor_2
   installed:
     metaWorldId: null
@@ -314,19 +400,21 @@ records:
     Parent: tc_office_tower
     Meter Tag: TWR-FL2
   Meter Definitions:
-    Measure Type: Electric
-    Synthetic Meter Number: SYN-VED-M-3006003
+    Measure Type: Electricity
+    Meter Number: SYN-VED-M-3006003
     Billing Account: tc_floor_2_ba
-    notes: owned submeter, no provider bill
+    Utility Provider: Valley Electric District
   Area:
     Value: 22000
     Unit: SqFt
   Point Definitions:
   - Description: Floor 2 Submeter kWh 60m
-    Point Type: Accumulator
-    Measure Type: Electric
-    Unit: kWh
-    Interval: 60
+    Reading Type: Analog
+    Measure Type: Electricity
+    Unit: KilowattHours - (kWh)
+    Archive Interval: 60
+    Index: ''
+  notes: owned submeter; takes allocated bills
 - key: tc_floor_3
   installed:
     metaWorldId: null
@@ -338,19 +426,21 @@ records:
     Parent: tc_office_tower
     Meter Tag: TWR-FL3
   Meter Definitions:
-    Measure Type: Electric
-    Synthetic Meter Number: SYN-VED-M-3006004
+    Measure Type: Electricity
+    Meter Number: SYN-VED-M-3006004
     Billing Account: tc_floor_3_ba
-    notes: owned submeter, no provider bill
+    Utility Provider: Valley Electric District
   Area:
     Value: 22000
     Unit: SqFt
   Point Definitions:
   - Description: Floor 3 Submeter kWh 60m
-    Point Type: Accumulator
-    Measure Type: Electric
-    Unit: kWh
-    Interval: 60
+    Reading Type: Analog
+    Measure Type: Electricity
+    Unit: KilowattHours - (kWh)
+    Archive Interval: 60
+    Index: ''
+  notes: owned submeter; takes allocated bills
 - key: tc_floor_4
   installed:
     metaWorldId: null
@@ -362,21 +452,22 @@ records:
     Parent: tc_office_tower
     Meter Tag: TWR-FL4
   Meter Definitions:
-    Measure Type: Electric
-    Synthetic Meter Number: SYN-VED-M-3006005
+    Measure Type: Electricity
+    Meter Number: SYN-VED-M-3006005
     Billing Account: tc_floor_4_ba
+    Utility Provider: Valley Electric District
   Area:
     Value: 22000
     Unit: SqFt
   Point Definitions:
   - Description: Floor 4 Submeter kWh 60m
-    Point Type: Accumulator
-    Measure Type: Electric
-    Unit: kWh
-    Interval: 60
-  notes: Floor 4's submeter is entered here and used by file 04's FY2024 Fully Submetered config; the chapter's
-    Method 3 story removes it from service starting FY2025 (nothing to delete in this file, just do not include
-    Floor 4 in that later config's detail rows).
+    Reading Type: Analog
+    Measure Type: Electricity
+    Unit: KilowattHours - (kWh)
+    Archive Interval: 60
+    Index: ''
+  notes: Floor 4's submeter is entered here and used by file 04's FY2024 Fully Submetered config; the chapter's Method 3 story removes
+    it from service starting FY2025 (nothing to delete in this file, just do not include Floor 4 in that later config's detail rows).
 - key: tc_landlord_house
   installed:
     metaWorldId: null
@@ -388,11 +479,20 @@ records:
     Parent: tc_office_tower
     Meter Tag: TWR-HOUSE
   Meter Definitions:
+    Measure Type: Electricity
     Billing Account: tc_landlord_house_ba
-    notes: allocation-only meter, no submeter of its own; receives Office Tower's unmetered remainder
+    Utility Provider: Valley Electric District
   Area:
     Value: 8000
     Unit: SqFt
+  notes: tenant space; takes allocated bills (file 04), no submeter of its own; receives Office Tower's unmetered remainder
+  Point Definitions:
+  - Description: Landlord/House Estimated kWh
+    Reading Type: Analog
+    Measure Type: Electricity
+    Unit: KilowattHours - (kWh)
+    Archive Interval: 60
+    Index: ''
 - key: tc_annex_main
   installed:
     metaWorldId: null
@@ -404,22 +504,24 @@ records:
     Parent: tc_campus_annex
     Meter Tag: ANX-MAIN
   Meter Definitions:
-    Measure Type: Electric
-    Synthetic Meter Number: SYN-VED-M-3007001
-    Provider: Valley Electric District
+    Measure Type: Electricity
+    Meter Number: SYN-VED-M-3007001
     Billing Account: tc_annex_main_ba
+    Utility Provider: Valley Electric District
     Bill Cycle: 1
   Point Definitions:
   - Description: Annex-Main kWh 60m
-    Point Type: Accumulator
-    Measure Type: Electric
-    Unit: kWh
-    Interval: 60
+    Reading Type: Analog
+    Measure Type: Electricity
+    Unit: KilowattHours - (kWh)
+    Archive Interval: 60
+    Index: ''
   - Description: Annex-Main kW 60m
-    Point Type: Analog
-    Measure Type: Electric
-    Unit: kW
-    Interval: 60
+    Reading Type: Analog
+    Measure Type: Electricity
+    Unit: Kilowatt - (kW)
+    Archive Interval: 60
+    Index: ''
 - key: tc_bldg_a
   installed:
     metaWorldId: null
@@ -431,23 +533,26 @@ records:
     Parent: tc_campus_annex
     Meter Tag: ANX-A
   Meter Definitions:
-    Measure Type: Electric
-    Synthetic Meter Number: SYN-VED-M-3007002
+    Measure Type: Electricity
+    Meter Number: SYN-VED-M-3007002
     Billing Account: tc_bldg_a_ba
+    Utility Provider: Valley Electric District
   Area:
     Value: 16000
     Unit: SqFt
   Point Definitions:
   - Description: Bldg A Submeter kWh 60m
-    Point Type: Accumulator
-    Measure Type: Electric
-    Unit: kWh
-    Interval: 60
+    Reading Type: Analog
+    Measure Type: Electricity
+    Unit: KilowattHours - (kWh)
+    Archive Interval: 60
+    Index: ''
   - Description: Bldg A Submeter kW 60m
-    Point Type: Analog
-    Measure Type: Electric
-    Unit: kW
-    Interval: 60
+    Reading Type: Analog
+    Measure Type: Electricity
+    Unit: Kilowatt - (kW)
+    Archive Interval: 60
+    Index: ''
 - key: tc_bldg_b
   installed:
     metaWorldId: null
@@ -459,23 +564,26 @@ records:
     Parent: tc_campus_annex
     Meter Tag: ANX-B
   Meter Definitions:
-    Measure Type: Electric
-    Synthetic Meter Number: SYN-VED-M-3007003
+    Measure Type: Electricity
+    Meter Number: SYN-VED-M-3007003
     Billing Account: tc_bldg_b_ba
+    Utility Provider: Valley Electric District
   Area:
     Value: 18000
     Unit: SqFt
   Point Definitions:
   - Description: Bldg B Submeter kWh 60m
-    Point Type: Accumulator
-    Measure Type: Electric
-    Unit: kWh
-    Interval: 60
+    Reading Type: Analog
+    Measure Type: Electricity
+    Unit: KilowattHours - (kWh)
+    Archive Interval: 60
+    Index: ''
   - Description: Bldg B Submeter kW 60m
-    Point Type: Analog
-    Measure Type: Electric
-    Unit: kW
-    Interval: 60
+    Reading Type: Analog
+    Measure Type: Electricity
+    Unit: Kilowatt - (kW)
+    Archive Interval: 60
+    Index: ''
 - key: tc_bldg_c
   installed:
     metaWorldId: null
@@ -487,23 +595,26 @@ records:
     Parent: tc_campus_annex
     Meter Tag: ANX-C
   Meter Definitions:
-    Measure Type: Electric
-    Synthetic Meter Number: SYN-VED-M-3007004
+    Measure Type: Electricity
+    Meter Number: SYN-VED-M-3007004
     Billing Account: tc_bldg_c_ba
+    Utility Provider: Valley Electric District
   Area:
     Value: 20000
     Unit: SqFt
   Point Definitions:
   - Description: Bldg C Submeter kWh 60m
-    Point Type: Accumulator
-    Measure Type: Electric
-    Unit: kWh
-    Interval: 60
+    Reading Type: Analog
+    Measure Type: Electricity
+    Unit: KilowattHours - (kWh)
+    Archive Interval: 60
+    Index: ''
   - Description: Bldg C Submeter kW 60m
-    Point Type: Analog
-    Measure Type: Electric
-    Unit: kW
-    Interval: 60
+    Reading Type: Analog
+    Measure Type: Electricity
+    Unit: Kilowatt - (kW)
+    Archive Interval: 60
+    Index: ''
 - key: tc_substation_master
   installed:
     metaWorldId: null
@@ -515,17 +626,18 @@ records:
     Parent: tc_substation_feed
     Meter Tag: SUB-MAIN
   Meter Definitions:
-    Measure Type: Electric
-    Synthetic Meter Number: SYN-VED-M-3008001
-    Provider: Valley Electric District
+    Measure Type: Electricity
+    Meter Number: SYN-VED-M-3008001
     Billing Account: tc_substation_master_ba
+    Utility Provider: Valley Electric District
     Bill Cycle: 1
   Point Definitions:
   - Description: Substation-Master kWh 60m
-    Point Type: Accumulator
-    Measure Type: Electric
-    Unit: kWh
-    Interval: 60
+    Reading Type: Analog
+    Measure Type: Electricity
+    Unit: KilowattHours - (kWh)
+    Archive Interval: 60
+    Index: ''
 - key: tc_substation_1
   installed:
     metaWorldId: null
@@ -537,15 +649,17 @@ records:
     Parent: tc_substation_feed
     Meter Tag: SUB-1
   Meter Definitions:
-    Measure Type: Electric
-    Synthetic Meter Number: SYN-VED-M-3008002
+    Measure Type: Electricity
+    Meter Number: SYN-VED-M-3008002
     Billing Account: tc_substation_1_ba
+    Utility Provider: Valley Electric District
   Point Definitions:
   - Description: Substation 1 Submeter kWh 60m
-    Point Type: Accumulator
-    Measure Type: Electric
-    Unit: kWh
-    Interval: 60
+    Reading Type: Analog
+    Measure Type: Electricity
+    Unit: KilowattHours - (kWh)
+    Archive Interval: 60
+    Index: ''
 - key: tc_substation_2
   installed:
     metaWorldId: null
@@ -557,15 +671,17 @@ records:
     Parent: tc_substation_feed
     Meter Tag: SUB-2
   Meter Definitions:
-    Measure Type: Electric
-    Synthetic Meter Number: SYN-VED-M-3008003
+    Measure Type: Electricity
+    Meter Number: SYN-VED-M-3008003
     Billing Account: tc_substation_2_ba
+    Utility Provider: Valley Electric District
   Point Definitions:
   - Description: Substation 2 Submeter kWh 60m
-    Point Type: Accumulator
-    Measure Type: Electric
-    Unit: kWh
-    Interval: 60
+    Reading Type: Analog
+    Measure Type: Electricity
+    Unit: KilowattHours - (kWh)
+    Archive Interval: 60
+    Index: ''
 - key: tc_property_total
   installed:
     metaWorldId: null
@@ -577,182 +693,315 @@ records:
     Parent: tc_property_total_bldg
     Meter Tag: TC-TOTAL
   Meter Definitions:
+    Measure Type: Electricity
     Billing Account: tc_property_total_ba
-    notes: 'aggregation target only: no provider, no point, receives the sum of every other Town Center tenant bill
-      (file 03, method 6)'
+    Utility Provider: Valley Electric District
+  notes: 'aggregation target only: no point of its own, receives the sum of every Town Center tenant bill (file 04, method 6)'
 - key: tc_market_main_ba
-  installed: {}
+  installed:
+    billingAccountId: null
   kind: Billing account (Utility Accountant tab, Stage 2 shape)
+  Company: Northlake Town Center
   meter: tc_market_main
-  number: SYN-VED-A-3005001
-  provider: Valley Electric District
-  typeCode: 1 AP Upload Only
-  billTypeCode: 1 Importer
+  Definitions:
+    Account Number: SYN-VED-A-3005001
+    Description: Mall-Main / Town Center
+    Currency Unit: 'US Dollar  # assumed'
+    Utility Provider: Valley Electric District
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Entry
+    Bill Invoice Template: Bill Table Invoice Default
 - key: tc_anchor_store_ba
-  installed: {}
+  installed:
+    billingAccountId: null
   kind: Billing account (Utility Accountant tab, Stage 2 shape)
+  Company: Northlake Town Center
   meter: tc_anchor_store
-  number: TC-MKT-ANCHOR
-  provider: null
-  typeCode: '0'
-  billTypeCode: 3 Allocation
+  Definitions:
+    Account Number: TC-MKT-ANCHOR
+    Description: Anchor Store / Town Center
+    Currency Unit: 'US Dollar  # assumed'
+    Utility Provider: Valley Electric District
+    Bill Service Type: No AP Upload
+    Bill Entry Type: Bill Generation
+    Bill Invoice Template: Bill Table Invoice Default
 - key: tc_food_court_ba
-  installed: {}
+  installed:
+    billingAccountId: null
   kind: Billing account (Utility Accountant tab, Stage 2 shape)
+  Company: Northlake Town Center
   meter: tc_food_court
-  number: TC-MKT-FOODCOURT
-  provider: null
-  typeCode: '0'
-  billTypeCode: 3 Allocation
+  Definitions:
+    Account Number: TC-MKT-FOODCOURT
+    Description: Food Court / Town Center
+    Currency Unit: 'US Dollar  # assumed'
+    Utility Provider: Valley Electric District
+    Bill Service Type: No AP Upload
+    Bill Entry Type: Bill Generation
+    Bill Invoice Template: Bill Table Invoice Default
 - key: tc_inline_shop_1_ba
-  installed: {}
+  installed:
+    billingAccountId: null
   kind: Billing account (Utility Accountant tab, Stage 2 shape)
+  Company: Northlake Town Center
   meter: tc_inline_shop_1
-  number: TC-MKT-SHOP1
-  provider: null
-  typeCode: '0'
-  billTypeCode: 3 Allocation
+  Definitions:
+    Account Number: TC-MKT-SHOP1
+    Description: In-line Shop 1 / Town Center
+    Currency Unit: 'US Dollar  # assumed'
+    Utility Provider: Valley Electric District
+    Bill Service Type: No AP Upload
+    Bill Entry Type: Bill Generation
+    Bill Invoice Template: Bill Table Invoice Default
 - key: tc_inline_shop_2_ba
-  installed: {}
+  installed:
+    billingAccountId: null
   kind: Billing account (Utility Accountant tab, Stage 2 shape)
+  Company: Northlake Town Center
   meter: tc_inline_shop_2
-  number: TC-MKT-SHOP2
-  provider: null
-  typeCode: '0'
-  billTypeCode: 3 Allocation
+  Definitions:
+    Account Number: TC-MKT-SHOP2
+    Description: In-line Shop 2 / Town Center
+    Currency Unit: 'US Dollar  # assumed'
+    Utility Provider: Valley Electric District
+    Bill Service Type: No AP Upload
+    Bill Entry Type: Bill Generation
+    Bill Invoice Template: Bill Table Invoice Default
 - key: tc_inline_shop_3_ba
-  installed: {}
+  installed:
+    billingAccountId: null
   kind: Billing account (Utility Accountant tab, Stage 2 shape)
+  Company: Northlake Town Center
   meter: tc_inline_shop_3
-  number: TC-MKT-SHOP3
-  provider: null
-  typeCode: '0'
-  billTypeCode: 3 Allocation
+  Definitions:
+    Account Number: TC-MKT-SHOP3
+    Description: In-line Shop 3 / Town Center
+    Currency Unit: 'US Dollar  # assumed'
+    Utility Provider: Valley Electric District
+    Bill Service Type: No AP Upload
+    Bill Entry Type: Bill Allocation
+    Bill Invoice Template: Bill Table Invoice Default
 - key: tc_inline_shop_4_ba
-  installed: {}
+  installed:
+    billingAccountId: null
   kind: Billing account (Utility Accountant tab, Stage 2 shape)
+  Company: Northlake Town Center
   meter: tc_inline_shop_4
-  number: TC-MKT-SHOP4
-  provider: null
-  typeCode: '0'
-  billTypeCode: 3 Allocation
+  Definitions:
+    Account Number: TC-MKT-SHOP4
+    Description: In-line Shop 4 / Town Center
+    Currency Unit: 'US Dollar  # assumed'
+    Utility Provider: Valley Electric District
+    Bill Service Type: No AP Upload
+    Bill Entry Type: Bill Allocation
+    Bill Invoice Template: Bill Table Invoice Default
 - key: tc_common_area_ba
-  installed: {}
+  installed:
+    billingAccountId: null
   kind: Billing account (Utility Accountant tab, Stage 2 shape)
+  Company: Northlake Town Center
   meter: tc_common_area
-  number: TC-MKT-COMMON
-  provider: null
-  typeCode: '0'
-  billTypeCode: 3 Allocation
+  Definitions:
+    Account Number: TC-MKT-COMMON
+    Description: Common Area / Town Center
+    Currency Unit: 'US Dollar  # assumed'
+    Utility Provider: Valley Electric District
+    Bill Service Type: No AP Upload
+    Bill Entry Type: Bill Allocation
+    Bill Invoice Template: Bill Table Invoice Default
 - key: tc_tower_main_ba
-  installed: {}
+  installed:
+    billingAccountId: null
   kind: Billing account (Utility Accountant tab, Stage 2 shape)
+  Company: Northlake Town Center
   meter: tc_tower_main
-  number: SYN-VED-A-3006001
-  provider: Valley Electric District
-  typeCode: 1 AP Upload Only
-  billTypeCode: 1 Importer
+  Definitions:
+    Account Number: SYN-VED-A-3006001
+    Description: Tower-Main / Town Center
+    Currency Unit: 'US Dollar  # assumed'
+    Utility Provider: Valley Electric District
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Entry
+    Bill Invoice Template: Bill Table Invoice Default
 - key: tc_floor_1_ba
-  installed: {}
+  installed:
+    billingAccountId: null
   kind: Billing account (Utility Accountant tab, Stage 2 shape)
+  Company: Northlake Town Center
   meter: tc_floor_1
-  number: TC-TWR-FL1
-  provider: null
-  typeCode: '0'
-  billTypeCode: 3 Allocation
+  Definitions:
+    Account Number: TC-TWR-FL1
+    Description: Floor 1 / Town Center
+    Currency Unit: 'US Dollar  # assumed'
+    Utility Provider: Valley Electric District
+    Bill Service Type: No AP Upload
+    Bill Entry Type: Bill Allocation
+    Bill Invoice Template: Bill Table Invoice Default
 - key: tc_floor_2_ba
-  installed: {}
+  installed:
+    billingAccountId: null
   kind: Billing account (Utility Accountant tab, Stage 2 shape)
+  Company: Northlake Town Center
   meter: tc_floor_2
-  number: TC-TWR-FL2
-  provider: null
-  typeCode: '0'
-  billTypeCode: 3 Allocation
+  Definitions:
+    Account Number: TC-TWR-FL2
+    Description: Floor 2 / Town Center
+    Currency Unit: 'US Dollar  # assumed'
+    Utility Provider: Valley Electric District
+    Bill Service Type: No AP Upload
+    Bill Entry Type: Bill Allocation
+    Bill Invoice Template: Bill Table Invoice Default
 - key: tc_floor_3_ba
-  installed: {}
+  installed:
+    billingAccountId: null
   kind: Billing account (Utility Accountant tab, Stage 2 shape)
+  Company: Northlake Town Center
   meter: tc_floor_3
-  number: TC-TWR-FL3
-  provider: null
-  typeCode: '0'
-  billTypeCode: 3 Allocation
+  Definitions:
+    Account Number: TC-TWR-FL3
+    Description: Floor 3 / Town Center
+    Currency Unit: 'US Dollar  # assumed'
+    Utility Provider: Valley Electric District
+    Bill Service Type: No AP Upload
+    Bill Entry Type: Bill Allocation
+    Bill Invoice Template: Bill Table Invoice Default
 - key: tc_floor_4_ba
-  installed: {}
+  installed:
+    billingAccountId: null
   kind: Billing account (Utility Accountant tab, Stage 2 shape)
+  Company: Northlake Town Center
   meter: tc_floor_4
-  number: TC-TWR-FL4
-  provider: null
-  typeCode: '0'
-  billTypeCode: 3 Allocation
+  Definitions:
+    Account Number: TC-TWR-FL4
+    Description: Floor 4 / Town Center
+    Currency Unit: 'US Dollar  # assumed'
+    Utility Provider: Valley Electric District
+    Bill Service Type: No AP Upload
+    Bill Entry Type: Bill Allocation
+    Bill Invoice Template: Bill Table Invoice Default
 - key: tc_landlord_house_ba
-  installed: {}
+  installed:
+    billingAccountId: null
   kind: Billing account (Utility Accountant tab, Stage 2 shape)
+  Company: Northlake Town Center
   meter: tc_landlord_house
-  number: TC-TWR-HOUSE
-  provider: null
-  typeCode: '0'
-  billTypeCode: 3 Allocation
+  Definitions:
+    Account Number: TC-TWR-HOUSE
+    Description: Landlord/House / Town Center
+    Currency Unit: 'US Dollar  # assumed'
+    Utility Provider: Valley Electric District
+    Bill Service Type: No AP Upload
+    Bill Entry Type: Bill Allocation
+    Bill Invoice Template: Bill Table Invoice Default
 - key: tc_annex_main_ba
-  installed: {}
+  installed:
+    billingAccountId: null
   kind: Billing account (Utility Accountant tab, Stage 2 shape)
+  Company: Northlake Town Center
   meter: tc_annex_main
-  number: SYN-VED-A-3007001
-  provider: Valley Electric District
-  typeCode: 1 AP Upload Only
-  billTypeCode: 1 Importer
+  Definitions:
+    Account Number: SYN-VED-A-3007001
+    Description: Annex-Main / Town Center
+    Currency Unit: 'US Dollar  # assumed'
+    Utility Provider: Valley Electric District
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Entry
+    Bill Invoice Template: Bill Table Invoice Default
 - key: tc_bldg_a_ba
-  installed: {}
+  installed:
+    billingAccountId: null
   kind: Billing account (Utility Accountant tab, Stage 2 shape)
+  Company: Northlake Town Center
   meter: tc_bldg_a
-  number: TC-ANX-A
-  provider: null
-  typeCode: '0'
-  billTypeCode: 3 Allocation
+  Definitions:
+    Account Number: TC-ANX-A
+    Description: Bldg A / Town Center
+    Currency Unit: 'US Dollar  # assumed'
+    Utility Provider: Valley Electric District
+    Bill Service Type: No AP Upload
+    Bill Entry Type: Bill Allocation
+    Bill Invoice Template: Bill Table Invoice Default
 - key: tc_bldg_b_ba
-  installed: {}
+  installed:
+    billingAccountId: null
   kind: Billing account (Utility Accountant tab, Stage 2 shape)
+  Company: Northlake Town Center
   meter: tc_bldg_b
-  number: TC-ANX-B
-  provider: null
-  typeCode: '0'
-  billTypeCode: 3 Allocation
+  Definitions:
+    Account Number: TC-ANX-B
+    Description: Bldg B / Town Center
+    Currency Unit: 'US Dollar  # assumed'
+    Utility Provider: Valley Electric District
+    Bill Service Type: No AP Upload
+    Bill Entry Type: Bill Allocation
+    Bill Invoice Template: Bill Table Invoice Default
 - key: tc_bldg_c_ba
-  installed: {}
+  installed:
+    billingAccountId: null
   kind: Billing account (Utility Accountant tab, Stage 2 shape)
+  Company: Northlake Town Center
   meter: tc_bldg_c
-  number: TC-ANX-C
-  provider: null
-  typeCode: '0'
-  billTypeCode: 3 Allocation
+  Definitions:
+    Account Number: TC-ANX-C
+    Description: Bldg C / Town Center
+    Currency Unit: 'US Dollar  # assumed'
+    Utility Provider: Valley Electric District
+    Bill Service Type: No AP Upload
+    Bill Entry Type: Bill Allocation
+    Bill Invoice Template: Bill Table Invoice Default
 - key: tc_substation_master_ba
-  installed: {}
+  installed:
+    billingAccountId: null
   kind: Billing account (Utility Accountant tab, Stage 2 shape)
+  Company: Northlake Town Center
   meter: tc_substation_master
-  number: SYN-VED-A-3008001
-  provider: Valley Electric District
-  typeCode: 1 AP Upload Only
-  billTypeCode: 1 Importer
+  Definitions:
+    Account Number: SYN-VED-A-3008001
+    Description: Substation-Master / Town Center
+    Currency Unit: 'US Dollar  # assumed'
+    Utility Provider: Valley Electric District
+    Bill Service Type: AP Upload Only
+    Bill Entry Type: Bill Entry
+    Bill Invoice Template: Bill Table Invoice Default
 - key: tc_substation_1_ba
-  installed: {}
+  installed:
+    billingAccountId: null
   kind: Billing account (Utility Accountant tab, Stage 2 shape)
+  Company: Northlake Town Center
   meter: tc_substation_1
-  number: TC-SUB-1
-  provider: null
-  typeCode: '0'
-  billTypeCode: 3 Allocation
+  Definitions:
+    Account Number: TC-SUB-1
+    Description: Substation 1 / Town Center
+    Currency Unit: 'US Dollar  # assumed'
+    Utility Provider: Valley Electric District
+    Bill Service Type: No AP Upload
+    Bill Entry Type: Bill Allocation
+    Bill Invoice Template: Bill Table Invoice Default
 - key: tc_substation_2_ba
-  installed: {}
+  installed:
+    billingAccountId: null
   kind: Billing account (Utility Accountant tab, Stage 2 shape)
+  Company: Northlake Town Center
   meter: tc_substation_2
-  number: TC-SUB-2
-  provider: null
-  typeCode: '0'
-  billTypeCode: 3 Allocation
+  Definitions:
+    Account Number: TC-SUB-2
+    Description: Substation 2 / Town Center
+    Currency Unit: 'US Dollar  # assumed'
+    Utility Provider: Valley Electric District
+    Bill Service Type: No AP Upload
+    Bill Entry Type: Bill Allocation
+    Bill Invoice Template: Bill Table Invoice Default
 - key: tc_property_total_ba
-  installed: {}
+  installed:
+    billingAccountId: null
   kind: Billing account (Utility Accountant tab, Stage 2 shape)
+  Company: Northlake Town Center
   meter: tc_property_total
-  number: TC-PROPERTY-TOTAL
-  provider: null
-  typeCode: '0'
-  billTypeCode: 3 Allocation
+  Definitions:
+    Account Number: TC-PROPERTY-TOTAL
+    Description: Property Total / Town Center
+    Currency Unit: 'US Dollar  # assumed'
+    Utility Provider: Valley Electric District
+    Bill Service Type: No AP Upload
+    Bill Entry Type: Bill Allocation
+    Bill Invoice Template: Bill Table Invoice Default

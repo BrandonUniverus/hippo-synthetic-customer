@@ -1,11 +1,16 @@
-# Stage 5, step 1: Bill Validation rules (Database Administrator > Nodes > company node > Bill Validation tab).
-# Entered before any bill in 03-bills.yaml so the deliberate-failure fixtures actually fire when those bills are
-# saved. The screen has two tabs, Bill Save and Batch Test (BillValidationType 1 and 2); Northlake uses Bill Save
-# only. "Validation for" picks Global Defaults or a company; "Settings for" then picks that scope's own settings,
-# its Validation Groups, one Group, or one Billing Account. The Test Name, Commodity, effective value and unit
-# columns are locked from the product's own 47-row test catalog (BillValidation, verified against
-# EEMSuite_Northlake); only State, Percent and Amount are editable, and only where the scope you picked is not
-# read-only.
+# Stage 5, step 1: Bill Validation rules (Database Administrator > Nodes > company node > Bill Validation tab; the same
+# page opens from the main window's Bill Validation item). Entered before any bill in 03-bills.yaml so the deliberate-
+# failure fixtures fire when those bills are saved.
+#
+# What the screen is (BillValidationViewModel.cs, BillValidationTestModel.cs, BillValidationView.xaml and
+# src/Documentation/Developers/Billing/BillValidation-DeepDive.md): "Validation for" picks Global Test Defaults or a
+# company; at a company, "Settings for" picks Company Defaults, Manage Groups, one Group or one Billing Account. The
+# grid has the columns State, Effective, Test Name, Commodity, Percent Check, Percent, Amount Check, Amount, Unit and
+# Color, on two tabs: Bill Save (BillValidationType 1) and Batch Test (2). The State cell offers Enabled and Off at
+# Global Test Defaults and Inherit, Enabled and Disabled everywhere else. There is NO provider scope: the scopes are
+# Global (0), Company (1), Group (2) and Billing Account (3), and the most specific row wins whole
+# (BillValidation_ResolveTests.sql: "the winning row supplies the whole configuration"). The AP/GL plan's "provider
+# level" therefore means a Group or Account row.
 stage: 5
 step: 1
 title: Bill Validation rules
@@ -13,87 +18,264 @@ app: Database Administrator
 screen: Nodes > company node > Bill Validation
 source:
 - data/eem/northlake-ap-gl-v1.yaml
+- data/bills/*.yaml
 - generators/documents/sources/implementation/dream-customer/phase3-ap-gl-validation-spec.md
-- data/bills/northlake-itemized-bills-v1.yaml
 notes:
-- 'Test catalog verified against the installed BillValidation table (47 rows, BV_TestID 1-47) and
-  BillValidationLabel (validation label / description / message per test). The six families the AP/GL plan
-  names map to real tests: cost_change_pct = BV_TestID 21 ("Large change in total cost as compared to preceding
-  bill"); cost_max = 23 ("Total bill cost exceeds the maximum for this billing account"); usage_change_pct = 25
-  ("Large change in meter usage in current bill vs. preceding bill"); usage_floor = 28 ("Total meter usage is
-  less than the expected minimum"), one row per commodity; period_length = 13 ("...exceeds the maximum") and 14
-  ("...less than expected minimum"); presence = 41 ("Meter not open prior to end of billing period") and 42
-  ("Meter closed prior to end of billing period"), the two tests closest to "required fields / active account."'
-- 'BillValidationTargetKind (verified in Models/Companies/BillValidationTargetKind.cs): a company''s "Settings
-  for" opens CompanyDefaults, GroupManager, one Group, or one Account. The five account overrides below use
-  Settings for > Account, so each is entered on that one billing account and nothing else.'
-- Global Defaults' State options are Enabled or Off; a company or account row's State options are Inherit,
-  Enabled or Disabled. Leaving a row on Inherit is how "every other account inherits the company setting, and
-  the company inherits Global" happens - nothing is entered for the accounts not listed here.
-- Percent and Amount are only editable on the row whose scope you are actually on; every other cell on that row
-  (Effective, Test Name, Commodity, the other check's description, Unit, Color) is locked from the catalog, shown
-  with a padlock and a tooltip - do not try to change them.
-- Enter this step signed in as a company administrator with the target company's eem_company_setup copy and
-  local Points scope from Stage 1. The Administrator user setting is separate from membership of that shared
-  group; bill-entry-only users do not hold the Bill Validation function.
-- 'Added 2026-10-01 (Ridgeline Wind): a fifth account override, on the Valley Electric generator account
-  SYN-VED-A-0010014. It keeps none of its export credit, so its bill is a small residue that moves with the wind,
-  and its only usage line, station service, does too: the two change-from-last-bill tests (21 and 25) would flag
-  most bills, and an open alert holds an ordinary AP bill out of the approval queue (Stage 6). The percent column
-  is a tinyint (255 at most) and the two itemized bills differ by +527% in cost and +960% in usage, so the tests
-  are turned off for that one account rather than raised. The 1,000 kWh usage floor and every other test stay on.'
+- 'THE TEST LIST. The product has 47 tests numbered 1 to 47 plus test 99 (accrual bill without a mapping): the numbered
+  index is the comment block at the top of Database/EEMSuite/Procs/BillValidation_Run.sql, and each test is one
+  BillValidation_Calc*.sql procedure (named in test_catalog below, which reads the proc for each). The words in
+  "Meaning" are that index. The on-screen Test Name is a BillValidationLabel row, installed data and not source: the
+  wording for tests 13, 14, 21, 23, 25, 28, 41 and 42 was copied from the installed grid by the earlier author and is used
+  verbatim in the Global block; for every other test copy the exact wording from the grid when you enter it, matching on
+  the number (the grid prefixes the number). "No row at any scope means the test is off" (BillValidation_ResolveTests.sql),
+  so a test is on only where a row enables it.'
+- 'WHICH TAB. Bill Save runs when a bill is saved or Validate Bill is pressed in Bill Entry (uaBillValidate
+  @ValidationType = 1), shows its findings in the editor and stores nothing. Batch Test (mode 2) is what the bill
+  validation job runs (uaBillValidate_Job, built-in task BILL_VALIDATION, which needs SysConstants IsValidateBillsJob = 1):
+  it is the only place an IMPORTED bill is ever validated, it writes BillValidation_Tbl, and an open BillValidation_Tbl row
+  is what holds a bill out of the AP approval queue (Stage 6). The earlier text said Northlake uses Bill Save only; with
+  that the 31 importer accounts are never validated and Stage 6 has nothing to read. So every rule meant to reach an
+  imported or a stored result is entered on BOTH tabs (Batch Test says "same rows"); the fixture-bay group is Bill Save
+  only, because its bills are read in the editor and then deleted.'
+- 'THRESHOLDS. Which of Percent and Amount a test has is its BillValidationLabel row (BV_PQLabel, BV_AQLabel); the grid locks
+  a cell the test does not have, so each Percent and Amount below is the one the calculation procedure reads and a cell the
+  test lacks is not given. Amount is a currency for tests 1, 2, 18, 21, 22, 23, 24, 35 and 37 (Unit: USD, label as the
+  picker shows it), a number of days for 10, 11, 13, 14, 17, 39 and 47, a usage for 20, 25, 26, 27, 28, 36, 38 and 43 to 46
+  (the row''s own unit: kWh, therms, kgal), a demand for 29 to 31 (kW) and a price for 33 (a price unit such as USD/kWh).
+  Percent is a tinyint, 255 at most. A comparison against a minimum reads NULL as "nothing qualifies"
+  (BillValidation_CalcUsageChange.sql needs both usages above t.AbsQuantity), so Global test 25 as first entered (Percent 40,
+  no Amount) could never report. It now carries a minimum usage per commodity, like test 28.'
+- 'A Company, Group or Account row carries the whole configuration, so an override that leaves Amount empty drops the
+  floor the Global row had. The Science Center override of test 21 therefore repeats the 1,000 USD floor (before, it ran with
+  none).'
+- 'Tests that report on many bills at once are not at Global scope: a Global row reaches all 50 accounts and an open
+  alert holds a bill out of the AP queue (Stage 6). They sit on the company, on one group or on named accounts so the alerts
+  are the ones this stage plans. Cedar Row Apartments and the Thermal Plant company inherit only the Global rows and their own
+  account overrides: that difference between companies is deliberate.'
+- 'EVIDENCE. A Bill Save finding is read in the editor (the issue strip, Show all) after the save and is stored nowhere. A
+  Batch Test finding is a BillValidation_Tbl row (IsError = 0). The fixture-bay bills (03-bills.yaml, validation_fixture_bay)
+  are entered, read and deleted, so each is recorded there as Expect: the test numbers the editor lists.'
+- Enter this step signed in as a company administrator with the target company's eem_company_setup copy and local Points
+  scope from Stage 1. The Administrator user setting is separate from membership of that shared group; bill-entry-only users
+  do not hold the Bill Validation function (BillValidation_CanConfigure.sql needs the Bill Validation or Hierarchy tab at
+  update level).
+- 'Added 2026-10-01 (Ridgeline Wind): a fifth account override, on the Valley Electric generator account SYN-VED-A-0010014.
+  It keeps none of its export credit, so its bill is a small residue that moves with the wind and its only usage line,
+  station service, does too: the two change-from-last-bill tests (21 and 25) would flag most bills, and an open alert holds
+  an ordinary AP bill out of the approval queue (Stage 6). The percent column is a tinyint (255 at most) and the two itemized
+  bills differ by +527% in cost and +960% in usage, so the tests are turned off for that one account rather than raised. The
+  1,000 kWh usage floor and every other test stay on.'
 records:
 - key: global_defaults
   installed: {}
-  Validation for: Global Defaults
+  Validation for: Global Test Defaults
   Bill Save:
-  - {Test Name: Large change in total cost as compared to preceding bill, Commodity: All, State: Enabled, Percent: 35, Amount (floor): 1000}
-  - {Test Name: Total bill cost exceeds the maximum for this billing account, Commodity: All, State: Enabled, Amount: 1000000}
-  - {Test Name: Large change in meter usage in current bill vs. preceding bill, Commodity: All, State: Enabled, Percent: 40}
-  - {Test Name: Total meter usage is less than the expected minimum, Commodity: Electric, State: Enabled, Amount: 1000, Unit: kWh}
-  - {Test Name: Total meter usage is less than the expected minimum, Commodity: Natural Gas, State: Enabled, Amount: 100, Unit: therms}
-  - {Test Name: Total meter usage is less than the expected minimum, Commodity: Water, State: Enabled, Amount: 100, Unit: kgal}
-  - {Test Name: Billing period length exceeds expected maximum for this billing account, Commodity: All, State: Enabled, Amount: 36}
-  - {Test Name: Billing period length less than expected minimum for this billing account, Commodity: All, State: Enabled, Amount: 26}
-  - {Test Name: Meter not open prior to end of billing period, Commodity: All, State: Enabled}
-  - {Test Name: Meter closed prior to end of billing period, Commodity: All, State: Enabled}
+  - {Test: 21, Test Name: Large change in total cost as compared to preceding bill, Commodity: All, State: Enabled, Percent: 35, Amount: 1000, Unit: USD}  # Amount is the floor: both bills must reach it
+  - {Test: 23, Test Name: Total bill cost exceeds the maximum for this billing account, Commodity: All, State: Enabled, Amount: 1000000, Unit: USD}
+  - {Test: 25, Test Name: Large change in meter usage in current bill vs. preceding bill, Commodity: Electric, State: Enabled, Percent: 40, Amount: 1000, Unit: kWh}  # Amount added, see THRESHOLDS
+  - {Test: 25, Test Name: Large change in meter usage in current bill vs. preceding bill, Commodity: Natural Gas, State: Enabled, Percent: 40, Amount: 100, Unit: therms}
+  - {Test: 25, Test Name: Large change in meter usage in current bill vs. preceding bill, Commodity: Water, State: Enabled, Percent: 40, Amount: 100, Unit: kgal}
+  - {Test: 28, Test Name: Total meter usage is less than the expected minimum, Commodity: Electric, State: Enabled, Amount: 1000, Unit: kWh}
+  - {Test: 28, Test Name: Total meter usage is less than the expected minimum, Commodity: Natural Gas, State: Enabled, Amount: 100, Unit: therms}
+  - {Test: 28, Test Name: Total meter usage is less than the expected minimum, Commodity: Water, State: Enabled, Amount: 100, Unit: kgal}
+  - {Test: 13, Test Name: Billing period length exceeds expected maximum for this billing account, Commodity: All, State: Enabled, Amount: 36}
+  - {Test: 14, Test Name: Billing period length less than expected minimum for this billing account, Commodity: All, State: Enabled, Amount: 26}
+  - {Test: 41, Test Name: Meter not open prior to end of billing period, Commodity: All, State: Enabled}
+  - {Test: 42, Test Name: Meter closed prior to end of billing period, Commodity: All, State: Enabled}
+  Batch Test:
+  - {Rows: the same twelve as Bill Save (21; 23; 25 x3 commodities; 28 x3; 13; 14; 41; 42)}  # so the job validates imported bills the same way
+- key: nlu_company_defaults
+  installed: {}
+  Validation for: Northlake University
+  Settings for: Company Defaults
+  Bill Save:
+  - {Test: 1, Meaning: Previous balance above threshold, State: Enabled, Amount: 1000, Unit: USD}
+  - {Test: 3, Meaning: Estimated bill, State: Enabled}
+  - {Test: 4, Meaning: Bill total reconciliation, State: Enabled}
+  - {Test: 5, Meaning: Billing before account opening, State: Enabled}
+  - {Test: 6, Meaning: Billing after account closure, State: Enabled}
+  - {Test: 7, Meaning: Period end after invoice date, State: Enabled}
+  - {Test: 8, Meaning: Payment due before invoice date, State: Enabled}
+  - {Test: 9, Meaning: Period starts after it ends, State: Enabled}
+  - {Test: 15, Meaning: Duplicate bills in fiscal period, State: Enabled}
+  - {Test: 47, Meaning: Invoice issued after allowed delay, State: Enabled, Amount: 10}  # days after period end; every series bill is issued within 7 days
+  - {Test: 99, Meaning: Accrual bill without a mapping, State: Enabled}
+  Batch Test:
+  - {Rows: the same eleven as Bill Save}
+  # why: these never report on a clean bill, so a company default is safe. They are the plan's "required fields / dates"
+  # family. Test 5 reports on the first bill of every account that reads on the 5th or the 15th, because that bill starts in
+  # December 2023 and the accounts are Active as of 2024-01-01 (Stage 2): an expected, harmless alert on the Jan-24 bills.
+- key: bay_group
+  installed: {}
+  Validation for: Northlake University
+  Settings for: Manage Groups
+  Add Group: {Group Name: Validation Bay, Members: 'SYN-SGU-A-0020005 (Lakeview Hall, Sierra Gas Utility)'}
+  # The group holds the one account whose deliberate-failure bills (03-bills.yaml, validation_fixture_bay) are entered, read
+  # and deleted. Save the group before opening Settings for > Group: Validation Bay.
+- key: bay_group_settings
+  installed: {}
+  Validation for: Northlake University
+  Settings for: 'Group: Validation Bay'
+  Bill Save:
+  - {Test: 2, Meaning: Late payment fees, State: Enabled, Amount: 25, Unit: USD}
+  - {Test: 10, Meaning: Overlap with preceding bill, State: Enabled, Amount: 3}
+  - {Test: 11, Meaning: Gap after preceding bill, State: Enabled, Amount: 3}
+  - {Test: 12, Meaning: Billing period length change, State: Enabled, Percent: 50}
+  - {Test: 16, Meaning: Missing fiscal periods, State: Enabled}
+  - {Test: 17, Meaning: Insufficient accounting overlap, State: Enabled, Amount: 4}  # days; 4 is the lowest minimum a 5th-to-4th bill passes
+  - {Test: 18, Meaning: Same total as preceding bill, State: Enabled, Amount: 500, Unit: USD}
+  - {Test: 19, Meaning: Zero current and preceding usage, Commodity: Natural Gas, State: Enabled}
+  - {Test: 20, Meaning: Same usage as preceding bill, Commodity: Natural Gas, State: Enabled, Amount: 100, Unit: therms}
+  - {Test: 22, Meaning: Total above historical high, State: Enabled, Percent: 50, Amount: 1000, Unit: USD}
+  - {Test: 23, Test Name: Total bill cost exceeds the maximum for this billing account, State: Enabled, Amount: 20000, Unit: USD}  # Global's 1,000,000 never reports
+  - {Test: 24, Meaning: Total cost below minimum, State: Enabled, Amount: 100, Unit: USD}
+  - {Test: 26, Meaning: Usage above historical high, Commodity: Natural Gas, State: Enabled, Percent: 50, Amount: 100, Unit: therms}
+  - {Test: 27, Meaning: Usage above maximum, Commodity: Natural Gas, State: Enabled, Amount: 5000, Unit: therms}
+  - {Test: 32, Meaning: Average price increase, Commodity: Natural Gas, State: Enabled, Percent: 15, Amount: 100, Unit: USD}
+  - {Test: 34, Meaning: Line item count change, State: Enabled}
+  - {Test: 35, Meaning: Total cost change vs the same period last year, State: Enabled, Percent: 50, Amount: 1000, Unit: USD}
+  - {Test: 36, Meaning: Usage change vs the same period last year, Commodity: Natural Gas, State: Enabled, Percent: 50, Amount: 100, Unit: therms}
+  - {Test: 39, Meaning: Bill resaved after allowed days, State: Enabled, Amount: 1}  # days; see fixture F01
+  - {Test: 40, Meaning: Variable average price increase, Commodity: Natural Gas, State: Enabled, Percent: 15, Amount: 100}
+  - {Test: 43, Meaning: Daily usage increase vs the same period last year, Commodity: Natural Gas, State: Enabled, Percent: 100, Amount: 100, Unit: therms}
+  Batch Test:
+  - {Rows: none}
 - key: ved_science_center_override
   installed: {}
   Validation for: Northlake University
   Settings for: 'Account: SYN-VED-A-0010002 (Science Center, Valley Electric District)'
   Bill Save:
-  - {Test Name: Large change in total cost as compared to preceding bill, State: Enabled, Percent: 60}
+  - {Test: 21, Test Name: Large change in total cost as compared to preceding bill, State: Enabled, Percent: 60, Amount: 1000, Unit: USD}  # Amount repeated: an account row replaces the Global row whole
+  Batch Test:
+  - {Rows: the same}
   # why: lab and exhaust loads swing far past the 35% campus threshold (data/eem/northlake-ap-gl-v1.yaml)
 - key: sgu_student_center_override
   installed: {}
   Validation for: Northlake University
   Settings for: 'Account: SYN-SGU-A-0020004 (Student Center, Sierra Gas Utility)'
   Bill Save:
-  - {Test Name: Large change in meter usage in current bill vs. preceding bill, State: Disabled}
+  - {Test: 25, Test Name: Large change in meter usage in current bill vs. preceding bill, Commodity: Natural Gas, State: Disabled}
+  Batch Test:
+  - {Rows: the same}
   # why: the estimated read and its corrected actual are a deliberate swing
 - key: rcu_cedar_row_a_override
   installed: {}
   Validation for: Cedar Row Apartments
   Settings for: 'Account: SYN-RCU-A-0030003 (Cedar Row A, River City Utilities)'
   Bill Save:
-  - {Test Name: Billing period length less than expected minimum for this billing account, State: Disabled}
+  - {Test: 14, Test Name: Billing period length less than expected minimum for this billing account, State: Disabled}
+  Batch Test:
+  - {Rows: the same}
   # why: the July 2024 account renewal produces one short period
 - key: ntp_science_center_override
   installed: {}
-  Validation for: Northlake Thermal Plant
+  Validation for: Northlake University  # all six Thermal Plant cost centers belong to Northlake University (Stage 2); the earlier text said Northlake Thermal Plant
   Settings for: 'Account: SYN-NTP-C-0000001 (Science Center allocation, Northlake Thermal Plant)'
   Bill Save:
-  - {Test Name: Total bill cost exceeds the maximum for this billing account, State: Enabled, Amount: 250000}
-  # why: an internal allocation never approaches the global ceiling
+  - {Test: 23, Test Name: Total bill cost exceeds the maximum for this billing account, State: Enabled, Amount: 250000, Unit: USD}
+  Batch Test:
+  - {Rows: the same}
+  # why: an internal allocation never approaches the global ceiling. The account's bills arrive in Stage 7 (Bill Allocation), so
+  # nothing reports on it until then; the row is entered here with the rest.
 - key: ved_ridgeline_generator_override
   installed: {}
   Validation for: Northlake Thermal Plant
   Settings for: 'Account: SYN-VED-A-0010014 (Ridgeline Substation, Valley Electric District)'
   Bill Save:
-  - {Test Name: Large change in total cost as compared to preceding bill, State: Disabled}
-  - {Test Name: Large change in meter usage in current bill vs. preceding bill, State: Disabled}
+  - {Test: 21, Test Name: Large change in total cost as compared to preceding bill, State: Disabled}
+  - {Test: 25, Test Name: Large change in meter usage in current bill vs. preceding bill, Commodity: Electric, State: Disabled}
+  Batch Test:
+  - {Rows: the same}
   # why: the generator account keeps none of its export credit, so its bill is a small residue ($1,077.45 on the windy
   # first bill, 2024-07-01 to 2024-08-04; $6,753.10 on the still bill for 2025-01-05 to 2025-02-04) and its station
   # service moves with the wind (4,428 kWh, then 46,920 kWh); +527% and +960% are past what the percent column can
   # hold (255), and an open alert would hold the bill out of the AP queue. Test 28's 1,000 kWh usage floor stays on,
   # and at 35 days the first bill is inside the 26-to-36-day period tests (data/bills/northlake-itemized-bills-v1.yaml)
+- key: ved_admin_hall_watch
+  installed: {}
+  Validation for: Northlake University
+  Settings for: 'Account: SYN-VED-A-0010001 (Admin Hall, Valley Electric District)'
+  Bill Save:
+  - {Test: 27, Meaning: Usage above maximum, Commodity: Electric, State: Enabled, Amount: 25000, Unit: kWh}
+  - {Test: 30, Meaning: Peak demand above maximum, Commodity: Electric, State: Enabled, Amount: 120, Unit: kW}
+  - {Test: 31, Meaning: Peak demand below minimum, Commodity: Electric, State: Enabled, Amount: 100, Unit: kW}
+  - {Test: 33, Meaning: Average price above maximum, Commodity: Electric, State: Enabled, Amount: 0.13, Unit: USD/kWh}  # price unit as the picker labels it
+  Batch Test:
+  - {Rows: the same}  # the account is imported, so the job is what validates it
+  Expect: >-
+    Admin Hall's Apr-24 bill (2024-03-05 to 2024-04-04, 6,888.42): test 27 reports (14,260 + 13,420 = 27,680 kWh over 25,000),
+    test 30 reports (138 kW over 120), test 33 reports (energy lines 3,898.72 over 27,680 kWh = 0.1408 USD/kWh over 0.13) and
+    test 31 does not (138 kW is not under 100).
+- key: ved_library_watch
+  installed: {}
+  Validation for: Northlake University
+  Settings for: 'Account: SYN-VED-A-0010003 (Library, Valley Electric District)'
+  Bill Save:
+  - {Test: 27, Meaning: Usage above maximum, Commodity: Electric, State: Enabled, Amount: 25000, Unit: kWh}
+  - {Test: 30, Meaning: Peak demand above maximum, Commodity: Electric, State: Enabled, Amount: 130, Unit: kW}
+  - {Test: 31, Meaning: Peak demand below minimum, Commodity: Electric, State: Enabled, Amount: 130, Unit: kW}
+  - {Test: 33, Meaning: Average price above maximum, Commodity: Electric, State: Enabled, Amount: 0.20, Unit: USD/kWh}
+  Batch Test:
+  - {Rows: the same}
+  Expect: >-
+    The Library's Sep-24 bill (2024-08-05 to 2024-09-04, 5,114.37, the meter exchange): test 31 reports (124 kW under 130);
+    tests 27 (5,160 kWh on the old meter, 10,800 on the new, both under 25,000), 30 (124 kW under 130) and 33 (0.1557 USD/kWh
+    on the new meter, 0.1562 on the old, both under 0.20) do not. Global test 41 also reports on it: the new meter
+    SYN-VED-M-0040103 is Open as of 2024-08-15, after the period start (Stage 2).
+- key: test_catalog
+  installed: {}
+  Purpose: >-
+    Every test, in number order, with the calculation it reads, the rule it enforces, where it is turned on, a bill that
+    trips it and a bill that does not. F01 to F20 are the fixture-bay bills of 03-bills.yaml (validation_fixture_bay);
+    the other bills are named by account and period. A result marked "# assumed" depends on a bill whose figures are
+    generated and not yet known. Status is exercised or not exercised, and a test not exercised says why.
+  Tests:
+  - {Test: 1, Meaning: Previous balance above threshold, Reads: CalcPreviousBalance, Level: Company NLU, Setting: Amount 1000 USD, Trips: 'HOS Student Center Feb-25 (SYN-HOS-P-0000002, Previous Balance 1,310.55); F02', Passes: 'HOS Science Center Feb-25 (Previous Balance 0); F13', Status: exercised}
+  - {Test: 2, Meaning: Late payment fees, Reads: 'CalcLatePaymentFees (line items whose commodity name contains "Late")', Level: Group Validation Bay, Setting: Amount 25 USD, Trips: F03 (Late Payment Fee 35.00), Passes: F13, Status: exercised}
+  - {Test: 3, Meaning: Estimated bill, Reads: CalcEstimatedBill (Bill Type = 1), Level: Company NLU, Setting: on, Trips: SGU Student Center estimated bill (2024-10-15 to 2024-11-14; Bill Type Estimated), Passes: the corrected bill for the same period, Status: exercised}
+  - {Test: 4, Meaning: Bill total reconciliation, Reads: 'CalcBillTotalReconciliation (Total Due against lines + previous balance - payment)', Level: Company NLU, Setting: on, Trips: 'F05 (Total Due 1,485.36, lines 1,475.36)', Passes: every series bill; F13, Status: exercised}
+  - {Test: 5, Meaning: Billing before account opening, Reads: CalcAccountOpening (earliest Active row of the account), Level: Company NLU, Setting: on, Trips: 'SGU Admin Hall Jan-24 (2023-12-15 to 2024-01-14; account Active as of 2024-01-01), and the first bill of every 5th- and 15th-cycle account', Passes: SGU Admin Hall Feb-24 (2024-01-15 to 2024-02-14), Status: exercised}
+  - {Test: 6, Meaning: Billing after account closure, Reads: CalcAccountClosure, Level: Company NLU, Setting: on, Status: not exercised, Why: no Northlake billing account is closed; the Stage 12 scenario "an account closes and is replaced" is the first bill that can report}
+  - {Test: 7, Meaning: Period end after invoice date, Reads: CalcPeriodEndAfterInvoiceDate, Level: Company NLU, Setting: on, Trips: 'F06 (Issue Date 2026-07-10, Period End 2026-07-14)', Passes: F13, Status: exercised}
+  - {Test: 8, Meaning: Payment due before invoice date, Reads: 'CalcPaymentDueBeforeInvoiceDate (Issue Date after Due Date)', Level: Company NLU, Setting: on, Trips: 'F07 (Issue Date 2026-08-16, Due Date 2026-08-10)', Passes: F13, Status: exercised}
+  - {Test: 9, Meaning: Period starts after it ends, Reads: CalcReversedBillingPeriod, Level: Company NLU, Setting: on, Status: not exercised, Why: the editor moves an end date that is not after the start to the next day (the bill editor guide), so no saved bill can have a reversed period; only an import could carry one and that path was not confirmed}
+  - {Test: 10, Meaning: Overlap with preceding bill, Reads: CalcPeriodOverlapAndGap, Level: Group Validation Bay, Setting: Amount 3 days, Trips: 'F08 (starts 2026-08-10, F07 ends 2026-08-14: 4 days)', Passes: F13, Status: exercised}
+  - {Test: 11, Meaning: Gap after preceding bill, Reads: CalcPeriodOverlapAndGap, Level: Group Validation Bay, Setting: Amount 3 days, Trips: 'F09 (starts 2026-09-21, F08 ends 2026-09-14: 7 days)', Passes: 'F13 (starts the day after F12 ends, a 1 day gap)', Status: exercised}
+  - {Test: 12, Meaning: Billing period length change, Reads: 'CalcBillingPeriodLengthChange (against the trailing fiscal year average)', Level: Group Validation Bay, Setting: Percent 50, Trips: 'F11 (15 days against an average of 31.7: -52.7%)', Passes: 'F13 (31 days, -2.2%)', Status: exercised}
+  - {Test: 13, Meaning: Billing period length above maximum, Reads: CalcBillingPeriodLimits, Level: Global, Setting: Amount 36, Trips: F10 (41 days), Passes: 'the generator first bill (35 days); F13', Status: exercised}
+  - {Test: 14, Meaning: Billing period length below minimum, Reads: CalcBillingPeriodLimits, Level: Global, Setting: Amount 26, Trips: F11 (15 days), Passes: 'the generator first bill (35 days); F13', Status: exercised}
+  - {Test: 15, Meaning: Duplicate bills in fiscal period, Reads: CalcDuplicateFiscalPeriod, Level: Company NLU, Setting: on, Trips: 'SGU Student Center estimated and corrected bills (both fiscal 2024-11)', Passes: SGU Student Center Oct-24 bill, Status: exercised}
+  - {Test: 16, Meaning: Missing fiscal periods, Reads: CalcMissingFiscalPeriods, Level: Group Validation Bay, Setting: on, Trips: 'F20 (typed fiscal 2027 period 11 after F19 period 8: periods 9 and 10 skipped)', Passes: F13, Status: exercised}
+  - {Test: 17, Meaning: Insufficient accounting overlap, Reads: 'CalcAccountingPeriodOverlap (CompanyCalendar)', Level: Group Validation Bay, Setting: Amount 4 days, Trips: 'F20 (August 15 to September 14 against period 11: 0 days)', Passes: 'a series bill, e.g. SGU Admin Hall Feb-24 (14 days) # assumed: calendar months', Status: exercised, Note: Northlake University's calendar ends in 2026 (Stage 1), so every 2027 fixture from F13 to F20 also reports 17 (no calendar row counts as 0 days); read the pass on a 2024-25 bill}
+  - {Test: 18, Meaning: Same total as preceding bill, Reads: CalcIdenticalTotalCost, Level: Group Validation Bay, Setting: Amount 500 USD, Trips: 'F14 (1,624.52, same as F13)', Passes: F13, Status: exercised}
+  - {Test: 19, Meaning: Zero current and preceding usage, Reads: CalcZeroUsage, Level: Group Validation Bay, Setting: Natural Gas on, Trips: 'F16 (0 therms after F15''s 0)', Passes: F13, Status: exercised}
+  - {Test: 20, Meaning: Same usage as preceding bill, Reads: CalcIdenticalUsage, Level: Group Validation Bay, Setting: Natural Gas, Amount 100 therms, Trips: 'F14 (1,170 therms, same as F13)', Passes: F13, Status: exercised}
+  - {Test: 21, Meaning: Total cost change vs preceding bill, Reads: CalcTotalCostChange, Level: Global, Setting: Percent 35, Amount 1000 USD, Trips: 'F18 (1,942.52 against F17 40,718.00: -95.2%); likely also Central Plant Sep-24 (151,171.47) # assumed: against its Aug-24 bill', Passes: 'F19 (-15.0%)', Status: exercised}
+  - {Test: 22, Meaning: Total above historical high, Reads: 'CalcHighTotalCost (trailing fiscal year)', Level: Group Validation Bay, Setting: Percent 50, Amount 1000 USD, Trips: 'F17 (40,718.00 against a high of 1,624.52: +2,406.5%)', Passes: F13 (+0.8%), Status: exercised}
+  - {Test: 23, Meaning: Total cost above maximum, Reads: CalcTotalCostLimits, Level: Global 1,000,000; Group Validation Bay 20,000, Setting: Amount in USD, Trips: 'F17 (40,718.00 over 20,000)', Passes: 'F13; the Central Plant Sep-24 bill (151,171.47) under the Global 1,000,000', Status: exercised}
+  - {Test: 24, Meaning: Total cost below minimum, Reads: CalcTotalCostLimits, Level: Group Validation Bay, Setting: Amount 100 USD, Trips: 'F15 (38.00)', Passes: F13, Status: exercised}
+  - {Test: 25, Meaning: Usage change vs preceding bill, Reads: CalcUsageChange, Level: Global (per commodity), Setting: Percent 40 and a minimum usage, Trips: 'F18 (1,180 therms against F17 30,000: -96.1%)', Passes: 'F19 (+0.8%)', Status: exercised}
+  - {Test: 26, Meaning: Usage above historical high, Reads: CalcHistoricalUsageAndDemandHighs, Level: Group Validation Bay, Setting: Natural Gas, Percent 50, Amount 100 therms, Trips: 'F17 (30,000 therms against a high of 1,170: +2,464.1%)', Passes: 'F13 (1,170 against 1,160: +0.9%)', Status: exercised}
+  - {Test: 27, Meaning: Usage above maximum, Reads: CalcUsageLimits, Level: Group Validation Bay (gas); Account Admin Hall and Library (electric), Setting: gas 5,000 therms; electric 25,000 kWh, Trips: 'F17 (30,000 therms); Admin Hall Apr-24 (27,680 kWh)', Passes: 'F13; Library Sep-24 (5,160 and 10,800 kWh)', Status: exercised}
+  - {Test: 28, Meaning: Usage below minimum, Reads: CalcUsageLimits, Level: Global (per commodity), Setting: 1000 kWh, 100 therms, 100 kgal, Trips: 'F15 (0 therms)', Passes: F13, Status: exercised}
+  - {Test: 29, Meaning: Demand above historical high, Reads: CalcHistoricalUsageAndDemandHighs, Level: none, Status: not exercised, Why: it needs a trailing year of demand lines on one meter; the manual accounts (gas, PPA) carry no demand line and the imported accounts' history is generated and not yet known; first practical after a year of imported demand lines exists}
+  - {Test: 30, Meaning: Peak demand above maximum, Reads: CalcDemandLimits, Level: Account Admin Hall 120 kW; Account Library 130 kW, Trips: 'Admin Hall Apr-24 (138 kW)', Passes: 'Library Sep-24 (124 kW)', Status: exercised}
+  - {Test: 31, Meaning: Peak demand below minimum, Reads: CalcDemandLimits, Level: Account Admin Hall 100 kW; Account Library 130 kW, Trips: 'Library Sep-24 (124 kW)', Passes: 'Admin Hall Apr-24 (138 kW)', Status: exercised}
+  - {Test: 32, Meaning: Average price increase, Reads: 'CalcAveragePriceIncrease (all charges)', Level: Group Validation Bay, Setting: Natural Gas, Percent 15, Amount 100 USD, Trips: 'F18 (1.40 against F17 1.142 USD/therm: +22.6%)', Passes: F19 (-18.4%), Status: exercised}
+  - {Test: 33, Meaning: Average price above maximum, Reads: CalcAveragePriceMaximum, Level: Account Admin Hall 0.13; Account Library 0.20, Setting: USD/kWh, Trips: 'Admin Hall Apr-24 (0.1408)', Passes: 'Library Sep-24 (0.1557)', Status: exercised}
+  - {Test: 34, Meaning: Line item count change, Reads: CalcLineItemCountChange, Level: Group Validation Bay, Setting: on, Trips: 'F03 (5 lines against F02''s 4)', Passes: F13 (4 against F12''s 4), Status: exercised}
+  - {Test: 35, Meaning: Total cost change vs same period last year, Reads: CalcTotalCostChange, Level: Group Validation Bay, Setting: Percent 50, Amount 1000 USD, Trips: 'F17 (fiscal 2027-06, 40,718.00 against 2026-06 F05 1,485.36: +2,641.3%)', Passes: 'F13 (2027-02 against 2026-02 F01: +16.5%)', Status: exercised}
+  - {Test: 36, Meaning: Usage change vs same period last year, Reads: CalcUsageChange, Level: Group Validation Bay, Setting: Natural Gas, Percent 50, Amount 100 therms, Trips: 'F17 (30,000 against F05 1,060: +2,730.2%)', Passes: 'F13 (1,170 against F01 1,000: +17.0%)', Status: exercised}
+  - {Test: 37, Meaning: Total cost change vs baseline, Reads: 'CalcTotalCostChange (BillScenario named Baseline)', Level: none, Status: not exercised, Why: it compares with the company's Baseline bill scenario, which Northlake does not have (only Actual exists); needs a scenario a later stage creates}
+  - {Test: 38, Meaning: Usage change vs baseline, Reads: CalcUsageChange, Level: none, Status: not exercised, Why: the same missing Baseline scenario}
+  - {Test: 39, Meaning: Bill resaved after allowed days, Reads: 'CalcBillResave (Bill.AsOfDate against the Bill Entry StatusHistory row)', Level: Group Validation Bay, Setting: Amount 1 day, Trips: 'F01 saved again on a later calendar day', Passes: F13 saved once, Status: exercised, Note: time dependent; do it the day after F01 is entered}
+  - {Test: 40, Meaning: Variable average price increase, Reads: 'CalcAveragePriceIncrease (categories not named Misc)', Level: Group Validation Bay, Setting: Natural Gas, Percent 15, Amount 100, Trips: 'F18 (+22.6%)', Passes: F19, Status: exercised}
+  - {Test: 41, Meaning: Billing before meter opening, Reads: 'CalcMeterOpeningAndClosure (SM Open row)', Level: Global, Setting: on, Trips: 'Library Sep-24 (new meter SYN-VED-M-0040103 Open as of 2024-08-15, period starts 2024-08-05)', Passes: 'Admin Hall Apr-24 (meter Open as of 2024-01-01)', Status: exercised}
+  - {Test: 42, Meaning: Billing after meter closure, Reads: CalcMeterOpeningAndClosure, Level: Global, Setting: on, Status: not exercised, Why: the only closed meter is the old Library meter (Closed - Ex as of 2024-08-14) and no bill after that date carries an item on it}
+  - {Test: 43, Meaning: Daily usage increase vs same period last year, Reads: CalcDailyUsageChange, Level: Group Validation Bay, Setting: Natural Gas, Percent 100, Amount 100 therms, Trips: 'F17 (967.7 therms a day against F05 34.2)', Passes: 'F13 (37.7 against F01 32.3: +17.0%)', Status: exercised}
+  - {Test: 44, Meaning: Daily usage decrease vs same period last year, Reads: CalcDailyUsageChange, Level: none, Status: not exercised, Why: it needs a fall against last year while the current usage stays above the minimum; the only controlled prior-year bills are the fixtures and the ones that fall (F15, F16) are at zero}
+  - {Test: 45, Meaning: Weather usage increase vs prior year, Reads: 'CalcDailyUsageChange (Weather Normalized scenario)', Level: none, Status: not exercised, Why: it reads bills of a Weather Normalized scenario by refBillID; Northlake has only Actual}
+  - {Test: 46, Meaning: Weather usage increase vs preceding bill, Reads: CalcDailyUsageChange, Level: none, Status: not exercised, Why: the same missing Weather Normalized scenario}
+  - {Test: 47, Meaning: Invoice issued after allowed delay, Reads: CalcInvoiceIssueDelay, Level: Company NLU, Setting: Amount 10 days, Trips: 'SGU Student Center corrected bill (issued 2024-12-16, 32 days after 2024-11-14); F11 (issued 15 days after)', Passes: 'SGU Student Center estimated bill (issued 4 days after); F13', Status: exercised}
+  - {Test: 99, Meaning: Accrual bill without a mapping, Reads: 'CalcUnmappedAccruals (Bill Type 2 with no BillAccrualMap row)', Level: Company NLU, Setting: on, Trips: 'SGU Admin Hall accrual bill (06-accruals.yaml; Bill Type Accrual) and every other bill on that account', Passes: SGU Science Center bills, Status: exercised}
+  Summary: '48 tests: 39 exercised (turned on at least once, with a bill that trips it and one that does not), 9 not exercised (6, 9, 29, 37, 38, 42, 44, 45, 46); 6, 9 and 42 are turned on anyway so they report the day a bill can trip them'

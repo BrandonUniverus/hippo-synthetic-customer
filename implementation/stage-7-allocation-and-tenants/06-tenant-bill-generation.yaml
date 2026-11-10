@@ -1,10 +1,8 @@
-# Stage 7, step 6: two screens that finish the tenant-billing story. Database Administrator's Tenant Rebill
-# tab (Nodes > meter node > Tenant Rebill) assigns each Town Center tenant meter its rate, its Bill
-# Generation type/schedule, and the reconciliation flag. The web Bill Allocation Configuration screen (same
-# screen as file 04, method 2 again) then does Cedar Row's residential case: 124 apartments, two commodities,
-# no resident ever sees a utility bill. Two editors in one file because they are one story — file 04 already
-# covers Town Center's 7-method showcase, and Cedar Row's 248 detail rows are the "big repetitive list" this
-# stage's version of Stage 1's Cedar Row submeter count, so it gets its own file rather than bloating file 04.
+# Stage 7, step 6: two screens that finish the tenant-billing story. Database Administrator's Tenant Rebill tab
+# (Nodes > meter node > Tenant Rebill) assigns each Town Center tenant meter its rate and its Bill Generation
+# type and schedule. The web Bill Allocation Configuration screen (same screen as file 04, method 2 again) then
+# holds Cedar Row's residential configs. Rewritten 2026-11-10: the rates are Stage 7's own (file 09), the tenants
+# have the provider, measure type and points the tab needs (file 02), and Cedar Row's rate rows are gone.
 stage: 7
 step: 6
 title: Tenant bill generation types and Cedar Row residential allocation
@@ -14,182 +12,154 @@ source:
 - generators/documents/sources/implementation/dream-customer/phase4-tenant-rebilling-spec.md
 - documents/guides/tenant-and-lease-roster.pdf
 - data/scenarios/demo-university-v1.yaml
+- 09-town-center-tenant-rates.yaml
+- 10-town-center-data-and-bills.yaml
 notes:
-- 'OPEN since the Stage 4 rework of 2026-11-09: the three rates this file assigns (NL-STEP-Demand, NL-RES-Tiered and
-  NL-MULTI-Commodity) are no longer in Stage 4''s 05-rates.yaml. The first two moved, unchanged, to
-  stage-4-rates/08-rate-lab.yaml, which is not ready to enter; NL-MULTI-Commodity was never defined anywhere. The
-  tenant rates need a home (the Rate Lab, or rates of Town Center''s own) before this step can be entered.'
-- 'Tenant Rebill tab fields (src/Apps/EEMSuite.Apps.DatabaseAdministrator/Views/Controls/TenantRebillView.xaml):
-  the Bill Scenarios sub-tab''s Rate Configuration grid has Rate, Start Date, End Date and a Bill checkbox whose
-  backing field is EnableBillReconcilliation (note the product''s own spelling); its Point Assignment grid excludes
-  points from rebilling. The Bill Generation sub-tab''s grid has Assigned Rates, Fiscal Start, Fiscal End, Schedule,
-  Status (the generation type), Available % and Offset. Status values are the 4 dbo.BillGenerationType rows: 1 Off,
-  2 Manual, 3 Auto, 4 Auto w/ Auto Regen (confirmed against both the Northlake and reference databases). The Bill
-  Generation grid''s row is backed by dbo.UtilityMeterRatesBillGen (MetaWorldID, BillScenarioID, FiscalStart, FiscalEnd,
-  BillGenStatusID, BillGenReconDataSourceID, BillGenScheduleCode, DataThreshold, OffsetDays — confirmed by column),
-  one row per meter per Bill Scenario; the reconciliation source (file 07) is a column on this same row, not a separate
-  screen.'
-- Every rate below must exist first (Stage 2/Rate Modeler); NL-STEP-Demand is purpose-built for a Town Center anchor
-  per data/eem/northlake-rates-v1.yaml ("fires type 210 + 600"). Assign it under both the Actual (-1) scenario and
-  Budget (file 01) per Phase 4 spec section D's "assign under both Actual and a non-actual scenario."
-- 'Cedar Row: Valley Electric bills Cedar Row A/B Electric Master and River City bills Cedar Row A/B Water Master;
-  no resident is ever billed directly (tenant-and-lease-roster.pdf). The 4 configs below are Method 2, Fully Submetered,
-  same screen and mechanic as file 04''s Tower-Main config, just at real scale: every apartment''s own submeter
-  (data/scenarios/demo-university-v1.yaml, SYN-SUB-E-* / SYN-SUB-W-*) is a candidate; the engine computes each apartment''s
-  Allocation % from its own interval/route consumption when Process Meter Allocations runs (file 07), so no percentage
-  is typed for any of the 248 rows below.'
-- House submeters (Cedar Row A/B Electric House, Cedar Row A/B Water House) are not candidates — their usage is
-  recovered as overhead per the Phase 4 spec, not charged to one apartment. This file sets Overhead % = 2 uniformly
-  on every apartment row rather than repeating it 248 times below; type the same value into every row's Overhead
-  % column. The real percentage should be recomputed each period from the house submeter's actual reading against
-  the master (a later refinement, not this stage's job).
-- Sewer is billed on the water submeter's usage capped at each apartment's winter average; that cap is a rate-engine
-  rule (Phase 2), not a Bill Allocation Configuration field, so it is not modeled on this screen.
-- 'Reconciliation: each Cedar Row master meter''s Tenant Rebill tab gets its real utility rate (already assigned
-  by whichever stage enters Cedar Row''s rates) with Bill (EnableBillReconcilliation) turned on, so rp_BillReconciliation
-  can compare the submetered total against the master bill (file 07).'
-- Records marked kind 'Cedar Row allocation config (#/reporting/BillAllocationConfiguration)' were entered on that
-  other editor; they sit in this file because they belong to this step.
+- 'Tenant Rebill tab fields (src/Apps/EEMSuite.Apps.DatabaseAdministrator/Views/Controls/TenantRebillView.xaml): the Bill Scenarios
+  sub-tab''s Rate Configuration grid has Rate, Start Date, End Date and a Bill checkbox whose backing field is EnableBillReconcilliation
+  (the product''s own spelling); its Point Assignment grid excludes points from rebilling. The Bill Generation sub-tab''s grid has Assigned
+  Rates, Fiscal Start, Fiscal End, Schedule, Status (the generation type), Available % and Offset. Status values are the 4 dbo.BillGenerationType
+  rows: 1 Off, 2 Manual, 3 Auto, 4 Auto w/ Auto Regen. The Bill Generation row is backed by dbo.UtilityMeterRatesBillGen, one row per
+  meter per Bill Scenario.'
+- 'WHY THE TENANT METERS COULD NOT TAKE A RATE, and what changed (confirmed in the product, 2026-11-10). The Tenant Rebill tab lists
+  the rates of the METER''S PROVIDER whose measure type is the METER''S measure type (TenantRebillViewModel.ChangeHierarchyIDAsync passes
+  node.MeterInfo.ProviderID and MeasureType.Id; UpdateAvailableRates filters on MeasureTypeId; an empty list shows ShowNoProviderRatesMessage).
+  UtilityRateMeterAssignment_Save then refuses a rate whose measure type differs from Meter.MT_MeasureTypeID (''Rate measure type must
+  match meter measure type!''). UtilityGenerationConfig_Save refuses a Bill Generation row on a meter with no child node (''No interval
+  points assigned to meter!'', source Interval). The tenant meters of the earlier file 02 had no measure type, no provider (the provider
+  is copied from the billing account, Meter_Save, and the Add Billing Account dialog will not save an account without one) and, for
+  most, no points. File 02 now gives every Town Center meter Measure Type Electricity and a Valley Electric District account, and the
+  four tenants this file generates for carry the points: Anchor Store kWh and kW, Food Court, In-line Shop 1 and In-line Shop 2 kWh.'
+- 'Per tenant, what each generation path needs: a Utility Provider (through the billing account) and Measure Type Electricity on the
+  meter; one or more child points of the right kind (kWh for TC-FLAT-GS, kWh and kW for TC-STEP-DEMAND) with data for the whole period
+  at Available % 100 (file 10); a Rate Configuration row whose Start Date is on or before the first period; a company administrator
+  to save the Bill Generation row (the proc refuses anyone else); and for Manual, a user with Bill Entry Web at level 3 (tc_company_admins,
+  file 01) to press Create on Generated Bills.'
+- Generation windows are 2026-01 only (Fiscal Start and End both 2026-1), on purpose. Mall-Main's method 1 configs allocate bills to
+  these same tenants for 2024 and 2025 (file 04), and a generated bill for the same period would be a second bill on the account. 2026
+  is the year with no method 1 window, so the Off, Manual, Auto and Auto w/ Auto Regen tenants show their behaviour without double billing.
+  Anchor Store's Actual rate row starts 2024-01-01, for the reconciliation of file 07; its generation stays Off.
+- 'Anchor Store''s Bill checkbox is ticked. UtilityRateMeterAssignment_Save then (a) copies the rate onto the company''s Bill Meter
+  Reconciliation scenario (file 01 adds it to Used) and (b) saves a Bill Generation row on that scenario by itself: schedule BL, status
+  4 (Auto w/ Auto Regen), data source Interval, from the rate''s start period, no end. Nothing is typed for that second row; it is the
+  reconciliation of file 07. Only an Actual-scenario row can tick Bill, and the other scenarios in the Rate Configuration scenario picker
+  exclude the reconciliation one on purpose.'
+- 'Cedar Row: Valley Electric bills Cedar Row A/B Electric Master and River City bills Cedar Row A/B Water Master; no resident is billed
+  directly (tenant-and-lease-roster.pdf). The earlier version of this file assigned NL-RES-Tiered and NL-MULTI-Commodity to the four
+  masters. They are gone: the masters keep the real tariffs Stage 4 assigns (VED-TOU-GS on the electric masters, RCU-W-TIER and RCU-S-VOL
+  on the water masters, 06-rate-assignments.yaml); a meter prices on one rate at a time; allocation of the master''s bill needs no rate
+  (it splits dollars already billed); and a Bill checkbox on a Cedar Row master would need the Reconciliation scenario on a company
+  that uses Actual only. The four allocation configs below stay.'
+- CEDAR ROW IS NOT ENTERABLE AS WRITTEN, and does nothing if it were. (1) Every apartment submeter in Stage 2 is an owned meter with
+  no billing account, and BillAllocationEligibleMeters_Get refuses a candidate with no billing account (error 3, errorAllocatedMeterDoesNotHaveBillingAccount),
+  so Add Allocated Meters offers none of the 248 rows; Stage 2 must give each of the 124 apartments an account (and a Bill Allocation
+  entry type) per commodity, the Cedar Row accounts not being required by anything else. (2) Method 2 has no calculator (file 04 notes),
+  so no allocated bill would follow. The configs are kept as the intended shape and for the day both are fixed; checks.sql reports them
+  as configs and does not expect a bill.
+- 'House submeters (Cedar Row A/B Electric House, Cedar Row A/B Water House) are not candidates: their usage is recovered as overhead
+  per the Phase 4 spec. Overhead % = 2 on every apartment row (type the same value into every row''s Overhead % column). Sewer is billed
+  on the water submeter''s usage capped at each apartment''s winter average; that cap is a rate-engine rule (Phase 2), not a Bill Allocation
+  Configuration field. Cedar Row C (48 water submeters plus house and laundry, opened 2025-09-01, Stage 2) has no config here.'
+- Records marked kind 'Cedar Row allocation config (#/reporting/BillAllocationConfiguration)' were entered on that other editor; they
+  sit in this file because they belong to this step.
 records:
 - key: tc_anchor_store_billgen
   Node: Anchor Store meter (file 02, tc_anchor_store)
   Bill Scenarios:
     Rate Configuration:
-    - Rate: NL-STEP-Demand
-      Start Date: 2024-01-01
+    - Rate: TC-STEP-DEMAND
+      Start Date: &id001 2024-01-01
       End Date: null
-      Bill: false
+      Bill: true
       Scenario: Actual
-    - Rate: NL-STEP-Demand
-      Start Date: 2024-01-01
+    - Rate: TC-STEP-DEMAND
+      Start Date: *id001
       End Date: null
       Bill: false
       Scenario: Budget
   Bill Generation:
-    Assigned Rates: NL-STEP-Demand
+    Assigned Rates: TC-STEP-DEMAND
     Fiscal Start:
-      Year: 2024
+      Year: 2026
       Period: 1
     Fiscal End:
-      Year: 9999
-      Period: 12
+      Year: 2026
+      Period: 1
     Schedule: CC (Company Calendar)
-    Status: 'Off'
     Available %: 100
     Offset: 0
-  notes: Generation type 1, Off — demonstrates a tenant meter that is fully configured but never generates a bill
-    on its own (its charge, if any, comes only from file 04's Bill Allocation Configuration).
+    Status: 'Off'
+  notes: 'Generation type 1, Off: fully configured, never generates. Bill is ticked, which creates the reconciliation (file 07); the
+    Budget row shows the rate under a non-actual scenario. Expected if it were on: 15,000.00 for 2026-01 (file 09).'
 - key: tc_food_court_billgen
   Node: Food Court meter (file 02, tc_food_court)
   Bill Scenarios:
     Rate Configuration:
-    - Rate: NL-STEP-Demand
-      Start Date: 2024-01-01
+    - Rate: TC-FLAT-GS
+      Start Date: 2026-01-01
       End Date: null
       Bill: false
       Scenario: Actual
   Bill Generation:
-    Assigned Rates: NL-STEP-Demand
+    Assigned Rates: TC-FLAT-GS
     Fiscal Start:
-      Year: 2024
+      Year: 2026
       Period: 1
     Fiscal End:
-      Year: 9999
-      Period: 12
+      Year: 2026
+      Period: 1
     Schedule: CC (Company Calendar)
-    Status: Manual
     Available %: 100
     Offset: 0
-  notes: Generation type 2, Manual — a bill is generated only when someone runs generation for this meter by hand;
-    nothing produces it on a schedule.
+    Status: Manual
+  notes: 'Generation type 2, Manual: a bill is made only when someone presses Create on Generated Bills. Expected 6,294.60 for 2026-01
+    (44,640 kWh).'
 - key: tc_inline_shop_1_billgen
   Node: In-line Shop 1 meter (file 02, tc_inline_shop_1)
   Bill Scenarios:
     Rate Configuration:
-    - Rate: NL-STEP-Demand
-      Start Date: 2024-01-01
+    - Rate: TC-FLAT-GS
+      Start Date: 2026-01-01
       End Date: null
       Bill: false
       Scenario: Actual
   Bill Generation:
-    Assigned Rates: NL-STEP-Demand
+    Assigned Rates: TC-FLAT-GS
     Fiscal Start:
-      Year: 2024
+      Year: 2026
       Period: 1
     Fiscal End:
-      Year: 9999
-      Period: 12
+      Year: 2026
+      Period: 1
     Schedule: CC (Company Calendar)
-    Status: Auto
     Available %: 100
     Offset: 0
-  notes: Generation type 3, Auto — the Run Bill Gen task (step 7; UtilityGenBill_Create, not Job_BillAllocation, which
-    is Bill Allocation) creates the missing-period bill for this meter every period on its own once the period's
-    interval data is complete to Available %.
+    Status: Auto
+  notes: 'Generation type 3, Auto: Run Bill Gen (Task_Tbl 42, UtilityGenBill_Create) writes the missing period''s bill once its data
+    is complete to Available %. Expected 878.28 for 2026-01 (5,952 kWh).'
 - key: tc_inline_shop_2_billgen
   Node: In-line Shop 2 meter (file 02, tc_inline_shop_2)
   Bill Scenarios:
     Rate Configuration:
-    - Rate: NL-STEP-Demand
-      Start Date: 2024-01-01
+    - Rate: TC-FLAT-GS
+      Start Date: 2026-01-01
       End Date: null
       Bill: false
       Scenario: Actual
   Bill Generation:
-    Assigned Rates: NL-STEP-Demand
+    Assigned Rates: TC-FLAT-GS
     Fiscal Start:
-      Year: 2024
+      Year: 2026
       Period: 1
     Fiscal End:
-      Year: 9999
-      Period: 12
+      Year: 2026
+      Period: 1
     Schedule: CC (Company Calendar)
-    Status: Auto w/ Auto Regen
     Available %: 100
     Offset: 0
-  notes: Generation type 4, Auto w/ Auto Regen — regenerates this meter's bill automatically whenever new allocated/interval
-    data arrives for an already-billed period, not just missing periods.
-- key: cedar_row_a_electric_master_tenantrebill
-  Node: Cedar Row A Electric Master meter (Stage 2)
-  Bill Scenarios:
-    Rate Configuration:
-    - Rate: NL-RES-Tiered
-      Start Date: 2024-01-01
-      End Date: null
-      Bill: true
-      Scenario: Actual
-  notes: Bill (EnableBillReconcilliation) on. This is the master the 60 apartment electric submeters reconcile back
-    to (file 07).
-- key: cedar_row_a_water_master_tenantrebill
-  Node: Cedar Row A Water Master meter (Stage 2)
-  Bill Scenarios:
-    Rate Configuration:
-    - Rate: NL-MULTI-Commodity
-      Start Date: 2024-01-01
-      End Date: null
-      Bill: true
-      Scenario: Actual
-  notes: Bill on; River City's water/sewer/stormwater commodity map lives on this rate (NL-MULTI-Commodity, data/eem/northlake-rates-v1.yaml).
-- key: cedar_row_b_electric_master_tenantrebill
-  Node: Cedar Row B Electric Master meter (Stage 2)
-  Bill Scenarios:
-    Rate Configuration:
-    - Rate: NL-RES-Tiered
-      Start Date: 2024-01-01
-      End Date: null
-      Bill: true
-      Scenario: Actual
-  notes: Same as Cedar Row A's electric master, Bill on.
-- key: cedar_row_b_water_master_tenantrebill
-  Node: Cedar Row B Water Master meter (Stage 2)
-  Bill Scenarios:
-    Rate Configuration:
-    - Rate: NL-MULTI-Commodity
-      Start Date: 2024-01-01
-      End Date: null
-      Bill: true
-      Scenario: Actual
-  notes: Same as Cedar Row A's water master, Bill on.
+    Status: Auto w/ Auto Regen
+  notes: 'Generation type 4, Auto w/ Auto Regen: regenerates the bill whenever new data lands in an already-billed period. Expected
+    669.96 for 2026-01 (4,464 kWh).'
 - key: cedar_row_a_electric_allocation
   installed:
     billAllocationConfigId: null

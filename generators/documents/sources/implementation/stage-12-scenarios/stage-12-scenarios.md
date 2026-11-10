@@ -119,4 +119,10 @@ demand. October has none (its demand came back first) and November bills it. The
 - Market Hall Kiosk K1 has seven Meter Reads bills from May to November 2025 with the totals in scenario 4's verify
   list, and the Northlake MVRS Gas Upload schedule's Use Reading TimeStamp is back to what Stage 3 expects.
 
-Stage 12 has no `checks.sql` yet; each scenario's verify list is the check until the first run is recorded.
+Run `checks.sql` beside this chapter against the instance database after the scenarios. It has one asserting
+check for each verify item (13 in all) and for the step expectations the scenario files state, each with Expected,
+Actual and PASS or FAIL, using only the values the YAML gives: scenario 1's 1388, 3 and 6 kgal, its route (CRAWTR,
+61 meters, sequence 350) and statuses; scenario 2's read type, prompts, constants and the 1294.60 and 1312 reads;
+scenario 3's 50 meters in walking order (the CSV is embedded in the check), the missing cycle 20 and the meter text;
+scenario 4's seven bills, 19,780 kWh and seven demand values. Before a scenario is entered its rows read missing and
+FAIL, which is the expected state.

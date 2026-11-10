@@ -1,96 +1,96 @@
-# Stage 7, step 7: run what the previous six steps configured. Meter allocation has an on-demand run (Web,
-# #/reporting/ProcessMeterAllocations); full tenant bill generation and bill allocation run only on their
-# scheduled tasks (Database Administrator has no such screen — scheduling itself is Web, #/tasks/manager);
-# reconciliation is a scenario and a deliberate mismatch, not a run of its own; tenant accruals have no
-# screen at all.
+# Stage 7, step 7: run what the previous steps configured. Meter allocation has an on-demand run (Web,
+# #/reporting/ProcessMeterAllocations); bill generation and bill allocation run only on their scheduled tasks
+# (Database Administrator has no such screen; scheduling itself is Web, #/tasks/manager); reconciliation is not a
+# run of its own but the second Bill Generation row that the Bill checkbox creates; tenant accruals have no screen.
 stage: 7
 step: 7
 title: Allocation runs, scheduled tasks and reconciliation
 app: Web
-screen: "#/reporting/ProcessMeterAllocations; #/tasks/manager"
+screen: '#/reporting/ProcessMeterAllocations; #/tasks/manager; the Bill Reconciliation report (rp_BillReconciliation)'
 source:
 - generators/documents/sources/implementation/dream-customer/phase4-tenant-rebilling-spec.md
 - generators/documents/sources/implementation/dream-customer/entry-path-and-gaps.md
+- 10-town-center-data-and-bills.yaml
 notes:
-- 'Process Meter Allocations (rp_WUIProcessMeterAllocations) lists every WUI master point for the chosen
-  fiscal year/period with a checkbox column; Start Process posts the checked MasterPtIDs to
-  api/TenantRebilling/ProcessMeterAllocation (confirmed in
-  src/Web/EEMSuite.Web/frontend/src/scripts/hippo/reports/WUIProcessMeterAllocations.ts). Run it once for
-  2024-01 after file 05''s families and fixtures are saved; this is the on-demand step that turns the
-  WUI configuration into PtAllocFailReason rows and allocated use.'
-- 'Full tenant bill generation and bill allocation are UI-THEN-RUN, not UI-DIRECT: dbo.Task_Tbl confirms
-  TaskID 24 "Process Bill Allocation" (Process Bill Allocation and Bill Aggregation, MinIntervalSeconds
-  86400 — daily), TaskID 42 "Run Bill Gen" (Run Bill Generation, every 300 seconds) and TaskID 47
-  "Run WUI Process" (Run WUI Process, TaskCode WUI_PROCESS_METER_ALLOCATIONS, SystemOnly). All three run
-  under EEMSuite.Tasks.EngineWorker; Database Administrator has no screen for them at all. Schedule 24 and 42
-  from Web #/tasks/manager (Task drawer: Task, Type, a cron or interval schedule, Run Now for an immediate
-  pass) so they cover the fiscal periods files 06 and 08 seeded. 47 is SystemOnly and does not need a manual schedule;
-  it is what actually executes what Process Meter Allocations queued.'
-- 'Reconciliation is entered on the meter that will show the variance, Anchor Store (file 02), by switching
-  its Tenant Rebill tab Bill Scenario dropdown to Bill Meter Reconciliation (ScenarioTypeID 20, confirmed in
-  dbo.ScenarioType) and assigning a rate under that scenario deliberately mismatched against Anchor Store''s
-  actual consumption, per the fixture below. rp_BillReconciliation (confirmed present) then shows the
-  variance; nothing else runs it.'
-- 'Tenant accruals: entry-path-and-gaps.md item A2 confirms there is no UI, API or scheduled task that writes
-  dbo.BillAccrualMap — verified again here: BillAccrualMap has 3 columns (BillID, ReversalBillID, plus the
-  audit columns) and nothing in src/Application or src/Domain references it by name. rp_Accrual and
-  rp_OpenAccruals exist as reports, but nothing populates the table they read from a Web or Database
-  Administrator screen. This stage records that gap and does not attempt an accrual fixture; see the
-  chapter''s Findings.'
-- 'PRODUCT FINDING: dbo.GuiReports_Tbl on EEMSuite_Northlake has 11 of the 14 Tenant Rebilling reports the
-  reference EEMSuite database registers under this feature; missing are rp_accruals ("#/reporting/Accruals/"),
-  rp_mpaaccruals ("#/reporting/MPAAccruals/") and rp_OpenAccruals ("#/reporting/OpenAccruals/") — all three
-  are accrual reports, consistent with the accrual gap above, and none of them will appear on the Reporting
-  menu until their catalog rows are installed. The 11 present and confirmed on both databases: rp_TenantMap,
-  rp_BillAllocationConfiguration, rp_BillGenerationConfig, rp_BillReconciliation, rp_RateAllocation,
-  rp_TenantBillAllocationMap, rp_TenantBillAudit, rp_TenantBillDefinition, rp_WUIPointFamilyConfig,
-  rp_WUIPointUseHistory, rp_WUIProcessMeterAllocations.'
+- Process Meter Allocations (rp_WUIProcessMeterAllocations) lists every WUI master point for the chosen fiscal year and period with
+  a checkbox column; Start Process posts the checked MasterPtIDs to api/TenantRebilling/ProcessMeterAllocation (WUIProcessMeterAllocations.ts).
+  Run it once for 2024-01 after file 05's families and indices are saved and Stage 3's data is in; the expected allocated use is in
+  file 10 (expected_wui).
+- 'Full tenant bill generation and bill allocation are UI-THEN-RUN, not UI-DIRECT: dbo.Task_Tbl has TaskID 24 ''Process Bill Allocation''
+  (Process Bill Allocation and Bill Aggregation, MinIntervalSeconds 86400, daily), TaskID 42 ''Run Bill Gen'' (every 300 seconds) and
+  TaskID 47 ''Run WUI Process'' (SystemOnly). Schedule 24 and 42 from Web #/tasks/manager (Task drawer: Task, Type, a cron or interval
+  schedule, Run Now). 47 is SystemOnly and runs what Process Meter Allocations queued. Task 24 runs Job_BillAllocation: BillAlloc_ProcessBills
+  (method 1) and then BillAgg_ProcessBills (method 6). ORDER MATTERS: key the master bills of file 10 first, Run Now on 24 (allocated
+  bills appear on the seven Mall-Main tenants, then the Property Total aggregate), and only then Run Now on 42 (the reconciliation compares
+  those allocated bills with a calculation).'
+- 'RECONCILIATION IS REACHABLE ONLY THROUGH THE BILL CHECKBOX, and the earlier fixture could not be entered. Read in the product: (1)
+  the Tenant Rebill scenario picker is UtilityBillScenario_Get with @BillScenarioType = 6, ''All except Bill Recon'', so Bill Meter
+  Reconciliation can never be chosen on the desktop and a rate cannot be typed under it. (2) UtilityRateMeterAssignment_Save, for an
+  Actual-scenario row with Bill ticked, copies THE SAME RATE onto scenario 20 and saves a Bill Generation row there with schedule BL,
+  status 4, data source Interval. (3) UtilityGenBillDates_Set fills UtilityBillGenLog.MasterBillID (the actual bill the report compares
+  with) ONLY for schedule BL, from the bills on the meter''s billing account in the fiscal range; CC, BC, MV and RC rows insert NULL.
+  The old fixture had schedule CC and a different rate under scenario 20: both unreachable. So the variance comes from the ACTUAL BILL
+  differing from the calculation, not from a second rate: Anchor Store''s actual bills are the allocated ones (2,040.00), its calculation
+  is TC-STEP-DEMAND on its own interval data (15,000.00), variance -12,960.00 in each of 2024-01 and 2025-01 (file 10, expected_reconciliation).'
+- rp_BillReconciliation (Web Bill Reconciliation, parameters Fiscal Period and Fiscal Year) shows, per meter and rate, Billed (the Bill's
+  BL_Amount) and Calculated (the BillScenarioPeriod amount of the scenario 20 calculation). It needs a UtilityBillGenLog row for the
+  scenario-20 rate, which exists once a bill is on the account and Run Bill Gen has run.
+- 'Tenant accruals: entry-path-and-gaps.md item A2 confirms there is no UI, API or scheduled task that writes dbo.BillAccrualMap (BillAccrualMap
+  has no writer under src). rp_Accrual and rp_OpenAccruals exist as reports, but nothing populates the table they read. This stage records
+  that gap and does not attempt an accrual fixture.'
+- 'PRODUCT FINDING: dbo.GuiReports_Tbl on EEMSuite_Northlake has 11 of the 14 Tenant Rebilling reports the reference EEMSuite database
+  registers under this feature; missing are rp_accruals, rp_mpaaccruals and rp_OpenAccruals, all accrual reports. The 11 present: rp_TenantMap,
+  rp_BillAllocationConfiguration, rp_BillGenerationConfig, rp_BillReconciliation, rp_RateAllocation, rp_TenantBillAllocationMap, rp_TenantBillAudit,
+  rp_TenantBillDefinition, rp_WUIPointFamilyConfig, rp_WUIPointUseHistory, rp_WUIProcessMeterAllocations.'
 records:
 - key: process_meter_allocations_2024_01
-  Screen: "#/reporting/ProcessMeterAllocations"
-  Parameters: {Fiscal Year: 2024, Fiscal Period: 1}
-  Action: Check every valid master point (wui_market_electric, wui_tower_electric, wui_fixtures's master
-    and Fixture Chain Mid), leave the deliberately-invalid ones unchecked only if the grid marks them
-    IsValid = 0 on its own; Start Process.
-  Repeat: Run again for 2024-02 and 2024-03 so file 05's InsufficientIntervalData fixture has more than one
-    period to be insufficient against.
+  Screen: '#/reporting/ProcessMeterAllocations'
+  Parameters:
+    Fiscal Year: 2024
+    Fiscal Period: 1
+  Action: Check every valid master point (wui_market_electric, wui_tower_electric, wui_fixtures's master and Fixture Chain Mid), leave
+    the deliberately invalid ones unchecked only if the grid marks them IsValid = 0 on its own; Start Process.
+  Repeat: Run again for 2024-02 and 2024-03 so file 05's InsufficientIntervalData fixture has more than one period to be insufficient
+    against.
+  Expected: Shop 3 26,318.37 kWh, Shop 4 25,306.12, Common Area 134,375.51 and Landlord/House 230,640 for 2024-01 (file 10)
 - key: scheduled_process_bill_allocation
-  Screen: "#/tasks/manager"
+  Screen: '#/tasks/manager'
   Task: Process Bill Allocation (Task_Tbl 24)
   Schedule: Daily, 1:00 AM
-  notes: Also click Run Now once after file 04, 03 and 06's allocation configs are all saved, so this
-    stage's checks see allocated bills without waiting for the next scheduled pass.
+  notes: 'Run Now once after the master bills of file 10 are keyed and files 03, 04 and 06 are saved. Expected: allocated bills on the
+    seven Mall-Main tenants for 2024-01 and 2025-01 (30,600.00 in all each), Property Total 30,600.00 for both, and NO allocated bill
+    for the Tower-Main, Mall-Main 2026-01, Annex-Main or Substation-Master bills (file 04).'
 - key: scheduled_run_bill_gen
-  Screen: "#/tasks/manager"
+  Screen: '#/tasks/manager'
   Task: Run Bill Gen (Task_Tbl 42)
   Schedule: Every 5 minutes
-  notes: Matches its MinIntervalSeconds (300); Run Now once after file 06's generation-type meters are saved. Added
-    2026-10-01 (Ridgeline Wind) - Run Now again after file 08's Ridgeline Bill Generation row is saved and Ridgeline's
-    turbine data is in; file 08 also adds its 18 monthly periods to what this task covers.
+  notes: 'Matches its MinIntervalSeconds (300). Run Now after Task 24 and after file 06 is saved and Stage 3''s January 2026 data is
+    in: expected one generated bill each for In-line Shop 1 (878.28) and In-line Shop 2 (669.96) for 2026-01, none for Anchor Store
+    (Off) and Food Court (Manual), and the two reconciliation calculations for Anchor Store. Run Now again after file 08''s Ridgeline
+    Bill Generation row is saved and Ridgeline''s turbine data is in.'
 - key: anchor_store_reconciliation
   Node: Anchor Store meter (file 02, tc_anchor_store)
-  Bill Scenario: Bill Meter Reconciliation
-  Rate Configuration:
-  - {Rate: NL-STEP-Demand, Start Date: 2024-01-01, End Date:, Bill: true}
-  Bill Generation:
-    Assigned Rates: NL-STEP-Demand
-    Fiscal Start: {Year: 2024, Period: 1}
-    Fiscal End: {Year: 2024, Period: 12}
-    Schedule: CC (Company Calendar)
-    Status: Manual
-    Available %: 100
-    Offset: 0
-  notes: dbo.UtilityMeterRatesBillGen (confirmed columns MetaWorldID, BillScenarioID, FiscalStart, FiscalEnd,
-    BillGenStatusID, BillGenReconDataSourceID, BillGenScheduleCode, DataThreshold, OffsetDays) is the one row
-    that backs both this Bill Generation entry and the reconciliation source; there is no separate BillGen
-    Recon Data Source lookup table to enter from, so this is not a distinct field on the screen — the source
-    (1 Interval / 2 Bill per the Phase 4 spec) follows from which side (interval or a real bill) exists for
-    this scenario's row. Recon source here is Interval, since Anchor Store has no other bill under scenario 20.
-  fixture: 'Deliberate mismatch: Anchor Store''s NL-STEP-Demand rate under Actual bills its metered demand at
-    the tariff''s stepped rate, but the reconciliation scenario''s copy of the rate is entered with the
-    Stepped Demand block boundaries shifted down one tier (# assumed), so the reconciliation''s expected
-    amount comes out higher than the Actual bill''s recovered amount for the same period. rp_BillReconciliation
-    (file checks.sql) should show a nonzero amount/quantity variance for Anchor Store in 2024-01.'
+  Entered: 'nowhere: the Bill checkbox on file 06''s Anchor Store Actual rate row creates the Bill Meter Reconciliation rate and its
+    Bill Generation row'
+  Created by the checkbox:
+    Bill Meter Reconciliation rate: TC-STEP-DEMAND, Start Date 2024-01-01
+    Bill Generation:
+      Schedule: BL (Bill)
+      Status: Auto w/ Auto Regen
+      Data source: Interval
+      Fiscal Start: 2024-01
+      Fiscal End: None (999901)
+      Available %: 0
+      Offset: 0
+  Report: Bill Reconciliation, Fiscal Year 2024 Fiscal Period 1, and 2025 / 1
+  Expected:
+    Billed: 2040.0
+    Calculated: 15000.0
+    Variance: -12960.0
+    Both periods: true
+  notes: Two rows in UtilityBillGenLog (the two allocated bills on the account), each with MasterBillID set. The desktop sends Data
+    source 0, which the proc turns into 1 (Interval); the Web Bill Generation Configuration report shows the Data source (rp_BillGenerationConfig)
+    and is where the two created rows can be read.
 - key: tenant_accruals
-  Screen: none — no UI, API or scheduled task path exists
-  notes: See the header note and the chapter's Findings; not entered.
+  Screen: 'none: no UI, API or scheduled task path exists'
+  notes: See the notes; not entered.

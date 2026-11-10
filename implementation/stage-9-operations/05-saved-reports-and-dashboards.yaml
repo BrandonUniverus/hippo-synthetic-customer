@@ -49,15 +49,60 @@ notes:
   on 10-minute data Active Power kW and Nacelle Wind Speed may both plot at one sixth of the reading, with no unit on the
   axes; the shape and the fit are unchanged. The first point selected is the X axis: if power lands on X, reselect with
   wind speed first. Run the first power curve against the point''s own values before relying on its scale.'
+- 'Dashboard editor (DashboardEditor.cshtml, viewDashboardConfiguration.ts, re-read 2026-11-10). Details card: Name, Columns
+  (1 to 5, default 2), Public link (shown only to a user holding the public_dashboards function), Show data as (the public
+  session''s user, "the public link shows only what this user is allowed to see"), Set as my homepage. Per tile, from the
+  tile''s options button: Refresh rate (minutes, default 15), Open report (empty = do not open, Same window, New window) and, for
+  chart reports only, Zoom mode (empty = none, Rolling, Specific). Shared report controls card: tick a control that two or more
+  tiles share to set it once in Report Settings for all of them (the screen lists the candidates it finds). Dashboard Report
+  Settings are applied to every viewer, the public session included. Sharing is on the dashboard list, not in the editor.'
+- 'Stage 1 grants public_dashboards to no group (only allow_dashboards is granted, in four groups), so the Public link box and
+  Show data as are hidden for every Northlake user until a group holds Public Dashboards. The Executive Overview record below
+  sets them as intended; Stage 1 needs the grant first (reported to the Stage 1 owner).'
+- 'Tiles and owners (changed 2026-11-10): a dashboard holds only its owner''s own saved reports, and the earlier tile lists named
+  reports no saved-report record created (Gateway Status, Alarm Data Map, Task Log, GHG History, Benchmark Ranking). Facility
+  Operations now lists three saved reports owned by jordan.hale, Executive Overview three owned by samantha.ireland. Daily
+  Operations is based on the Task Log report alone: a saved report snapshots one report, and TaskLog plus GatewayStatus was two.
+  Weekly Cost Rollup is based on Spend by Commodity (rp_SpendScene, AddSpendSceneReport.sql), not a nameless variant; the name is kept because the delivery is weekly.'
 records:
-- {key: saved_monthly_building_energy, kind: saved_report, installed: {guiMfrSavedReportsId: }, Save-as-Favorite: {Title: Monthly Building Energy, Module: Use Analysis, "Based On": MonthlyEUI, Params: "Northlake Main Campus buildings, rolling 12 months", Dashboardable: true}}
-- {key: saved_weekly_cost_rollup, kind: saved_report, installed: {guiMfrSavedReportsId: }, Save-as-Favorite: {Title: Weekly Cost Rollup, Module: Bill Processing, "Based On": "cost/spend report (rp_ variant already in the coverage matrix's Bill Management bucket)", Params: "all three companies, current fiscal week", Dashboardable: true}}
-- {key: saved_executive_sustainability_summary, kind: saved_report, installed: {guiMfrSavedReportsId: }, Save-as-Favorite: {Title: Executive Sustainability Summary, Module: Green House Gases, "Based On": GHGHistory, Params: "all three companies, 2024-2025", Dashboardable: true}}
-- {key: saved_daily_operations, kind: saved_report, installed: {guiMfrSavedReportsId: }, Save-as-Favorite: {Title: Daily Operations, Module: System Administration, "Based On": "TaskLog + GatewayStatus", Params: "yesterday, all gateways", Dashboardable: true}}
-- {key: dashboard_facility_operations, kind: dashboard, installed: {guiMfrDashboardId: }, MyFavoriteReports_Index: {Title: Facility Operations, Tiles: "Gateway Status, Alarm Data Map, Task Log", Public: false, Owner: jordan.hale}}
-- {key: dashboard_executive_overview, kind: dashboard, installed: {guiMfrDashboardId: }, MyFavoriteReports_Index: {Title: Executive Overview, Tiles: "GHG History, Benchmark Ranking (Use per area), Weekly Cost Rollup", Public: true, Owner: samantha.ireland}}
-- {key: custom_campus_vs_cedar_row_eui, kind: proposed_custom_report, installed: {guiMfrSavedReportsId: }, Save-as-Favorite: {Title: "Northlake Campus vs. Cedar Row EUI Comparison", "Based On": BenchmarkRanking, Params: "peer set locked to the 12-building set from Stage 8 step 6"}}
-- {key: custom_quarterly_es_portfolio_status, kind: proposed_custom_report, installed: {guiMfrSavedReportsId: }, Save-as-Favorite: {Title: "Quarterly ENERGY STAR Portfolio Status", "Based On": ESRatingHistory, Params: "all 13 properties, quarterly grouping"}}
+- {key: saved_monthly_building_energy, kind: saved_report, installed: {guiMfrSavedReportsId: }, Owner: jordan.hale, Save-as-Favorite: {Title: Monthly Building Energy, Module: Use Analysis, "Based On": MonthlyEUI, Params: "Northlake Main Campus buildings, rolling 12 months", Dashboardable: true}}
+- {key: saved_weekly_cost_rollup, kind: saved_report, installed: {guiMfrSavedReportsId: }, Owner: samantha.ireland, Save-as-Favorite: {Title: Weekly Cost Rollup, Module: Bill Tracking, "Based On": "Spend by Commodity (rp_SpendScene)", Params: "all three companies, current fiscal year to the latest period", Dashboardable: true}}   # Params assumed: the Spend report takes a fiscal period range, not a week
+- {key: saved_executive_sustainability_summary, kind: saved_report, installed: {guiMfrSavedReportsId: }, Owner: samantha.ireland, Save-as-Favorite: {Title: Executive Sustainability Summary, Module: Green House Gases, "Based On": GHGHistory, Params: "all three companies, 2024-2025", Dashboardable: true}}
+- {key: saved_daily_operations, kind: saved_report, installed: {guiMfrSavedReportsId: }, Owner: jordan.hale, Save-as-Favorite: {Title: Daily Operations, Module: System Health, "Based On": TaskLog, Params: "yesterday, all tasks", Dashboardable: true}}
+- {key: saved_gateway_status, kind: saved_report, installed: {guiMfrSavedReportsId: }, Owner: jordan.hale, Save-as-Favorite: {Title: Gateway Status, Module: System Health, "Based On": GatewayStatus, Params: "90% threshold (the report's default), results by node", Dashboardable: true}}
+- {key: saved_alarm_data_map, kind: saved_report, installed: {guiMfrSavedReportsId: }, Owner: jordan.hale, Save-as-Favorite: {Title: Alarm Data Map, Module: System Health, "Based On": AlarmDataMap, Params: "all points, last 30 days", Dashboardable: true}}
+- {key: saved_task_log, kind: saved_report, installed: {guiMfrSavedReportsId: }, Owner: jordan.hale, Save-as-Favorite: {Title: Task Log, Module: System Health, "Based On": TaskLog, Params: "last 7 days, all tasks", Dashboardable: true}}
+- key: dashboard_facility_operations
+  kind: dashboard
+  installed: {guiMfrDashboardId: }
+  MyFavoriteReports_Index:
+    Title: Facility Operations
+    Name: Facility Operations
+    Columns: 3   # assumed: one tile per column
+    Public link: false
+    Owner: jordan.hale
+    Tiles:
+    - {Report: Gateway Status, Refresh rate: 5, Open report: Same window}   # assumed
+    - {Report: Alarm Data Map, Refresh rate: 5, Open report: New window}   # assumed
+    - {Report: Task Log, Refresh rate: 15, Open report: ""}   # default refresh; Open report cleared (do not open)
+- key: dashboard_executive_overview
+  kind: dashboard
+  installed: {guiMfrDashboardId: }
+  MyFavoriteReports_Index:
+    Title: Executive Overview
+    Name: Executive Overview
+    Columns: 2
+    Public link: true   # needs the public_dashboards function, which Stage 1 does not yet grant (see the note above)
+    Show data as: samantha.ireland   # assumed: the user the lobby screen's public session reads as
+    Set as my homepage: true   # for samantha.ireland
+    Owner: samantha.ireland
+    Tiles:
+    - {Report: Executive Sustainability Summary, Refresh rate: 60, Open report: New window}   # assumed
+    - {Report: "Northlake Campus vs. Cedar Row EUI Comparison", Refresh rate: 60, Open report: New window}   # assumed
+    - {Report: Weekly Cost Rollup, Refresh rate: 60, Open report: Same window}   # assumed
+    Shared report controls: {Tick: "the hierarchy / company control the three tiles have in common, if the card lists it"}   # assumed; the card lists only what the tiles share
+- {key: custom_campus_vs_cedar_row_eui, kind: proposed_custom_report, installed: {guiMfrSavedReportsId: }, Owner: samantha.ireland, Save-as-Favorite: {Title: "Northlake Campus vs. Cedar Row EUI Comparison", "Based On": BenchmarkRanking, Params: "peer set locked to the 12-building set from Stage 8 step 6"}}
+- {key: custom_quarterly_es_portfolio_status, kind: proposed_custom_report, installed: {guiMfrSavedReportsId: }, Owner: samantha.ireland, Save-as-Favorite: {Title: "Quarterly ENERGY STAR Portfolio Status", "Based On": ESRatingHistory, Params: "all 13 properties, quarterly grouping"}}
 # ---- Ridgeline Wind ----
 - key: goal_ridgeline_expected_vs_actual_scorecard
   kind: goal
@@ -73,9 +118,22 @@ records:
 # relative because it is delivered every month.
 - {key: saved_ridgeline_farm_generated_vs_possible, kind: saved_report, installed: {guiMfrSavedReportsId: }, Owner: mateo.alvarez, Save-as-Favorite: {Title: Ridgeline Farm Generated vs Possible, Module: Use Analysis, "Based On": MultiPointTrend, Params: "Ridgeline Farm Generated kWh 10m and Ridgeline Farm Possible Power kW 10m, 2025-01-01 to 2025-12-31, Daily; the gap between the lines widens from 2025-02-11 to 2025-04-22 while WTG-07 is down", Dashboardable: true}}
 - {key: saved_ridgeline_wtg07_generated_vs_possible, kind: saved_report, installed: {guiMfrSavedReportsId: }, Owner: mateo.alvarez, Save-as-Favorite: {Title: Ridgeline WTG-07 Generated vs Possible, Module: Use Analysis, "Based On": MultiPointTrend, Params: "Ridgeline WTG-07 Generated kWh 10m and Possible kW 10m, 2025-02-01 to 2025-12-31, Daily; the M&V view of the WTG-07 Gearbox Replacement project (step 1): zero against full possible power until 2025-04-22, then the two lines together", Dashboardable: true}}
-- {key: saved_ridgeline_gateway_status, kind: saved_report, installed: {guiMfrSavedReportsId: }, Owner: mateo.alvarez, Save-as-Favorite: {Title: Ridgeline Gateway Status, Module: System Manager, "Based On": GatewayStatus, Params: "90% threshold (the report's default), results by node", Dashboardable: true}}
+- {key: saved_ridgeline_gateway_status, kind: saved_report, installed: {guiMfrSavedReportsId: }, Owner: mateo.alvarez, Save-as-Favorite: {Title: Ridgeline Gateway Status, Module: System Health, "Based On": GatewayStatus, Params: "90% threshold (the report's default), results by node", Dashboardable: true}}
 - {key: saved_ridgeline_monthly_performance, kind: saved_report, installed: {guiMfrSavedReportsId: }, Owner: "the delivery's author, a system administrator (step 6)", Save-as-Favorite: {Title: Ridgeline Monthly Performance, Module: Use Analysis, "Based On": MultiPointTrend, Params: "Ridgeline Farm Generated kWh 10m and Ridgeline Farm Possible Power kW 10m, Last Month, Daily; a relative range, so it shows nothing for the scenario (its data ends 2025-12-31) until it is run on a month inside it", Dashboardable: true}}
-- {key: dashboard_ridgeline_operations, kind: dashboard, installed: {guiMfrDashboardId: }, MyFavoriteReports_Index: {Title: Ridgeline Operations, Tiles: "Ridgeline Farm Generated vs Possible, Ridgeline WTG-07 Generated vs Possible, Ridgeline Gateway Status", Public: false, Owner: mateo.alvarez, "Shared With": "group ntp_wind_ops (Northlake Thermal Plant)"}}
+- key: dashboard_ridgeline_operations
+  kind: dashboard
+  installed: {guiMfrDashboardId: }
+  MyFavoriteReports_Index:
+    Title: Ridgeline Operations
+    Name: Ridgeline Operations
+    Columns: 2
+    Public link: false
+    Owner: mateo.alvarez
+    Shared With: group ntp_wind_ops (Northlake Thermal Plant)
+    Tiles:
+    - {Report: Ridgeline Farm Generated vs Possible, Refresh rate: 15, Open report: New window, Zoom mode: Rolling}   # assumed
+    - {Report: Ridgeline WTG-07 Generated vs Possible, Refresh rate: 15, Open report: New window, Zoom mode: Specific}   # assumed; the outage window is a fixed span
+    - {Report: Ridgeline Gateway Status, Refresh rate: 5, Open report: Same window}   # assumed; a chart-less report has no Zoom mode
 # Power curves, Elena's: one calendar year (2025, assumed) so every wind-speed bin fills; WTG-07's carries its fault as a stack
 # along zero power from 2025-02-11 to 2025-04-22. The curve fit is goal 43: Scatter Plot fits only a straight line, y = mx + b.
 - {key: saved_ridgeline_wtg01_power_curve, kind: saved_report, installed: {guiMfrSavedReportsId: }, Owner: elena.vasquez, "Shared With": "group eem_ridgeline_research (Northlake University copy)", Save-as-Favorite: {Title: Ridgeline WTG-01 Power Curve, Module: Use Analysis, "Based On": ScatterPlot, Params: "X Nacelle Wind Speed 10m, Y Active Power kW 10m, both on Ridgeline WTG-01, 2025-01-01 to 2025-12-31", Dashboardable: true}}

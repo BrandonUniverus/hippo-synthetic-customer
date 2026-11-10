@@ -31,8 +31,8 @@ records:
   - "gateway profiles -> scratch Input/Working/Backup/Error folders under C:\\Hippo\\Verify\\Gateways"
   - "Energy Star CustomerServer / PM credentials -> left blank (no external calls from a throwaway database)"
   - "SMTP/mail relay -> left unset or pointed at a local sink, so no alarm/MFR mail actually sends"
-  reportChecklist:  # one representative report per stage/bucket, with the value to expect
-  - {report: Company node / Levels (Database Administrator), expect: "3 companies (6 Northlake University, 3 Cedar Row Apartments, 5 Northlake Thermal Plant), 4 base levels each"}
+  reportChecklist:  # one representative report per stage/bucket, with the value to expect; checks.sql asserts the ones that can be queried and prints the rest as read-by-eye
+  - {report: Company node / Levels (Database Administrator), expect: "3 companies (6 Northlake University, 3 Cedar Row Apartments, 5 Northlake Thermal Plant) with 4 base levels each, and Stage 7 adds Northlake Town Center; scripted in checks.sql baseline_counts"}
   - {report: Utility Providers list, expect: "6 providers (1 Valley Electric District, 2 Sierra Gas Utility, 3 River City Utilities, 4 Northlake Thermal Plant, 5 Helios Onsite Solar, and Ridgeline Wind, added 2026-10-01)"}
   - {report: rp_MonthlyEUI / BenchmarkRanking, expect: "the 12-building peer set ranked, Science Center (lab) highest EUI"}
   - {report: GHGHistory, expect: "computed emissions per company, Scope 2 electric via eGRID CAMX and Scope 1 gas via Non-electric commodities"}
@@ -41,12 +41,12 @@ records:
   - {report: WeatherRegression / RegressionSummary, expect: "4 regressions with R^2 in the ranges from Stage 8 step 5"}
   - {report: ProjectDetail / ProjectSummary / ProjectFinance, expect: "the 5 projects (the WTG-07 Gearbox Replacement included) with their capital/incentive/event values from Stage 9 step 1"}
   - {report: rp_AlarmDataMap, expect: "the 15 alarm definitions from Stage 9 step 2 (ten Ridgeline Turbine State alarms and the met mast high-wind alarm among them), with any raised/ack/resolved history that has occurred, WTG-07's 2025 Fault included"}
-  - {report: rp_Audit, expect: "the bill/account/meter field-edit rows from Stage 9 step 3"}
+  - {report: Audit Explorer (audit_explorer, replaced rp_Audit), expect: "4 or more entries by jordan.hale: the bill, billing account and two meter edits from Stage 9 step 3; scripted in checks.sql activity_and_audit_survive_restore"}
   - {report: rp_ActivityTracker, expect: "login and report-view counts per user; casey.holt at zero; elena.vasquez and kai.nakamura with report views on Ridgeline points only"}
-  - {report: rp_TaskLog / rp_GatewayStatus, expect: "run history for the 12 scheduled tasks from Stage 9 step 4"}
+  - {report: rp_TaskLog / rp_GatewayStatus, expect: "finished TaskRun history for the enabled Task Library schedules and maintenance entries of Stage 9 step 4 (TaskLog and WorkflowRun are retired), and 12 gateways, 26 nodes, 258 direct points on Gateway Status (Stage 3)"}
   - {report: MyFavoriteReports dashboards, expect: "Facility Operations, Executive Overview and Ridgeline Operations render their tiles"}
-  - {report: Bill Tracking (Ridgeline accounts), expect: "the generated July 2024 Ridgeline transfer statement at $129,330.27; the generator account's first bill (July 1 to August 4, 2024) at $1,077.45, its -$152,792.65 credit on the Central Plant's September 2024 bill and nowhere else"}
+  - {report: Bill Tracking (Ridgeline accounts), expect: "the generated July 2024 Ridgeline transfer statement at $129,330.27; the generator account's first bill (July 1 to August 4, 2024) at $1,077.45, its -$152,792.65 credit on the Central Plant's September 2024 bill and nowhere else; scripted in checks.sql ridgeline_bill_values"}
   - {report: rp_HMRConfiguration, expect: "the Neptune and MVRS routes from Stage 9 step 7"}
-  - {report: my_imports, expect: "the two MyImport template uploads from Stage 9 step 7"}
+  - {report: my_imports, expect: "the Loss Factor Import definition and its one upload from Stage 9 step 7 (Interval Data Import and Northlake Stage 2 are also installed); Meter Swap, Create Hierarchy, Hospitality, SWG, CRC and Boulder City are absent"}
   cleanUp: "drop EEMSuite_NorthlakeVerify and its scratch folders once every row above matches; the real
     EEMSuite_Northlake and its ProgramData folders are never touched by this step"

@@ -1,75 +1,189 @@
-# Stage 9, step 4: Task schedules (Web, #/tasks/manager) and two custom workflows plus one custom task
-# (Configuration Tool, Workflow Designer). VERIFIED against the installed Task_Tbl (41 rows) and Workflow (18
-# built-in rows) before writing this file. `kind` on each record distinguishes a plain schedule on an existing
-# task, a new multi-step workflow, and the one new task.
+# Stage 9, step 4: scheduled tasks and workflows. Rewritten 2026-11-10 against the product's current built-in task catalog
+# (src/Domain/Services/EEMSuite.Domain.Services/Admin/Tasks/BuiltInTaskCatalog.cs, Revision 4). Three screens, one job each:
+#   Web, Task Dashboard > Tasks (#/tasks/manager redirects there): the schedules of the tasks a customer may schedule.
+#   Configuration Tool > Maintenance: the built-in maintenance procedures each machine runs, with a schedule apiece.
+#   Configuration Tool > Tasks (Task Editor) and Workflow Designer: a custom task, and the two custom workflows.
+# Task run history is no longer TaskLog or WorkflowRun (both retired by Scripts/RetireTaskLogs.sql): every run is a
+# dbo.TaskRun row (TaskRunId, TaskName, StartedAt, EndedAt, FinalStatus, SummaryText, ErrorCount) shown in the Task Dashboard
+# and the Task Log report (rp_TaskLog); log lines are in the application log (Log Viewer).
 stage: 9
 step: 4
 title: Tasks and workflows
 app: Web, Configuration Tool
-screen: tasks/manager, Workflow Designer
+screen: Task Dashboard > Tasks; Configuration Tool > Maintenance; Configuration Tool > Tasks; Workflow Designer
 source:
 - generators/documents/sources/implementation/dream-customer/phase6-operations-engagement-spec.md
 notes:
-- 'tasks/manager fields (CreateTaskItem): pick a Task, then One Shot / Interval (>=300s, the task''s
-  MinIntervalSeconds floor) / Cron, a target machine, and Active. Run Now is available per item. TaskType buckets
-  (verified, 6 rows): 1 System Tasks, 2 Standard Alerts, 3 EEM Gateways, 4 Report Tasks, 5 MFR Reports, 6 Bill
-  Importer Tasks.'
-- 'The 12 standard-schedule records below are all existing Task_Tbl rows (verified: Daily Administration 17,
-  Process HDD/CDD Calculations 25, Run DataGap Calculations 28, Run Bill Validation 27, Late Bills 13, Populate
-  Warehouse 23, Run Bill Importer 43, Alarm Mail Service 4, Gateway Status 12, Energy Star 19, Energy Star
-  Automation Task 20, Weather Normalization Sync 48); nothing to create for these, only a schedule. (Alarm Mail
-  Service is also the alarm_mail_task record in 02-alarms.yaml; it appears once here for the full schedule list.)'
-- 'Workflow Designer screens (verified file layout): WorkflowsDashboardView lists workflows; WorkflowDesignerView
-  opens one on a node-based canvas (WorkflowFlowCanvasView/WorkflowFlowNodeRowView). The installed Workflow table
-  ships 18 built-in single-purpose workflows (SQLJobs, SQLEmailer, Alarm Mail Notification, each gateway type,
-  BillImporter, AP Upload Emailer, Anonymize User Data); a custom workflow in this stage composes several of
-  those components into one multi-step flow and gets its own WorkflowId/WorkflowVersion.'
-- 'The custom Northlake task (proposed): "Nightly Campus Load Summary" -- a Report Task built on the existing
-  SQLEmailer workflow (id 2, verified: "Runs a SQL emailer command, then sends the result as HTML tables or
-  per-result-table CSV attachments"), no new workflow needed. Its SQL summarizes yesterday''s electric kWh, gas
-  therms and cost per Northlake Main Campus building and emails it as an HTML table.'
+- 'The catalog today (BuiltInTaskCatalog.Definitions): Workflow Quick Run, Anonymize User Data, Export User Data, Alarm Mail
+  Notification, Run WUI Process, Bank of Canada Currency Update and Publisher are SystemOnly (the product owns them; the
+  Task Library shows them read-only). AP Emailer Task has CanSchedule false (it runs when an AP file is uploaded, Stage 6).
+  BIP Automated Import and Password Expiration Notification are the two built-in tasks a customer schedules. Maintenance SQL
+  (SystemOnly) carries 13 maintenance entries, edited on the Configuration Tool Maintenance page, not on the Task Library.
+  Gateway tasks (Stage 3) and any task made in the Task Editor are the rest of the library.'
+- 'Task Library schedule form (taskScheduleForm.ts, schedule-editor.ts): Description (required), Machine (when the task has more
+  than one target), Status Enabled, then Schedule with How often = Once at... / Every N (minute, hour, day, week; the floor is the
+  task''s Min Interval, 300 s) / At specific times (Daily, Weekdays, Specific weekdays, Day N of month, Last day of month,
+  Nth weekday of month, each at HH:MM) / Custom cron; Start date; Run forever, or an end date; then the task''s parameters.
+  The ScheduleKind stored is 0 once, 1 interval, 2 cron (TaskSchedules.sql); the presets store a cron expression.'
+- 'Configuration Tool > Maintenance (MaintenanceView, MaintenanceScheduleEditorView): pick a Machine, then each procedure shows
+  an Enabled toggle and its schedule (a Quartz cron, with a Time zone); procedures that share a schedule run top to bottom in
+  their run order. Assign built-in maintenance (Repair or Full reset) puts the 13 built-in rows on a machine. Built-in rows
+  arrive switched off (BuiltInMaintenance_Ensure inserts IsEnabled = 0); the records below say which Northlake switches on.'
+- 'Where the old 12 standard schedules went (Task_Tbl ids 4, 12, 13, 17, 19, 20, 23, 25, 27, 28, 43, 48 are history):
+  Process HDD/CDD Calculations is the Degree-day calculations entry (DEGREE_DAYS); Run DataGap Calculations is Data gap
+  monitoring (DATA_GAPS); Run Bill Validation is Bill validation (BILL_VALIDATION); Populate Warehouse is Warehouse upkeep
+  (WAREHOUSE_UPKEEP); Weather Normalization Sync is Weather normalization (WEATHER_NORMALIZATION); Run Bill Importer is BIP
+  Automated Import. Removed with no equivalent: Daily Administration (17, also absent per ADR-002c line 273), Late Bills (13) and
+  Gateway Status (12) as scheduled tasks (their reports rp_LateBills and rp_GatewayStatus remain), Alarm Mail Service (4, now
+  the SystemOnly Alarm Mail Notification, nothing to schedule), Energy Star (19) and Energy Star Automation Task (20) (not in the
+  catalog: if Stage 8 step 4 made an ENERGY STAR task in the Task Editor, its schedule is entered there).'
+- 'BIP Automated Import is both a built-in task (BIP_AUTOMATED_IMPORT, Task Library) and a maintenance entry
+  (BIP_AUTOMATED_IMPORT, procedure BillImportPro_ImportTask, every 5 minutes). Both run the same procedure, so Northlake enables at
+  most one. The Task Library schedule below is left Enabled off because Stage 5 imports its bill files by hand and an automatic
+  import would race it; the maintenance row stays off too. Whether both should exist is a product question (finding candidate).'
+- 'Built-in maintenance with a configuration prerequisite does nothing until it is met: Bill validation needs the system
+  constant IsValidateBillsJob on, Configuration audit retention needs ApplicationAudit:RetentionDays. Northlake switches both
+  rows on; they run empty until the setting exists.'
+- 'Workflow Designer screens (verified file layout): WorkflowsDashboardView lists workflows; WorkflowDesignerView opens one on a
+  node-based canvas. A custom workflow composes components (gateway, BillImporter, Sql, SQLEmailer, ...) into one multi-step
+  flow and gets its own WorkflowId and WorkflowVersion. A task is then made in Configuration Tool > Tasks (Add Group, Add task:
+  Name, Description, Task Code, run kind Workflow with Latest or Pinned, or Executable; Can Schedule, Single Schedule,
+  Min Interval; default parameters) and scheduled on the Task Library.'
+- 'The custom task, Nightly Campus Load Summary, is a task on the existing SQLEmailer workflow, no new workflow: its SQL
+  summarizes yesterday''s electric kWh, gas therms and cost per Northlake Main Campus building and emails it as an HTML
+  table. It carries two schedules, so Single Schedule is switched off on its task.'
+- 'Alarm Mail Notification (what mails the Stage 9 step 2 alarms) is product-owned and is not scheduled here; see the last
+  record of 02-alarms.yaml.'
 records:
-- {key: sched_daily_administration, kind: standard_schedule, installed: {taskItemId: }, Task Manager: {Task: "Daily Administration (17)", Type: System Tasks, Schedule: "daily, 02:00"}}
-- {key: sched_process_hdd_cdd, kind: standard_schedule, installed: {taskItemId: }, Task Manager: {Task: "Process HDD/CDD Calculations (25)", Type: System Tasks, Schedule: "daily, 03:00"}}
-- {key: sched_run_datagap, kind: standard_schedule, installed: {taskItemId: }, Task Manager: {Task: "Run DataGap Calculations (28)", Type: System Tasks, Schedule: "every 300s"}}
-- {key: sched_run_bill_validation, kind: standard_schedule, installed: {taskItemId: }, Task Manager: {Task: "Run Bill Validation (27)", Type: System Tasks, Schedule: "every 300s"}}
-- {key: sched_late_bills, kind: standard_schedule, installed: {taskItemId: }, Task Manager: {Task: "Late Bills (13)", Type: Standard Alerts, Schedule: "daily, 06:00"}}
-- {key: sched_populate_warehouse, kind: standard_schedule, installed: {taskItemId: }, Task Manager: {Task: "Populate Warehouse (23)", Type: System Tasks, Schedule: hourly}}
-- {key: sched_run_bill_importer, kind: standard_schedule, installed: {taskItemId: }, Task Manager: {Task: "Run Bill Importer (43)", Type: Bill Importer Tasks, Schedule: "every 300s"}}
-- {key: sched_alarm_mail_service, kind: standard_schedule, installed: {taskItemId: }, Task Manager: {Task: "Alarm Mail Service (4)", Type: System Tasks, Schedule: "every 300s"}}
-- {key: sched_gateway_status, kind: standard_schedule, installed: {taskItemId: }, Task Manager: {Task: "Gateway Status (12)", Type: Standard Alerts, Schedule: hourly}}
-- {key: sched_energy_star, kind: standard_schedule, installed: {taskItemId: }, Task Manager: {Task: "Energy Star (19)", Type: System Tasks, Schedule: "every 300s (holds until the sandbox PM account is connected, Stage 8 step 4)"}}
-- {key: sched_energy_star_automation, kind: standard_schedule, installed: {taskItemId: }, Task Manager: {Task: "Energy Star Automation Task (20)", Type: System Tasks, Schedule: "every 300s"}}
-- {key: sched_weather_normalization_sync, kind: standard_schedule, installed: {taskItemId: }, Task Manager: {Task: "Weather Normalization Sync (48)", Type: System Tasks, Schedule: "every 300s"}}
+- key: sched_password_expiration
+  kind: task_schedule
+  installed: {taskItemId: }
+  Task Dashboard > Tasks:
+    Task: Password Expiration Notification
+    Description: Password expiration notice, weekdays 06:00
+    Status: Enabled
+    How often: At specific times, Weekdays at HH:MM
+    Time (HH:MM): '06:00'
+    Run forever: true
+    Parameters: {To: jordan.hale@northlake.example.edu}   # assumed: the Northlake administrator who would handle expiring passwords
+- key: sched_bip_automated_import
+  kind: task_schedule
+  installed: {taskItemId: }
+  Task Dashboard > Tasks:
+    Task: BIP Automated Import
+    Description: BIP automated import
+    Status: Enabled off   # assumed, see the note on BIP above
+    How often: Every N, 5 minutes
+    Run forever: true
+- key: maint_bip_automated_import
+  kind: maintenance_entry
+  installed: {maintenanceTaskId: }
+  Maintenance: {Entry: BIP automated import, Procedure: BillImportPro_ImportTask, Schedule: '0 0/5 * * * ?', Enabled: false, Run order: 10}
+- key: maint_calendar_extension
+  kind: maintenance_entry
+  installed: {maintenanceTaskId: }
+  Maintenance: {Entry: Calendar extension, Procedure: CompanyCalendar_AutoAddYear, Schedule: '0 0 2 * * ?', Enabled: true, Run order: 10}
+- key: maint_bill_sync
+  kind: maintenance_entry
+  installed: {maintenanceTaskId: }
+  Maintenance: {Entry: Bill synchronization, Procedure: job_wh_Bills_Sync, Schedule: '0 0/5 * * * ?', Enabled: true, Run order: 10}
+- key: maint_warehouse_upkeep
+  kind: maintenance_entry
+  installed: {maintenanceTaskId: }
+  Maintenance: {Entry: Warehouse upkeep, Procedure: Job_PopulateWarehouse, Schedule: '0 2 * * * ?', Enabled: true, Run order: 10}
+- key: maint_log_retention
+  kind: maintenance_entry
+  installed: {maintenanceTaskId: }
+  Maintenance: {Entry: Application log retention, Procedure: TaskLogs_Delete, Schedule: '0 0 2 * * ?', Enabled: true, Run order: 70}
+- key: maint_audit_retention
+  kind: maintenance_entry
+  installed: {maintenanceTaskId: }
+  Maintenance: {Entry: Configuration audit retention, Procedure: AuditEntry_PurgeExpired, Schedule: '0 0/15 * * * ?', Enabled: true, Run order: 10}
+  prerequisite: ApplicationAudit:RetentionDays (not set by this recipe, so the row runs and purges nothing)
+- key: maint_bill_validation
+  kind: maintenance_entry
+  installed: {maintenanceTaskId: }
+  Maintenance: {Entry: Bill validation, Procedure: uaBillValidate_Job, Schedule: '0 0/30 * * * ?', Enabled: true, Run order: 10}
+  prerequisite: system constant IsValidateBillsJob (Stage 5 step 1 rules)
+- key: maint_bill_generation
+  kind: maintenance_entry
+  installed: {maintenanceTaskId: }
+  Maintenance: {Entry: Bill generation, Procedure: UtilityGenBill_Create, Schedule: '0 0 2 * * ?', Enabled: true, Run order: 30}
+  note: Stage 7 step 7's Run Bill Gen, and Stage 12 scenario 4's bills.
+- key: maint_bill_allocation
+  kind: maintenance_entry
+  installed: {maintenanceTaskId: }
+  Maintenance: {Entry: Bill allocation, Procedure: Job_BillAllocation, Schedule: '0 0 2 * * ?', Enabled: true, Run order: 40}
+- key: maint_degree_days
+  kind: maintenance_entry
+  installed: {maintenanceTaskId: }
+  Maintenance: {Entry: Degree-day calculations, Procedure: IndexDDCalc, Schedule: '0 0 2 * * ?', Enabled: true, Run order: 20}
+- key: maint_data_gaps
+  kind: maintenance_entry
+  installed: {maintenanceTaskId: }
+  Maintenance: {Entry: Data gap monitoring, Procedure: hmDataGap_Exec, Schedule: '0 10 * * * ?', Enabled: true, Run order: 10}
+- key: maint_weather_normalization
+  kind: maintenance_entry
+  installed: {maintenanceTaskId: }
+  Maintenance: {Entry: Weather normalization, Procedure: job_WeatherNormalization, Schedule: '0 0 2 * * ?', Enabled: true, Run order: 60}
+- key: maint_baseline_fill
+  kind: maintenance_entry
+  installed: {maintenanceTaskId: }
+  Maintenance: {Entry: Baseline filling, Procedure: PointData_BaselineFill, Schedule: '0 0 2 * * ?', Enabled: true, Run order: 50}
 - key: workflow_bill_download_validate_notify
   kind: custom_workflow
   installed:
     workflowId:
     workflowVersionId:
+    taskItemId:
   Workflow Designer:
     Name: "Bill Download, Import, Validate, Notify Finance"
     Steps: "download the provider bill file (existing gateway component appropriate to the file source) -> BillImporter
-      workflow component -> Run Bill Validation -> SQLEmailer notifying the NLU Rates Admins group of results"
-  scheduledAs: a new task on this workflow, daily 07:00
+      workflow component -> Sql component calling uaBillValidate_Job (the procedure behind the Bill validation maintenance
+      entry; assumed, the component's parameter names are read when it is dropped on the canvas) -> SQLEmailer notifying
+      the NLU Rates Admins group of results"
+  Task Editor: {Group: Northlake, Task: "Bill Download, Import, Validate, Notify Finance", Run kind: Workflow (Latest), Can Schedule: true}
+  Task Dashboard > Tasks:
+    Description: Bill download, import, validate, notify finance (daily 07:00)
+    Status: Enabled
+    How often: At specific times, Daily at HH:MM
+    Time (HH:MM): '07:00'
+    Run forever: true
 - key: workflow_gateway_regression_alert
   kind: custom_workflow
   installed:
     workflowId:
     workflowVersionId:
+    taskItemId:
   Workflow Designer:
     Name: "Gateway Read, Publish, Weather Regression, Alert"
     Steps: "run the AcquiSuite/MV90 gateway component for a metered building -> publish normalized interval readings
-      (built into the gateway component) -> Weather Normalization Sync -> Alarm Mail Notification if the fit degrades"
-  scheduledAs: a new task on this workflow, daily 04:00, after the gateway's own interval schedule
+      (built into the gateway component) -> Sql component calling job_WeatherNormalization (the procedure behind the
+      Weather normalization maintenance entry; assumed) -> SQLEmailer mailing the fit result to NLU Rates Admins if it
+      degrades (replaces the earlier Alarm Mail Notification step: that workflow is the product's own and is not a
+      component to compose)"
+  Task Editor: {Group: Northlake, Task: "Gateway Read, Publish, Weather Regression, Alert", Run kind: Workflow (Latest), Can Schedule: true}
+  Task Dashboard > Tasks:
+    Description: Gateway read, publish, weather regression, alert (daily 04:00)
+    Status: Enabled
+    How often: Custom cron
+    Cron: '0 0 4 * * ?'
+    Run forever: true
+  note: runs after the gateway's own interval schedule; this one uses the Custom cron mode, the others use presets.
 - key: nightly_campus_load_summary
   kind: custom_task
   installed:
     taskId:
-    taskItemId:
-  Task Manager:
-    Task: Nightly Campus Load Summary
-    Type: Report Tasks
-    "Built On": "SQLEmailer (Workflow 2, existing)"
-    Query: "yesterday's electric kWh, gas therms and cost per Northlake Main Campus building"
-    Recipients: nlu_facilities_setup
-    Schedule: "daily, 06:30"
+    taskItemIds: []
+  Task Editor:
+    Group: Northlake
+    Name: Nightly Campus Load Summary
+    Description: Yesterday's electric kWh, gas therms and cost per Northlake Main Campus building
+    Task Code: NLU_CAMPUS_LOAD   # assumed; the Optional unique code field
+    Run kind: Workflow, SQLEmailer (Workflow 2, existing), Latest
+    Can Schedule: true
+    Single Schedule: false   # two schedules below
+    Default parameters: {Query: "yesterday's electric kWh, gas therms and cost per Northlake Main Campus building", To: nlu_facilities_setup}
+  Schedules:
+  - {Description: Nightly campus load summary (daily 06:30), Status: Enabled, How often: "At specific times, Daily at HH:MM", Time (HH:MM): '06:30', Run forever: true}
+  - {Description: Nightly campus load summary (pilot send), Status: Enabled, How often: "Once at...", Start date: '2026-12-01 06:35'}   # assumed date, the pilot send before the daily one is trusted

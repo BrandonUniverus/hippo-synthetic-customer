@@ -9,13 +9,21 @@ status: Ready to enter (revised 2026-10-01)
 Stage 2 turns the three companies from Stage 1 into a working meter-to-point tree: the units
 Northlake adds to the catalog, billing accounts for every utility and internal counterparty, the
 sites and buildings that already exist on the instance plus the new Ridgeline Wind Site and Cedar
-Row C, 390 meters, 474 points a person enters (including the three baseline point shells, the
+Row C, 391 meters, 475 points a person enters (including the three baseline point shells, the
 Student Center activity index and the 73 points the handheld routes read), the weather-station
-assignment every building gets, and the eleven aggregates. EEM adds another 203 points of its own
+assignment every Sacramento-area building gets, and the eleven aggregates. EEM adds another 204 points of its own
 behind these (usage points behind every register, HDD/CDD behind the three temperature indexes),
-for 677 points in the finished tree. Cedar Row C, the emergency generators, the switchgear meter and
+for 679 points in the finished tree. Cedar Row C, the emergency generators, the switchgear meter and
 their points were added on November 7, 2026, for the Stage 3 handheld routes; the Stage 2 import
 creates them beside what is already entered.
+
+**Added 2026-11-10: variety.** Stage 2 was already entered, so this is extra work on the installed
+instance, and nothing already entered changes. A Toronto site and building bring a second time zone
+(Eastern), a second country (Canada), a first area in square metres, a Canadian dollar billing
+account and a Node Contact; a closed Lakeshore Boathouse brings a closed building, a two-row area
+history, a removed meter (Status Removed), an inactive billing account and a register with a Delta
+Multiplier of 1.037; the Ridgeline Wind Site gains a Node Contact; and Step 7 saves one Hierarchy Filter.
+Each step below says what these add.
 Nothing in this stage loads a bill or an interval reading; that is Stage 3 onward. The baselines
 themselves are configured in Stage 3, once their measured points have a gateway. See the
 [inventory standard](northlake-inventory-standard.pdf) for how the physical estate was inventoried
@@ -87,24 +95,27 @@ seeded unit, so its conversions stay as seeded (product finding 37).
 
 **Where:** Database Administrator, Nodes, the company node's Utility Accountant tab.
 
-**Enter:** [01-billing-accounts.yaml](01-billing-accounts.yaml), 51 records.
+**Enter:** [01-billing-accounts.yaml](01-billing-accounts.yaml), 53 records.
 
 **Order inside the editor:** select the company, click Add, set Currency Unit to US Dollar first (a
-new account starts as Australian Dollar, the first currency by name), fill the rest of Definitions and save;
+new account starts as Australian Dollar, the first currency by name; the Toronto account takes Canadian Dollar), fill the rest of Definitions and save;
 Service Address, Account Address, Account Contact, Notes and Status unlock after the first save.
 Status needs an administrator.
 
 **What varies:** Bill Entry Type is Bill Importer for every Valley Electric and River City account
-(31), Bill Entry for Sierra Gas and Helios (13), Bill Allocation for the six Thermal Plant cost
+(31), Bill Entry for Sierra Gas and Helios and the Toronto account (15), Bill Allocation for the six Thermal Plant cost
 centers, and Bill Generation for Ridgeline's transfer agreement. Bill Service Type is AP Upload
-Only (46), No AP Upload for the Cedar Row control account, Bill Payment for the three Helios PPA
+Only (48), No AP Upload for the Cedar Row control account, Bill Payment for the three Helios PPA
 accounts and the Ridgeline transfer (a journal). The Thermal Plant cost centers and the Ridgeline
 transfer use the Billing Charges Report template. Every account gets Active Billing Account as of
 2024-01-01, which bill validation's account-opening test needs, except the two Ridgeline accounts,
 which open on 2024-07-01. SYN-RCU-A-0030003 carries its pre-renewal number in Previous Account
 Number, and the Ridgeline generator account SYN-VED-A-0010014 the seller's number; one account has
 no contact; service addresses carry the building's coordinates; the Thermal Plant's mail stop goes
-in Address 2.
+in Address 2. Two accounts were added on 2026-11-10: SYN-GSH-A-0090001 for the Toronto Research Hall,
+the only Canadian dollar account (its provider is Georgian Shore Hydro, Stage 1), and SYN-SGU-A-0020011 for the
+Lakeshore Boathouse, which opens 2024-01-01 and is closed on 2025-07-31. The import writes only the Active row, so enter
+the closing Status row by hand on the Status page, after the import, with the entry the page lists for closing an account.
 
 **Remember:** Bill Entry lists only Bill Entry accounts. The 31 importer, 6 allocation and 1
 generation accounts never appear there; their bills arrive through Bill Importer (Stage 5),
@@ -121,17 +132,24 @@ allocation and generation (Stage 7).
 
 **Where:** Database Administrator, Nodes.
 
-**Enter:** [02-sites-and-buildings.yaml](02-sites-and-buildings.yaml), the 5 sites (the 4
-company sites plus the Weather Reference site) and the 16 buildings.
+**Enter:** [02-sites-and-buildings.yaml](02-sites-and-buildings.yaml), the 6 sites (the 4
+company sites, the Weather Reference site and the Northlake Toronto Campus) and the 18 buildings.
 
 **What each record holds:** every page the node editor shows for that node, in order: the Level
 it is added at (the company's Stage 1 level, such as 2: Facilities), Definitions with the Site or
 Building Code, Node Address, Area, Keywords, a building's Status and Notes. A null or empty page is
 deliberate and stays empty; those are the empty states under test. Keywords are what is assigned
 on that node: Department once on each site, which its buildings list under Inherited Keywords to
-verify. Sites have no Status page; every building opens on 2024-01-01, the Ridgeline buildings on
+verify. Sites have no Status page; every building opens on 2024-01-01 (the Toronto Research Hall on 2026-01-01), the Ridgeline buildings on
 the acquisition date, 2024-07-01. Northlake University codes its campus (NLU-MAIN, ADM, SCI and
 so on); Cedar Row and the Thermal Plant leave the code empty.
+
+**Added 2026-11-10:** the Northlake Toronto Campus and Toronto Research Hall (Eastern time, Country CANADA,
+Region ON, the hall's Area in SqM, a Node Contact on the campus), the Lakeshore Boathouse (Status Open on 2024-01-01 and
+Closed on 2025-06-30, Area 3,200 SqFt from 2024-01-01 and 2,400 SqFt from 2025-03-01), and a Node Contact for
+Mateo Alvarez on the Ridgeline Wind Site. Node Contact is the page of that name on a node; it takes First Name, Last Name,
+Title, Phone and Email, like an Account Contact. The Area page lists two units; the one that is not SqFt is square metres.
+The checks cover the new nodes' time zone, address, area and status, but not Node Contact.
 
 **Order inside the editor:** the original nodes, their Node Address, their Area history and their
 Department keywords already exist. Open each one and check the values against the file, then add
@@ -168,18 +186,19 @@ rather than re-entering areas.
 **Where:** Database Administrator, Nodes, Meter nodes under each building (and, for the two
 weather stations, under Weather Reference).
 
-**Enter:** [03-meters.yaml](03-meters.yaml), 390 records: 67 utility meters (on a billing
+**Enter:** [03-meters.yaml](03-meters.yaml), 391 records: 68 utility meters (on a billing
 account), 320 owned meters with no billing account (including 248 apartment submeters at Cedar
 Row A and B, Cedar Row C's 50 water submeters, three emergency generators, the Central Plant Main
 Switchgear and the Ridgeline met mast), and the 3 weather-station meters (KSAC, KSMF and KSUU).
 
 **Order inside the editor:** add the meter node under its building, then on its Definitions page
 set Measure Type first (a new meter starts as Activity Level), then Meter Number, the Billing
-Account (which brings the meter's Utility Provider and Bill Cycle choices with it) for the 67
+Account (which brings the meter's Utility Provider and Bill Cycle choices with it) for the 68
 meters that have one, then Provider Meter Number and Meter Multiplier. Save, then Keywords and
 Status. Every meter opens on its in-service date: 2024-01-01 for most, 2024-07-01 for the thirteen
 Ridgeline meters and 2024-08-15 for the Library replacement, whose predecessor closes as Closed - Ex
-on 2024-08-14. A meter's Status page writes the SM history that bill validation reads (tests 41
+on 2024-08-14, and the Lakeshore Boathouse gas meter (added 2026-11-10) goes Open on 2024-01-01 and
+Removed on 2025-07-15. A meter's Status page writes the SM history that bill validation reads (tests 41
 and 42) and lists SM's statuses; saving the backdated Open row replaces the Open row Meter_Save
 wrote on the day the meter was entered. Enter a sample by hand; the Stage 2 import sets the rest.
 
@@ -214,7 +233,7 @@ in the Weather Stations picker (finding 18): never pick it.
 **Where:** Database Administrator, Nodes, Point nodes under each meter (one, the Student Center
 Event Count, directly under its building).
 
-**Enter:** [04-points.yaml](04-points.yaml), 474 records, 72 of them Ridgeline's and 73 the handheld routes' (registers on Cedar Row C, the irrigation meters, the generators and the switchgear, whose four demand reads are Analog points with no register). A new Accumulator takes only an Energy or Volume unit or one with a rate unit, so each generator's run hours (in Hour) are an Analog register with its own Analog usage point. Ridgeline has six on each
+**Enter:** [04-points.yaml](04-points.yaml), 475 records, 72 of them Ridgeline's and 73 the handheld routes' (registers on Cedar Row C, the irrigation meters, the generators and the switchgear, whose four demand reads are Analog points with no register). A new Accumulator takes only an Energy or Volume unit or one with a rate unit, so each generator's run hours (in Hour) are an Analog register with its own Analog usage point. Ridgeline has six on each
 turbine (Generated kWh, Active Power kW and Possible kW, Nacelle Wind Speed, Rotor Speed and the
 four-state Turbine State, all at 10 minutes), six on the met mast in metric units, three on the
 interconnection meter (export, station service and reactive kVArh at 15 minutes) and three on KSUU
@@ -222,9 +241,11 @@ interconnection meter (export, station service and reactive kVArh at 15 minutes)
 on the two meters whose multiplier would otherwise act on no data: Science Center Electric Lab
 Wing (x40, its current-transformer ratio) and Central Plant Boiler Gas (x3.0367, the pressure
 factor), the gas one in Hundreds of Cubic Feet - (ccf), the Volume unit, not the Energy unit with
-the same label.
+the same label. The Lakeshore Boathouse gas meter's register (added 2026-11-10) reads hundreds of cubic feet and
+reports therms, so its Delta Multiplier is 1.037; the Delta box on the Point Definitions page is visible only for
+an Accumulator, and it is the one multiplier that is not 1. The workbook and the checks do not carry it, so type it.
 
-A meter with no points is a bill-only utility meter: 37 of the 390 carry only monthly bills, which
+A meter with no points is a bill-only utility meter: 37 of the 391 carry only monthly bills, which
 reach them in Stage 5 through the billing account, so they need no point.
 
 **Order inside the editor:** add the point, then set Reading Type, Measure Type, Units and Archive
@@ -239,7 +260,7 @@ Activity Level index, Relative Humidity and Pressure points, the points whose un
 0, and Rotor Speed as an Activity Level point because RPM is seeded under that measure type alone.
 
 **EEM creates for you:** an AccumulatorDelta point behind every Accumulator point, and an HDD and a
-CDD point behind each Degree Days index, in (F) or (C) units to match the temperature, for 138
+CDD point behind each Degree Days index, in (F) or (C) units to match the temperature, for 204
 points EEM generates on its own. Capture their IDs on the parent point's own `installed:` block
 (`deltaPointId`, or `hddPointId`/`cddPointId`) rather than typing them in as separate records.
 
@@ -254,7 +275,8 @@ page.
 Sacramento Executive Airport for the eight campus buildings and the Central Plant, KSMF Sacramento
 International Airport for the four Cedar Row buildings, and KSUU Travis Air Force Base for
 Ridgeline Turbine Field and Ridgeline Substation. The Ridgeline Met Mast sorts first in the combo
-for the Ridgeline nodes because it stands on the site; it is not a station.
+for the Ridgeline nodes because it stands on the site; it is not a station. The two buildings added on 2026-11-10 get none: the Toronto Research Hall is
+outside the three stations' reach and the Lakeshore Boathouse is closed.
 
 **Order inside the editor:** do this after Step 3, since the Station combo only lists meters
 that already exist with the Weather measure type. It has to be repeated once per company; the
@@ -292,6 +314,20 @@ re-entered once the fix is in.
 
 **Check:** `06 Aggregates`, `06 Aggregate members`.
 
+## Step 7. Hierarchy filters
+
+**Where:** Database Administrator, Nodes, the tree's filter bar, manage filters (the Hierarchy Filters page).
+
+**Enter:** [07-hierarchy-filters.yaml](07-hierarchy-filters.yaml), one filter (added 2026-11-10): Utility Meters,
+the Northlake University meters whose Meter Type keyword is Utility Meter, usable by everyone in the company.
+
+**Order inside the editor:** New filter, then Name, Where (the company, then what the filter returns: Meters),
+What (add a Keyword criterion: Meter Type is one of Utility Meter) and Who (Everyone in my company, offered to
+administrators). Save, then Count matches: compare the count with the Northlake University meters in
+03-meters.yaml that carry Meter Type = Utility Meter.
+
+**Record:** the filter's ID, if the page shows one. There is no check for it; the page's own count is the check.
+
 ## Entering by hand or by import
 
 A draft My Import handler (Northlake Stage 2, in the EEMSuite repository under
@@ -324,20 +360,24 @@ copied node.
 
 - Seven new units exist with their measure types and conversions, and Kilometers per Hour, Meters
   per Second, Degrees, Kilogram per cubic meter and PSIG carry their new measure types.
-- 51 billing accounts exist with their entry type, service type, template, addresses, contact
+- 53 billing accounts exist with their entry type, service type, template, addresses, contact
   (all but one), Active status from 2024-01-01 (2024-07-01 for the two Ridgeline accounts), and the
-  renewal and transferred accounts' previous numbers and notes.
-- The 5 sites and 16 buildings carry an address with coordinates, a floor area where one applies,
+  renewal and transferred accounts' previous numbers and notes; one account is in Canadian
+  dollars and one, the Lakeshore Boathouse's, is inactive from 2025-07-31.
+- The 6 sites and 18 buildings carry an address with coordinates, a floor area where one applies,
   a Department keyword, and Cedar Row A, B and C the Meter Type keyword; the two Ridgeline groups hold
-  their Points on the Ridgeline Wind Site.
-- 390 meters exist, 67 of them on a billing account, with the right measure type, multiplier, bill
+  their Points on the Ridgeline Wind Site; the Toronto nodes are in Eastern time and the hall's area is in square
+  metres; the Lakeshore Boathouse is closed from 2025-06-30 and has two area rows; the Toronto Campus and the Ridgeline
+  Wind Site each have a Node Contact.
+- 391 meters exist, 68 of them on a billing account, with the right measure type, multiplier, bill
   cycle and keywords, the Library meters carry their exchange status and the Ridgeline meters open
-  on 2024-07-01.
-- 474 points a person enters exist, each register with a usage point behind it in the right unit and
-  each temperature index with its HDD and CDD children in the right scale, for 677 points in total.
+  on 2024-07-01, and the Boathouse gas meter is Removed from 2025-07-15.
+- 475 points a person enters exist, each register with a usage point behind it in the right unit and
+  each temperature index with its HDD and CDD children in the right scale, for 679 points in total, the Boathouse register's usage point carrying a Delta Multiplier of 1.037.
 - Campus and plant buildings resolve to KSAC, Cedar Row buildings to KSMF and the Ridgeline nodes to
   KSUU.
 - 11 aggregate points exist with the right members, each registered for calculation.
+- The Utility Meters hierarchy filter exists and counts what the file's meters say it should.
 
 Run `checks.sql` beside this chapter to see each of these as a result set.
 

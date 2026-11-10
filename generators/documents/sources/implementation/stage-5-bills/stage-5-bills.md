@@ -1,7 +1,7 @@
 ---
 title: Stage 5. Bills
 subtitle: Bill validation rules, imported and manual bills, images, notes and approval
-status: Ready to enter (revised 2026-10-01)
+status: Ready to enter (revised 2026-11-10)
 ---
 
 # Stage 5. Bills
@@ -16,6 +16,18 @@ bounces. Bill Validation rules go in first so the deliberate failures actually
 fire when the bills that should trip them are saved. Stage 2's hierarchy and
 Stage 4's rates are prerequisites; nothing here needs Stage 3's interval data,
 though the interval-metered buildings' demand lines read better once it exists.
+
+**Who enters what (reconciled 2026-11-10).** Bill Entry lists only Bill Entry
+accounts, so the recipe now says one thing everywhere. The 31 Valley Electric
+and River City accounts, Cedar Row Apartments' and the Thermal Plant's included,
+are Bill Importer accounts and nora.chen imports them. The 13 Sierra Gas and
+Helios accounts are Bill Entry accounts: iris.morales types them, and
+marcus.reed types Cedar Row's own gas and PPA accounts. The six Thermal Plant
+cost centers are Bill Allocation accounts, so Bill Entry cannot open them and
+their bills arrive with Stage 7's allocation (keiko.tan reviews); Ridgeline's
+own statement is generated, also in Stage 7. That makes 44 accounts and 1,049
+bills in this stage (1,193 once Stage 7 adds the 144 plant bills, 1,211 with
+Ridgeline's 18 statements).
 
 **Added 2026-10-01: Ridgeline Wind.** The Thermal Plant's wind company brings two
 accounts, and this stage enters only one of them. Valley Electric's generator
@@ -38,48 +50,91 @@ itemized Valley Electric statements and that hand-made one are in
 - Stage 1's companies, providers, calendars, groups and users are in place; Stage
   2's billing accounts and meters exist with their synthetic account and meter
   numbers recorded, the Ridgeline generator account and its interconnection meter
-  included; Stage 4's VED-TOU-GS-FY25 rate is loaded, and so are the generator
+  included; Stage 4's reworked rates are loaded - VED-TOU-GS with its 2025-01-01
+  price date (there is no separate FY25 rate), VED-TOU-PRI, and the generator
   rates VED-GEN-IC and VED-BCT.
 - Accounts and meters are referenced here by synthetic number, not by database
   ID - look each one up in Stage 2's records before opening it.
 - Before Step 5, confirm the approver holds the Bill Validation function: that
   is what the product checks when a bill is validated, and Stage 1 grants it
   through EEM Company Setup (see Findings).
+- Leave SysConstants IsValidateBillsJob unset until the end of Step 5. The
+  validation job approves and un-approves bills by itself once it is on (see
+  Step 5 and Findings).
+- Step 3's bills carry no per-line Expense Account yet: that is Stage 6
+  (`per_line_coding`), after the GL accounts exist.
 
 ## Step 1. Bill Validation rules
 
 **Where:** Database Administrator, Nodes, the company node's Bill Validation
-tab.
+tab (the same page opens from the main window's Bill Validation item).
 
-**Enter:** [01-bill-validation-rules.yaml](01-bill-validation-rules.yaml), six
-records: the Global defaults and five account-level overrides.
+**Enter:** [01-bill-validation-rules.yaml](01-bill-validation-rules.yaml),
+twelve records: the Global defaults, the Northlake University Company Defaults,
+the Validation Bay group (created in Manage Groups, then its own settings), seven
+account records (the five planned overrides, the Ridgeline generator's holding
+two rows, plus two "watch" accounts, Admin Hall and the Library), and
+`test_catalog`, which lists all 48 tests.
 
-**Order inside the editor:** pick "Validation for" (Global Defaults, or a
-company), then "Settings for" if you picked a company (its own defaults, its
-groups, one group, or one billing account). The Bill Save tab holds the tests
-Northlake uses; Batch Test is untouched. Test Name, Commodity, the paired
-description and Unit are locked from the product's own catalog - only State,
-Percent and Amount are yours to set, and only on the row for the scope you are
-actually on.
+**The test list.** The product has 47 numbered tests and a 48th, number 99
+(accrual bill without a mapping). Their numbers and meanings are the index at
+the top of `BillValidation_Run.sql`; each is one `BillValidation_Calc*` procedure,
+and `test_catalog` says for every test which calculation it reads, where it is
+turned on, a bill that trips it and a bill that does not. 39 are exercised that
+way. Nine are not, each with its reason (6 no account is closed, 9 the editor
+repairs a reversed period, 29 needs a year of demand history, 37 and 38 need a
+Baseline bill scenario, 42 no bill bills the one closed meter, 44 needs a fall
+against a known year, 45 and 46 need a Weather Normalized scenario); 6, 9 and 42
+are turned on anyway so they report the day a bill can trip them.
 
-**The five overrides** each open one billing account directly through "Settings
-for > Account": Science Center's cost-change threshold is raised to 60% (lab
-loads swing further than the 35% campus default), Student Center's usage-change
-test is turned off (the estimate-then-correction fixture is a deliberate swing),
-Cedar Row A's minimum-period-length test is turned off (the July 2024 renewal
-produces one short period), the Thermal Plant's Science Center allocation gets
-its own $250,000 cost ceiling instead of the $1,000,000 global one, and, added
-for Ridgeline, the Valley Electric generator account has both of its tests
-against the previous bill (cost change and usage change) turned off. Its bill
-is the small residue left after the export credit leaves ($1,077.45 on the first
-bill, $6,753.10 on the calm bill for January 5 to February 4, 2025) and its only
-usage, station service, follows the wind (4,428 kWh, then 46,920 kWh). The
-percent column holds at most 255, so raising the threshold could not cover a
-swing that size.
+**Levels.** The screen has four scopes - Global, Company, Group and Billing
+Account - and no provider scope. Global holds the planned families (cost change,
+cost maximum, usage change, usage floor, period length, meter open and closed).
+Northlake University's Company Defaults hold the date and presence tests that
+never report on a clean bill (previous balance, estimated bill, reconciliation,
+billing before account opening, the date orders, duplicate period, invoice
+delay, unmapped accrual). The Validation Bay group (Lakeview Hall's gas account)
+holds the tests whose deliberate failures are fixture bills that are read and
+deleted. Two accounts, Admin Hall and the Library, carry the electric usage,
+demand and price tests that the sample PDFs trip.
+
+**Both tabs.** The earlier text said Northlake uses Bill Save only. Bill Save
+runs when a bill is saved in Bill Entry and stores nothing; an imported bill is
+never saved in the editor, so it is validated only by the validation job, which
+runs the Batch Test tab and writes BillValidation_Tbl. So the Global, Company and
+account rows are entered on both tabs, and the Stage 6 approval queue reads what
+the job stored.
+
+**Order inside the editor:** pick "Validation for" (Global Test Defaults, or a
+company), then "Settings for" if you picked a company (Company Defaults, Manage
+Groups, a Group or one billing account). Test Name, Commodity and the paired
+description are locked from the product's own catalog; State, Percent, Amount
+and Unit are yours to set, and Percent and Amount only where the test has that
+cell. A Company, Group or Account row replaces the whole configuration of the
+row it overrides, so the Science Center override repeats the 1,000 dollar floor
+and Global test 25 now carries a minimum usage (without one it could never
+report).
+
+**The overrides** each open one billing account through "Settings for >
+Account": Science Center's cost-change threshold is 60% (lab loads swing further
+than the 35% campus default), Student Center's gas usage-change test is turned
+off (the estimate-then-correction fixture is a deliberate swing), Cedar Row A's
+minimum-period-length test is turned off (the July 2024 renewal produces one
+short period), the Thermal Plant's Science Center allocation gets its own
+$250,000 cost ceiling (entered under Northlake University: all six cost centers
+belong to it, not to the Thermal Plant company as the earlier text said), and,
+added for Ridgeline, the Valley Electric generator account has both of its tests
+against the previous bill (cost change and electric usage change) turned off.
+Its bill is the small residue left after the export credit leaves ($1,077.45 on
+the first bill, $6,753.10 on the calm bill for January 5 to February 4, 2025)
+and its only usage, station service, follows the wind (4,428 kWh, then 46,920
+kWh). The percent column holds at most 255, so raising the threshold could not
+cover a swing that size.
 
 **Record:** nothing generated; the scope and test you picked are the record.
 
-**Check:** `validation_rules_set`.
+**Check:** `validation_rules_set` (four result sets), then
+`validation_findings_expected` once the job has run (Step 5).
 
 ## Step 2. Bill Importer sources
 
@@ -127,8 +182,10 @@ every manually-entered account; the imported series from Step 2 for Valley
 Electric and River City.
 
 **Enter:** [03-bills.yaml](03-bills.yaml), a monthly series rule per provider
-group covering the 50 billing accounts that take bills in this stage, six named
-fixtures, and the Ridgeline records described below.
+group covering the 44 billing accounts that take bills in this stage (the
+Thermal Plant's six are a reference for Stage 7), six named fixtures, the
+Ridgeline records described below, the sample totals and header and line fields,
+and the Validation Bay fixture bills.
 
 **Every bill follows its provider's read cycle** and posts to the month it ends
 in: Valley Electric reads on the 5th (a bill runs from the 5th to the 4th),
@@ -137,8 +194,10 @@ cycle, the Thermal Plant and Helios close with the calendar month. The sample
 bills under `documents/utility-bills/` are exact and itemized, generated from
 `data/bills/` on those cycles and at the tariffs; the fixtures quote them.
 
-**Order inside the editor:** period start/end/days, fiscal year/period,
-received/issue/due dates and invoice number first, then the Bill Items grid -
+**Order inside the editor:** period start/end/days, fiscal year/period and Bill
+Type, then received/issue/due dates and invoice number, then previous balance,
+payment received, pay amount (Bill Payment accounts only) and total due, then
+the Bill Items grid -
 one line per charge from the bill-charge-line spec, in the order the provider
 bills them, taxes last. A line whose quantity is zero for that period (a winter
 peak line, an empty water tier, Cedar Row's stormwater line) is left out
@@ -153,9 +212,11 @@ exported, so enter and check it before that point.
   the old meter and August 15 to September 4 on the new one, so the cycle is
   billed once, not twice.
 - **Estimated then corrected** - Sierra Gas Student Center's November 2024 bill
-  (October 15 to November 14) is entered once with its gas lines flagged
-  Estimate ($935.90), and a second time with the actual read after the December
-  read ($885.32).
+  (October 15 to November 14) is entered once with Bill Type Estimated
+  ($935.90), and a second time, independently, with the actual read after the
+  December read ($885.32). There is no Estimate checkbox on a line and no
+  "supersedes" link in the editor, so both bills stay on the account and
+  validation tests 3 and 15 report on them.
 - **Duplicate import** - River City's Main Campus file delivered on September 4,
   2024 (the campus accounts' August bills) is imported twice on purpose (Step
   2), as River City sent it; each account's water, sewer and stormwater lines
@@ -170,7 +231,9 @@ exported, so enter and check it before that point.
   on January 1, 2025, which falls inside Student Center's January 2025 bill
   (December 5 to January 4). That bill is priced in two parts: energy by the
   date it was used, demand and the facility charge prorated by days ($8,469.10).
-  The bills either side are wholly at one rate.
+  The bills either side are wholly at one rate. The 2025 step is a second price
+  date on VED-TOU-GS. The Valley Electric fixtures need item periods, which the
+  flat BIF drops, so they go in as the source service's native XML.
 
 **Ridgeline (added 2026-10-01):**
 
@@ -205,13 +268,37 @@ exported, so enter and check it before that point.
   research credit, $129,330.27) is kept in `03-bills.yaml` as the acceptance
   reference.
 
+**Header and line fields.** `header_field_bills` and `line_field_bills` set the
+fields no bill set before, on the bills the sources support: invoice numbers
+(the pattern the source service prints) and received dates on every Bill Entry
+bill; a previous balance of 1,310.55, a payment of 500.00 and a pay amount on the
+Helios Student Center February 2025 bill (Total Due 3,439.55); Bill Type
+Estimated on the Sierra Gas estimate and the Helios March 2025 backfill bill;
+Exclude on every Helios rec_transfer line and on each Sierra Gas transport
+therms line. Provider Meter Number is not a bill field: the grid shows the
+meter's, set in Stage 2. The per-line Expense Account is Stage 6.
+
+**Known totals.** `sample_bill_totals` lists the 24 bills whose total is printed
+on a sample PDF. For every other bill the expected total exists only as the
+output of the source service's bill generator; `expected_totals_feed` gives the
+command that writes all 1,193 to `expected-bill-totals.sql`, which `checks.sql`
+loads (in the same session) and compares bill by bill.
+
+**The Validation Bay.** `validation_fixture_bay` has twenty small gas bills
+(F01 to F20) for Lakeview Hall's account that trip the validation tests no real
+bill trips, each with the tests the editor must list. Enter them after the
+series, read the findings, delete all twenty.
+
 **Record:** nothing new beyond the bills themselves; Stage 6 refers back to
 these accounts by synthetic number.
 
 **Check:** `bills_per_account`, `charge_lines_sum_to_total`,
-`estimated_then_corrected`, `meter_replacement_continuity`, `late_bill_present`,
-`generator_account_opened_mid_window`, `itemized_ridgeline_bills_match`,
-`bct_credit_counted_once`, `ridgeline_transfer_not_entered_here`.
+`bill_totals_expected_vs_actual`, `bill_type_set`, `header_fields_set`,
+`line_fields_set`, `entered_by`, `estimated_then_corrected`,
+`meter_replacement_continuity`, `late_bill_present`, `duplicate_file_import`,
+`account_number_change`, `rate_step_bill`, `generator_account_opened_mid_window`,
+`bct_credit_counted_once`, `ridgeline_transfer_not_entered_here`,
+`thermal_plant_not_entered_here`, `validation_fixture_bay_clean`.
 
 ## Step 4. Bill images and notes
 
@@ -220,7 +307,7 @@ History screen for a meter note; the Utility Accountant tab's Notes page for a
 billing-account note.
 
 **Enter:** [04-bill-images-and-notes.yaml](04-bill-images-and-notes.yaml),
-twenty-four bill images and five notes.
+nineteen of the twenty-four bill images and five notes.
 
 **Order:** attach each sample PDF to the bill it illustrates - the provider's
 standard sample to a typical month, the scenario samples to the matching
@@ -231,8 +318,11 @@ adds three Valley Electric statements (the generator's first bill and its calm
 bill ending February 4, 2025, the Central Plant's first credit), a note on the
 generator account (transferred at the acquisition, the seller's number
 SYN-VED-A-0019014) and the hand-made July 2024 Ridgeline statement. Nobody
-enters that bill, so its PDF waits for the statement EEM generates in Stage 7
-and is the one image not attached here.
+enters that bill, so its PDF waits for the statement EEM generates in Stage 7.
+The four Thermal Plant sample PDFs wait for Stage 7 as well, for the same
+reason: the cost centers' bills are allocated there. How an image reaches a bill
+on an imported account (Bill Entry lists only Bill Entry accounts) is not
+confirmed; record what works.
 
 **Record:** nothing generated.
 
@@ -246,14 +336,20 @@ Validate action on Bill Validation.
 **Enter:** [05-approval.yaml](05-approval.yaml).
 
 **Order:** every bill already carries a Status_Code 1 (Bill Entry) history row
-from being saved. Open roughly a third of each account's bills, spread across
-the two years, and click Validate to advance them to Status_Code 2 (QC
-Approval). Then, as the fixture in Step 5's second record, sign in as a
-bill-entry-only user and confirm she cannot do the same.
+from being saved or imported. First, with the job still off, open the Sierra
+Gas and Helios bills that post to fiscal periods 3, 6, 9 and 12 (8 of an
+account's 24, exactly a third; 104 in all with Library's 7 and the exception)
+and click Validate; also validate the Student Center estimate. Then, as the
+fixture in the second record, sign in as a bill-entry-only user and confirm she
+cannot do the same. Last, set SysConstants IsValidateBillsJob to 1 and let the
+built-in BILL_VALIDATION task run once: every bill without a finding reaches
+Status_Code 2 by itself (that is how the imported accounts are approved, under
+EEMValidate_Job), and a bill with a finding is put back to Status_Code 1 - the
+estimate included.
 
 **Record:** nothing generated; the status change is the record.
 
-**Check:** `approvals_by_role`.
+**Check:** `approvals_by_role`, and now `validation_findings_expected`.
 
 ## Stage 5 is done when
 
@@ -264,17 +360,21 @@ bill-entry-only user and confirm she cannot do the same.
   tax lines are a percent of the subtotal before them (the Central Plant's, from
   the September 2024 bill, leave the VED-BCT credit and fee out of that
   subtotal), and site/building rollups equal the sum of their bills.
-- Ten Bill Validation test rows exist at Global scope and five account-level
-  overrides exist, exactly where the AP/GL plan calls for them; the fifth, on
-  the Ridgeline generator account, switches off both change tests.
+- Bill Validation rows exist at Global, Company, Group and Account scope on both
+  tabs, 42 of the 48 tests are turned on, and each of the 39 exercised tests has
+  a bill that trips it and one that does not (`test_catalog`); the Ridgeline
+  generator override switches off both change tests.
 - Two Bill Importer sources are configured and the fiscal-period and bad-data
   samples are rejected with the product's own messages, not silently dropped.
-- Every account that existed in January 2024 has at least 23 monthly bills for
-  2024-2025, the Ridgeline generator account has 17 (August 2024 to December
-  2025), the six named fixtures behave as described, twenty-three bill images
-  and five notes are attached (a twenty-fourth image joins Ridgeline's generated
-  statement in Stage 7), and roughly a third of each account's bills have been
-  advanced to QC Approval.
+- Every account that takes bills in this stage has 24 monthly bills for
+  2024-2025 (23 for Sierra Gas Library, 25 for Sierra Gas Student Center), the
+  Ridgeline generator account has 17 (August 2024 to December 2025), 1,049 in
+  all; the six named fixtures behave as described; nineteen bill images and five
+  notes are attached (the other five images join the Thermal Plant and Ridgeline
+  bills in Stage 7); every bill's Total Due is the expected one, 24 of them
+  printed on sample PDFs and the rest from the generator's feed; and the Bill
+  Entry accounts' third has been approved by hand before the job approved the
+  rest.
 - Each generator credit has left its bill and landed once, sign reversed, on the
   Central Plant's next one: 16 matched pairs, with the last generator bill's
   (December 2025) still in transit, and Ridgeline's own account has no bill
@@ -324,6 +424,25 @@ of these as a result set.
   building's use; mapped to Misc Chgs/Credits it keeps the dollars and drops the
   kWh from the bill. Northlake takes the second, and the export stays in the
   received interval channel.
+
+- **The validation job approves, and un-approves, on its own.** The
+  BILL_VALIDATION task (`uaBillValidate_Job`) runs the Batch Test rules over
+  every saved or imported bill: a bill with no finding gets Status_Code 2 (written
+  by EEMValidate_Job), a bill with a finding is put back to 1. The planned "one
+  third approved" therefore only holds on the Bill Entry accounts until the job is
+  switched on, and a manual Validate on a bill with findings is undone by the
+  job's next pass.
+- **An imported bill is never validated by Bill Save.** Only the job's Batch
+  Test tab sees it, so Batch Test has to carry the same rules as Bill Save.
+- **There is no Estimate checkbox and no supersedes link.** Bill Type
+  (0 normal, 1 estimated, 2 accrual) is the only estimate marker an entered
+  bill has, the importer drops the BIF's Estimate column, and `Bill.refBillID` is
+  read and written by nothing in the product.
+- **A Bill Allocation account cannot be opened in Bill Entry.** The Thermal
+  Plant's bills can only arrive through allocation (Stage 7).
+- **Bill Importer utility rows are per provider and company text**
+  (`BillImportPro_Utility` is unique on description, provider and company
+  name), so three companies for each of two providers is up to six rows, not two.
 
 None of the above blocks entering this stage's bills - they are recorded so
 Stage 6 and any later permission cleanup start from what is actually installed.
